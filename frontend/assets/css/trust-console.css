@@ -1,0 +1,92 @@
+/* trust-console.css — Trust Console（/ai 右栏 / mobile 分栏） */
+.ai-layout { display: grid; grid-template-columns: 1fr 400px; gap: var(--sp-4); align-items: start; }
+@media (max-width: 1023px) { .ai-layout { grid-template-columns: 1fr; } }
+.trust-console { border: 1px solid var(--color-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); position: sticky; top: 80px; max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+@media (max-width: 1023px) { .trust-console { position: static; max-height: 70vh; } }
+.tc-head { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--color-line); display: flex; align-items: center; gap: 8px; }
+.tc-head .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--color-green); animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.tc-verifiers { display: flex; gap: 6px; padding: 10px var(--sp-4); border-bottom: 1px solid var(--color-line); flex-wrap: wrap; }
+.tc-v { font-size: 10px; padding: 3px 8px; border-radius: 999px; background: var(--color-surface); color: var(--color-ink-2); font-family: var(--font-mono); }
+.tc-v.ok { background: var(--color-green-bg); color: var(--color-green); }
+.tc-v.fail { background: var(--color-red-bg); color: var(--color-red); }
+.tc-v.run { background: var(--color-yellow-bg); color: var(--color-yellow); }
+.tc-events { flex: 1; overflow-y: auto; padding: var(--sp-2) var(--sp-4); }
+.tc-evt { font-family: var(--font-mono); font-size: 11px; padding: 6px 0; border-bottom: 1px dashed var(--color-line); display: flex; gap: 8px; }
+.tc-evt .k { color: var(--color-ink-2); flex: none; }
+.tc-evt.ok .k { color: var(--color-green); }
+.tc-evt.fail { background: var(--color-red-bg); border-radius: 6px; padding: 6px 8px; margin: 2px 0; color: var(--color-red); }
+.tc-evt .msg { flex: 1; word-break: break-all; }
+.tc-demo { padding: var(--sp-3) var(--sp-4); border-top: 1px dashed var(--color-yellow); background: #FFFBEF; display: flex; gap: 8px; align-items: center; }
+.tc-demo .btn { flex: none; }
+.tc-ir { font-size: 10px; }
+.tc-ir summary { cursor: pointer; color: var(--color-ink-2); font-family: var(--font-mono); }
+.tc-ir pre { background: var(--color-surface); padding: 8px; border-radius: 6px; overflow-x: auto; max-height: 260px; }
+.chat-area { display: flex; flex-direction: column; height: calc(100vh - 160px); min-height: 480px; }
+@media (max-width: 1023px) { .chat-area { height: calc(100vh - 220px); } }
+.chat-thread { flex: 1; overflow-y: auto; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
+.msg { max-width: 82%; border-radius: 14px; padding: 10px 14px; font-size: var(--fs-14); white-space: pre-wrap; word-break: break-word; }
+.msg.user { align-self: flex-end; background: #000; color: #fff; border-bottom-right-radius: 4px; }
+.msg.ai { align-self: flex-start; background: #fff; border: 1px solid var(--color-line); border-bottom-left-radius: 4px; }
+.msg.ai.err { border-color: var(--color-red); color: var(--color-red); }
+.chat-composer { display: flex; gap: var(--sp-2); padding: var(--sp-3); border-top: 1px solid var(--color-line); background: #fff; border-radius: 0 0 var(--r-card) var(--r-card); }
+.chat-composer .input { border-radius: var(--r-pill); }
+.composer-hint { font-size: 11px; color: var(--color-ink-2); padding: 0 var(--sp-4) var(--sp-2); }
+.chat-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: var(--sp-2) var(--sp-4); }
+.chip { background: var(--color-surface); border: none; border-radius: 999px; padding: 6px 14px; font-size: var(--fs-12); cursor: pointer; color: var(--color-ink); }
+.chip:hover { background: var(--color-primary-tint); }
+.ai-welcome { text-align: center; padding: var(--sp-8) var(--sp-4); }
+.ai-welcome img { width: 72px; margin-bottom: var(--sp-3); }
+.mobile-tabs { display: none; }
+@media (max-width: 1023px) {
+  .mobile-tabs { display: flex; margin-bottom: var(--sp-3); background: var(--color-surface); border-radius: var(--r-btn); padding: 4px; }
+  .mobile-tabs button { flex: 1; border: none; background: none; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--color-ink-2); }
+  .mobile-tabs button.active { background: #fff; color: var(--color-ink); box-shadow: var(--shadow); }
+  .tc-pane-hidden { display: none; }
+}
+
+/* ---- PC/平板端对话区加宽（.page 全局 1080px 上限对本页放开） ---- */
+body[data-page="ai"] .page { max-width: 1480px; padding-left: calc(248px + var(--sp-6)); }
+@media (max-width: 767px) { body[data-page="ai"] .page { padding-left: var(--sp-4); } }
+.ai-layout { grid-template-columns: minmax(0, 1fr) 400px; }
+@media (min-width: 1200px) {
+  .ai-layout { grid-template-columns: minmax(0, 1fr) 420px; gap: var(--sp-6); }
+  .chat-area { height: calc(100vh - 170px); min-height: 560px; }
+}
+@media (max-width: 1023px) { .msg.ai { max-width: 94%; } .msg.user { max-width: 88%; } }
+.chat-thread { padding: var(--sp-6); gap: var(--sp-4); }
+.msg { font-size: 15px; line-height: 1.7; }
+.msg.ai { max-width: min(88%, 960px); }
+.msg.user { max-width: 76%; }
+.msg.md { white-space: normal; }
+.chat-composer .input { font-size: 15px; }
+
+/* ---- Markdown 元素（S.md 渲染产物） ---- */
+.md-p { margin: 0 0 8px; }
+.md-p:last-child { margin-bottom: 0; }
+.md-h { margin: 12px 0 6px; font-weight: 700; line-height: 1.4; }
+h3.md-h { font-size: 16px; }
+h4.md-h { font-size: 15px; }
+h5.md-h { font-size: 14px; color: var(--color-ink-2); }
+.md-h:first-child { margin-top: 0; }
+.md-list { margin: 4px 0 10px; padding-left: 22px; display: flex; flex-direction: column; gap: 5px; }
+.md-list:last-child { margin-bottom: 0; }
+.md-list li::marker { color: var(--color-navy); }
+.md-code { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 6px; padding: 1px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.md-pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 8px 0; font-size: 13px; line-height: 1.55; }
+.md-pre code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; background: none; border: none; padding: 0; }
+.md-table-wrap { overflow-x: auto; margin: 8px 0; border: 1px solid var(--color-line); border-radius: 10px; }
+.md-table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.md-table th, .md-table td { padding: 8px 12px; border-bottom: 1px solid var(--color-line); text-align: left; white-space: nowrap; }
+.md-table th { background: var(--color-surface); font-weight: 600; }
+.md-table tr:last-child td { border-bottom: none; }
+.md-quote { margin: 6px 0; padding: 8px 14px; border-left: 3px solid var(--color-navy); background: var(--color-primary-tint); border-radius: 6px; color: var(--color-ink-2); }
+.md-hr { border: none; border-top: 1px solid var(--color-line); margin: 12px 0; }
+.msg a { color: var(--color-navy); text-decoration: underline; }
+
+/* ---- 控制台自适应与收起开关 ---- */
+@media (min-width: 1024px) and (max-width: 1359px) { .ai-layout { grid-template-columns: minmax(0, 1fr) 340px; } }
+.ai-layout.console-hidden { grid-template-columns: minmax(0, 1fr); }
+.ai-layout.console-hidden .trust-console { display: none; }
+.tc-toggle { background: none; border: 1px solid var(--color-line); border-radius: var(--r-btn); padding: 3px 10px; font-size: var(--fs-12); cursor: pointer; color: var(--color-ink-2); white-space: nowrap; }
+.tc-toggle:hover { background: var(--color-surface); color: var(--color-navy); }

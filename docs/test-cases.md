@@ -1,0 +1,45 @@
+# Suveoo — 测试用例说明
+
+测试框架：**vitest + @cloudflare/vitest-pool-workers**（真实 workerd 运行时 + miniflare 内存绑定 KV/R2/DO，`isolatedStorage` 逐测试回滚）。运行：`cd backend && npm test`。
+
+## 目录与覆盖
+
+### unit/（纯函数，74 用例）
+
+| 文件 | 覆盖 |
+|------|------|
+| money-math.test.js | bigint 分转换边界、0.1+0.2 陷阱、AA 分账守恒（¥860/3 → 286.67/286.67/286.66）、Luhn（经典用例 7992739871→3）、rng 注入可复现 |
+| policy-engine.test.js | 三色边界（日累计恰 ¥1,000 含本笔）、AI 通道单笔/日累计硬上限、上限只约束转账类不误伤理财、未注册工具拒绝 |
+| ir-compiler.test.js | IR 结构（facts/steps/trace/nonce）、provenance 默认与覆盖、内部字段不入 IR、nonce 唯一性 |
+| consent-binding.test.js | grant_hash 确定性、一次性消费、过期、用户绑定、凭空哈希拒绝、**500→5000 突变即失效**（决赛演示第二幕） |
+| taint-check.test.js | 商户备注充当 amount 全链路阻断（先于 Consent）、非授权字段放行、MODEL_OUTPUT 不可授权、绿色轻量通道 |
+| invariants.test.js | 余额不足/恰好等于、严格模式数据缺失、PR 适当性（R5>PR3 拒）、长程任务补偿配对 |
+| idempotency.test.js | 同 nonce 重放拒绝、五道 stages 顺序恒定、绿色通道 skipped 标记 |
+| auth-crypto.test.js | JWT 往返/过期/篡改/错密钥、PBKDF2 盐随机、常数时间比较 |
+| card-plan.test.js | 余额区间（30 种子扫描）、四卡守恒、卡面 8 选 4 去重、默认卡唯一、BIN-网络映射 |
+
+### integration/（SELF 全栈 + 真实绑定，25 用例）
+
+| 文件 | 覆盖 |
+|------|------|
+| registration-provisioning.test.js | 验证码邮件→开户发卡（4+1、余额区间、掩码、卡面去重）→会话→登出黑名单→卡号登录→错 5 次锁定→找回密码→账号存在性不泄露→60s 冷却 |
+| static-routing.test.js | 尾斜杠等价、/index.html 兜底、404 状态码、动态卡路由重写、缓存头分级、304、安全头、静态仅 GET/HEAD |
+| transfer-flow.test.js | 表单通道两段式（INPUT_REQUIRED→确认→扣款→流水可查）、grant 一次性、突变失效、红级 OTP、MCP 通道同规（initialize/tools list/call）、注入样本经 MCP 阻断、AI 硬上限 |
+| saga-compensation.test.js | seed→锁 ¥600→注入失败→`T1✓ T2✗ C1✓`→资金解锁且余额守恒；正常路径 DONE；手动取消补偿 |
+| scheduled-tasks.test.js | 预约建立（两段式）→alarm 到点执行→DONE+扣款；到期前取消→CANCELLED 不执行 |
+
+### attack/（对抗用例，回归时与 unit 同跑）
+
+prompt-injection / replay-attack / authorization-bypass / consent-mutation 四类样本场景（当前由上述 unit/integration 文件承载断言；独立攻击语料库扩展中）。
+
+## 运行结果
+
+```
+Test Files  18 passed (18)
+     Tests  99 passed (99)
+  Duration   ~16s
+```
+
+## SuveooBench
+
+评测脚本位 `backend/tests/bench/generate-benchmark.js`（扩展中）；当前看板数据 `frontend/assets/data/benchmark.json` 由集成用例指标汇总生成，/ai/benchmark 可视化。

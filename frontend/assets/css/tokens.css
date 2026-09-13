@@ -1,0 +1,25 @@
+/* tokens.css — 设计令牌（pages.md §2.1） */
+:root {
+  --color-bg: #FFFFFF;
+  --color-ink: #000000;
+  --color-ink-2: #666666;
+  --color-navy: #1E2A78;
+  --color-primary: #1E2A78;
+  --color-primary-hover: #16215E;
+  --color-primary-tint: #EEF0F9;
+  --color-surface: #F7F7F8;
+  --color-line: #E5E5E5;
+  --color-green: #1F7A4D;
+  --color-yellow: #B7791F;
+  --color-red: #C0392B;
+  --color-green-bg: #EAF4EF;
+  --color-yellow-bg: #FBF3E4;
+  --color-red-bg: #F9ECEA;
+  --font-sans: "Inter", "Noto Sans SC", "Noto Sans TC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Noto Sans Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-20: 20px; --fs-28: 28px; --fs-36: 36px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
+  --r-card: 12px; --r-btn: 8px; --r-pill: 24px;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --z-header: 100; --z-dropdown: 200; --z-modal: 300; --z-toast: 400;
+}

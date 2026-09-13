@@ -1,0 +1,80 @@
+{
+ "slug": "global-equity-index",
+ "name": "Suveoo 环球股票指数基金",
+ "code": "SV-GEI",
+ "risk_level": 4,
+ "inception": "2022-11-01",
+ "nav": 2.0185,
+ "day_change": 0.12,
+ "returns": {
+  "1m": -0.4,
+  "3m": -0.52,
+  "6m": 8.1,
+  "1y": 18.6,
+  "since": 18.6
+ },
+ "min_invest": "¥100",
+ "fee": "0.50%/年",
+ "manager": {
+  "name": "Marcus Webb",
+  "tenure_years": 6,
+  "aum": "¥38.6 亿（模拟）"
+ },
+ "holdings": [
+  {
+   "name": "Apple Inc.",
+   "weight": 4.2
+  },
+  {
+   "name": "微软",
+   "weight": 3.8
+  },
+  {
+   "name": "诺和诺德",
+   "weight": 3.1
+  },
+  {
+   "name": "台积电",
+   "weight": 2.9
+  },
+  {
+   "name": "贵州茅台",
+   "weight": 2.4
+  },
+  {
+   "name": "腾讯控股",
+   "weight": 2.2
+  },
+  {
+   "name": "LVMH",
+   "weight": 1.9
+  },
+  {
+   "name": "丰田汽车",
+   "weight": 1.7
+  },
+  {
+   "name": "美国国债 10Y",
+   "weight": 8.5
+  },
+  {
+   "name": "现金及等价物",
+   "weight": 5.3
+  }
+ ],
+ "nav_history": [
+  1.7254,
+  1.7665,
+  1.7703,
+  1.8236,
+  1.8254,
+  1.8754,
+  1.8775,
+  1.923,
+  1.9463,
+  1.9808,
+  1.9795,
+  2.0185
+ ],
+ "notice": "理财有风险，投资须谨慎。这是模拟银行系统，数据为模拟数据，不构成投资建议。"
+}

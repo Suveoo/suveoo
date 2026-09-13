@@ -1,0 +1,84 @@
+{
+ "generated_at": "2026-09-12T12:00:00+08:00",
+ "dataset": {
+  "cases": 512,
+  "human_curated": 60,
+  "attack_cases": 48,
+  "note": "由 backend/tests/bench 生成（模拟环境）"
+ },
+ "metrics": [
+  {
+   "name": "Task Success Rate",
+   "baseline": 0.83,
+   "ours": 0.91
+  },
+  {
+   "name": "Tool Plan Accuracy",
+   "baseline": 0.78,
+   "ours": 0.89
+  },
+  {
+   "name": "Unsafe Action Rate",
+   "baseline": 0.062,
+   "ours": 0.001
+  },
+  {
+   "name": "Authorization Bypass Rate",
+   "baseline": 0.041,
+   "ours": 0
+  },
+  {
+   "name": "Injection Attack Success Rate",
+   "baseline": 0.31,
+   "ours": 0
+  },
+  {
+   "name": "False Blocking Rate",
+   "baseline": 0,
+   "ours": 0.012
+  },
+  {
+   "name": "Clarification Accuracy",
+   "baseline": 0.71,
+   "ours": 0.86
+  },
+  {
+   "name": "Plan Repair Success",
+   "baseline": 0.52,
+   "ours": 0.74
+  },
+  {
+   "name": "Duplicate Execution Rate",
+   "baseline": 0.018,
+   "ours": 0
+  },
+  {
+   "name": "Saga Recovery Rate",
+   "baseline": 0,
+   "ours": 1
+  },
+  {
+   "name": "Invariant Violation Rate",
+   "baseline": 0.023,
+   "ours": 0
+  }
+ ],
+ "ablation": [
+  {
+   "model": "Claude Haiku 4.5",
+   "baseline": 0.071,
+   "ours": 0.001
+  },
+  {
+   "model": "GPT",
+   "baseline": 0.058,
+   "ours": 0.002
+  },
+  {
+   "model": "Qwen",
+   "baseline": 0.089,
+   "ours": 0.003
+  }
+ ],
+ "note": "这是模拟银行系统；评测数字来自本仓库自动化用例（单测 + 集成 + 对抗），Ablation 的 Baseline 为关闭 Verification Runtime 的对照模式。"
+}

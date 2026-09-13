@@ -1,0 +1,33 @@
+/* genui.css — Verified GenUI 卡片（11 种）与确认弹窗 */
+.genui-card { border: 1px solid var(--color-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); padding: var(--sp-4); max-width: 480px; margin: 6px 0; font-size: var(--fs-14); }
+.genui-card .gc-head { display: flex; align-items: center; gap: 8px; margin-bottom: var(--sp-3); font-weight: 600; }
+.genui-card .gc-head .badge { margin-left: auto; }
+.gc-kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--color-line); }
+.gc-kv:last-of-type { border-bottom: none; }
+.gc-kv .v { font-weight: 600; }
+.gc-amount { font-family: var(--font-mono); font-size: var(--fs-28); font-weight: 700; text-align: center; margin: var(--sp-3) 0; }
+.gc-actions { display: flex; gap: var(--sp-3); margin-top: var(--sp-4); }
+.gc-actions .btn { flex: 1; }
+.gc-countdown { text-align: center; font-size: var(--fs-12); color: var(--color-ink-2); margin-top: 6px; }
+.gc-grant { font-size: 11px; color: var(--color-ink-2); text-align: center; margin-top: 6px; font-family: var(--font-mono); }
+.gc-blocked { border-color: var(--color-red); }
+.gc-blocked .gc-head { color: var(--color-red); }
+.gc-otp { display: flex; gap: var(--sp-2); margin-top: var(--sp-3); }
+.gc-otp .input { text-align: center; font-family: var(--font-mono); letter-spacing: 4px; }
+.split-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--color-line); }
+.split-sum { display: flex; justify-content: space-between; padding: 8px 0; font-weight: 600; color: var(--color-green); }
+.prov-chip { display: inline-block; font-size: 10px; padding: 0 6px; border-radius: 4px; margin-left: 6px; font-family: var(--font-mono); }
+.prov-trusted { background: var(--color-green-bg); color: var(--color-green); }
+.prov-untrusted { background: var(--color-red-bg); color: var(--color-red); }
+.prov-system { background: var(--color-surface); color: var(--color-ink-2); }
+.usage-bar { width: 90px; height: 6px; background: var(--color-surface); border-radius: 999px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.usage-bar > i { display: block; height: 100%; background: var(--color-navy); }
+.ai-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.ai-chip:hover { background: #e2e6f5; }
+.ai-chip svg, .ai-chip img { width: 14px; height: 14px; }
+.ai-quick-bar { display: flex; align-items: center; gap: 10px; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 10px 18px; cursor: pointer; background: #fff; margin-bottom: var(--sp-4); color: var(--color-ink-2); }
+.ai-quick-bar:hover { border-color: var(--color-navy); }
+.ai-quick-bar svg, .ai-quick-bar img { width: 18px; height: 18px; flex: none; }
+.ai-quick-bar .go { margin-left: auto; color: var(--color-navy); }
+.insight-card { display: flex; gap: 12px; align-items: flex-start; }
+.insight-card img, .insight-card svg { width: 28px; height: 28px; flex: none; }

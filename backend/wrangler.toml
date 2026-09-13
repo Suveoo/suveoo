@@ -1,0 +1,60 @@
+name = "suveoo-bank-main"
+main = "worker-main.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 生产路由（自定义域方式二选一：routes 或 dashboard Custom Domain）
+routes = [
+  { pattern = "suveoo.com/*", zone_name = "suveoo.com", custom_domain = false },
+  { pattern = "www.suveoo.com/*", zone_name = "suveoo.com", custom_domain = false }
+]
+
+# Durable Objects（SQLite 存储，免费档可用）
+[[durable_objects.bindings]]
+name = "LEDGER"
+class_name = "LedgerDO"
+[[durable_objects.bindings]]
+name = "SAGA"
+class_name = "SagaDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LedgerDO", "SagaDO"]
+
+# KV
+[[kv_namespaces]]
+binding = "SESSION_KV"
+id = "a4e1bd7856e34feeb9289951ddeb9843"
+[[kv_namespaces]]
+binding = "AUDIT_KV"
+id = "74c46e671810403f9132c30a22e8c298"
+
+# R2
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "suveoo-bank-r2"
+
+# Email Sending（suveoo.com 需先完成 Email Service 域验证，见 §8）
+[[send_email]]
+name = "EMAIL"
+
+# 普通变量（非密钥）
+[vars]
+CONSENT_GRANT_TTL_SECONDS = "120"
+INVARIANT_STRICT_MODE = "true"
+DEMO_MODE = "true"                  # 演示模式：开启 /api/demo/seed 与故障注入（决赛后改回 "false"）
+FIDO2_RP_ID = "suveoo.com"
+FIDO2_ORIGIN = "https://suveoo.com"
+SENDER_NOREPLY = "noreply@suveoo.com"
+SENDER_SECURITY = "security@suveoo.com"
+SUPPORT_INBOX = "support@suveoo.com"
+# LLM Provider（可配置；模型名手动指定，不走 /v1/models 自动发现）
+# 当前：阿里云百炼 Anthropic 兼容端点 + qwen3.6-flash（开发期省成本）
+LLM_PROVIDER = "qwen"
+LLM_BASE_URL = "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic"
+LLM_MODEL = "qwen3.6-flash"
+# 切回 Anthropic 直连示例：
+#   LLM_PROVIDER = "anthropic"
+#   LLM_BASE_URL = "https://api.anthropic.com"
+#   LLM_MODEL = "claude-haiku-4.5"
+# API Key 一律走 secret：npx wrangler secret put LLM_API_KEY

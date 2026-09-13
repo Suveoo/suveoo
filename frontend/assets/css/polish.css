@@ -1,0 +1,280 @@
+/* polish.css — 全站 UI/UX 精修层（最后加载，可覆盖前序样式）
+   设计原则：金融级克制——中性墨色阴影、低幅度短时动效、功能性反馈优先；
+   无品牌色发光、无弹性位移、无装饰性动画；全部动效遵守 prefers-reduced-motion。 */
+
+/* ===== 1. 渲染与跨 OS 基础（不可见的品质） ===== */
+html { scroll-behavior: smooth; color-scheme: light; }
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+::selection { background: var(--color-navy); color: #fff; }
+input, select, textarea { accent-color: var(--color-navy); }
+a { text-underline-offset: 3px; }
+/* 标题排版：收紧字距（静态，非动画）——编辑级排版质感 */
+h1 { letter-spacing: -0.02em; }
+h2 { letter-spacing: -0.01em; }
+/* 跨平台细滚动条（Firefox + WebKit），中性灰 */
+* { scrollbar-width: thin; scrollbar-color: #CDD1D9 transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: #CDD1D9; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #B3B9C4; background-clip: content-box; }
+*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+
+/* ===== 2. 动效基建（短时、低幅度、单缓动族） ===== */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+#content { animation: fade-in .2s ease-out both; }
+.modal-mask { animation: fade-in .16s ease-out both; }
+.modal { animation: rise-in .2s cubic-bezier(.25, .6, .3, 1) both; }
+.dropdown { animation: fade-in .14s ease-out both; }
+.toast { animation: rise-in .22s cubic-bezier(.25, .6, .3, 1) both; }
+.msg { animation: fade-in .18s ease-out both; }
+.genui-card { animation: rise-in .22s cubic-bezier(.25, .6, .3, 1) both; }
+
+/* ===== 3. 微交互：以边界与层次表达状态，不做位移表演 ===== */
+.btn { transition: background-color .15s ease, border-color .15s ease, box-shadow .18s ease; }
+.btn-primary { box-shadow: 0 1px 2px rgba(15, 23, 42, .10); }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(15, 23, 42, .14); }
+.btn-primary:active:not(:disabled) { box-shadow: none; }
+.btn-danger:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(15, 23, 42, .14); }
+.btn-ghost:hover:not(:disabled) { border-color: #CBD0DA; }
+.quick-item, .pay-action, .fund-card, .mini-action, .hero-input, .chip, .upload-box {
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .18s ease;
+}
+.quick-item:hover:not(.disabled),
+.pay-action:hover:not(.disabled),
+.fund-card:hover {
+  border-color: var(--color-navy);
+  box-shadow: 0 3px 14px rgba(15, 23, 42, .07);
+}
+.quick-item:hover:not(.disabled) .qi,
+.pay-action:hover:not(.disabled) .pi {
+  background: var(--color-primary-tint);
+  box-shadow: inset 0 0 0 1px rgba(30, 42, 120, .18);
+}
+.chip:hover { border-color: var(--color-navy); color: var(--color-navy); background: var(--color-primary-tint); }
+.hero-input:focus-within { box-shadow: 0 0 0 3px var(--color-primary-tint); }
+.bank-card { transition: box-shadow .22s ease; }
+.bank-card:hover { box-shadow: 0 4px 18px rgba(15, 23, 42, .09); }
+.list-row { transition: background-color .12s ease; }
+a.list-row, .list-row[style*="cursor"] { border-radius: var(--r-btn); }
+a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
+.acc-head { transition: background-color .12s ease; }
+.acc-head:hover { background: var(--color-surface); }
+.drawer-item, .bn-item, .icon-btn, .header-user, .lang-item, .tc-toggle {
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+.progressbar i { transition: width .3s ease; }
+.input { transition: border-color .15s ease, box-shadow .15s ease; }
+
+/* ===== 4. 顶栏：轻微玻璃质感（滚动内容从其下穿过时依稀可辨） ===== */
+.app-header {
+  background: rgba(255, 255, 255, .88);
+  backdrop-filter: blur(10px) saturate(1.15);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+}
+
+/* ===== 5. 表格与横向溢出：显式包裹层滚动（不依赖 :has；:has 仅作兜底） ===== */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap .table { min-width: 540px; }
+.card:has(.table) { overflow-x: auto; }
+.card:has(.table) .table:not(.table-wrap .table) { min-width: 0; }
+.md-table-wrap, .dd-list, .chat-thread, .modal, .trust-console { overscroll-behavior: contain; }
+
+/* ===== 6. 移动端视口高度（iOS Safari 动态地址栏：100vh → 100dvh） ===== */
+@supports (height: 100dvh) {
+  .chat-area { height: calc(100dvh - 160px); }
+  .modal { max-height: 88dvh; }
+  .cookie-pop { max-height: 70dvh; overflow-y: auto; }
+  @media (max-width: 1023px) { .chat-area { height: calc(100dvh - 220px); } }
+  @media (min-width: 1200px) { .chat-area { height: calc(100dvh - 170px); min-height: 560px; } }
+}
+
+/* ===== 7. 响应式断点微调 ===== */
+@media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) {
+  h1 { font-size: 24px; }
+  .hero { padding: var(--sp-4); }
+  .hero-input { padding: 10px 14px; }
+  .card { padding: var(--sp-4); }
+  .page { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+}
+/* 长文法条阅读节奏 */
+.legal-body { line-height: 1.9; }
+.legal-body p { margin: 0 0 10px; }
+.legal-body h2 { margin: 26px 0 10px; padding-top: 14px; border-top: 1px dashed var(--color-line); }
+.legal-body h3 { margin: 14px 0 6px; }
+@media (min-width: 768px) {
+  .legal-toc { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+}
+
+/* ===== 8. 无障碍：遵循系统"减弱动效"偏好 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  html { scroll-behavior: auto; }
+  #content, .modal, .msg, .genui-card, .dropdown, .toast { animation: none; }
+}
+
+/* ===== 9. 内联 SVG 图标对齐（替代文本符号与 emoji 字符） ===== */
+.badge .ic, .task-step .ic, .tc-evt .k .ic, .msg .ic, .md-list .ic { vertical-align: -2px; }
+.task-step .ic { margin: 0 2px; }
+.tc-evt .k { display: inline-flex; align-items: center; gap: 4px; }
+.tc-evt .k .ic { flex: none; }
+.tc-evt.fail .k .ic { color: var(--color-red); }
+.msg.err .ic { vertical-align: -3px; }
+
+/* ===== 10. 移动端专项修复 ===== */
+
+/* 10.1 换行文本一律稳定靠左（chip 是 button，默认居中导致换行后"居中失效"观感） */
+.chip { text-align: left; }
+.hero-chips, .chat-chips { align-items: flex-start; }
+.chip { white-space: normal; word-break: break-word; }
+
+/* 10.2 通知下拉：文本列正确撑满并允许换行（此前 .grow 无 flex 定义） */
+.notif-item .grow { flex: 1; min-width: 0; }
+.notif-item .nt { line-height: 1.45; }
+.notif-item .muted { word-break: break-word; }
+/* 通用兜底：一切 .grow 文本列都不得溢出 flex */
+.grow { min-width: 0; }
+
+/* 10.3 移动端页脚可拉到底：bottom-nav 是 fixed，页脚需要等高避让 */
+@media (max-width: 767px) {
+  .app-footer { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .auth-wrap { margin-top: var(--sp-4); }
+  .brand-banner { padding: var(--sp-6) var(--sp-4); }
+  .about-banner { padding: var(--sp-6) var(--sp-4); }
+  .hero { padding: var(--sp-4); }
+}
+
+/* ===== 11. 移动端/平板 AI 页：自然页面滚动 + 固定输入条 + 控制台全屏抽屉 ===== */
+@media (max-width: 1023px) {
+  body[data-page="ai"] .page {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: var(--sp-3) var(--sp-3) calc(178px + env(safe-area-inset-bottom));
+  }
+  .ai-layout { display: block; }
+  .mobile-tabs { position: sticky; top: 56px; z-index: 60; margin: 0 0 var(--sp-2); box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
+  .chat-area { height: auto; min-height: 0; }
+  .chat-thread { overflow: visible; height: auto; }
+  .composer-hint { display: none; }
+  .chat-composer {
+    position: fixed;
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
+    z-index: 90;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    box-shadow: 0 6px 24px rgba(15, 23, 42, .16);
+  }
+  @media (min-width: 768px) {
+    .mobile-tabs { top: 64px; }
+    .chat-composer { bottom: calc(10px + env(safe-area-inset-bottom)); }
+    body[data-page="ai"] .page { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+  }
+  /* 控制台全屏抽屉（内部自滚：flex 链补 min-height:0） */
+  .trust-console {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) + 10);
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    display: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .trust-console.open { display: flex; animation: fade-in .18s ease-out both; }
+  .tc-head { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .tc-events { flex: 1 1 0; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .tc-verifiers, .tc-demo, .tc-ir { flex: none; }
+  .tc-close {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--color-primary-tint);
+    color: var(--color-navy);
+    border: none;
+    border-radius: var(--r-pill);
+    padding: 6px 12px;
+    font-size: var(--fs-12);
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+@media (min-width: 1024px) { .tc-close { display: none; } }
+body.tc-open { overflow: hidden; }
+
+/* ===== 12. 预测问题 chip：行距收紧 + 尾部灰色回勾箭头 ===== */
+.chip { line-height: 1.4; }
+.chip-go { width: 13px; height: 13px; margin-left: 5px; vertical-align: -2px; color: var(--color-ink-2); flex: none; }
+
+/* ===== 13. 控制台抽屉底部返回条（仅移动/平板） ===== */
+@media (max-width: 1023px) {
+  .tc-back-bar {
+    flex: none;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-line);
+    background: #fff;
+  }
+  .trust-console .tc-events { padding-bottom: 12px; }
+}
+@media (min-width: 1024px) { .tc-back-bar { display: none; } }
+
+/* ===== 14. 预测问题 chip 之间的间距收紧（行距 6px、移动端再收紧；chip 内部行距不变） ===== */
+.hero-chips, .chat-chips { gap: 6px 8px; }
+@media (max-width: 767px) {
+  .hero-chips, .chat-chips { gap: 4px 7px; }
+  .hero-chips .chip, .chat-chips .chip { padding: 4px 12px; }
+}
+
+/* ===== 15. 登录页：标题与表单间距 + 密码可见性切换 ===== */
+.auth-wrap .card h2 { margin-bottom: var(--sp-6); }
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 46px; }
+.pw-eye {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--color-ink-2);
+  padding: 7px; display: inline-flex; border-radius: 8px;
+  transition: color .15s ease, background-color .15s ease;
+}
+.pw-eye:hover { color: var(--color-navy); background: var(--color-surface); }
+
+/* ===== 16. 窄屏防破版补强：grid/flex 文本子项不撑轨 + 长 token 可断行 ===== */
+.legal-grid > * { min-width: 0; }
+.legal-body, .legal-toc { overflow-wrap: anywhere; }
+@media (max-width: 767px) { .legal-grid { gap: var(--sp-4); } }
+
+/* ===== 17. 法条网格：item 宽度显式化（margin:auto 会使 grid item 走 fit-content，
+   被内部表格 min-width 撑破窄屏；width:100% 后由轨道决定宽度，表格在 .table-wrap 内滚） ===== */
+.legal-grid .legal-body, .legal-grid .legal-toc { width: 100%; }
+
+/* ===== 18. 字段通用间距（div.field 与 label.field 一致）+ 金额不换行 ===== */
+.field { display: block; margin-bottom: var(--sp-4); }
+.total { white-space: nowrap; }
+@media (max-width: 360px) { .assets-block .total { font-size: 30px; } }
+
+/* ===== 19. 支付三按钮：窄屏保持一行（紧凑化） ===== */
+@media (max-width: 767px) {
+  .pay-actions { gap: var(--sp-2); }
+  .pay-action { padding: var(--sp-4) var(--sp-2); font-size: var(--fs-12); }
+  .pay-action .pi { width: 44px; height: 44px; }
+  .pay-action .pi svg { width: 22px; height: 22px; }
+}
+
+/* ===== 20. 下拉容器文本靠左（下拉挂在 button 内，需显式覆盖按钮默认居中） ===== */
+.dropdown { text-align: left; }
+.lang-item { text-align: left; }
+
+/* ===== 21. Header 模拟声明：i+圆圈 图标（替代 SIMULATED 文字按钮） ===== */
+.sim-info { display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-2); border-radius: 50%; transition: color .15s ease, background-color .15s ease; padding: 2px; }
+.sim-info:hover { color: var(--color-navy); background: var(--color-primary-tint); text-decoration: none; }

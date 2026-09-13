@@ -1,0 +1,80 @@
+{
+ "slug": "esg-bond",
+ "name": "Suveoo 环球 ESG 债券基金",
+ "code": "SV-ESGB",
+ "risk_level": 2,
+ "inception": "2023-05-01",
+ "nav": 1.0688,
+ "day_change": -0.33,
+ "returns": {
+  "1m": 0.55,
+  "3m": 1.09,
+  "6m": 2.1,
+  "1y": 4.3,
+  "since": 4.3
+ },
+ "min_invest": "¥100",
+ "fee": "0.40%/年",
+ "manager": {
+  "name": "陈以宁",
+  "tenure_years": 6,
+  "aum": "¥38.6 亿（模拟）"
+ },
+ "holdings": [
+  {
+   "name": "Apple Inc.",
+   "weight": 4.2
+  },
+  {
+   "name": "微软",
+   "weight": 3.8
+  },
+  {
+   "name": "诺和诺德",
+   "weight": 3.1
+  },
+  {
+   "name": "台积电",
+   "weight": 2.9
+  },
+  {
+   "name": "贵州茅台",
+   "weight": 2.4
+  },
+  {
+   "name": "腾讯控股",
+   "weight": 2.2
+  },
+  {
+   "name": "LVMH",
+   "weight": 1.9
+  },
+  {
+   "name": "丰田汽车",
+   "weight": 1.7
+  },
+  {
+   "name": "美国国债 10Y",
+   "weight": 8.5
+  },
+  {
+   "name": "现金及等价物",
+   "weight": 5.3
+  }
+ ],
+ "nav_history": [
+  0.9191,
+  0.9309,
+  0.945,
+  0.9561,
+  0.9769,
+  0.9799,
+  1.0038,
+  1.0179,
+  1.0254,
+  1.0441,
+  1.0614,
+  1.0688
+ ],
+ "notice": "理财有风险，投资须谨慎。这是模拟银行系统，数据为模拟数据，不构成投资建议。"
+}

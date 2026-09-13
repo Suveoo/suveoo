@@ -1,0 +1,26 @@
+/* base.css — reset 与全局排版 */
+@font-face { font-family: "Inter"; src: url("/assets/fonts/inter-variable.ttf") format("truetype-variations"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Noto Sans SC"; src: url("/assets/fonts/noto-sans-sc.ttf") format("truetype-variations"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Noto Sans TC"; src: url("/assets/fonts/noto-sans-tc.ttf") format("truetype-variations"); font-weight: 100 900; font-display: swap; }
+:lang(zh-TW) { --font-sans: "Inter", "Noto Sans TC", "Noto Sans SC", system-ui, sans-serif; }
+@font-face { font-family: "Noto Sans Mono"; src: url("/assets/fonts/noto-sans-mono.ttf") format("truetype-variations"); font-weight: 100 900; font-display: swap; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); font-size: var(--fs-14); line-height: 1.6; }
+h1, h2, h3, h4, p { margin: 0; }
+h1 { font-size: var(--fs-28); font-weight: 700; }
+h2 { font-size: var(--fs-20); font-weight: 700; }
+h3 { font-size: var(--fs-16); font-weight: 600; }
+a { color: var(--color-navy); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; }
+code { font-family: var(--font-mono); font-size: 0.92em; background: var(--color-surface); padding: 1px 5px; border-radius: 4px; }
+button { font-family: inherit; }
+::selection { background: var(--color-primary-tint); }
+:focus-visible { outline: 2px solid var(--color-navy); outline-offset: 2px; }
+.mono, .amount { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--color-ink-2); }
+.small { font-size: var(--fs-12); }
+.center { text-align: center; }
+.hidden { display: none !important; }

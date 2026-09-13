@@ -1,0 +1,45 @@
+# 仅用于 vitest-pool-workers（@cloudflare/vitest-pool-workers）本地测试环境。
+# 与 wrangler.toml 的差异：不含 routes / send_email（miniflare 不支持），
+# 增加 MAIL_OUTBOX（测试收件箱 KV）；密钥用明文测试值。
+name = "suveoo-bank-main-test"
+main = "worker-main.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "SESSION_KV"
+id = "test_session_kv"
+[[kv_namespaces]]
+binding = "AUDIT_KV"
+id = "test_audit_kv"
+[[kv_namespaces]]
+binding = "MAIL_OUTBOX"
+id = "test_mail_outbox"
+
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "suveoo-bank-r2-test"
+
+[[durable_objects.bindings]]
+name = "LEDGER"
+class_name = "LedgerDO"
+[[durable_objects.bindings]]
+name = "SAGA"
+class_name = "SagaDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LedgerDO", "SagaDO"]
+
+[vars]
+JWT_SECRET = "test-jwt-secret-not-for-prod"
+CANARY_TOKEN_SECRET = "test-canary-secret"
+CONSENT_GRANT_TTL_SECONDS = "120"
+INVARIANT_STRICT_MODE = "true"
+DEMO_MODE = "true"
+FIDO2_RP_ID = "suveoo.com"
+FIDO2_ORIGIN = "https://suveoo.com"
+SENDER_NOREPLY = "noreply@suveoo.com"
+SENDER_SECURITY = "security@suveoo.com"
+SUPPORT_INBOX = "support@suveoo.com"
+LLM_PROVIDER = "anthropic"
