@@ -162,6 +162,26 @@ S.wealth = {
   FUND_IDS: ["global-mixed-1", "global-money-1", "em-gov-bond", "global-mixed-2", "global-equity-index", "apac-tech", "esg-bond", "gold-index"],
   DEP_IDS: ["demand", "notice-7d", "term-3m", "term-6m", "term-1y", "term-3y"],
 };
+
+/* 金融计算工具目录（/wealth 入口卡片区与 /wealth/tools 导航卡共用；按部署阶段逐步追加） */
+S.toolCatalog = [
+  { slug: "savings-compound", icon: "coins", nameKey: "tc.savingsName", descKey: "tc.savingsDesc" },
+  { slug: "loan-compare", icon: "scale", nameKey: "tc.loanName", descKey: "tc.loanDesc" },
+  { slug: "goal-planner", icon: "target", nameKey: "tc.goalName", descKey: "tc.goalDesc" },
+  { slug: "credit-payoff", icon: "card", nameKey: "tc.creditName", descKey: "tc.creditDesc" },
+  { slug: "retirement", icon: "sun", nameKey: "tc.retireName", descKey: "tc.retireDesc" },
+  { slug: "inflation-calculator", icon: "trend", nameKey: "tc.inflName", descKey: "tc.inflDesc" },
+  { slug: "split-bill-plus", icon: "users", nameKey: "tc.splitName", descKey: "tc.splitDesc" },
+  { slug: "deposit-compare", icon: "bank", nameKey: "tc.depName", descKey: "tc.depDesc" },
+  { slug: "fx-convert", icon: "exchange", nameKey: "tc.fxName", descKey: "tc.fxDesc" },
+  { slug: "budget-allocator", icon: "pie", nameKey: "tc.budgetName", descKey: "tc.budgetDesc" },
+];
+S.toolCard = (t) => `
+  <a class="tool-card" href="/wealth/tools/${t.slug}">
+    <span class="ti">${S.ui.icon(t.icon, 20)}</span>
+    <span style="min-width:0"><span class="tn">${S.fmt.escape(S.t(t.nameKey))}</span>
+    <span class="td" style="display:block">${S.fmt.escape(S.t(t.descKey))}</span></span>
+  </a>`;
 S.fundCache = () => Promise.all(S.wealth.FUND_IDS.map((id) => S.api.json(`/assets/data/funds/${id}.json`)));
 S.depCache = () => Promise.all(S.wealth.DEP_IDS.map((s) => S.api.json(`/assets/data/deposits/${s}.json`)));
 S.fundSlug = () => (location.pathname.match(/\/wealth\/funds\/([a-z0-9-]+)/) ?? [])[1];

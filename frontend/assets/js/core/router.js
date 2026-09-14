@@ -4,7 +4,8 @@ S.router = {
   register(name, fn) { this.pages[name] = fn; },
   async boot() {
     const page = document.body.dataset.page ?? "";
-    const needAuth = !["", "home", "login", "register", "recovery", "ai-benchmark", "tools", "about", "help", "contact", "privacy-policy", "cookie-privacy", "terms", "offline"].includes(page);
+    const needAuth = !["", "home", "login", "register", "recovery", "ai-benchmark", "tools", "about", "help", "contact", "privacy-policy", "cookie-privacy", "terms", "offline",
+      "savings-compound", "loan-compare", "goal-planner", "credit-payoff", "retirement", "deposit-compare", "fx-convert", "inflation-calculator", "split-bill-plus", "budget-allocator"].includes(page);
     if (needAuth || page === "home") {
       const sess = await S.auth.session();
       if (needAuth && !sess) {

@@ -9,7 +9,9 @@ S.router.register("wealth", async () => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.deposits"))}</h2><a class="more" href="/wealth/deposits">${S.fmt.escape(S.t("wealth.allDeposits"))} →</a></div>
     <div class="hscroll" id="deps"></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.fxQuick"))}</h2><a class="more" href="/wealth/fx">${S.fmt.escape(S.t("wealth.allFx"))} →</a></div>
-    <div class="card" id="fx"></div>`;
+    <div class="card" id="fx"></div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.toolHub"))}</h2><a class="more" href="/wealth/tools">${S.fmt.escape(S.t("tc.navTitle"))} →</a></div>
+    <div class="tool-grid" id="tool-hub"></div>`;
   document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.carFund"));
   /* 持仓 */
   const h = await S.api.get("/api/wealth/holdings");
@@ -57,4 +59,6 @@ S.router.register("wealth", async () => {
     <div class="list-row"><img class="fx-flag" src="${q.flag}" alt=""> <b>${S.fmt.escape(q.name)}</b>
       <span class="grow"></span><span class="mono">${q.mid}</span> ${S.charts.spark(q.spark, { color: "auto" })}</div>`).join("");
   S.ui.$$(".ask").forEach((b) => { b.onclick = () => S.router.ai(b.dataset.q); });
+  /* 金融计算工具入口卡（目录见 core/app.js 的 S.toolCatalog） */
+  document.getElementById("tool-hub").innerHTML = S.toolCatalog.map((t) => S.toolCard(t)).join("");
 });

@@ -278,3 +278,33 @@ body.tc-open { overflow: hidden; }
 /* ===== 21. Header 模拟声明：i+圆圈 图标（替代 SIMULATED 文字按钮） ===== */
 .sim-info { display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-2); border-radius: 50%; transition: color .15s ease, background-color .15s ease; padding: 2px; }
 .sim-info:hover { color: var(--color-navy); background: var(--color-primary-tint); text-decoration: none; }
+
+/* ===== 22. 金融计算工具：入口卡网格（/wealth 入口区 + /wealth/tools 页内导航） ===== */
+.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (max-width: 767px) { .tool-grid { grid-template-columns: 1fr; } }
+.tool-card {
+  display: flex; gap: var(--sp-3); align-items: flex-start; text-align: left;
+  background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card);
+  padding: var(--sp-4); text-decoration: none; color: var(--color-ink); min-width: 0;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.tool-card:hover { border-color: var(--color-navy); box-shadow: var(--shadow); text-decoration: none; }
+.tool-card:active { transform: translateY(1px); }
+.tool-card .ti { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--color-primary-tint); color: var(--color-navy); display: inline-flex; align-items: center; justify-content: center; }
+.tool-card .tn { font-weight: 600; font-size: var(--fs-14); margin-bottom: 2px; }
+.tool-card .td { font-size: var(--fs-12); color: var(--color-ink-2); line-height: 1.5; }
+
+/* ===== 23. 计算工具页：结果大数字 + 双栏对照 + 还款构成条 ===== */
+.tc-result { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: flex-end; }
+.tc-result .kv { min-width: 0; }
+.tc-result .kv .lb { font-size: var(--fs-12); color: var(--color-ink-2); margin-bottom: 4px; }
+.tc-result .kv .v { font-family: var(--font-mono); font-weight: 700; white-space: nowrap; }
+.tc-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (max-width: 767px) { .tc-duo { grid-template-columns: 1fr; } }
+.tc-duo .card { margin: 0; }
+.tc-bar { height: 14px; border-radius: 7px; overflow: hidden; display: flex; background: var(--color-surface); margin: var(--sp-2) 0; }
+.tc-bar i { display: block; height: 100%; transition: width .18s ease; }
+.tc-bar .p-p { background: var(--color-navy); }
+.tc-bar .p-i { background: #B7C0E8; }
+.tc-warn { background: var(--color-red-bg); color: var(--color-red); border-radius: var(--r-btn); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-12); display: flex; gap: 8px; align-items: flex-start; }
+.tc-warn svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }

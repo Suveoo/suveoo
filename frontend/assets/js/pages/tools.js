@@ -8,7 +8,9 @@ S.router.register("tools", async () => {
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tools.title"))}</h1>${S.sim.footnote()}
     <div class="tabs" id="t-tabs">${T.map(([id, name], i) => `<button class="tab${i === 0 ? " active" : ""}" data-t="${id}">${S.fmt.escape(name)}</button>`).join("")}</div>
     <div class="card" style="max-width:520px" id="pane"></div>
-    <p class="muted small" style="margin-top:12px">${S.fmt.escape(S.t("tools.deeplink", "/wealth/tools?tool=split&total=860&n=3"))}</p>`;
+    <p class="muted small" style="margin-top:12px">${S.fmt.escape(S.t("tools.deeplink", "/wealth/tools?tool=split&total=860&n=3"))}</p>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("tc.navTitle"))}</h2></div>
+    <div class="tool-grid">${(S.toolCatalog ?? []).map((t) => S.toolCard(t)).join("")}</div>`;
   const pane = document.getElementById("pane");
   const num = (label, id, val) => `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input" id="${id}" value="${val}" inputmode="decimal"></label>`;
   const out = `<div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("tools.result"))}</span><span class="v mono" id="out">—</span></div>`;
