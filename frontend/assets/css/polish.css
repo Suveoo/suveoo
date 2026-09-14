@@ -315,3 +315,35 @@ body.tc-open { overflow: hidden; }
 .cookie-pop .ck-row .grow { flex: 1; min-width: 0; }
 .cookie-pop .modal-actions { flex-wrap: wrap; }
 .cookie-pop .modal-actions .btn-sm { flex: 1 1 auto; padding: 8px 10px; }
+
+/* ===== 23. 帮助中心：搜索栏 / 分类 pills / 平滑手风琴 / 步骤卡 / 滚动渐显 ===== */
+.help-search { display: flex; align-items: center; gap: 10px; padding: 10px 16px; margin: var(--sp-4) 0 var(--sp-3); }
+.help-search .hs-ic { color: var(--color-ink-2); display: inline-flex; }
+.help-search .input { border: none; box-shadow: none; padding: 6px 0; flex: 1; background: transparent; }
+.help-search .input:focus { box-shadow: none; }
+.help-search:focus-within { border-color: var(--color-navy); box-shadow: 0 0 0 3px var(--color-primary-tint); }
+.help-pills { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; top: 72px; z-index: 60; background: linear-gradient(#fff 82%, rgba(255,255,255,0)); padding: 8px 16px 12px; margin: 0 -16px 0; }
+.hpill { font-size: var(--fs-12); padding: 5px 12px; border: 1px solid var(--color-line); border-radius: 999px; background: #fff; color: var(--color-ink); text-decoration: none; transition: border-color .15s ease, color .15s ease, background-color .15s ease; white-space: nowrap; }
+.hpill:hover { border-color: var(--color-navy); color: var(--color-navy); background: var(--color-primary-tint); }
+.help-sec { margin: var(--sp-8) 0 var(--sp-3); opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; }
+.help-sec.in { opacity: 1; transform: none; }
+.help-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.help-step { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: var(--sp-4); }
+.hs-num { width: 26px; height: 26px; border-radius: 50%; background: var(--color-primary-tint); color: var(--color-navy); font-weight: 700; font-size: var(--fs-12); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); }
+.help-step .btn { margin-top: auto; }
+.faq-cat-name { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-16); }
+.help-ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; color: var(--color-ink); font-size: var(--fs-14); }
+.help-cta { margin-top: var(--sp-8); display: flex; align-items: center; gap: 12px; }
+.help-cta .btn { flex: none; margin-left: auto; }
+/* 平滑手风琴：grid-template-rows 高度动画（比 max-height 跟手，无内容跳变） */
+.acc-item.hacc { border: 1px solid var(--color-line); border-radius: var(--r-btn); background: #fff; margin-bottom: 8px; overflow: hidden; }
+.acc-item.hacc .acc-head { border-radius: 0; }
+.acc-item.hacc .acc-head svg { transition: transform .25s cubic-bezier(.25,.6,.3,1); flex: none; color: var(--color-ink-2); }
+.acc-item.hacc.open .acc-head svg { transform: rotate(90deg); color: var(--color-navy); }
+.acc-item.hacc .acc-body { max-height: 0; overflow: hidden; transition: max-height .32s cubic-bezier(.25,.6,.3,1); }
+@media (max-width: 900px) { .help-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .help-grid { grid-template-columns: 1fr; } .help-pills { top: 60px; } .help-cta { flex-wrap: wrap; } .help-cta .btn { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .help-sec { opacity: 1; transform: none; transition: none; } }
+
+/* 手风琴开态：JS 内联 maxHeight 精确控高，此处固定值为无 JS 兜底 */
+.acc-item.hacc.open .acc-body { max-height: 900px; }
