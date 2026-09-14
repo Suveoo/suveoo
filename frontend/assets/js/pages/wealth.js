@@ -48,7 +48,7 @@ S.router.register("wealth", async () => {
     </div>`).join("");
   const deps = (await Promise.all(["demand", "notice-7d", "term-3m", "term-6m", "term-1y", "term-3y"].map((s) => S.api.json(`/assets/data/deposits/${s}.json`)))).filter(Boolean);
   document.getElementById("deps").innerHTML = deps.map((d) => `
-    <div class="fund-card" style="min-width:200px">
+    <div class="fund-card">
       <div class="fname">${S.fmt.escape(d.name)}</div>
       <div class="fret" style="margin:10px 0">${d.rate}%</div>
       <div class="muted small">${S.fmt.escape(d.term)} · ${S.fmt.escape(S.t("deps.minFrom", d.min))}</div>

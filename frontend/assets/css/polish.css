@@ -442,4 +442,6 @@ body.tc-open { overflow: hidden; }
   /* pay：常用收款人横滑区改两列 */
   .hscroll.payees { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); overflow-x: visible; }
   .hscroll.payees .fund-card { min-width: 0; width: auto; }
+  .hscroll.deps .fund-card, .hscroll.payees .fund-card { min-width: 0 !important; max-width: none !important; }
+  .hscroll.payees .fund-card[style] { min-width: 0 !important; }
 }

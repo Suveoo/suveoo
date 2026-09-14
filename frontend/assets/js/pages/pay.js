@@ -26,7 +26,7 @@ S.router.register("pay", async () => {
   const pr = await S.api.get("/api/payees");
   if (pr.ok) {
     const el = document.getElementById("payees");
-    el.className = "hscroll";
+    el.className = "hscroll payees";
     el.innerHTML = (pr.data.payees ?? []).slice(0, 6).map((p) => `
       <div class="fund-card" style="min-width:200px">
         <div class="row"><span class="avatar">${S.fmt.escape(p.name.slice(0, 1))}</span><b>${S.fmt.escape(p.name)}</b></div>
