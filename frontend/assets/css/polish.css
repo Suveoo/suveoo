@@ -308,3 +308,10 @@ body.tc-open { overflow: hidden; }
 .tc-bar .p-i { background: #B7C0E8; }
 .tc-warn { background: var(--color-red-bg); color: var(--color-red); border-radius: var(--r-btn); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-12); display: flex; gap: 8px; align-items: flex-start; }
 .tc-warn svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+
+/* ===== 22. Cookie 偏好：分类开关行 ===== */
+.cookie-pop .ck-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-top: 1px solid var(--color-line); }
+.cookie-pop .ck-row:first-of-type { border-top: none; }
+.cookie-pop .ck-row .grow { flex: 1; min-width: 0; }
+.cookie-pop .modal-actions { flex-wrap: wrap; }
+.cookie-pop .modal-actions .btn-sm { flex: 1 1 auto; padding: 8px 10px; }

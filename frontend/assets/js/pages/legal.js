@@ -6,25 +6,16 @@ const legalPage = async () => {
     : location.pathname.startsWith("/cookie-privacy") ? "cookie" : "terms";
   const titles = { privacy: S.t("legal.privacy"), cookie: S.t("legal.cookie"), terms: S.t("legal.terms") };
 
-  /* 统一为 [{h, ps:[], ss:[{h, ps:[]}]}] 结构 */
-  let sections;
-  if (which === "cookie") {
-    const bodies = { cookie: S.t("legal.cookieBody") };
-    sections = [
-      { h: S.t("legal.c1t"), ps: [bodies.cookie], ss: [] },
-      { h: S.t("legal.c2t"), ps: [S.t("legal.c2b")], ss: [] },
-      { h: S.t("legal.c3t"), ps: [S.t("legal.c3b")], ss: [] },
-    ];
-  } else {
-    const lang = S.i18n.lang;
-    const doc = S.LEGAL_DOCS?.[which];
-    const arts = doc?.[lang] ?? doc?.["zh-CN"] ?? [];
-    sections = arts.map((a) => ({
-      h: a.t,
-      ps: a.ps ?? [],
-      ss: (a.ss ?? []).map((s) => ({ h: s.t, ps: s.ps ?? [] })),
-    }));
-  }
+  /* 统一为 [{h, ps:[], ss:[{h, ps:[]}]}] 结构；cookie 页同样使用深度文档（docs-cookie.js） */
+  const lang = S.i18n.lang;
+  const arts = which === "cookie"
+    ? (S.COOKIE_DOCS?.[lang] ?? S.COOKIE_DOCS?.["zh-CN"] ?? [])
+    : (S.LEGAL_DOCS?.[which]?.[lang] ?? S.LEGAL_DOCS?.[which]?.["zh-CN"] ?? []);
+  const sections = arts.map((a) => ({
+    h: a.t,
+    ps: a.ps ?? [],
+    ss: (a.ss ?? []).map((s) => ({ h: s.t, ps: s.ps ?? [] })),
+  }));
 
   c.innerHTML = `<div class="legal-grid">
     <nav class="legal-toc">

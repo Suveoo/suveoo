@@ -140,20 +140,35 @@ S.chrome = {
     this._notifTimer = setInterval(upd, 60000);
   },
   cookieModal() {
+    const anaOn = S.ga4.analyticsOn();
     const box = S.ui.el(`
       <div class="cookie-pop" role="dialog" aria-label="Cookie preferences">
         <h2>${S.fmt.escape(S.t("cookie.title"))}</h2>
         <p>${S.fmt.escape(S.t("cookie.body"))}</p>
         <p class="small"><a href="/cookie-privacy">${S.fmt.escape(S.t("cookie.policy"))}</a></p>
+        <div class="ck-row">
+          <div class="grow"><b class="small">${S.fmt.escape(S.t("cookie.necTitle"))}</b><div class="muted small">${S.fmt.escape(S.t("cookie.necDesc"))}</div></div>
+          <span class="switch"><input type="checkbox" checked disabled aria-label="${S.fmt.escape(S.t("cookie.necTitle"))}"><span class="tk"></span></span>
+        </div>
+        <div class="ck-row">
+          <div class="grow"><b class="small">${S.fmt.escape(S.t("cookie.anaTitle"))}</b><div class="muted small">${S.fmt.escape(S.t("cookie.anaDesc"))}</div></div>
+          <span class="switch"><input type="checkbox" id="ck-ana" ${anaOn ? "checked" : ""} aria-label="${S.fmt.escape(S.t("cookie.anaTitle"))}"><span class="tk"></span></span>
+        </div>
         <div class="modal-actions">
-          <button class="btn btn-ghost" id="ck-n">${S.fmt.escape(S.t("cookie.necessaryOnly"))}</button>
-          <button class="btn btn-primary" id="ck-y">${S.fmt.escape(S.t("cookie.acceptAll"))}</button>
+          <button class="btn btn-ghost btn-sm" id="ck-n">${S.fmt.escape(S.t("cookie.necessaryOnly"))}</button>
+          <button class="btn btn-light btn-sm" id="ck-save">${S.fmt.escape(S.t("common.save"))}</button>
+          <button class="btn btn-primary btn-sm" id="ck-y">${S.fmt.escape(S.t("cookie.acceptAll"))}</button>
         </div>
       </div>`);
     document.body.appendChild(box);
     const done = (fn) => { fn(); box.remove(); };
-    box.querySelector("#ck-y").onclick = () => { done(() => { S.ga4.grant(); S.ga4.event("consent_grant", { mode: "all" }); }); };
-    box.querySelector("#ck-n").onclick = () => { done(() => { S.ga4.deny(); S.ga4.event("consent_grant", { mode: "necessary" }); }); };
+    box.querySelector("#ck-y").onclick = () => done(() => { S.ga4.grant(); S.ga4.event("consent_grant", { mode: "all" }); });
+    box.querySelector("#ck-save").onclick = () => done(() => {
+      const on = box.querySelector("#ck-ana").checked;
+      S.ga4.setAnalytics(on);
+      S.ga4.event("consent_save", { analytics: on });
+    });
+    box.querySelector("#ck-n").onclick = () => done(() => { S.ga4.deny(); S.ga4.event("consent_grant", { mode: "necessary" }); });
   },
 };
 
