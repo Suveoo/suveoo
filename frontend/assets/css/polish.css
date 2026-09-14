@@ -388,8 +388,8 @@ body.tc-open { overflow: hidden; }
 .help-ul li { display: flex; align-items: flex-start; gap: 8px; }
 .help-ul li svg { flex: none; margin-top: 3px; color: var(--color-navy); }
 /* 通知未读：整行柔色 + 圆角（替代与 logo/时间戳相切的 inset 硬边） */
-.notif-item.unread { box-shadow: none !important; background: var(--color-primary-tint); border-radius: 10px; padding-left: 14px; padding-right: 14px; margin: 2px 0; }
-.dropdown .notif-item.unread { margin: 2px 4px; padding-left: 12px; padding-right: 12px; }
+.notif-item.unread { box-shadow: none !important; }
+
 /* wealth 移动端单列自适应 */
 @media (max-width: 600px) {
   .hscroll { flex-direction: column; overflow-x: visible; }
@@ -407,15 +407,17 @@ body.tc-open { overflow: hidden; }
 .acc-item.hacc.open .acc-body { max-height: none !important; padding-bottom: 0; }
 .acc-item.hacc.open .acc-inner { padding-bottom: 14px; }
 
-/* ===== 28. 通知未读：整行柔色盒（list-row 版与 notif-item 版统一；不再切 logo/时间戳） ===== */
+/* ===== 28. 通知未读：占位与已读行完全一致（同 padding、无 margin），仅换底色；
+   内容列与已读行严格对齐，不产生左右错位 ===== */
 .list-row.unread, .notif-item.unread {
   background: var(--color-primary-tint) !important;
   border-radius: 12px;
-  border-bottom-color: transparent;
-  margin: 4px 2px;
-  padding: 12px 14px !important;
+  border-bottom-color: transparent !important;
   box-shadow: none !important;
 }
+/* 底色与下一行分隔线之间留呼吸缝，避免色块紧贴分隔线 */
+.list-row.unread { margin: 3px 0; }
+.notif-item.unread { margin: 3px 0; }
 
 /* ===== 29. AI 思考中动效（三点脉冲）+ insight 箭头灰化缩小光学对齐 + header 右侧间距收紧 ===== */
 /* AI 思考中气泡（.msg.thinking 由 ai.js 控制） */
