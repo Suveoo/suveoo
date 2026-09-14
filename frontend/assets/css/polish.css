@@ -397,7 +397,7 @@ body.tc-open { overflow: hidden; }
 }
 
 /* ===== 26. Header logo 适度放大（全端；移动端尤甚） ===== */
-.app-header .logo-link img { height: 26px; transition: height .2s ease; }
+.app-header .logo-link img { height: 31px; transition: height .2s ease; }
 @media (max-width: 767px) { .app-header .logo-link img { height: 30px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 28px; } }
 
