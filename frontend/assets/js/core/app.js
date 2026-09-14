@@ -33,7 +33,8 @@ S.chrome = {
         </div>
       </header>`);
     document.body.prepend(header);
-    /* drawer (PC)：一级全宽（内嵌人字箭头 ∨/>）点击即跳转即展开（单开）+ 二级直达 + 主页组「最近」平铺常驻 */
+    /* drawer (PC)：一级全宽（内嵌人字箭头 ∨/>）点击即跳转即展开（单开）；
+       顶部顺序：Suveoo AI → 「最近」独立平铺区（新用户以 5 条最常用填充）→ 主页 → 收付 → 财富 → 账户 */
     const SUB = {
       home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
       pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
@@ -43,7 +44,7 @@ S.chrome = {
         : [["/account/register", "plus", "login.toRegister"], ["/account/recovery", "help", "login.toRecovery"]],
     };
     const AI_SUB = [["/ai/tasks", "clock", "tasks.title"], ["/ai/benchmark", "chart", "bench.title"]];
-    /* 路径 → 图标/i18n 键注册表：「最近」只收录 drawer 内存在的项，保证标签与图标三语可用 */
+    /* 路径 → 图标/i18n 键注册表（一级+二级全并）；「最近」只收录其中条目，保证标签与图标三语可用 */
     const PATH_INFO = {
       "/home": ["home", "nav.home"], "/pay": ["pay", "nav.pay"], "/wealth": ["wealth", "nav.wealth"],
       "/account": ["account", "nav.account"], "/ai": ["ai", "nav.ai"], "/account/login": ["account", "nav.login"],
@@ -60,14 +61,21 @@ S.chrome = {
         localStorage.setItem(REC_KEY, JSON.stringify(list.slice(0, 5)));
       }
     } catch { /* 隐私模式等场景静默 */ }
+    /* 「最近」：老用户=真实最近 5 条；新用户=固定 5 条最常用（主页/收付/财富/AI/转账） */
+    const DEFAULT_RECENTS = ["/home", "/pay", "/wealth", "/ai", "/transfer/intrabank"];
     const recents = (() => {
-      try { return JSON.parse(localStorage.getItem(REC_KEY) ?? "[]").filter((p) => PATH_INFO[p]).slice(0, 5); } catch { return []; }
+      try {
+        const list = JSON.parse(localStorage.getItem(REC_KEY) ?? "[]").filter((p) => PATH_INFO[p]);
+        return (list.length ? list : DEFAULT_RECENTS).slice(0, 5);
+      } catch { return DEFAULT_RECENTS; }
     })();
+    const recHtml = `
+      <div class="drawer-recents">
+        <div class="rec-head">${S.fmt.escape(S.t("nav.recents"))}</div>
+        ${recents.map((p) => `<a class="drawer-sub rec${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(PATH_INFO[p][0], 14)}<span>${S.t(PATH_INFO[p][1])}</span></a>`).join("")}
+      </div>`;
     const chev = (k) => S.ui.icon("chevron", 11) + "";
     const subHtml = (list) => `<div class="drawer-subs"><div class="ds-inner">${(list ?? []).map(([p, ic, k]) => `<a class="drawer-sub${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(ic, 13)}<span>${S.t(k)}</span></a>`).join("")}</div></div>`;
-    const recHtml = recents.length
-      ? `<div class="drawer-recents"><div class="rec-head">${S.fmt.escape(S.t("nav.recents"))}</div>${recents.map((p) => `<a class="drawer-sub rec${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(PATH_INFO[p][0], 13)}<span>${S.t(PATH_INFO[p][1])}</span></a>`).join("")}</div>`
-      : "";
     const drawer = S.ui.el(`
       <aside class="side-drawer">
         <div class="drawer-group drawer-ai-group${act === "ai" ? " open" : ""}" data-sec="ai">
@@ -78,10 +86,10 @@ S.chrome = {
           </a>
           ${subHtml(AI_SUB)}
         </div>
+        ${recHtml}
         ${this.nav.map((n) => `
         <div class="drawer-group${act === n.key ? " open" : ""}" data-sec="${n.key}">
           <a class="drawer-item${act === n.key ? " active" : ""}" href="${n.path}">${S.ui.icon(n.icon)}<span>${S.t("nav." + n.key)}</span><span class="drawer-chev">${chev()}</span></a>
-          ${n.key === "home" ? recHtml : ""}
           ${subHtml(SUB[n.key])}
         </div>`).join("")}
         <div class="drawer-group${act === "account" ? " open" : ""}" data-sec="account">
