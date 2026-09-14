@@ -347,3 +347,25 @@ body.tc-open { overflow: hidden; }
 
 /* 手风琴开态：JS 内联 maxHeight 精确控高，此处固定值为无 JS 兜底 */
 .acc-item.hacc.open .acc-body { max-height: 900px; }
+
+/* ===== 24. Side drawer 重设计：一级紧凑 + 分区二级直达 ===== */
+@media (min-width: 768px) {
+  .side-drawer { overflow-y: auto; }
+  .drawer-ai { padding: var(--sp-3); margin-bottom: var(--sp-2); border-radius: var(--r-btn); }
+  .drawer-ai img { width: 28px; height: 28px; }
+  .drawer-ai .t { font-size: var(--fs-14); margin-top: 4px; }
+  .drawer-ai .s { font-size: 10px; }
+  .drawer-item { gap: 8px; padding: 6px 8px 6px 10px; border-radius: var(--r-btn); font-size: var(--fs-12); border-left-width: 3px; }
+  .drawer-item svg { width: 15px; height: 15px; }
+  .drawer-item > span:first-of-type { flex: 1; }
+  .drawer-item > svg:last-of-type { width: 11px; height: 11px; color: var(--color-ink-2); transition: transform .2s ease; }
+  .drawer-group.open .drawer-item > svg:last-of-type { transform: rotate(90deg); color: var(--color-navy); }
+  .drawer-subs { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .25s ease; }
+  .drawer-group.open .drawer-subs { grid-template-rows: 1fr; }
+  .drawer-subs > a { display: none; }
+  .drawer-group.open .drawer-subs > a { display: flex; }
+  .drawer-sub { display: flex; align-items: center; gap: 7px; padding: 4px 8px 4px 30px; font-size: 11.5px; color: var(--color-ink-2); border-radius: 6px; text-decoration: none; transition: color .12s ease, background-color .12s ease; }
+  .drawer-sub svg { width: 12px; height: 12px; opacity: .75; }
+  .drawer-sub:hover { color: var(--color-navy); background: var(--color-primary-tint); text-decoration: none; }
+  .drawer-sub.cur { color: var(--color-navy); font-weight: 600; background: var(--color-primary-tint); }
+}
