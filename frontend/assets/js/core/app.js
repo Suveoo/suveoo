@@ -33,49 +33,64 @@ S.chrome = {
         </div>
       </header>`);
     document.body.prepend(header);
-    /* drawer (PC)：一级项紧凑化 + 分区二级常用页直达（当前分区默认展开，点一级切换） */
+    /* drawer (PC)：一级全宽（内嵌人字箭头 ∨/>）点击即跳转即展开（单开）+ 二级直达 + 主页组「最近」平铺常驻 */
     const SUB = {
-      home: [["/home", "home", "nav.home"], ["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"]],
-      pay: [["/pay", "pay", "nav.pay"], ["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/transfer/payees", "account", "payees.title"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
-      wealth: [["/wealth", "wealth", "nav.wealth"], ["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
+      home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
+      pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
+      wealth: [["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
       account: user
-        ? [["/account", "account", "nav.account"], ["/account/dashboard", "chart", "dash.title"], ["/account/cards", "card", "acct.grid.cards"], ["/account/security", "shield", "sec.title"], ["/account/downloads", "download", "acct.downloads"]]
-        : [["/account/login", "account", "nav.login"], ["/account/register", "plus", "login.toRegister"], ["/account/recovery", "help", "login.toRecovery"]],
+        ? [["/account/dashboard", "chart", "dash.title"], ["/account/cards", "card", "acct.grid.cards"], ["/account/security", "shield", "sec.title"], ["/account/downloads", "download", "acct.downloads"]]
+        : [["/account/register", "plus", "login.toRegister"], ["/account/recovery", "help", "login.toRecovery"]],
     };
+    const AI_SUB = [["/ai/tasks", "clock", "tasks.title"], ["/ai/benchmark", "chart", "bench.title"]];
+    /* 路径 → 图标/i18n 键注册表：「最近」只收录 drawer 内存在的项，保证标签与图标三语可用 */
+    const PATH_INFO = {
+      "/home": ["home", "nav.home"], "/pay": ["pay", "nav.pay"], "/wealth": ["wealth", "nav.wealth"],
+      "/account": ["account", "nav.account"], "/ai": ["ai", "nav.ai"], "/account/login": ["account", "nav.login"],
+      "/ai/tasks": ["clock", "tasks.title"], "/ai/benchmark": ["chart", "bench.title"],
+      ...Object.values(SUB).flat().reduce((m, [p, ic, k]) => ({ ...m, [p]: [ic, k] }), {}),
+    };
+    /* 记录最近访问（仅注册表内路径；去重置顶，上限 5） */
+    const REC_KEY = "suveoo_recents";
+    try {
+      const cur = location.pathname;
+      if (PATH_INFO[cur] && cur !== "/account/login") {
+        const list = JSON.parse(localStorage.getItem(REC_KEY) ?? "[]").filter((x) => x !== cur);
+        list.unshift(cur);
+        localStorage.setItem(REC_KEY, JSON.stringify(list.slice(0, 5)));
+      }
+    } catch { /* 隐私模式等场景静默 */ }
+    const recents = (() => {
+      try { return JSON.parse(localStorage.getItem(REC_KEY) ?? "[]").filter((p) => PATH_INFO[p]).slice(0, 5); } catch { return []; }
+    })();
+    const chev = (k) => S.ui.icon("chevron", 11) + "";
+    const subHtml = (list) => `<div class="drawer-subs"><div class="ds-inner">${(list ?? []).map(([p, ic, k]) => `<a class="drawer-sub${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(ic, 13)}<span>${S.t(k)}</span></a>`).join("")}</div></div>`;
+    const recHtml = recents.length
+      ? `<div class="drawer-recents"><div class="rec-head">${S.fmt.escape(S.t("nav.recents"))}</div>${recents.map((p) => `<a class="drawer-sub rec${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(PATH_INFO[p][0], 13)}<span>${S.t(PATH_INFO[p][1])}</span></a>`).join("")}</div>`
+      : "";
     const drawer = S.ui.el(`
       <aside class="side-drawer">
-        <a class="drawer-ai${act === "ai" ? " active" : ""}" href="/ai">
-          <img src="/assets/images/suveoo-ai-logo.svg" alt="">
-          <div class="t">Suveoo AI</div>
-          <div class="s">${S.fmt.escape(S.t("ai.drawerSub"))}</div>
-        </a>
+        <div class="drawer-group drawer-ai-group${act === "ai" ? " open" : ""}" data-sec="ai">
+          <a class="drawer-ai${act === "ai" ? " active" : ""}" href="/ai">
+            <img src="/assets/images/suveoo-ai-logo.svg" alt="">
+            <div class="ai-txt"><div class="t">Suveoo AI</div><div class="s">${S.fmt.escape(S.t("ai.drawerSub"))}</div></div>
+            <span class="drawer-chev">${chev()}</span>
+          </a>
+          ${subHtml(AI_SUB)}
+        </div>
         ${this.nav.map((n) => `
         <div class="drawer-group${act === n.key ? " open" : ""}" data-sec="${n.key}">
-          <a class="drawer-item${act === n.key ? " active" : ""}" href="${n.path}">${S.ui.icon(n.icon)}<span>${S.t("nav." + n.key)}</span>${S.ui.icon("arrow-right", 12)}</a>
-          <div class="drawer-subs">${(SUB[n.key] ?? []).map(([p, ic, k]) => `<a class="drawer-sub${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(ic, 13)}<span>${S.t(k)}</span></a>`).join("")}</div>
+          <a class="drawer-item${act === n.key ? " active" : ""}" href="${n.path}">${S.ui.icon(n.icon)}<span>${S.t("nav." + n.key)}</span><span class="drawer-chev">${chev()}</span></a>
+          ${n.key === "home" ? recHtml : ""}
+          ${subHtml(SUB[n.key])}
         </div>`).join("")}
         <div class="drawer-group${act === "account" ? " open" : ""}" data-sec="account">
-          <a class="drawer-item${act === "account" ? " active" : ""}" href="${user ? "/account" : "/account/login"}">${S.ui.icon("account")}<span>${user ? S.t("nav.account") : S.t("nav.loginSignup")}</span>${S.ui.icon("arrow-right", 12)}</a>
-          <div class="drawer-subs">${(SUB.account ?? []).map(([p, ic, k]) => `<a class="drawer-sub${location.pathname === p ? " cur" : ""}" href="${p}">${S.ui.icon(ic, 13)}<span>${S.t(k)}</span></a>`).join("")}</div>
+          <a class="drawer-item${act === "account" ? " active" : ""}" href="${user ? "/account" : "/account/login"}">${S.ui.icon("account")}<span>${user ? S.t("nav.account") : S.t("nav.loginSignup")}</span><span class="drawer-chev">${chev()}</span></a>
+          ${subHtml(SUB.account)}
         </div>
       </aside>`);
     document.body.appendChild(drawer);
-    /* 一级点击（同分区）切换展开而不跳转；跳转逻辑保留给不同分区与二级项 */
-    S.ui.$$(".drawer-group", drawer).forEach((g) => {
-      g.querySelector(".drawer-item").addEventListener("click", (ev) => {
-        if (g.classList.contains("open") && !g.querySelector(".drawer-sub.cur")) {
-          ev.preventDefault();
-          g.classList.remove("open");
-        } else if (g.classList.contains("open")) {
-          ev.preventDefault();
-          S.ui.$$(".drawer-group.open", drawer).forEach((x) => x !== g && x.classList.remove("open"));
-        } else {
-          ev.preventDefault();
-          S.ui.$$(".drawer-group.open", drawer).forEach((x) => x.classList.remove("open"));
-          g.classList.add("open");
-        }
-      });
-    });
+    /* 初始展开组直接到位（无动画）；单开语义由 act 决定，无需 JS 切换 */
     /* bottom nav (mobile) */
     const bn = S.ui.el(`
       <nav class="bottom-nav">
