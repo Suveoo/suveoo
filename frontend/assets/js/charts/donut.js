@@ -4,7 +4,7 @@ S.charts.donut = function (items, { size = 200 } = {}) {
   // items: [{label, value, color}]
   const total = items.reduce((a, b) => a + b.value, 0);
   if (!total) return `<div class="muted small">${S.fmt.escape(S.t("common.noData"))}</div>`;
-  const R = size / 2 - 10, C = 2 * Math.PI * R;
+  const PAD = 14, R = size / 2 - PAD, C = 2 * Math.PI * R;
   let acc = 0;
   const segs = items.map((it) => {
     const frac = it.value / total;
@@ -14,7 +14,7 @@ S.charts.donut = function (items, { size = 200 } = {}) {
     return seg;
   }).join("");
   const legend = items.map((it) => `<div class="split-row"><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.color};margin-right:8px"></i>${S.fmt.escape(it.label)}</span><span class="mono">${Math.round((it.value / total) * 100)}%</span></div>`).join("");
-  return `<div class="row" style="align-items:center;gap:24px;flex-wrap:wrap"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs}
+  return `<div class="row" style="align-items:center;gap:24px;flex-wrap:wrap"><svg width="${size + PAD * 2}" height="${size + PAD * 2}" viewBox="-${PAD} -${PAD} ${size + PAD * 2} ${size + PAD * 2}">${segs}
     <text x="${size / 2}" y="${size / 2 + 5}" text-anchor="middle" font-size="13" fill="#666">${S.fmt.escape(S.t("common.total"))}</text></svg>
     <div style="flex:1;min-width:180px">${legend}</div></div>`;
 };

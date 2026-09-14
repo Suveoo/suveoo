@@ -62,13 +62,13 @@ S.router.register("help", async () => {
   /* 故障排查手风琴 */
   document.getElementById("trouble-body").innerHTML = acc(D.trouble ?? []);
 
-  /* 防诈骗清单 */
-  document.getElementById("anti-body").innerHTML = `<div class="card card-surface"><ul class="help-ul">${(D.antifraud ?? []).map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>`;
+  /* 防诈骗清单（箭头 SVG 符号） */
+  document.getElementById("anti-body").innerHTML = `<div class="card card-surface"><ul class="help-ul">${(D.antifraud ?? []).map((s) => `<li>${S.ui.icon("arrow-right", 12)} ${esc(s)}</li>`).join("")}</ul></div>`;
 
-  /* AI 安全（五道验证） */
+  /* AI 安全（五道验证，箭头 SVG 符号） */
   document.getElementById("ai-body").innerHTML = `<div class="card">
     <p class="muted">${esc(D.ai?.intro ?? "")}</p>
-    <div class="stack" style="gap:6px">${(D.ai?.items ?? []).map((s) => `<div class="task-step"><span class="st">·</span>${esc(s)}</div>`).join("")}</div>
+    <div class="stack" style="gap:6px">${(D.ai?.items ?? []).map((s) => `<div class="task-step"><span class="st">${S.ui.icon("arrow-right", 12)}</span>${esc(s)}</div>`).join("")}</div>
     <p class="muted small" style="margin-top:12px">${esc(D.ai?.chain ?? "")}</p></div>`;
 
   /* 分类锚点 pills（粘性） */

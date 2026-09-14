@@ -380,3 +380,23 @@ body.tc-open { overflow: hidden; }
   .drawer-group.open .drawer-sub { margin: 3px 0; padding: 5px 10px; font-size: var(--fs-14); color: var(--color-ink-2); }
   .drawer-group.open .drawer-sub svg { width: 14px; height: 14px; }
 }
+
+/* ===== 25. 列表符号统一为箭头 SVG + notif 未读柔色 + wealth 移动单列 ===== */
+.insight-li { display: flex; align-items: flex-start; gap: 6px; }
+.insight-li svg { flex: none; margin-top: 2px; color: var(--color-navy); }
+.help-ul { list-style: none; padding-left: 0 !important; }
+.help-ul li { display: flex; align-items: flex-start; gap: 8px; }
+.help-ul li svg { flex: none; margin-top: 3px; color: var(--color-navy); }
+/* 通知未读：整行柔色 + 圆角（替代与 logo/时间戳相切的 inset 硬边） */
+.notif-item.unread { box-shadow: none !important; background: var(--color-primary-tint); border-radius: 10px; padding-left: 14px; padding-right: 14px; margin: 2px 0; }
+.dropdown .notif-item.unread { margin: 2px 4px; padding-left: 12px; padding-right: 12px; }
+/* wealth 移动端单列自适应 */
+@media (max-width: 600px) {
+  .hscroll { flex-direction: column; overflow-x: visible; }
+  .hscroll .fund-card { min-width: 0; width: 100%; }
+}
+
+/* ===== 26. Header logo 适度放大（全端；移动端尤甚） ===== */
+.app-header .logo-link img { height: 34px; transition: height .2s ease; }
+@media (max-width: 767px) { .app-header .logo-link img { height: 40px; } }
+@media (max-width: 380px) { .app-header .logo-link img { height: 36px; } }

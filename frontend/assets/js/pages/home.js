@@ -16,8 +16,8 @@ S.router.register("home", async ({ user }) => {
     <div class="quick-grid" id="services"></div>
     <div class="card" id="insight" style="margin-top:16px"></div>
     <div class="card card-surface banner" style="margin-top:16px">${S.ui.icon("shield", 16)}<div><b>${S.fmt.escape(S.t("home.securityTitle"))}</b>
-      <ul class="small muted" style="margin:6px 0 0;padding-left:18px">
-        <li>${S.fmt.escape(S.t("help.af1"))}</li><li>${S.fmt.escape(S.t("help.af2"))}</li><li>${S.fmt.escape(S.t("help.af3"))}</li>
+      <ul class="small muted home-anti" style="margin:6px 0 10px;padding-left:0;list-style:none">
+        <li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af1"))}</span></li><li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af2"))}</span></li><li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af3"))}</span></li>
       </ul><a class="small" href="/help#antifraud">${S.fmt.escape(S.t("common.more"))} →</a></div></div>
     <div class="brand-banner" style="margin-top:24px">
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
@@ -74,8 +74,8 @@ S.router.register("home", async ({ user }) => {
   if (ins.ok) {
     document.getElementById("insight").innerHTML = `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
-      ${(ins.data.insights ?? []).map((t) => `<p class="muted small" style="margin-top:6px">· ${S.fmt.escape(t)}</p>`).join("")}
-      <div style="margin-top:8px"><button class="ai-chip" id="ask-ai">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div></div>`;
+      ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}</p>`).join("")}
+      <div style="margin-top:10px"><button class="ai-chip" id="ask-ai">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div></div>`;
     document.getElementById("ask-ai").onclick = () => S.router.ai(S.t("prompt.billInsight"));
   }
 });
