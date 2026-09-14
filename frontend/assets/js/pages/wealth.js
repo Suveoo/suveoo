@@ -7,7 +7,7 @@ S.router.register("wealth", async () => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.funds"))}</h2><a class="more" href="/wealth/funds">${S.fmt.escape(S.t("wealth.allFunds"))} →</a></div>
     <div class="hscroll" id="funds"></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.deposits"))}</h2><a class="more" href="/wealth/deposits">${S.fmt.escape(S.t("wealth.allDeposits"))} →</a></div>
-    <div class="hscroll" id="deps"></div>
+    <div class="hscroll deps" id="deps"></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.fxQuick"))}</h2><a class="more" href="/wealth/fx">${S.fmt.escape(S.t("wealth.allFx"))} →</a></div>
     <div class="card" id="fx"></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.toolHub"))}</h2><a class="more" href="/wealth/tools">${S.fmt.escape(S.t("tc.navTitle"))} →</a></div>

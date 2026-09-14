@@ -400,3 +400,46 @@ body.tc-open { overflow: hidden; }
 .app-header .logo-link img { height: 34px; transition: height .2s ease; }
 @media (max-width: 767px) { .app-header .logo-link img { height: 40px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 36px; } }
+
+/* ===== 27. 手风琴收起态零高度（padding 也要归零，否则露半行答案） ===== */
+.acc-item.hacc .acc-body { padding: 0 16px !important; max-height: 0 !important; }
+.acc-item.hacc .acc-inner { padding-bottom: 14px; }
+.acc-item.hacc.open .acc-body { max-height: none !important; padding-bottom: 0; }
+.acc-item.hacc.open .acc-inner { padding-bottom: 14px; }
+
+/* ===== 28. 通知未读：整行柔色盒（list-row 版与 notif-item 版统一；不再切 logo/时间戳） ===== */
+.list-row.unread, .notif-item.unread {
+  background: var(--color-primary-tint) !important;
+  border-radius: 12px;
+  border-bottom-color: transparent;
+  margin: 4px 2px;
+  padding: 12px 14px !important;
+  box-shadow: none !important;
+}
+
+/* ===== 29. AI 思考中动效（三点脉冲）+ insight 箭头灰化缩小光学对齐 + header 右侧间距收紧 ===== */
+/* AI 思考中气泡（.msg.thinking 由 ai.js 控制） */
+.msg.thinking .dots { display: inline-flex; gap: 5px; padding: 4px 2px; }
+.msg.thinking .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-ink-2); opacity: .4; animation: think-bounce 1.2s infinite; }
+.msg.thinking .dots i:nth-child(2) { animation-delay: .15s; }
+.msg.thinking .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes think-bounce { 0%, 60%, 100% { transform: none; opacity: .35; } 30% { transform: translateY(-4px); opacity: 1; } }
+/* AI 洞察箭头：灰、小、光学居中（flex 行内 vertical-align 不参与，用 margin-top 校正基线） */
+.insight-li { align-items: center; }
+.insight-li svg { width: 11px; height: 11px; margin-top: 0; color: var(--color-ink-2); }
+/* header 右侧图标组间距收紧（移动端） */
+@media (max-width: 767px) {
+  .header-right { gap: 2px; }
+  .v-sep { margin: 0 2px; }
+  .icon-btn { padding: 6px; }
+}
+
+/* ===== 30. 移动端 wealth/pay 双列卡 ===== */
+@media (max-width: 600px) {
+  /* wealth：存款横滑区改两列（基金横滑区维持单列滚动）；此处按内容类区分：deps 容器由 wealth.js 标注 */
+  .hscroll.deps { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); overflow-x: visible; }
+  .hscroll.deps .fund-card { min-width: 0; width: auto; }
+  /* pay：常用收款人横滑区改两列 */
+  .hscroll.payees { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); overflow-x: visible; }
+  .hscroll.payees .fund-card { min-width: 0; width: auto; }
+}

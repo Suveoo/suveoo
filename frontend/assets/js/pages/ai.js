@@ -102,7 +102,7 @@ S.router.register("ai", async ({ user }) => {
     busy = true;
     bubble("user", text);
     S.ui.$("#chips")?.remove();
-    const aiMsg = bubble("ai", "…");
+    const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
     S.trust.evt("CHAT", null, text.slice(0, 60));
     S.ga4.event("ai_chat_start", { entry: "composer" });
     /* 流式 Markdown：累积原文、节流重渲（160ms），结束时全量渲染一次 */
@@ -117,7 +117,7 @@ S.router.register("ai", async ({ user }) => {
     };
     const renderSoon = () => { if (!renderTimer) renderTimer = setTimeout(renderNow, 160); };
     await S.chat.send(text, {
-      onToken: (t) => { if (aiMsg.textContent === "…") aiMsg.textContent = ""; raw += t; renderSoon(); },
+      onToken: (t) => { raw += t; renderSoon(); },
       onGenui: (card) => {
         renderNow();
         const node = S.genui.render(card);
@@ -125,9 +125,10 @@ S.router.register("ai", async ({ user }) => {
         if (card && card.component === "transfer_confirmation" && card.grant_hash) attachConfirm(card, aiMsg);
       },
       onTrust: (ev) => S.trust.onEvent(ev),
-      onError: (msg) => { renderNow(); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); },
+      onError: (msg) => { clearTimeout(renderTimer); renderTimer = null; aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); },
       onDone: () => {
         clearTimeout(renderTimer); renderTimer = null;
+        aiMsg.classList.remove("thinking");
         if (!raw) aiMsg.textContent = S.t("ai.done");
         else renderNow();
         busy = false;

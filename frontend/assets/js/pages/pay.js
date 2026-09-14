@@ -16,7 +16,7 @@ S.router.register("pay", async () => {
       <a class="mini-action" href="/pay/bills">${S.ui.icon("doc", 16)}${S.fmt.escape(S.t("pay.billsEntry"))}</a>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("pay.payees"))}</h2><a class="more" href="/transfer/payees">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
-    <div class="hscroll" id="payees">${S.ui.skeleton(2)}</div>
+    <div class="hscroll payees" id="payees">${S.ui.skeleton(2)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("pay.recent"))}</h2><a class="more" href="/transfer/history">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card" id="recent">${S.ui.skeleton(3)}</div>`;
   document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.hotpotAA"));

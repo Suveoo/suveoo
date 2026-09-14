@@ -9,7 +9,7 @@ S.router.register("notifications", async () => {
     const r = await S.api.get("/api/notifications");
     if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
     el.innerHTML = (r.data.notifications ?? []).map((n) => `
-      <div class="list-row ${n.read ? "" : "unread"}" style="${n.read ? "" : "background:var(--color-primary-tint)"}">
+      <div class="list-row ${n.read ? "" : "unread"}">
         <span class="avatar">${S.ui.icon(n.type === "SECURITY" ? "shield" : n.type === "WEALTH" ? "wealth" : n.type === "TASK" ? "clock" : "bell", 14)}</span>
         <div class="grow"><b>${S.fmt.escape(n.title)}</b><div class="muted small">${S.fmt.escape(n.body)}</div></div>
         <span class="muted small">${S.fmt.relTime(n.ts)}</span>
