@@ -398,8 +398,8 @@ body.tc-open { overflow: hidden; }
 
 /* ===== 26. Header logo 适度放大（全端；移动端尤甚） ===== */
 .app-header .logo-link img { height: 31px; transition: height .2s ease; }
-@media (max-width: 767px) { .app-header .logo-link img { height: 30px; } }
-@media (max-width: 380px) { .app-header .logo-link img { height: 28px; } }
+@media (max-width: 767px) { .app-header .logo-link img { height: 26px; } }
+@media (max-width: 380px) { .app-header .logo-link img { height: 24px; } }
 
 /* ===== 27. 手风琴收起态零高度（padding 也要归零，否则露半行答案） ===== */
 .acc-item.hacc .acc-body { padding: 0 16px !important; max-height: 0 !important; }
