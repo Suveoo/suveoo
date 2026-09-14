@@ -11,6 +11,8 @@ S.chrome = {
     if (p.startsWith("/transfer")) return "pay";
     for (const n of this.nav) if (p.startsWith(n.path)) return n.key;
     if (p.startsWith("/account")) return "account";
+    /* 一级路径之外的公开页归属其所在分区（通知/关于/帮助/联系 → 主页） */
+    if (["/notifications", "/about", "/help", "/contact"].some((x) => p.startsWith(x))) return "home";
     return "";
   },
   async render() {
