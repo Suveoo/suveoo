@@ -15,6 +15,9 @@ dist/
 # ===== Internal strategy docs (not part of competition deliverables) =====
 for-claude-code/
 
+for_developer/
+notes/
+
 # ===== OS Generated =====
 Thumbs.db
 ehthumbs.db
