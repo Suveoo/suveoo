@@ -13,3 +13,9 @@ JWT_SECRET=
 
 # 金丝雀令牌（openssl rand -hex 32）
 CANARY_TOKEN_SECRET=
+
+# ===== Telegram 开户通知（可选；不配置则不发通知） =====
+# 从 @BotFather 创建 bot 后获得 token；chat_id 通过向 bot 发消息后访问
+# https://api.telegram.org/bot<TOKEN>/getUpdates 读取 chat.id
+TELEGRAM_BOT_TOKEN =
+TELEGRAM_CHAT_ID =

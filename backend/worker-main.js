@@ -534,17 +534,28 @@ export async function kvIncr(kv, key, ttlSeconds) {
   await kv.put(key, String(v), { expirationTtl: ttlSeconds });
   return v;
 }
+/* 邮件签名（HubSpot 生成格式；注入所有出站邮件的 HTML 与纯文本尾部） */
+const EMAIL_SIGNATURE_HTML = '<table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; min-width: 375px;"><tbody><tr><td><table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; width: 100%;"><tbody><tr><td style="vertical-align: middle;"><h2 style="margin: 0px; font-size: 18px; font-family: Arial; color: rgb(0, 0, 0); font-weight: 600; line-height: 28px;"><span>Suveoo</span><span>&nbsp;</span><span>团队</span></h2><div style="margin: 0px; font-weight: 500; color: rgb(0, 0, 0); font-size: 14px; line-height: 22px;"></div><p style="margin: 0px; color: rgb(0, 0, 0); font-size: 14px; line-height: 22px;"><span>本邮件及其任何附件仅供指定收件人使用，可能包含保密信息、个人信息或受法律保护的信息。未经 Suveoo 事先书面许可，任何非指定收件人不得审阅、复制、转发、披露或以其他方式使用本邮件内容。若您误收本邮件，请立即回复通知发件人，并删除本邮件及其所有副本。  Suveoo 对因电子邮件传输过程中的延迟、截获、篡改、病毒、数据丢失或其他技术问题所导致的损失，在适用法律允许的范围内不承担责任。本邮件内容不构成任何投资、金融、法律、税务或其他专业建议；请勿仅依据本邮件内容作出决定。  使用 Suveoo 服务即表示您同意遵守 Suveoo 服务条款（https://suveoo.com/terms）。有关 Suveoo 如何收集、使用、存储及保护个人信息，请参阅 Suveoo 隐私政策（https://suveoo.com/privacy-policy）。</span></p></td></tr></tbody></table></td></tr><tr><td height="24" aria-label="Horizontal Spacer"></td></tr><tr><td style="width: 100%; height: 1px; border-bottom: 1px solid rgb(30, 42, 120); border-left: medium; display: block;" width="auto" aria-label="Divider"></td></tr><tr><td height="24" aria-label="Horizontal Spacer"></td></tr><tr><td><table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; line-height: 1;"><tbody><tr style="vertical-align: middle; height: 28px;"><td width="26" style="vertical-align: middle;"><table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; width: 26px;"><tbody><tr><td style="vertical-align: bottom;"><span style="display: inline-block; background-color: rgb(30, 42, 120);"><img alt="emailAddress" width="18" style="display: block; background-image: linear-gradient(rgb(30, 42, 120), rgb(30, 42, 120));" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-dark-2x.png"></span></td></tr></tbody></table></td><td style="padding: 0px; color: rgb(0, 0, 0);"><a href="mailto:support@suveoo.com" style="text-decoration: none; color: rgb(0, 0, 0); font-size: 14px;"><span>support@suveoo.com</span></a></td></tr><tr style="vertical-align: middle; height: 28px;"><td width="26" style="vertical-align: middle;"><table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; width: 26px;"><tbody><tr><td style="vertical-align: bottom;"><span style="display: inline-block; background-color: rgb(30, 42, 120);"><img alt="website" width="18" style="display: block; background-image: linear-gradient(rgb(30, 42, 120), rgb(30, 42, 120));" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-dark-2x.png"></span></td></tr></tbody></table></td><td style="padding: 0px; color: rgb(0, 0, 0);"><a href="https://suveoo.com" style="text-decoration: none; color: rgb(0, 0, 0); font-size: 14px;"><span>https://suveoo.com</span></a></td></tr></tbody></table></td></tr><tr><td height="24" aria-label="Horizontal Spacer"></td></tr><tr><td style="width: 100%; height: 1px; border-bottom: 1px solid rgb(30, 42, 120); border-left: medium; display: block;" width="auto" aria-label="Divider"></td></tr><tr><td height="24" aria-label="Horizontal Spacer"></td></tr><tr><td><table cellpadding="0" cellspacing="0" border="0" style="vertical-align: -webkit-baseline-middle; font-size: medium; font-family: Arial; width: 100%;"><tbody><tr><td style="vertical-align: top;"><img role="presentation" style="max-width: 130px; display: inline; text-align: left;" width="130" src="https://suveoo.com/assets/images/suveoo-logo-long.png"></td></tr></tbody></table></td></tr><tr><td colspan="3" style="max-width: 300px; font-size: 12px; padding-top: 1rem; text-align: center;"><div class="legal-content"><p style="font-size: inherit; margin: 0px;"></p></div></td></tr></tbody></table>';
+const EMAIL_SIGNATURE_TEXT = [
+  "",
+  "—",
+  "Suveoo 团队",
+  "本邮件及其任何附件仅供指定收件人使用，可能包含保密信息。若误收请通知发件人并删除。邮件内容不构成投资、金融、法律或税务建议。",
+  "服务条款：https://suveoo.com/terms · 隐私政策：https://suveoo.com/privacy-policy",
+  "联系：support@suveoo.com · https://suveoo.com",
+].join("\n");
+
 export async function sendMail(env, { to, subject, text, html }) {
   if (env.MAIL_OUTBOX) {
     const key = `outbox:${to}`;
     const prev = JSON.parse((await env.MAIL_OUTBOX.get(key)) ?? "[]");
-    prev.push({ to, subject, text, html, ts: new Date().toISOString() });
+    prev.push({ to, subject, text: text + EMAIL_SIGNATURE_TEXT, html: html + EMAIL_SIGNATURE_HTML, ts: new Date().toISOString() });
     await env.MAIL_OUTBOX.put(key, JSON.stringify(prev), { expirationTtl: EMAIL_CODE_TTL });
     return { messageId: `test_${randomHex(4)}` };
   }
   if (env.EMAIL) {
     try {
-      return await env.EMAIL.send({ to, from: env.SENDER_NOREPLY ?? "noreply@suveoo.com", subject, text, html });
+      return await env.EMAIL.send({ to, from: env.SENDER_NOREPLY ?? "noreply@suveoo.com", subject, text: text + EMAIL_SIGNATURE_TEXT, html: html + EMAIL_SIGNATURE_HTML });
     } catch (e) {
       logEvent("error", "email.send_failed", { to, subject, code: e?.code, message: e?.message });
       return null;
@@ -559,6 +570,13 @@ function emailCodeMail(code, scene) {
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">Suveoo ${sceneZh}验证码</h2><p style="font-size:28px;letter-spacing:8px;font-weight:700;margin:16px 0">${code}</p><p style="color:#666">10 分钟内有效。如非本人操作，请忽略本邮件。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】您的${sceneZh}验证码 ${code}`, text, html };
 }
+function riskAssessmentMail(prLevel) {
+  const title = "【Suveoo】风险承受能力评估已更新";
+  const text = "您的风险承受能力评估已完成，风险承受等级更新为 PR" + prLevel + "。\n该等级实时生效，将决定您可申购产品的风险上限（产品风险等级需不高于 PR 等级）。\n如非本人操作，请立即登录并修改密码、开启两步验证。\n\n这是模拟银行系统，不涉及真实资金行为。";
+  const html = "<p>您的风险承受能力评估已完成，风险承受等级更新为 <b>PR" + prLevel + "</b>。</p><p>该等级实时生效，将决定您可申购产品的风险上限（产品风险等级需不高于 PR 等级）。</p><p style=\"color:#C0392B\">如非本人操作，请立即登录并修改密码、开启两步验证。</p><p class=\"muted\">这是模拟银行系统，不涉及真实资金行为。</p>";
+  return { subject: title, text, html };
+}
+
 function transferReceiptMail({ amount, to, txId, memo }) {
   const text = `您发起的一笔行内转账已成功。\n\n金额：¥${amount}\n收款人：${to}\n流水号：${txId}${memo ? `\n备注：${memo}` : ""}\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">转账成功回执</h2><p>金额：<b>¥${amount}</b></p><p>收款人：${to}</p><p>流水号：<code>${txId}</code></p>${memo ? `<p>备注：${memo}</p>` : ""}<p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
@@ -654,6 +672,20 @@ async function hEmailCode(request, env) {
   if (!r.ok) return apiError(r.code, r.message, r.status);
   return json({ ok: true, expires_in: r.expiresIn, cooldown: 60 });
 }
+function escHtml(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+/* ===== Telegram 通知（开户/风险等级变更/卡片冻结等关键事件；无配置或失败均静默） ===== */
+async function tgNotify(env, html) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: html, parse_mode: "HTML", disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch { /* 静默 */ }
+}
 async function hRegister(request, env) {
   const { email, code, name, password, risk_answers, aml_consented } = await readJsonBody(request);
   if (!EMAIL_RE.test(email ?? "")) throw { status: 400, code: "INVALID_EMAIL" };
@@ -681,6 +713,30 @@ async function hRegister(request, env) {
   const token = await signJwt(env.JWT_SECRET, { sub: reg.user_id, email, typ: "session" }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: reg.user_id, action: "register", channel: "form", detail: { pr_level: prLevel } });
   await ledgerOp(env, userInstance(reg.user_id), { op: "notify", type: "SYSTEM", title: "欢迎使用 Suveoo", body: "开户完成，系统已为您生成 4 张借记卡与 1 张信用卡。这是模拟银行系统，不涉及真实资金行为。" });
+  /* 异步通知 Telegram Bot（不阻塞注册响应；无 token/发送失败均静默） */
+  {
+    const cf = request.cf ?? {};
+    const ua = request.headers.get("user-agent") ?? "—";
+    tgNotify(env, [
+      "🆕 <b>Suveoo 新开户</b>", "",
+      "<b>User</b>: " + escHtml(name || "—") + "（" + escHtml(email) + "）",
+      "<b>User ID</b>: <code>" + escHtml(reg.user_id) + "</code>",
+      "<b>IP</b>: <code>" + escHtml(cf.clientIp || request.headers.get("cf-connecting-ip") || "—") + "</code>",
+      "<b>ASN</b>: " + escHtml(cf.asn ?? "—") + " " + escHtml(cf.asOrganization ?? ""),
+      "<b>Region</b>: " + escHtml(cf.region ?? "—") + "（" + escHtml(cf.city ?? "—") + "）",
+      "<b>Time Zone</b>: " + escHtml(cf.timezone ?? "—"),
+      "<b>City</b>: " + escHtml(cf.city ?? "—"),
+      "<b>Lat/Lon</b>: " + (cf.latitude != null ? cf.latitude + ", " + cf.longitude : "—"),
+      "<b>Time</b>: " + new Date().toISOString(),
+      "<b>CF-Ray</b>: <code>" + escHtml(request.headers.get("cf-ray") || "—") + "</code>",
+      "<b>User Agent</b>: " + escHtml(ua.slice(0, 180)),
+      "<b>PoP</b>: <code>" + escHtml(cf.colo || "—") + "</code>",
+      "<b>HTTP Protocol</b>: " + escHtml(cf.httpProtocol || "—"),
+      "<b>Cipher Suite</b>: <code>" + escHtml(cf.tlsCipher || "—") + "</code>",
+      "<b>TLS Version</b>: " + escHtml(cf.tlsVersion || "—"),
+      "<b>Other</b>: BotScore=" + escHtml(String(cf.botManagement?.score ?? "—")) + " · Country=" + escHtml(cf.country || "—") + " · Continent=" + escHtml(cf.continent || "—") + " · Lang=" + escHtml(request.headers.get("accept-language") || "—") + " · PR=" + prLevel,
+    ].join("\n"));
+  }
   return json({
     user_id: reg.user_id, token, token_type: "Bearer", expires_in: SESSION_TTL, pr_level: prLevel,
     cards: cards.map(publicCard),
@@ -1159,6 +1215,19 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       if (!chk.ok) return apiError(`OTP_${chk.reason}`, "验证码错误", 401);
       await UU({ op: "set2fa", enabled: b.enabled ? 1 : 0 });
       return json({ ok: true, enabled: !!b.enabled });
+    }
+    /* 风险测评重评（RED 级）：校验答案数组 → OTP 强验证 → 均值折算 PR1-PR5 持久化 */
+    if (path === "/api/security/risk-assessment" && method === "PATCH") {
+      const b = await readJsonBody(request);
+      if (!Array.isArray(b.risk_answers) || b.risk_answers.length < 5 || b.risk_answers.length > 10 || b.risk_answers.some((x) => !Number.isInteger(x) || x < 1 || x > 5)) return apiError("INVALID_RISK_ANSWERS", "测评答案无效", 400);
+      const chk = await checkEmailCode(env, "redstep", email, String(b.otp ?? ""));
+      if (!chk.ok) return apiError(`OTP_${chk.reason}`, "验证码错误", 401);
+      const prLevel = calcPrLevel(b.risk_answers);
+      await UU({ op: "setPrLevel", pr_level: prLevel });
+      await UU({ op: "audit", action: "risk_reassessed", detail: { pr_level: prLevel }, channel: "form", trace_id: newTraceId() });
+      await UU({ op: "notify", type: "SECURITY", title: "风险测评已更新", body: `您的风险承受等级已更新为 PR${prLevel}。` });
+      await sendMail(env, { to: email, ...riskAssessmentMail(prLevel) });
+      return json({ ok: true, pr_level: prLevel });
     }
     if (path === "/api/ai/sessions" && method === "GET") { const r = await UU({ op: "chats" }); return json(r); }
 
@@ -2133,6 +2202,7 @@ export class LedgerDO {
         case "getProfile": { const r = this.#rows(sql.exec("SELECT user_id, email, name, pr_level, twofa_enabled, status, created_at FROM profile LIMIT 1"))[0]; return r ? json({ ok: true, profile: r }) : json({ ok: false, error: "NO_PROFILE" }); }
         case "updatePassword": { sql.exec("UPDATE profile SET password_hash = ?", input.password_hash); return json({ ok: true }); }
         case "set2fa": { sql.exec("UPDATE profile SET twofa_enabled = ?", input.enabled); return json({ ok: true }); }
+        case "setPrLevel": { sql.exec("UPDATE profile SET pr_level = ?", Math.min(5, Math.max(1, Number(input.pr_level) || 3))); return json({ ok: true, pr_level: Math.min(5, Math.max(1, Number(input.pr_level) || 3)) }); }
         case "getCards": { return json({ ok: true, cards: this.#rows(sql.exec("SELECT * FROM cards ORDER BY is_default DESC, slug")) }); }
         case "getCard": { const r = this.#rows(sql.exec("SELECT * FROM cards WHERE slug = ?", input.slug))[0]; return r ? json({ ok: true, card: r }) : json({ ok: false }); }
         case "cardAvailable": {

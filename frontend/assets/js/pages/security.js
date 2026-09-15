@@ -12,11 +12,10 @@ S.router.register("security", async ({ user }) => {
         <label class="switch"><input type="checkbox" id="tfa" ${sec.twofa_enabled ? "checked" : ""}><span class="tk"></span></label></div>
       <div class="list-row"><span class="avatar">${S.ui.icon("chart", 14)}</span>
         <div class="grow"><b>${S.fmt.escape(S.t("sec.pr"))}</b><div class="muted small">${S.fmt.escape(S.t("wealth.prLevel"))}：PR${user?.pr_level ?? 3}（${S.fmt.escape(S.t("wealth.riskMatch"))}）</div></div>
-        <button class="btn btn-sm btn-ghost" id="retest">${S.fmt.escape(S.t("sec.retest"))}</button></div>
+        <a class="btn btn-sm btn-ghost" id="retest" href="/account/risk-assessment">${S.fmt.escape(S.t("sec.retest"))}</a></div>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("sec.audit"))}</h2></div>
     <div class="card" id="audit">${S.ui.skeleton(4)}</div>`;
-  document.getElementById("retest").onclick = () => S.router.ai(S.t("prompt.retest"));
   document.getElementById("chg").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.changePass"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("consent.otp"))}</span>

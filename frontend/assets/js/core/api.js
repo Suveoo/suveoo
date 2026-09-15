@@ -28,14 +28,19 @@ S.api = {
       }
       if (!out) out = { status: 0, ok: false, data: { error: { code: "TIMEOUT", message: S.t("common.timeout") } } };
     }
-    if (out.status === 401) {
+    /* /api/security/* 的 401 是业务性 OTP 错误（OTP_ 码），不应视为会话失效 */
+    const isOtpBiz401 = out.data?.error?.code?.startsWith("OTP_");
+    if (out.status === 401 && !isOtpBiz401) {
       /* 守卫的业务性 401（红级 OTP_REQUIRED）不是会话失效：不清令牌、不跳登录 */
       if (out.data?.status === "OTP_REQUIRED") return out;
       this.token = null; // 会话失效先清令牌，杜绝带着坏 token 循环
       // 已在登录页时不再跳转（否则 next 参数会无限嵌套）
-      if (!path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login")) {
+      /* 会话级防抖：一次过期只触发一次跳转（并发 401 全部让位） */
+      if (!path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
+        sessionStorage.setItem("suveoo_redirecting", "1");
         const next = encodeURIComponent(location.pathname + location.search);
         location.replace(`/account/login?next=${next}`);
+        setTimeout(() => sessionStorage.removeItem("suveoo_redirecting"), 4000);
       }
       return { status: 401, ok: false, data: out.data };
     }

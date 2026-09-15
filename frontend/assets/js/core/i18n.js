@@ -15,16 +15,15 @@ S.i18n = {
   async init() {
     try {
       const withTimeout = (p, ms = 4000) => Promise.race([p, new Promise((r) => setTimeout(() => r({}), ms))]);
-      // 跟随 HTML 里的资源版本参数（?v=bN），i18n JSON 变更后立即生效而非等 max-age 过期
+      /* 跟随 HTML 资产版本（?v=bNN），语言包更新随部署立即生效；404 → fallback 机制照旧 */
       const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
-      const u = (p) => (av ? `${p}?v=${av}` : p);
-      const [main, fb] = await Promise.all([
-        withTimeout(fetch(u(`/i18n/${this.lang}.json`)).then((r) => (r.ok ? r.json() : {}))),
-        this.lang === "zh-CN" ? Promise.resolve({}) : withTimeout(fetch(u("/i18n/fallback.json")).then((r) => (r.ok ? r.json() : {}))),
-      ]);
-      this.dict = { ...fb, ...main };
+      const u = (f) => `/i18n/${f}.json${av ? "?v=" + av : ""}`;
+      const load = (f) => fetch(u(f)).then((r) => (r.ok ? r.json() : {}));
+      const list = this.lang === "zh-CN" ? ["zh-CN"] : [this.lang, "zh-CN"];
+      const parts = await Promise.all(list.map((f) => withTimeout(load(f))));
+      this.dict = Object.assign({}, ...parts.filter(Boolean));
+      document.documentElement.lang = this.lang;
     } catch { this.dict = {}; }
-    document.documentElement.lang = this.lang;
   },
   async set(code) {
     if (code === this.lang) return;
