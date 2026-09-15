@@ -9,6 +9,8 @@ S.router = {
     if (needAuth || page === "home") {
       const sess = await S.auth.session();
       if (needAuth && !sess) {
+        /* 标记重定向中：app.js 的看门狗/完成校验检测到此标志即放弃 reload（防循环） */
+        S.router.redirecting = true;
         const next = encodeURIComponent(location.pathname + location.search);
         location.replace(`/account/login?next=${next}`);
         return;

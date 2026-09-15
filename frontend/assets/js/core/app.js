@@ -296,8 +296,12 @@ S.purchaseModal = async (fund) => {
       new Promise((_, reject) => setTimeout(() => reject(new Error("BOOT_WATCHDOG")), 20000)),
     ]);
     sessionStorage.removeItem("suveoo_boot_retried");
+    /* 登录重定向中：由 /account/login 页面接管，不做完成校验、不做任何自救 */
+    if (S.router.redirecting) return;
     if (document.querySelector('#content .skeleton[data-boot="1"]')) throw new Error("BOOT_INCOMPLETE");
   } catch (e) {
+    /* 重定向中：放弃一切自救/报错（导航已发生，当前 document 即将销毁） */
+    if (S.router.redirecting) return;
     const code = String(e?.message ?? "");
     if ((code.includes("BOOT_WATCHDOG") || code.includes("BOOT_INCOMPLETE")) &&
         document.querySelector('#content .skeleton[data-boot="1"]') &&
