@@ -631,15 +631,16 @@ async function readJsonBody(request, limit = 16384) {
   if (text.length > limit) throw { status: 413, code: "PAYLOAD_TOO_LARGE" };
   try { return JSON.parse(text || "{}"); } catch { throw { status: 400, code: "INVALID_JSON" }; }
 }
-export async function handleAuthApi(request, env, url) {
+export async function handleAuthApi(request, env, url, ctx) {
+  const waitUntil = ctx ? (p) => ctx.waitUntil(p) : null;
   if (request.method !== "POST") return apiError("METHOD_NOT_ALLOWED", "POST only", 405);
   try {
     switch (url.pathname) {
       case "/api/auth/email-code": return await hEmailCode(request, env);
-      case "/api/auth/register": return await hRegister(request, env);
-      case "/api/auth/login": return await hLogin(request, env);
-      case "/api/auth/mfa": return await hMfa(request, env);
-      case "/api/auth/recover": return await hRecover(request, env);
+      case "/api/auth/register": return await hRegister(request, env, waitUntil);
+      case "/api/auth/login": return await hLogin(request, env, waitUntil);
+      case "/api/auth/mfa": return await hMfa(request, env, waitUntil);
+      case "/api/auth/recover": return await hRecover(request, env, waitUntil);
       case "/api/auth/logout": return await hLogout(request, env);
       default: return apiError("NOT_FOUND", `no auth route: ${url.pathname}`, 404);
     }
@@ -674,7 +675,7 @@ async function hEmailCode(request, env) {
 }
 function escHtml(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-/* ===== Telegram 通知（开户/风险等级变更/卡片冻结等关键事件；无配置或失败均静默） ===== */
+/* ===== Telegram 通知（开户/登录/风险操作/写操作执行等关键事件；无配置或失败均静默） ===== */
 async function tgNotify(env, html) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
   try {
@@ -686,7 +687,70 @@ async function tgNotify(env, html) {
     });
   } catch { /* 静默 */ }
 }
-async function hRegister(request, env) {
+/* 发送并挂到请求生命周期上：未 await 的 fetch 在响应返回后会被运行时取消（注册通知丢失的根因），必须 waitUntil */
+function tgFire(env, waitUntil, lines) {
+  const p = tgNotify(env, Array.isArray(lines) ? lines.join("\n") : lines);
+  if (typeof waitUntil === "function") waitUntil(p);
+  return p;
+}
+/* 请求侧公共遥测行（IP/ASN/UA 等，注册/登录类消息复用） */
+function tgRequestLines(request) {
+  const cf = request.cf ?? {};
+  const ua = request.headers.get("user-agent") ?? "—";
+  return [
+    "<b>IP</b>: <code>" + escHtml(cf.clientIp || request.headers.get("cf-connecting-ip") || "—") + "</code>",
+    "<b>Region</b>: " + escHtml(cf.country ?? "—") + " · " + escHtml(cf.region ?? "—") + "（" + escHtml(cf.city ?? "—") + "）",
+    "<b>User Agent</b>: " + escHtml(ua.slice(0, 180)),
+    "<b>Time</b>: " + new Date().toISOString(),
+  ];
+}
+/* EXECUTED 写操作 → Telegram 消息行（REST 与 AI 通道共用收口；金额/对象取自已验证 IR，非模型自由文本） */
+function tgActionLines(ir, ex) {
+  const p = ir.steps[0].params ?? {};
+  const chan = ir.channel === "ai" ? "AI 通道" : "经典表单";
+  const tier = ir.risk?.tier ?? "—";
+  let title = ir.intent, facts = [];
+  switch (ir.intent) {
+    case "transfer_execute":
+      title = "💸 转账已执行";
+      facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "收款人 " + escHtml(p.recipient_name ?? String(p.recipient ?? "—")), "流水号 <code>" + escHtml(ex?.tx_id ?? "—") + "</code>"];
+      break;
+    case "wealth_product_purchase":
+      title = "📈 理财申购已执行";
+      facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"];
+      break;
+    case "wealth_product_redeem":
+      title = "📉 理财赎回已执行";
+      facts = ["产品 <code>" + escHtml(p.product_id) + "</code>", "份额 " + escHtml(p.amount === "ALL" ? "全部持仓" : "¥" + p.amount)];
+      break;
+    case "fx_exchange":
+      title = "💱 换汇已执行";
+      facts = [(p.direction === "buy" ? "购汇 " : "结汇 ") + escHtml(p.currency ?? "—"), "折合 <b>¥" + escHtml(p.amount_cny) + "</b>"];
+      break;
+    case "card_freeze": title = "🧊 卡片已冻结"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
+    case "card_unfreeze": title = "🔓 卡片已解冻"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
+    case "card_limit_adjust":
+      title = "🎚 卡片限额已调整";
+      facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>", "单笔 ¥" + escHtml(p.new_limit ?? "—") + " / 日累计 ¥" + escHtml(p.new_daily_limit ?? "—")];
+      break;
+    case "bill_pay": title = "🧾 账单已缴费"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
+    case "autopay_manage": title = "🔁 自动扣款开关变更"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
+    case "subscription_cancel": title = "❌ 订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
+    case "payee_manage": title = "👥 收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
+    case "funds_lock": title = "🔒 资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
+    case "scheduled_task_create": title = "⏰ 长程任务已建立"; facts = ["任务 " + escHtml(p.title ?? p.task_type), "执行于 " + escHtml(p.execute_at ?? "—")]; break;
+    case "ecommerce_order_mock": title = "🛍 演示商户订单已执行"; facts = ["商品 " + escHtml(p.item ?? "—"), "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
+    default: facts = ["intent <code>" + escHtml(ir.intent) + "</code>"];
+  }
+  return [
+    "<b>" + title + "</b>", "",
+    ...facts,
+    "<b>通道</b>: " + chan + " · <b>风险级</b>: " + tier + " · <b>User</b>: <code>" + escHtml(ir.user_id) + "</code>",
+    "<b>trace_id</b>: <code>" + escHtml(ir.trace_id ?? "—") + "</code>",
+    "<b>Time</b>: " + new Date().toISOString(),
+  ];
+}
+async function hRegister(request, env, waitUntil) {
   const { email, code, name, password, risk_answers, aml_consented } = await readJsonBody(request);
   if (!EMAIL_RE.test(email ?? "")) throw { status: 400, code: "INVALID_EMAIL" };
   if (typeof password !== "string" || !/^\S{8,32}$/.test(password)) throw { status: 400, code: "INVALID_PASSWORD", message: "密码须为 8-32 位" };
@@ -713,29 +777,24 @@ async function hRegister(request, env) {
   const token = await signJwt(env.JWT_SECRET, { sub: reg.user_id, email, typ: "session" }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: reg.user_id, action: "register", channel: "form", detail: { pr_level: prLevel } });
   await ledgerOp(env, userInstance(reg.user_id), { op: "notify", type: "SYSTEM", title: "欢迎使用 Suveoo", body: "开户完成，系统已为您生成 4 张借记卡与 1 张信用卡。这是模拟银行系统，不涉及真实资金行为。" });
-  /* 异步通知 Telegram Bot（不阻塞注册响应；无 token/发送失败均静默） */
+  /* 异步通知 Telegram Bot（tgFire 经 waitUntil 挂到请求生命周期，响应返回后不会被运行时取消） */
   {
     const cf = request.cf ?? {};
-    const ua = request.headers.get("user-agent") ?? "—";
-    tgNotify(env, [
+    tgFire(env, waitUntil, [
       "🆕 <b>Suveoo 新开户</b>", "",
       "<b>User</b>: " + escHtml(name || "—") + "（" + escHtml(email) + "）",
       "<b>User ID</b>: <code>" + escHtml(reg.user_id) + "</code>",
-      "<b>IP</b>: <code>" + escHtml(cf.clientIp || request.headers.get("cf-connecting-ip") || "—") + "</code>",
+      ...tgRequestLines(request),
       "<b>ASN</b>: " + escHtml(cf.asn ?? "—") + " " + escHtml(cf.asOrganization ?? ""),
-      "<b>Region</b>: " + escHtml(cf.region ?? "—") + "（" + escHtml(cf.city ?? "—") + "）",
       "<b>Time Zone</b>: " + escHtml(cf.timezone ?? "—"),
-      "<b>City</b>: " + escHtml(cf.city ?? "—"),
       "<b>Lat/Lon</b>: " + (cf.latitude != null ? cf.latitude + ", " + cf.longitude : "—"),
-      "<b>Time</b>: " + new Date().toISOString(),
       "<b>CF-Ray</b>: <code>" + escHtml(request.headers.get("cf-ray") || "—") + "</code>",
-      "<b>User Agent</b>: " + escHtml(ua.slice(0, 180)),
       "<b>PoP</b>: <code>" + escHtml(cf.colo || "—") + "</code>",
       "<b>HTTP Protocol</b>: " + escHtml(cf.httpProtocol || "—"),
       "<b>Cipher Suite</b>: <code>" + escHtml(cf.tlsCipher || "—") + "</code>",
       "<b>TLS Version</b>: " + escHtml(cf.tlsVersion || "—"),
       "<b>Other</b>: BotScore=" + escHtml(String(cf.botManagement?.score ?? "—")) + " · Country=" + escHtml(cf.country || "—") + " · Continent=" + escHtml(cf.continent || "—") + " · Lang=" + escHtml(request.headers.get("accept-language") || "—") + " · PR=" + prLevel,
-    ].join("\n"));
+    ]);
   }
   return json({
     user_id: reg.user_id, token, token_type: "Bearer", expires_in: SESSION_TTL, pr_level: prLevel,
@@ -752,11 +811,14 @@ async function resolveLoginUser(env, identifier) {
   const prof = await ledgerOp(env, userInstance(userId), { op: "getProfile" });
   return prof.ok ? { userId, email: prof.profile.email, profile: prof.profile } : null;
 }
-async function hLogin(request, env) {
+async function hLogin(request, env, waitUntil) {
   const { identifier, password } = await readJsonBody(request);
   if (!identifier || typeof password !== "string") throw { status: 400, code: "INVALID_REQUEST" };
   const lockKey = `loginfail:${String(identifier).toLowerCase()}`;
-  if (Number((await env.SESSION_KV.get(lockKey)) ?? "0") >= LOGIN_FAIL_LIMIT) throw { status: 429, code: "LOGIN_LOCKED", message: "失败次数过多，请 15 分钟后再试" };
+  if (Number((await env.SESSION_KV.get(lockKey)) ?? "0") >= LOGIN_FAIL_LIMIT) {
+    tgFire(env, waitUntil, ["⛔ <b>登录已锁定</b>", "", "同一账户连续失败次数过多，已临时锁定 15 分钟。", ...tgRequestLines(request)]);
+    throw { status: 429, code: "LOGIN_LOCKED", message: "失败次数过多，请 15 分钟后再试" };
+  }
   const user = await resolveLoginUser(env, identifier);
   const auth = user ? await U(env, user.userId)({ op: "getAuth" }) : null;
   const passwordOk = auth?.ok ? await verifyPassword(password, auth.password_hash) : false;
@@ -774,9 +836,10 @@ async function hLogin(request, env) {
   }
   const token = await signJwt(env.JWT_SECRET, { sub: user.userId, email: user.email, typ: "session" }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: user.userId, action: "login", channel: "form", detail: { twofa: false } });
+  tgFire(env, waitUntil, ["🔑 <b>登录成功</b>", "", "<b>User</b>: " + escHtml(user.email), "两步验证：未启用", ...tgRequestLines(request)]);
   return json({ mfa_required: false, token, token_type: "Bearer", expires_in: SESSION_TTL });
 }
-async function hMfa(request, env) {
+async function hMfa(request, env, waitUntil) {
   const { mfa_token, code } = await readJsonBody(request);
   if (!env.JWT_SECRET) return apiError("SERVER_NOT_CONFIGURED", "JWT_SECRET missing", 500);
   const claims = await verifyJwt(String(mfa_token ?? ""), env.JWT_SECRET);
@@ -785,9 +848,10 @@ async function hMfa(request, env) {
   if (!chk.ok) throw { status: 401, code: chk.reason };
   const token = await signJwt(env.JWT_SECRET, { sub: claims.sub, email: claims.email, typ: "session" }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: claims.sub, action: "login", channel: "form", detail: { twofa: true } });
+  tgFire(env, waitUntil, ["🔑 <b>登录成功</b>", "", "<b>User</b>: " + escHtml(claims.email), "两步验证：已通过（邮箱验证码）", ...tgRequestLines(request)]);
   return json({ mfa_required: false, token, token_type: "Bearer", expires_in: SESSION_TTL });
 }
-async function hRecover(request, env) {
+async function hRecover(request, env, waitUntil) {
   const { email, code, new_password } = await readJsonBody(request);
   if (!EMAIL_RE.test(email ?? "")) throw { status: 400, code: "INVALID_EMAIL" };
   if (typeof new_password !== "string" || !/^\S{8,32}$/.test(new_password)) throw { status: 400, code: "INVALID_PASSWORD" };
@@ -798,6 +862,7 @@ async function hRecover(request, env) {
   const upd = await U(env, found.user_id)({ op: "updatePassword", password_hash: await hashPassword(new_password) });
   if (!upd.ok) throw { status: 500, code: "UPDATE_FAILED" };
   await audit(env, { user_id: found.user_id, action: "password_recovered", channel: "form" });
+  tgFire(env, waitUntil, ["🛡 <b>密码已重置（找回流程）</b>", "", "<b>User</b>: " + escHtml(email), "经邮箱验证码强验证后完成。", ...tgRequestLines(request)]);
   return json({ ok: true });
 }
 async function hLogout(request, env) {
@@ -887,6 +952,8 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
   if (v.status === VERDICT.VERIFIED) {
     const ex = await executeIntent(env, ir);
     await nonceStore.record(ir.nonce);
+    /* 全站写操作统一 Telegram 通知（转账/理财/冻结/缴费/换汇/订阅/任务等；REST 与 AI 通道在此收口） */
+    tgFire(env, ctxInfo.waitUntil, tgActionLines(ir, ex));
     return { status: "EXECUTED", ir, tier, result: ex, stages: v.stages };
   }
   return { ...v, ir };
@@ -1098,7 +1165,8 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
     if (path === "/api/demo/seed" && method === "POST") {
       if (env.DEMO_MODE !== "true") return apiError("FORBIDDEN", "DEMO_MODE off", 403);
-      return await seedDemo(env);
+      const b = await readJsonBody(request).catch(() => ({}));
+      return await seedDemo(env, typeof b.email === "string" && b.email ? b.email : null);
     }
 
     /* ---- 收款人 / 账单 / 订阅 ---- */
@@ -1207,6 +1275,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       if (typeof b.new_password !== "string" || !/^\S{8,32}$/.test(b.new_password)) return apiError("INVALID_PASSWORD", "密码须为 8-32 位", 400);
       await UU({ op: "updatePassword", password_hash: await hashPassword(b.new_password) });
       await UU({ op: "audit", action: "password_changed", detail: {}, channel: "form", trace_id: newTraceId() });
+      tgFire(env, ctxInfo.waitUntil, ["🛡 <b>登录密码已修改</b>", "", "<b>User</b>: " + escHtml(email), "安全中心红级操作（邮箱 OTP 强验证后生效）。", "<b>Time</b>: " + new Date().toISOString()]);
       return json({ ok: true });
     }
     if (path === "/api/security/2fa" && method === "POST") {
@@ -1214,6 +1283,12 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       const chk = await checkEmailCode(env, "redstep", email, String(b.otp ?? ""));
       if (!chk.ok) return apiError(`OTP_${chk.reason}`, "验证码错误", 401);
       await UU({ op: "set2fa", enabled: b.enabled ? 1 : 0 });
+      tgFire(env, ctxInfo.waitUntil, [
+        "🛡 <b>两步验证已" + (b.enabled ? "开启" : "关闭") + "</b>", "",
+        "<b>User</b>: " + escHtml(email),
+        b.enabled ? "登录将要求邮箱验证码第二步。" : "⚠️ 关闭后登录仅凭密码，安全性降低。",
+        "<b>Time</b>: " + new Date().toISOString(),
+      ]);
       return json({ ok: true, enabled: !!b.enabled });
     }
     /* 风险测评重评（RED 级）：校验答案数组 → OTP 强验证 → 均值折算 PR1-PR5 持久化 */
@@ -1227,6 +1302,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       await UU({ op: "audit", action: "risk_reassessed", detail: { pr_level: prLevel }, channel: "form", trace_id: newTraceId() });
       await UU({ op: "notify", type: "SECURITY", title: "风险测评已更新", body: `您的风险承受等级已更新为 PR${prLevel}。` });
       await sendMail(env, { to: email, ...riskAssessmentMail(prLevel) });
+      tgFire(env, ctxInfo.waitUntil, ["📊 <b>风险承受等级已更新</b>", "", "<b>User</b>: " + escHtml(email), "新等级 <b>PR" + prLevel + "</b>（红级操作，OTP 强验证后生效）。", "<b>Time</b>: " + new Date().toISOString()]);
       return json({ ok: true, pr_level: prLevel });
     }
     if (path === "/api/ai/sessions" && method === "GET") { const r = await UU({ op: "chats" }); return json(r); }
@@ -1681,12 +1757,12 @@ async function mcpExecuteTool(env, ctxInfo, name, args, sid) {
   return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, stages: g.stages }), isError: true };
 }
 
-export async function handleMcp(request, env, url) {
+export async function handleMcp(request, env, url, ctx) {
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { allow: "POST" } });
   const claims = await requireSession(request, env);
   if (!claims) return jsonrpcErr(null, -32001, "unauthorized: Bearer JWT required", 401);
   const sid = url.searchParams.get("sid") ?? "mcp";
-  const ctxInfo = { userId: claims.sub, email: claims.email };
+  const ctxInfo = { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null };
   let msg;
   try { msg = await request.json(); } catch { return jsonrpcErr(null, -32700, "parse error"); }
   const { id = null, method } = msg;
@@ -1846,7 +1922,7 @@ async function llmMessages(env, messages, tools) {
   return { out: await res.json() };
 }
 
-export async function handleAiChat(request, env) {
+export async function handleAiChat(request, env, ctx) {
   const claims = await requireSession(request, env);
   if (!claims) return apiError("UNAUTHORIZED", "invalid session", 401);
   let body = {};
@@ -1893,7 +1969,7 @@ export async function handleAiChat(request, env) {
           const toolResults = [];
           for (const tu of toolUses) {
             /* 本地转发一次 tools/call（与 /mcp 端点同一执行路径，含 airing 事件） */
-            const r = await mcpExecuteTool(env, { userId: claims.sub, email: claims.email }, tu.name, tu.input ?? {}, sid);
+            const r = await mcpExecuteTool(env, { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null }, tu.name, tu.input ?? {}, sid);
             toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: r.text, ...(r.isError ? { is_error: true } : {}) });
             await flushAiring();
           }
@@ -1955,10 +2031,117 @@ function genDemoTransactions(rng) {
   }
   return txs;
 }
-async function seedDemo(env) {
-  const email = "demo@suveoo.com";
+/* 全板块仿真数据（任意真实账户灌数据用）：120 天流水 + 收款人 + 账单 + 订阅 + 持仓 + 通知 + 长程任务。
+ * 金额/日期均带随机抖动（避免"太整"），人名/商户贴近真实语料；数值范围对齐 genDemoTransactions 的量级。 */
+function genUserSeedData(rng) {
+  const txs = [];
+  const now = Date.now(), DAY = 86400000;
+  const iso = (d, h, mi) => { const t = new Date(Math.min(d + (h * 60 + mi) * 60000, now - 60000)); return t.toISOString(); };
+  const amt = (min, max) => (min + rng() * (max - min)).toFixed(2);
+  const cats = [
+    { c: "餐饮", w: 0.26, gen: () => [ ["瑞幸咖啡", 9.9, 21], ["星巴克", 30, 41], ["霸王茶姬", 15, 23], ["外婆家", 68, 158], ["绿茶餐厅", 74, 166], ["老乡鸡", 26, 52], ["必胜客", 89, 187], ["海底捞", 168, 342] ] },
+    { c: "购物", w: 0.17, gen: () => [ ["京东商城", 39, 699], ["天猫超市", 45, 320], ["盒马鲜生", 56, 286], ["山姆会员商店", 128, 866], ["优衣库", 99, 498], ["屈臣氏", 35, 168], ["无印良品", 28, 245] ] },
+    { c: "交通", w: 0.14, gen: () => [ ["杭州地铁", 3, 9], ["滴滴出行", 11.5, 88], ["高德打车", 12, 76], ["哈啰单车", 1.5, 4.5] ] },
+    { c: "娱乐", w: 0.07, gen: () => [ ["万达影城", 39, 118], ["猫眼演出", 180, 480], ["Steam", 42, 268] ] },
+    { c: "生活服务", w: 0.14, gen: () => [ ["美团外卖", 22, 68], ["饿了么", 21, 63], ["中国移动", 28, 128], ["中国石化", 235, 412] ] },
+    { c: "医疗", w: 0.04, gen: () => [ ["老百姓大药房", 16, 128], ["丁当快药", 25, 96], ["口腔诊所", 60, 420] ] },
+  ];
+  const pick = () => { let r = rng(), acc = 0; for (const c of cats) { acc += c.w; if (r <= acc) return c; } return cats[0]; };
+  const salaries = ["32847.60", "33512.84", "32196.47", "32968.25"];
+  let monthIdx = 0;
+  for (let d = 119; d >= 0; d--) {
+    const day = new Date(now - d * DAY);
+    const date = day.getDate(), dow = day.getDay();
+    const n = 2 + Math.floor(rng() * 3);
+    for (let i = 0; i < n; i++) {
+      const c = pick();
+      const list = c.gen();
+      const [merchant, lo, hi] = list[Math.floor(rng() * list.length)];
+      const hour = 8 + Math.floor(rng() * 13), minute = Math.floor(rng() * 60);
+      txs.push({ ts: iso(day.getTime(), hour, minute), amount_cents: String(toCents(amt(lo, hi))), direction: "OUT", counterparty: merchant, category: c.c, memo: null, status: "SUCCESS", channel: "card", trace_id: null });
+    }
+    /* 工资：每月 10 日上午（含少量绩效浮动） */
+    if (date === 10) {
+      txs.push({ ts: iso(day.getTime(), 9, 41), amount_cents: String(toCents(salaries[monthIdx % salaries.length])), direction: "IN", counterparty: "杭州星澜信息技术有限公司", category: "工资", memo: "工资入账（税后）", status: "SUCCESS", channel: "form", trace_id: null });
+      monthIdx++;
+    }
+    /* 房租：每月 1 日转房东沈建平 */
+    if (date === 1) txs.push({ ts: iso(day.getTime(), 8, 12), amount_cents: String(toCents("3650.00")), direction: "OUT", counterparty: "沈建平", category: "住房", memo: "9 月房租（滨江星澜府 2-1-1203）", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 信用卡还款：每月 22 日 */
+    if (date === 22) txs.push({ ts: iso(day.getTime(), 10, 6), amount_cents: String(toCents(amt(1850, 7420))), direction: "OUT", counterparty: "信用卡还款", category: "信用", memo: "信用卡全额还款", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 周五晚聚餐 → 周六转陈嘉玮 AA */
+    if (dow === 6 && date % 3 === 0) txs.push({ ts: iso(day.getTime(), 11, 27), amount_cents: String(toCents(amt(96, 218))), direction: "OUT", counterparty: "陈嘉玮", category: "转账", memo: "周五聚餐 AA", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 差旅报销：隔月 18 日 */
+    if (date === 18 && d % 61 < 30) txs.push({ ts: iso(day.getTime(), 14, 33), amount_cents: String(toCents(amt(1420, 3860))), direction: "IN", counterparty: "杭州星澜信息技术有限公司", category: "报销", memo: "差旅报销（高铁+住宿）", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 理财申赎（近 3 个月各一笔，channel=form） */
+    if (d === 88) txs.push({ ts: iso(day.getTime(), 15, 8), amount_cents: String(toCents("20000.00")), direction: "OUT", counterparty: "Suveoo 环球货币基金 1", category: "理财", memo: "申购", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 61) txs.push({ ts: iso(day.getTime(), 10, 52), amount_cents: String(toCents(amt(26000, 27000))), direction: "OUT", counterparty: "Suveoo 环球多元资产组合 1", category: "理财", memo: "申购", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 34) txs.push({ ts: iso(day.getTime(), 9, 18), amount_cents: String(toCents(amt(7800, 8100))), direction: "IN", counterparty: "Suveoo 环球货币基金 1", category: "理财", memo: "赎回到账", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 9) txs.push({ ts: iso(day.getTime(), 16, 44), amount_cents: String(toCents(amt(11500, 12200))), direction: "OUT", counterparty: "Suveoo 环球黄金指数基金", category: "理财", memo: "申购", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 偶发朋友间转账（真人名 + 生活化备注） */
+    if (d === 52) txs.push({ ts: iso(day.getTime(), 20, 15), amount_cents: String(toCents("436.00")), direction: "OUT", counterparty: "周慕言", category: "转账", memo: "演唱会门票两张", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 47) txs.push({ ts: iso(day.getTime(), 19, 2), amount_cents: String(toCents("128.50")), direction: "IN", counterparty: "陈嘉玮", category: "转账", memo: "电影票代付返还", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 25) txs.push({ ts: iso(day.getTime(), 12, 38), amount_cents: String(toCents("215.80")), direction: "OUT", counterparty: "郑皓文", category: "转账", memo: "羽毛球场地分摊", status: "SUCCESS", channel: "form", trace_id: null });
+    if (d === 13) txs.push({ ts: iso(day.getTime(), 18, 24), amount_cents: String(toCents("168.00")), direction: "OUT", counterparty: "吴雅婷", category: "转账", memo: "同事生日礼物分摊", status: "SUCCESS", channel: "form", trace_id: null });
+    /* 一笔大额异常消费（供账单归因/离群检测演示） */
+    if (d === 40) txs.push({ ts: iso(day.getTime(), 15, 36), amount_cents: String(toCents("8299.00")), direction: "OUT", counterparty: "数码旗舰店", category: "购物", memo: "平板电脑（教育优惠）", status: "SUCCESS", channel: "card", trace_id: null });
+  }
+  const payees = [
+    { name: "沈建平", account: newCardNumber({ bin: "622288", rng: seededRng(11) }), group_label: "房东", email: null },
+    { name: "陈嘉玮", account: newCardNumber({ bin: "622288", rng: seededRng(12) }), group_label: "朋友", email: null },
+    { name: "林芷晴", account: newCardNumber({ bin: "622288", rng: seededRng(13) }), group_label: "家人", email: null },
+    { name: "周慕言", account: newCardNumber({ bin: "622288", rng: seededRng(14) }), group_label: "朋友", email: null },
+    { name: "吴雅婷", account: newCardNumber({ bin: "622288", rng: seededRng(15) }), group_label: "工作", email: null },
+    { name: "郑皓文", account: newCardNumber({ bin: "622288", rng: seededRng(16) }), group_label: "朋友", email: null },
+    { name: "苏婉宁", account: newCardNumber({ bin: "622288", rng: seededRng(17) }), group_label: "家人", email: null },
+  ];
+  const bills = [
+    { id: "power", name: "电费（市南供电）", category: "生活服务", amount_cents: "23786", due_day: 5, autopay: 1 },
+    { id: "water", name: "水费（市自来水公司）", category: "生活服务", amount_cents: "4820", due_day: 7, autopay: 1 },
+    { id: "gas", name: "燃气费", category: "生活服务", amount_cents: "8635", due_day: 9, autopay: 0 },
+    { id: "mobile", name: "手机话费（中国移动 5G 套餐）", category: "生活服务", amount_cents: "12800", due_day: 12, autopay: 1 },
+    { id: "broadband", name: "宽带（电信千兆）", category: "生活服务", amount_cents: "10900", due_day: 15, autopay: 1 },
+    { id: "car-loan", name: "车贷（比亚迪金融）", category: "贷款", amount_cents: "428653", due_day: 10, autopay: 1 },
+    { id: "property", name: "物业费（滨江星澜府）", category: "住房", amount_cents: "41270", due_day: 25, autopay: 0 },
+    { id: "credit-repay", name: "信用卡还款（全额）", category: "信用", amount_cents: "0", due_day: 22, autopay: 1 },
+  ];
+  const subs = [
+    { id: "iqiyi", merchant: "爱奇艺", plan: "黄金 VIP · 连续包月", amount_cents: "2500", cycle: "月", usage_score: 74, dark_pattern_note: "首年特惠下月到期，将恢复 ¥30/月", reminders: 1 },
+    { id: "netease-music", merchant: "网易云音乐", plan: "黑胶 VIP · 连续包月", amount_cents: "1800", cycle: "月", usage_score: 58, dark_pattern_note: null, reminders: 1 },
+    { id: "icloud", merchant: "iCloud+", plan: "50GB", amount_cents: "2100", cycle: "月", usage_score: 91, dark_pattern_note: null, reminders: 0 },
+    { id: "wechat-read", merchant: "微信读书", plan: "付费无限卡", amount_cents: "1900", cycle: "月", usage_score: 33, dark_pattern_note: null, reminders: 1 },
+    { id: "keep", merchant: "Keep", plan: "连续包月会员", amount_cents: "1600", cycle: "月", usage_score: 6, dark_pattern_note: null, reminders: 1 },
+    { id: "chatgpt", merchant: "ChatGPT Plus", plan: "个人版（USD 计价折算）", amount_cents: "14657", cycle: "月", usage_score: 83, dark_pattern_note: null, reminders: 0 },
+    { id: "sams", merchant: "山姆会员商店", plan: "卓越会籍", amount_cents: "26000", cycle: "年", usage_score: 47, dark_pattern_note: null, reminders: 1 },
+  ];
+  const holdings = [
+    { fund: "global-mixed-1", amount_cents: "6243827", cost_nav: "1.2103" },
+    { fund: "global-money-1", amount_cents: "2856409", cost_nav: "1.0187" },
+    { fund: "gold-index", amount_cents: "1528364", cost_nav: "1.7420" },
+    { fund: "esg-bond", amount_cents: "1142055", cost_nav: "1.0421" },
+    { fund: "apac-tech", amount_cents: "816732", cost_nav: "1.5890" },
+  ];
+  const notifs = [
+    { type: "SECURITY", title: "新设备登录提醒", body: "您的账户于一台新 Windows 设备完成登录。如非本人操作，请立即修改密码。" },
+    { type: "WEALTH", title: "黄金持仓涨幅提示", body: "Suveoo 环球黄金指数基金近一月净值上行，当前持仓收益率为正值区间。" },
+    { type: "TRANSFER", title: "转账成功", body: "¥3,650.00 已转给沈建平（9 月房租）。" },
+    { type: "SYSTEM", title: "系统维护公告", body: "本周日 02:00-04:00 例行维护，期间部分功能可能出现短暂不可用。" },
+    { type: "TASK", title: "预约转账待执行", body: "每月 1 日房租转账任务将于近日执行，余额充足。" },
+    { type: "WEALTH", title: "持仓月报已生成", body: "本月持仓月报已生成，可前往月度报告页面下载查看。" },
+  ];
+  const tasks = [
+    { type: "scheduled_transfer", title: "每月 1 日 · 房租转账（沈建平）", payload: { amount: "3650.00", recipient_name: "沈建平", memo: "房租（滨江星澜府）", repeat: "monthly" }, offset_days: 14 },
+    { type: "scheduled_transfer", title: "每月 12 日 · 给林芷晴转生活费", payload: { amount: "2000.00", recipient_name: "林芷晴", memo: "大学生活费", repeat: "monthly" }, offset_days: 26 },
+  ];
+  return { txs, payees, bills, subs, holdings, notifs, tasks };
+}
+async function seedDemo(env, targetEmail) {
+  const demoEmail = "demo@suveoo.com";
+  const email = targetEmail && EMAIL_RE.test(targetEmail) ? targetEmail.trim().toLowerCase() : demoEmail;
+  const isDemo = email === demoEmail;
   let userId = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "findUser", email })).user_id;
   if (!userId) {
+    if (!isDemo) return apiError("USER_NOT_FOUND", `账户不存在：${email}（仅可为已注册账户灌数据）`, 404);
     const plan = generateCardPlan({ rng: seededRng(20260912) });
     const bins = [...plan.networks.map((n) => BIN_BY_NETWORK[n]), CREDIT_BIN];
     const reg = await ledgerOp(env, REGISTRY_INSTANCE, { op: "register", email, bins });
@@ -1970,48 +2153,54 @@ async function seedDemo(env) {
       password_hash: await hashPassword("jinrongkeji2026"), cards,
     });
   }
-  const txs = genDemoTransactions(seededRng(20260912));
-  const payees = [
-    { name: "张三", account: newCardNumber({ bin: "622288", rng: seededRng(1) }), group_label: "朋友", email: null },
-    { name: "李四", account: newCardNumber({ bin: "622288", rng: seededRng(2) }), group_label: "朋友", email: null },
-    { name: "王五", account: newCardNumber({ bin: "622288", rng: seededRng(3) }), group_label: "朋友", email: null },
-    { name: "房东陈叔", account: newCardNumber({ bin: "622288", rng: seededRng(4) }), group_label: "家人", email: null },
-    { name: "女儿", account: newCardNumber({ bin: "622288", rng: seededRng(5) }), group_label: "家人", email: null },
-  ];
-  const bills = [
-    { id: "utility", name: "水电燃气（市北公用）", category: "生活服务", amount_cents: "28640", due_day: 5, autopay: 1 },
-    { id: "broadband", name: "宽带网络", category: "生活服务", amount_cents: "12900", due_day: 8, autopay: 1 },
-    { id: "credit-repay", name: "信用卡还款（全额）", category: "信用", amount_cents: "0", due_day: 10, autopay: 1 },
-    { id: "car-loan", name: "车贷", category: "贷款", amount_cents: "386000", due_day: 15, autopay: 1 },
-  ];
-  const subs = [
-    { id: "netflix", merchant: "Netflix", plan: "标准版", amount_cents: "6800", cycle: "月", usage_score: 62, dark_pattern_note: "首月特惠将于下月恢复原价 ¥98", reminders: 1 },
-    { id: "youtube", merchant: "YouTube Premium", plan: "个人版", amount_cents: "6900", cycle: "月", usage_score: 8, dark_pattern_note: null, reminders: 1 },
-    { id: "google-one", merchant: "Google One", plan: "100GB", amount_cents: "2500", cycle: "月", usage_score: 45, dark_pattern_note: null, reminders: 1 },
-  ];
-  const holdings = [
-    { fund: "global-mixed-1", amount_cents: "5000000", cost_nav: "1.0210" },
-    { fund: "global-money-1", amount_cents: "2000000", cost_nav: "1.0012" },
-    { fund: "gold-index", amount_cents: "800000", cost_nav: "1.0830" },
-  ];
-  const notifs = [
-    { type: "SECURITY", title: "新设备登录提醒", body: "您的账户于新设备完成登录（模拟）。" },
-    { type: "WEALTH", title: "持仓月报", body: "Suveoo 环球多元资产组合 1 近一月净值上行。" },
-    { type: "SYSTEM", title: "利率调整通知", body: "3 个月定期存款利率调整为 1.05%。" },
-    { type: "TASK", title: "生日订花任务待执行", body: "预算 ¥600 已锁定，将于生日前 2 天下单。" },
-  ];
-  const tasks = [
-    { type: "birthday_flowers", title: "爱人生日 · 鲜花预订（Saga 演示）", payload: { item: "鲜花礼盒", amount: "600.00", reason: "birthday_reservation" }, offset_days: 2 },
-    { type: "scheduled_transfer", title: "每月 1 日给女儿转生活费", payload: { amount: "2000.00", repeat: "monthly" }, offset_days: 19 },
-  ];
+  let txs, payees, bills, subs, holdings, notifs, tasks;
+  if (isDemo) {
+    txs = genDemoTransactions(seededRng(20260912));
+    payees = [
+      { name: "张三", account: newCardNumber({ bin: "622288", rng: seededRng(1) }), group_label: "朋友", email: null },
+      { name: "李四", account: newCardNumber({ bin: "622288", rng: seededRng(2) }), group_label: "朋友", email: null },
+      { name: "王五", account: newCardNumber({ bin: "622288", rng: seededRng(3) }), group_label: "朋友", email: null },
+      { name: "房东陈叔", account: newCardNumber({ bin: "622288", rng: seededRng(4) }), group_label: "家人", email: null },
+      { name: "女儿", account: newCardNumber({ bin: "622288", rng: seededRng(5) }), group_label: "家人", email: null },
+    ];
+    bills = [
+      { id: "utility", name: "水电燃气（市北公用）", category: "生活服务", amount_cents: "28640", due_day: 5, autopay: 1 },
+      { id: "broadband", name: "宽带网络", category: "生活服务", amount_cents: "12900", due_day: 8, autopay: 1 },
+      { id: "credit-repay", name: "信用卡还款（全额）", category: "信用", amount_cents: "0", due_day: 10, autopay: 1 },
+      { id: "car-loan", name: "车贷", category: "贷款", amount_cents: "386000", due_day: 15, autopay: 1 },
+    ];
+    subs = [
+      { id: "netflix", merchant: "Netflix", plan: "标准版", amount_cents: "6800", cycle: "月", usage_score: 62, dark_pattern_note: "首月特惠将于下月恢复原价 ¥98", reminders: 1 },
+      { id: "youtube", merchant: "YouTube Premium", plan: "个人版", amount_cents: "6900", cycle: "月", usage_score: 8, dark_pattern_note: null, reminders: 1 },
+      { id: "google-one", merchant: "Google One", plan: "100GB", amount_cents: "2500", cycle: "月", usage_score: 45, dark_pattern_note: null, reminders: 1 },
+    ];
+    holdings = [
+      { fund: "global-mixed-1", amount_cents: "5000000", cost_nav: "1.0210" },
+      { fund: "global-money-1", amount_cents: "2000000", cost_nav: "1.0012" },
+      { fund: "gold-index", amount_cents: "800000", cost_nav: "1.0830" },
+    ];
+    notifs = [
+      { type: "SECURITY", title: "新设备登录提醒", body: "您的账户于新设备完成登录（模拟）。" },
+      { type: "WEALTH", title: "持仓月报", body: "Suveoo 环球多元资产组合 1 近一月净值上行。" },
+      { type: "SYSTEM", title: "利率调整通知", body: "3 个月定期存款利率调整为 1.05%。" },
+      { type: "TASK", title: "生日订花任务待执行", body: "预算 ¥600 已锁定，将于生日前 2 天下单。" },
+    ];
+    tasks = [
+      { type: "birthday_flowers", title: "爱人生日 · 鲜花预订（Saga 演示）", payload: { item: "鲜花礼盒", amount: "600.00", reason: "birthday_reservation" }, offset_days: 2 },
+      { type: "scheduled_transfer", title: "每月 1 日给女儿转生活费", payload: { amount: "2000.00", repeat: "monthly" }, offset_days: 19 },
+    ];
+  } else {
+    ({ txs, payees, bills, subs, holdings, notifs, tasks } = genUserSeedData(seededRng(Date.now() & 0xffff)));
+  }
   const r = await ledgerOp(env, userInstance(userId), { op: "seedDemo", txs, payees, bills, subs, holdings, notifs, tasks });
-  await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读
+  if (isDemo) await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读；真实账户 2FA 状态不动
   if (r.ok) {
     for (const t of r.task_ids ?? []) {
       const stub = env.SAGA.get(env.SAGA.idFromName(`task:${userId}:${t.id}`));
       await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "schedule", user_id: userId, task_id: t.id, execute_at: t.execute_at }) });
     }
   }
+  if (!isDemo) return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, note: "全板块仿真数据已灌入（幂等，覆盖流水/收款人/账单/订阅/持仓/通知/任务；不改动密码、2FA 与卡片）。" });
   return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, note: "演示种子已就绪（幂等）。密码 jinrongkeji2026（演示账户已免 2FA）；自注册账户强制邮箱 2FA。" });
 }
 
@@ -2084,10 +2273,10 @@ export default {
     }
     if (url.pathname === "/api/health") return json({ status: "ok", version: VERSION });
     if (url.pathname === "/api/version") return json({ version: VERSION, provider: env.LLM_PROVIDER ?? null, demo_mode: env.DEMO_MODE ?? null });
-    if (url.pathname.startsWith("/api/auth/")) return handleAuthApi(request, env, url);
+    if (url.pathname.startsWith("/api/auth/")) return handleAuthApi(request, env, url, ctx);
     if (url.pathname === "/api/session") return handleSession(request, env);
-    if (url.pathname === "/api/ai/chat") return handleAiChat(request, env);
-    if (url.pathname.startsWith("/mcp")) return handleMcp(request, env, url);
+    if (url.pathname === "/api/ai/chat") return handleAiChat(request, env, ctx);
+    if (url.pathname.startsWith("/mcp")) return handleMcp(request, env, url, ctx);
     if (url.pathname === "/api/fx" && request.method === "GET") {
       const obj = await env.ASSETS.get("assets/data/fx.json").catch(() => null);
       return obj ? json(await new Response(obj.body).json()) : apiError("NOT_FOUND", "fx data missing", 404);
@@ -2100,12 +2289,13 @@ export default {
     }
     if (url.pathname === "/api/demo/seed" && request.method === "POST") {
       if (env.DEMO_MODE !== "true") return apiError("FORBIDDEN", "DEMO_MODE off", 403);
-      return await seedDemo(env);
+      const b = await readJsonBody(request).catch(() => ({}));
+      return await seedDemo(env, typeof b.email === "string" && b.email ? b.email : null);
     }
     if (url.pathname.startsWith("/api/")) {
       const claims = await requireSession(request, env);
       if (!claims) return apiError("UNAUTHORIZED", "invalid session", 401);
-      return handleDataApi(request, env, url, { userId: claims.sub, email: claims.email });
+      return handleDataApi(request, env, url, { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null });
     }
     return serveStatic(env, request, url);
   },
