@@ -1,10 +1,13 @@
-/* genui/consent.js — 两段式确认弹窗（黄/红；红级内嵌 OTP） */
+/* genui/consent.js — 两段式确认弹窗（黄/红；红级内嵌 OTP；标题/图标按 IR intent 定制） */
 S.consent = {
-  /** data = 202 INPUT_REQUIRED 响应体。resolve(null)=取消，resolve({otp})=确认。 */
-  modal(data, { onEvent = null } = {}) {
+  /** data = 202 INPUT_REQUIRED 响应体。resolve(null)=取消，resolve({otp})=确认。
+   *  opts.action 覆盖 IR intent（目前仅存款页传 "deposit"——与申购共用 wealth_product_purchase intent）；
+   *  opts.subject 传产品等展示名（快照里只有 product_id）。 */
+  modal(data, { onEvent = null, action = null, subject = null } = {}) {
     const { grant, red, tier } = data;
     const card = S.genuiCards.transfer_confirmation({
       component: "transfer_confirmation", issuer: "verified_ir", tier,
+      action: action ?? grant?.snapshot?.action ?? "transfer_execute", subject,
       snapshot: grant.snapshot, grant_hash: grant.grant_hash, trace_id: data.trace_id,
     });
     const email = S.auth._session?.email;
@@ -41,9 +44,11 @@ S.consent = {
       const sendBtn = box.querySelector("#ck-send");
       if (sendBtn) sendBtn.onclick = async () => {
         sendBtn.disabled = true;
-        const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: S.consent.userEmail });
-        if (r.status === 429) S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true);
-        else S.ui.toast(S.t("consent.codeSent"));
+        /* userEmail 历史上从未被赋值——回退会话邮箱，否则邮件实际发不出（400 被误报为已发送） */
+        const to = S.consent.userEmail ?? (await S.auth.session())?.email;
+        const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: to });
+        if (!r.ok) { S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true); setTimeout(() => (sendBtn.disabled = false), 5000); return; }
+        S.ui.toast(S.t("consent.codeSent"));
         setTimeout(() => (sendBtn.disabled = false), 60000);
       };
       /* 倒计时（与 CONSENT_GRANT_TTL_SECONDS 一致） */

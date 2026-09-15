@@ -10,11 +10,7 @@ S.router.register("savings-compound", async () => {
       ${num(S.t("tc.years"), "years", "5")}
       ${num(S.t("tc.monthlyAdd") + "（CNY）", "monthly", "2000")}
       <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.freq"))}</span>
-        <select class="input" id="freq">
-          <option value="12" selected>${S.fmt.escape(S.t("tc.freqMonth"))}</option>
-          <option value="4">${S.fmt.escape(S.t("tc.freqQuarter"))}</option>
-          <option value="1">${S.fmt.escape(S.t("tc.freqYear"))}</option>
-        </select></label>
+        <span id="freq"></span></label>
       <p class="muted small" style="margin:0">${S.fmt.escape(S.t("tc.shareHint"))}</p>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("tools.result"))}</h2></div>
@@ -30,6 +26,9 @@ S.router.register("savings-compound", async () => {
     <div class="card" id="curve"></div>
     ${S.sim.footnote()}`;
   const $ = (id) => document.getElementById(id);
+  const freqSel = S.ctl.select({ label: S.t("tc.freq"), options: [{ v: "12", label: S.t("tc.freqMonth") }, { v: "4", label: S.t("tc.freqQuarter") }, { v: "1", label: S.t("tc.freqYear") }], value: "12" });
+  freqSel.id = "freq";
+  $("freq").replaceWith(freqSel);
   const calc = () => {
     const p = S.toolKit.num("principal"), r = S.toolKit.num("rate"), y = S.toolKit.num("years"), m = S.toolKit.num("monthly");
     const f = Number($("freq").value) || 12;

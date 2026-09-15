@@ -36,12 +36,16 @@ S.router.register("payees", async () => {
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span><input class="input" id="p-name" placeholder="${S.fmt.escape(S.t("payees.namePh"))}"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.accountNo"))}</span><input class="input mono" id="p-acct" placeholder="${S.fmt.escape(S.t("payees.accountPh"))}" maxlength="16"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.group"))}</span>
-        <select class="input" id="p-group">${["family", "friends", "landlord", "work", "default"].map((k) => `<option>${S.fmt.escape(S.t("payees.group." + k))}</option>`).join("")}</select></label>
+        <span id="p-group"></span></label>
       <div class="modal-actions"><button class="btn btn-ghost" id="cx">${S.fmt.escape(S.t("common.cancel"))}</button>
       <button class="btn btn-primary" id="ok">${S.fmt.escape(S.t("common.add"))}</button></div>`);
+    const groupKeys = ["family", "friends", "landlord", "work", "default"];
+    const groupSel = S.ctl.select({ label: S.t("payees.group"), options: groupKeys.map((k) => ({ v: S.t("payees.group." + k), label: S.t("payees.group." + k) })) });
+    groupSel.id = "p-group";
+    m.el.querySelector("#p-group").replaceWith(groupSel);
     m.el.querySelector("#cx").onclick = m.close;
     m.el.querySelector("#ok").onclick = async () => {
-      const body = { name: m.el.querySelector("#p-name").value.trim(), account: m.el.querySelector("#p-acct").value.replace(/\s/g, ""), group_label: m.el.querySelector("#p-group").value };
+      const body = { name: m.el.querySelector("#p-name").value.trim(), account: m.el.querySelector("#p-acct").value.replace(/\s/g, ""), group_label: groupSel.value };
       if (!body.name || !/^\d{16}$/.test(body.account)) { S.ui.toast(S.t("transfer.invalidAccount"), true); return; }
       const r2 = await S.api.mutate("/api/payees", body);
       if (r2.cancelled) return;

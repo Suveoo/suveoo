@@ -29,6 +29,8 @@ S.api = {
       if (!out) out = { status: 0, ok: false, data: { error: { code: "TIMEOUT", message: S.t("common.timeout") } } };
     }
     if (out.status === 401) {
+      /* 守卫的业务性 401（红级 OTP_REQUIRED）不是会话失效：不清令牌、不跳登录 */
+      if (out.data?.status === "OTP_REQUIRED") return out;
       this.token = null; // 会话失效先清令牌，杜绝带着坏 token 循环
       // 已在登录页时不再跳转（否则 next 参数会无限嵌套）
       if (!path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login")) {
@@ -69,11 +71,12 @@ S.api = {
   /**
    * 两段式写操作：INPUT_REQUIRED → 弹确认卡（红级含 OTP）→ 带 grant_hash 重试。
    * 返回最终响应（或 {cancelled:true}）。这是表单通道走五道验证的统一入口。
+   * opts.action/opts.subject 为确认卡展示提示（如存款页 action="deposit"）；缺省按 IR intent 推导。
    */
-  async mutate(path, body, { onEvent = null } = {}) {
+  async mutate(path, body, { onEvent = null, action = null, subject = null } = {}) {
     let r = await this.post(path, body);
     if (r.data && r.data.status === "INPUT_REQUIRED") {
-      const confirmed = await S.consent.modal(r.data, { onEvent });
+      const confirmed = await S.consent.modal(r.data, { onEvent, action, subject });
       if (!confirmed) return { cancelled: true };
       r = await this.post(path, { ...body, grant_hash: r.data.grant.grant_hash, otp: confirmed.otp || undefined });
     } else if (r.data && r.data.status === "OTP_REQUIRED") {

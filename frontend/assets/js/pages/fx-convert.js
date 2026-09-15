@@ -5,12 +5,8 @@ S.router.register("fx-convert", async () => {
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.fxName"))}</h1>
     <div class="card" style="max-width:520px">
       <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.direction"))}</span>
-        <select class="input" id="dir">
-          <option value="buy" selected>${S.fmt.escape(S.t("tc.fxDirBuy"))}</option>
-          <option value="sell">${S.fmt.escape(S.t("tc.fxDirSell"))}</option>
-        </select></label>
-      <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.currency"))}</span>
-        <select class="input" id="ccy">${fx.quotes.map((q) => `<option value="${q.code}"${q.code === "USD" ? " selected" : ""}>${S.fmt.escape(q.name)}（${q.code}）</option>`).join("")}</select></label>
+        <span id="dir"></span></label>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.currency"))}</span><span id="ccy"></span></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("common.amount"))}</span><input class="input input-lg" id="amount" value="1000" inputmode="decimal"></label>
       <p class="muted small" style="margin:0">${S.fmt.escape(S.t("tc.shareHint"))}</p>
     </div>
@@ -26,6 +22,12 @@ S.router.register("fx-convert", async () => {
     </div>
     ${S.sim.footnote()}`;
   const $ = (id) => document.getElementById(id);
+  const dirSel = S.ctl.select({ label: S.t("tc.direction"), options: [{ v: "buy", label: S.t("tc.fxDirBuy") }, { v: "sell", label: S.t("tc.fxDirSell") }], value: "buy" });
+  dirSel.id = "dir";
+  $("dir").replaceWith(dirSel);
+  const ccySel = S.ctl.select({ label: S.t("tc.currency"), options: fx.quotes.map((q) => ({ v: q.code, label: `${q.name}（${q.code}）` })), value: "USD" });
+  ccySel.id = "ccy";
+  $("ccy").replaceWith(ccySel);
   const calc = () => {
     const dir = $("dir").value, code = $("ccy").value, amt = S.toolKit.num("amount");
     const q = fx.quotes.find((x) => x.code === code);

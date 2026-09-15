@@ -73,10 +73,19 @@ S.md = {
     }
     return out.join("");
   },
-  /* 行内：代码 span → 链接（仅 http/s）→ 粗体 → 斜体 → 还原代码 */
+  /* 工具深链按钮卡：匹配工具页带参 URL（Markdown 链接或裸 URL 均识别）。
+     注：整体转义后 URL 中的 & 已成 &amp;，作为 href 属性恰是合法转义，无需还原。 */
+  toolLinkRe: /^https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?.+$/,
+  toolCard(url) {
+    return `<a class="tool-open" href="${url}" target="_blank" rel="noopener noreferrer">${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>`;
+  },
+  /* 行内：代码 span → 工具深链按钮（先于普通链接）→ 链接（仅 http/s）→ 粗体 → 斜体 → 还原代码 */
   inline(s) {
     const spans = [];
     s = s.replace(/`([^`]+)`/g, (m, c) => { spans.push(c); return "\u0000C" + (spans.length - 1) + "\u0000"; });
+    s = s.replace(/\[[^\]]*\]\((https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)]+)\)/g, (m, url) => (this.toolLinkRe.test(url) ? this.toolCard(url) : m));
+    /* 裸 URL：前缀不得是 URL 字符（避免截断已有链接），“图形化页面：”全角冒号等标点后可识别 */
+    s = s.replace(/(?<![\w\/.=&,])(https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s<)）」』】]+)/g, (m, url) => (this.toolLinkRe.test(url) ? this.toolCard(url) : m));
     s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");

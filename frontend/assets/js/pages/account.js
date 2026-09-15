@@ -1,4 +1,4 @@
-/* account.js — P05 账户中心 */
+/* account.js — P05 账户中心（资料卡 + 资产概要 + 最近流水 + 快捷入口） */
 S.router.register("account", async ({ user }) => {
   const c = document.getElementById("content");
   const items = [
@@ -15,6 +15,10 @@ S.router.register("account", async ({ user }) => {
           <div class="muted small">${S.fmt.escape(S.t("acct.opened"))}：${S.fmt.date(user?.created_at ?? null) || "—"}</div></div>
       </div>
     </div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("acct.overview"))}</h2><a class="more" href="/account/dashboard">${S.fmt.escape(S.t("acct.dashboard"))} →</a></div>
+    <div class="card" id="ov">${S.ui.skeleton(2)}</div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("acct.recent"))}</h2><a class="more" href="/transfer/history">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
+    <div class="card" id="recent">${S.ui.skeleton(3)}</div>
     <div class="grid grid-4" style="margin-top:16px">
       ${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi">${S.ui.icon(ic, 22)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}
     </div>
@@ -27,6 +31,29 @@ S.router.register("account", async ({ user }) => {
     </div>
     <button class="btn btn-ghost btn-block" style="margin-top:16px" id="logout">${S.ui.icon("lock", 14)} ${S.fmt.escape(S.t("acct.logout"))}</button>
     ${S.sim.footnote()}`;
+  /* 资产概要：复用 /api/overview（与仪表盘同源同口径） */
+  const ovBox = document.getElementById("ov");
+  const ov = await S.api.get("/api/overview");
+  ovBox.innerHTML = ov.ok ? `
+    <div class="row between" style="gap:12px;flex-wrap:wrap">
+      <div><div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))}（CNY）</div>
+        <div class="total mono" style="font-size:28px;font-weight:700">¥ ${S.fmt.moneyPlain(ov.data.total_assets)}</div>
+        <div class="muted small">${S.fmt.escape(S.t("home.todayPnl"))} ${S.fmt.escape(String(ov.data.today_pnl?.amount ?? "—"))}（${S.fmt.escape(String(ov.data.today_pnl?.percent ?? "—"))}）</div></div>
+      <div style="text-align:right">
+        <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("acct.balance"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.total_balance)}</span></div>
+        <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.holdings_total)}</span></div>
+      </div>
+    </div>` : S.ui.empty(S.t("common.loadFailed"));
+  /* 最近 5 笔流水：复用 /api/transfers（与转账记录同源） */
+  const rcBox = document.getElementById("recent");
+  const rc = await S.api.get("/api/transfers");
+  rcBox.innerHTML = rc.ok ? ((rc.data.txs ?? []).slice(0, 5).map((t) => `
+    <div class="list-row">
+      <span class="avatar">${S.ui.icon(t.direction === "IN" ? "plus" : "pay", 14)}</span>
+      <div class="grow"><b>${S.fmt.escape(t.counterparty ?? "—")}</b>
+        <div class="muted small">${S.fmt.datetime(t.ts)} · ${S.fmt.escape(t.category ?? "")}</div></div>
+      <div class="amt mono" style="color:${t.direction === "IN" ? "var(--color-green)" : "inherit"}">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain((Number(t.amount_cents) / 100).toFixed(2))}</div>
+    </div>`).join("") || S.ui.empty(S.t("common.emptyTx"))) : S.ui.empty(S.t("common.loadFailed"));
   document.getElementById("logout").onclick = () => S.auth.logout();
   /* 偏好 · 语言：点击弹出三语选择（选择后即时生效） */
   document.getElementById("pref-lang").onclick = () => {

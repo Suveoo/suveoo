@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcCompoundSavings, calcLoanCompare, calcGoalSaving,
   calcCreditPayoff, calcRetirement, calcInflation, calcSplitBill,
-  calcDepositCompare, calcFxConvert,
+  calcDepositCompare, calcFxConvert, calcBudgetAllocator,
 } from "../../worker-main.js";
 
 const DEPOSITS = [
@@ -258,5 +258,31 @@ describe("calc_fx_convert 外汇兑换", () => {
     expect(calcFxConvert({ dir: "buy", ccy: "XXX", amount: 100 }, FX_QUOTES).status).toBe("INVALID");
     expect(calcFxConvert({ dir: "buy", ccy: "USD", amount: -5 }, FX_QUOTES).status).toBe("INVALID");
     expect(calcFxConvert({ dir: "buy", ccy: "USD", amount: 100 }, []).status).toBe("INVALID");
+  });
+});
+
+describe("calc_budget_allocator 预算分配器", () => {
+  it("典型值：月入 12000 按 50/30/20 分配", () => {
+    const r = calcBudgetAllocator({ income: 12000, needs: 50, wants: 30, save: 20 });
+    expect(r.result.needs_amount).toBe(6000);
+    expect(r.result.wants_amount).toBe(3600);
+    expect(r.result.save_amount).toBe(2400);
+    expect(r.summary).toContain("6,000");
+    expect(r.link).toBe("https://suveoo.com/wealth/tools/budget-allocator?income=12000&needs=50&wants=30&save=20");
+  });
+
+  it("默认比例：仅传收入按 50/30/20", () => {
+    const r = calcBudgetAllocator({ income: 8000 });
+    expect(r.result.needs_pct).toBe(50);
+    expect(r.result.wants_pct).toBe(30);
+    expect(r.result.save_pct).toBe(20);
+    expect(r.result.save_amount).toBe(1600);
+    expect(r.summary).toContain("比例结构健康");
+  });
+
+  it("非法输入拒绝：比例和≠100 / 负收入 / 缺收入", () => {
+    expect(calcBudgetAllocator({ income: 12000, needs: 50, wants: 40, save: 20 }).status).toBe("INVALID");
+    expect(calcBudgetAllocator({ income: -1, needs: 50, wants: 30, save: 20 }).status).toBe("INVALID");
+    expect(calcBudgetAllocator({}).status).toBe("INVALID");
   });
 });

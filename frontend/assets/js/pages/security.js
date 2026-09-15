@@ -36,8 +36,10 @@ S.router.register("security", async ({ user }) => {
     };
   };
   document.getElementById("tfa").onchange = async (e) => {
-    await S.api.post("/api/auth/email-code", { scene: "redstep", email: user?.email?.includes("*") ? undefined : user?.email });
-    const otp = prompt(S.t("consent.otpNeeded"));
+    const otp = await S.ctl.otp({
+      email: user?.email,
+      send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+    });
     if (!otp) { e.target.checked = !e.target.checked; return; }
     const r = await S.api.post("/api/security/2fa", { enabled: e.target.checked, otp });
     if (r.ok) S.ui.toast(S.t("common.opOk"));

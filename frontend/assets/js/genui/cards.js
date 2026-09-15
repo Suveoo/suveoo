@@ -3,15 +3,43 @@ S.genuiCards = {
   kv(pairs) {
     return pairs.filter(([k, v]) => v != null).map(([k, v]) => `<div class="gc-kv"><span class="muted">${S.fmt.escape(k)}</span><span class="v">${S.fmt.escape(v)}</span></div>`).join("");
   },
+  /* 确认卡按操作定制：intent → 标题键/图标/主字段标签；fee 仅对有资金流动的操作展示 */
+  confirmMeta: {
+    transfer_execute:    { title: "genui.confirmTransfer", icon: "send",     field: "genui.to",       fee: true },
+    ecommerce_order_mock:{ title: "genui.confirmTransfer", icon: "pay",      field: "genui.merchant", fee: true },
+    bill_pay:            { title: "genui.confirmBillPay",  icon: "pay",      field: "genui.merchant", fee: true },
+    wealth_product_purchase: { title: "genui.confirmPurchase", icon: "wealth", field: "genui.product", fee: false },
+    wealth_product_redeem:   { title: "genui.confirmRedeem",   icon: "wealth", field: "genui.product", fee: false },
+    deposit:             { title: "genui.confirmDeposit",  icon: "bank",     field: "genui.product", fee: false },
+    fx_exchange:         { title: "genui.confirmFx",       icon: "exchange", field: null,             fee: true },
+    card_limit_adjust:   { title: "genui.confirmLimit",    icon: "gear",     field: "genui.card",     fee: false },
+    card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
+    card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
+    /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
+    generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
+  },
   transfer_confirmation(c) {
     const p = { ...(c.snapshot?.params ?? {}), recipient_display: c.params?.recipient_display, recipient_name: c.params?.recipient_name ?? c.snapshot?.params?.recipient_name };
-    const amt = p.amount_cny ?? p.amount ?? "0";
+    const meta = c.action == null ? this.confirmMeta.transfer_execute : (this.confirmMeta[c.action] ?? this.confirmMeta.generic);
+    /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号 */
+    let subject = c.subject ?? null;
+    if (!subject) {
+      if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
+      else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze") subject = p.card_id ?? null;
+      else if (c.action === "fx_exchange") subject = null;
+      else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
+    }
+    const rawAmt = p.amount_cny ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
+    /* "ALL" 全额赎回占位无数值可显示，以文案替代，避免渲染 ¥ NaN */
+    const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : S.t("genui.redeemAll");
     return `<div class="genui-card">
-      <div class="gc-head">${S.ui.icon("send", 16)} ${S.t("genui.confirmTransfer")} ${S.ui.tierBadge(c.tier)}</div>
-      <div class="gc-amount">¥ ${S.fmt.moneyPlain(amt)}</div>
+      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(meta.title)} ${S.ui.tierBadge(c.tier)}</div>
+      <div class="gc-amount">${amtText}</div>
       ${S.genuiCards.kv([
-        [S.t("genui.to"), p.recipient_display ?? p.recipient_name ?? p.recipient ?? (p.bill_id ? S.t("genui.billNo", p.bill_id) : p.item)],
-        [S.t("genui.fee"), "¥0.00"], ["Currency", p.currency ?? "CNY"],
+        ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
+        ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
+        ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
+        ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
       <div class="gc-grant">grant ${String(c.grant_hash ?? "").slice(0, 12)}…</div>

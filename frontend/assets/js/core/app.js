@@ -272,7 +272,7 @@ S.purchaseModal = async (fund) => {
   m.el.querySelector("#ok").onclick = async () => {
     const amount = m.el.querySelector("#w-amt").value.trim();
     if (!/^\d+(\.\d{1,2})?$/.test(amount)) { S.ui.toast(S.t("common.badAmount"), true); return; }
-    const r = await S.api.mutate("/api/wealth/purchase", { product_id: fund.slug, amount });
+    const r = await S.api.mutate("/api/wealth/purchase", { product_id: fund.slug, amount }, { subject: fund.name });
     if (r.cancelled) return;
     if (r.data?.status === "EXECUTED" && r.data.result?.ok) { m.close(); S.ui.toast(S.t("common.opOk")); }
     else S.ui.toast(r.data?.result?.error === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.reason ?? r.data?.result?.error ?? "failed", true);

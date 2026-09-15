@@ -30,13 +30,14 @@ S.router.register("cards", async () => {
     S.ui.$$(".fz").forEach((b) => {
       b.onclick = async () => {
         const intent = b.dataset.st === "FROZEN" ? "unfreeze" : "freeze";
-        const email = (await S.auth.session())?.email;
         const r2 = await S.api.mutate(`/api/cards/${b.dataset.slug}/${intent}`, {});
         if (r2.cancelled) return;
         if (r2.data?.status === "OTP_REQUIRED") {
-          /* 红级：先取验证码再重试 */
-          await S.api.post("/api/auth/email-code", { scene: "redstep", email: S.consent.userEmail ?? email });
-          const otp = prompt(S.t("consent.otpNeeded"));
+          /* 红级：自绘验证码弹窗取码后重试（邮箱以后端会话为准，前端只有掩码） */
+          const otp = await S.ctl.otp({
+            email: (await S.auth.session())?.email,
+            send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+          });
           if (!otp) return;
           const r3 = await S.api.post(`/api/cards/${b.dataset.slug}/${intent}`, { otp });
           S.ui.toast(r3.data?.status === "EXECUTED" ? S.t("common.opOk") : r3.data?.reason ?? "failed", r3.data?.status !== "EXECUTED");

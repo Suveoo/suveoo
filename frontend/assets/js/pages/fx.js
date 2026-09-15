@@ -8,7 +8,7 @@ S.router.register("fx", async () => {
     <div class="card" style="max-width:520px">
       <div class="tabs"><button class="tab active" data-dir="buy">${S.fmt.escape(S.t("fx.dirBuy"))}</button><button class="tab" data-dir="sell">${S.fmt.escape(S.t("fx.dirSell"))}</button></div>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("fx.cny"))}</span><input class="input input-lg" id="x-amt" value="1000" inputmode="decimal"></label>
-      <label class="field"><span class="lb">${S.fmt.escape(S.t("fx.currency"))}</span><select class="input" id="x-cur"></select></label>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("fx.currency"))}</span><span id="x-cur"></span></label>
       <div class="gc-kv"><span class="muted" id="x-desc">—</span><span class="v mono" id="x-out">—</span></div>
       <button class="btn btn-primary btn-block" style="margin-top:12px" id="x-go">${S.fmt.escape(S.t("fx.exchange"))}</button>
       <div class="progressbar" style="margin-top:14px"><i style="width:34%"></i></div>
@@ -21,22 +21,29 @@ S.router.register("fx", async () => {
     ${fx.quotes.map((q) => `<tr><td><img class="fx-flag" src="${q.flag}" alt="">${S.fmt.escape(q.name)}</td>
       <td class="mono">${q.buy}</td><td class="mono">${q.sell}</td><td class="mono">${q.mid}</td><td>${S.charts.spark(q.spark, { color: "auto" })}</td></tr>`).join("")}
     </tbody></table>`;
-  document.getElementById("x-cur").innerHTML = fx.quotes.map((q) => `<option value="${q.code}" data-mid="${q.mid}">${S.fmt.escape(q.name)} (${q.code})</option>`).join("");
+  const curSel = S.ctl.select({
+    label: S.t("fx.currency"),
+    options: fx.quotes.map((q) => ({ v: q.code, label: `${q.name} (${q.code})` })),
+    value: "USD",
+  });
+  curSel.id = "x-cur";
+  document.getElementById("x-cur").replaceWith(curSel);
+  const quoteOf = (code) => fx.quotes.find((q) => q.code === code) ?? fx.quotes[0];
   let dir = "buy";
   S.ui.$$("[data-dir]").forEach((t) => { t.onclick = () => { dir = t.dataset.dir; S.ui.$$("[data-dir]").forEach((x) => x.classList.toggle("active", x === t)); calc(); }; });
   const calc = () => {
     const amt = Number(document.getElementById("x-amt").value) || 0;
-    const opt = document.getElementById("x-cur").selectedOptions[0];
-    const mid = Number(opt?.dataset.mid ?? 1);
+    const q = quoteOf(curSel.value);
+    const mid = Number(q?.mid ?? 1);
     const out = dir === "buy" ? amt / mid : amt * mid;
-    document.getElementById("x-desc").textContent = dir === "buy" ? `${S.fmt.escape(opt?.text ?? "")} ≈` : `CNY ≈`;
+    document.getElementById("x-desc").textContent = dir === "buy" ? `${S.fmt.escape(q ? `${q.name} (${q.code})` : "")} ≈` : "CNY ≈";
     document.getElementById("x-out").textContent = dir === "buy" ? out.toFixed(2) : "¥ " + S.fmt.moneyPlain(out);
   };
   document.getElementById("x-amt").oninput = calc;
-  document.getElementById("x-cur").onchange = calc;
+  curSel.addEventListener("input", calc);
   calc();
   document.getElementById("x-go").onclick = async () => {
-    const body = { direction: dir, currency: document.getElementById("x-cur").value, amount_cny: document.getElementById("x-amt").value };
+    const body = { direction: dir, currency: curSel.value, amount_cny: document.getElementById("x-amt").value };
     const r = await S.api.mutate("/api/fx/exchange", body);
     if (r.cancelled) return;
     S.ui.toast(r.data?.status === "EXECUTED" ? S.t("common.opOk") : r.data?.reason ?? "failed", r.data?.status !== "EXECUTED");

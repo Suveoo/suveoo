@@ -24,7 +24,7 @@ S.router.register("ai", async ({ user }) => {
       <aside class="trust-console" id="tc"></aside>
     </div>`;
   S.trust.mount(document.getElementById("tc"));
-  /* 控制台收起开关（桌面端给对话让出全宽；偏好记忆） */
+  /* 控制台收起开关（桌面端给对话让出全宽；偏好记忆）+ 自动打开工具链接开关（同区） */
   if (window.matchMedia("(min-width: 1024px)").matches) {
     const layout = document.querySelector(".ai-layout");
     const head = document.querySelector("#tc .tc-head");
@@ -38,6 +38,12 @@ S.router.register("ai", async ({ user }) => {
       };
       btn.onclick = () => { localStorage.setItem("suveoo.tc", layout.classList.contains("console-hidden") ? "open" : "hidden"); apply(); };
       apply();
+      /* 自动打开工具链接：默认开；回答末尾"有且仅有一个"工具 URL 时新标签直达（一次为限） */
+      const ao = S.ui.el('<button class="tc-toggle" id="ao-toggle"></button>');
+      head.appendChild(ao);
+      const applyAo = () => { ao.innerHTML = (localStorage.getItem("suveoo.aiAutoOpen") !== "off" ? S.ui.icon("check", 12) + " " : "") + S.fmt.escape(S.t("ai.autoOpen")); };
+      ao.onclick = () => { localStorage.setItem("suveoo.aiAutoOpen", localStorage.getItem("suveoo.aiAutoOpen") !== "off" ? "off" : "on"); applyAo(); };
+      applyAo();
     }
   }
 
@@ -131,6 +137,11 @@ S.router.register("ai", async ({ user }) => {
         aiMsg.classList.remove("thinking");
         if (!raw) aiMsg.textContent = S.t("ai.done");
         else renderNow();
+        /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
+        if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
+          const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
+          if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
+        }
         busy = false;
       },
     });
@@ -149,7 +160,10 @@ S.router.register("ai", async ({ user }) => {
       /* AI 通道确认必须原样回传工具参数（grant 快照绑定的是工具参数，不是表单字段），直连 /mcp 不再经过模型 */
       const args = { ...(card.params ?? {}), grant_hash: card.grant_hash };
       if (card.tier === "RED") {
-        const otp = prompt(S.t("consent.otpNeeded"));
+        const otp = await S.ctl.otp({
+          email: S.auth._session?.email,
+          send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+        });
         if (!otp) { bar.querySelector("#gc-ok").disabled = false; return; }
         args.otp = otp;
       }

@@ -28,7 +28,8 @@ S.router.register("wealth", async () => {
     const ra = document.getElementById("redeem-all");
     if (ra && total) ra.onclick = async () => {
       for (const x of list) {
-        const r = await S.api.mutate("/api/wealth/redeem", { product_id: x.fund, amount: "ALL" });
+        if (!(Number(x.value ?? x.amount) > 0)) continue; /* 0 值持仓不发起赎回（否则多弹一张无意义确认卡） */
+        const r = await S.api.mutate("/api/wealth/redeem", { product_id: x.fund, amount: "ALL" }, { subject: x.name ?? x.fund });
         if (r.cancelled) return;
         if (r.data?.status !== "EXECUTED") { S.ui.toast(r.data?.reason ?? "failed", true); return; }
       }

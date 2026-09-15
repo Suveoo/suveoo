@@ -7,29 +7,39 @@ S.router.register("intrabank-scheduled", async () => {
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toAccount"))}</span><input class="input mono" id="s-acct" maxlength="16" inputmode="numeric"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("common.amount"))}</span><input class="input input-lg" id="s-amt" placeholder="0.00" inputmode="decimal"></label>
       <div class="grid grid-2">
-        <label class="field"><span class="lb">${S.fmt.escape(S.t("sch.when"))}</span><input class="input" type="datetime-local" id="s-when"></label>
+        <label class="field"><span class="lb">${S.fmt.escape(S.t("sch.when"))}</span><input class="input mono" id="s-when" placeholder="YYYY-MM-DD HH:mm" inputmode="numeric"></label>
         <label class="field"><span class="lb">${S.fmt.escape(S.t("sch.repeat"))}</span>
-          <select class="input" id="s-rep"><option value="once">${S.fmt.escape(S.t("sch.once"))}</option><option value="monthly">${S.fmt.escape(S.t("sch.monthly"))}</option></select></label>
+          <span id="s-rep"></span></label>
       </div>
       <div class="banner">${S.ui.icon("clock", 16)}<div>${S.fmt.escape(S.t("sch.tzNote"))}<div id="tz-dual" class="mono" style="margin-top:4px"></div></div></div>
       <button class="btn btn-primary btn-block" id="s-go">${S.ui.icon("clock", 16)} ${S.fmt.escape(S.t("common.submit"))}</button>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("tasks.title"))}</h2></div>
     <div class="card" id="tasks">${S.ui.skeleton(2)}</div>`;
+  const repSel = S.ctl.select({ label: S.t("sch.repeat"), options: [{ v: "once", label: S.t("sch.once") }, { v: "monthly", label: S.t("sch.monthly") }], value: "once" });
+  repSel.id = "s-rep";
+  document.getElementById("s-rep").replaceWith(repSel);
   const when = document.getElementById("s-when");
-  when.onchange = () => {
-    const iso = when.value ? new Date(when.value).toISOString() : null;
-    if (!iso) return;
-    const d = S.fmt.dualTime(iso);
-    document.getElementById("tz-dual").textContent = `${d.local} / ${d.beijing}`;
+  /* 自绘替代 datetime-local：文本输入 YYYY-MM-DD HH:mm（本地时区），失焦即校验并联动双时区显示 */
+  const parseWhen = () => {
+    const m = when.value.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T]?(\d{2}):(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  when.onchange = when.onblur = () => {
+    const d = parseWhen();
+    if (!d) return;
+    document.getElementById("tz-dual").textContent = (() => { const t = S.fmt.dualTime(d.toISOString()); return `${t.local} / ${t.beijing}`; })();
   };
   document.getElementById("s-go").onclick = async () => {
+    const whenDate = parseWhen();
     const body = {
       recipient_name: document.getElementById("s-name").value.trim(),
       recipient_account: document.getElementById("s-acct").value.replace(/\s/g, ""),
       amount: document.getElementById("s-amt").value.trim(),
-      execute_at: when.value ? new Date(when.value).toISOString() : null,
-      repeat: document.getElementById("s-rep").value,
+      execute_at: whenDate ? whenDate.toISOString() : null,
+      repeat: repSel.value,
     };
     if (!body.recipient_name || !/^\d{16}$/.test(body.recipient_account) || !/^\d+(\.\d{1,2})?$/.test(body.amount ?? "") || !body.execute_at) {
       S.ui.toast(S.t("sched.fillAll"), true); return;

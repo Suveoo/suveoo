@@ -19,13 +19,13 @@ S.router.register("bills", async () => {
       <div style="text-align:right"><div class="amt mono">¥${S.fmt.moneyPlain((Number(b.amount_cents) / 100).toFixed(2))}</div>
         <div class="row" style="gap:8px;justify-content:flex-end;margin-top:4px">
           <label class="switch" title="Autopay"><input type="checkbox" data-ap="${b.id}" ${Number(b.autopay) === 1 ? "checked" : ""}><span class="tk"></span></label>
-          <button class="btn btn-sm btn-light pay-bill" data-id="${b.id}">${S.fmt.escape(S.t("bills.pay"))}</button>
+          <button class="btn btn-sm btn-light pay-bill" data-id="${b.id}" data-name="${S.fmt.escape(b.name)}">${S.fmt.escape(S.t("bills.pay"))}</button>
         </div></div>
     </div>`).join("");
   S.ui.$$(".pay-bill").forEach((btn) => {
     btn.onclick = async () => {
       btn.disabled = true;
-      const r2 = await S.api.mutate(`/api/bills/${btn.dataset.id}/pay`, {});
+      const r2 = await S.api.mutate(`/api/bills/${btn.dataset.id}/pay`, {}, { subject: btn.dataset.name });
       if (r2.cancelled) { btn.disabled = false; return; }
       if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 900); }
       else { S.ui.toast(r2.data?.error?.message ?? r2.data?.reason ?? "failed", true); btn.disabled = false; }

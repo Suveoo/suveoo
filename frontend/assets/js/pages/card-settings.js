@@ -46,9 +46,10 @@ S.router.register("card-settings", async () => {
   };
   document.getElementById("cs-fz").onclick = async () => {
     const intent = cd.status === "FROZEN" ? "unfreeze" : "freeze";
-    const email = (await S.auth.session())?.email;
-    await S.api.post("/api/auth/email-code", { scene: "redstep", email });
-    const otp = prompt(S.t("consent.otpNeeded"));
+    const otp = await S.ctl.otp({
+      email: (await S.auth.session())?.email,
+      send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+    });
     if (!otp) return;
     const r2 = await S.api.post(`/api/cards/${slug}/${intent}`, { otp });
     if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }

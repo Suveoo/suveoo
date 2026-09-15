@@ -31,3 +31,9 @@
 .ai-quick-bar .go { margin-left: auto; color: var(--color-navy); }
 .insight-card { display: flex; gap: 12px; align-items: flex-start; }
 .insight-card img, .insight-card svg { width: 28px; height: 28px; flex: none; }
+
+/* 工具深链按钮卡（md.js 渲染 AI 回答中的图形化计算器 URL） */
+.tool-open { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; padding: 12px 16px; max-width: 340px; border: 1px solid var(--color-primary); border-radius: var(--r-btn); background: var(--color-primary-tint); color: var(--color-navy); font-weight: 600; font-size: var(--fs-14); text-decoration: none; transition: box-shadow .18s ease, transform .18s ease; }
+.tool-open:hover { box-shadow: 0 4px 12px rgba(30, 42, 120, .16); text-decoration: none; }
+.tool-open svg { flex: none; }
+.tool-open svg:last-child { margin-left: auto; }

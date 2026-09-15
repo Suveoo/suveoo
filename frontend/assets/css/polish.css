@@ -251,6 +251,7 @@ body.tc-open { overflow: hidden; }
 
 /* ===== 16. 窄屏防破版补强：grid/flex 文本子项不撑轨 + 长 token 可断行 ===== */
 .legal-grid > * { min-width: 0; }
+.grid > * { min-width: 0; } /* 1fr 轨道内长内容（基金名等）不再把第二轨挤出视口 */
 .legal-body, .legal-toc { overflow-wrap: anywhere; }
 @media (max-width: 767px) { .legal-grid { gap: var(--sp-4); } }
 
