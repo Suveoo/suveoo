@@ -107,3 +107,7 @@
 /* 月度报告页说明卡：三段文案合一后的紧凑形态（小内边距、随行折行，窄屏不溢出） */
 .dl-note { padding: 10px 14px; }
 .dl-note .row { flex-wrap: wrap; }
+
+/* 卡片头部行窄屏允许换行（如 /wealth 总额 + 赎回按钮不再溢出卡缘）——放宽 .grid 限定为全卡片 */
+.card .row.between { flex-wrap: wrap; row-gap: 6px; }
+.card .row.between .btn { white-space: nowrap; }

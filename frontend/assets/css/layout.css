@@ -82,3 +82,7 @@
 .row.between { justify-content: space-between; }
 .row.wrap { flex-wrap: wrap; }
 .stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* viewport-fit=cover（2026-09）：绘制延伸进刘海/手势条区域——顶部 header 垫入安全区，底部导航已带 inset */
+.app-header { padding-top: env(safe-area-inset-top); height: calc(64px + env(safe-area-inset-top)); }
+@media (max-width: 767px) { .app-header { height: calc(56px + env(safe-area-inset-top)); } }
