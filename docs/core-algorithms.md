@@ -1,6 +1,6 @@
 # Suveoo — 核心算法说明
 
-> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 99 个 vitest 用例，跑在真实 workerd 运行时）
+> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 159 个 vitest 用例，跑在真实 workerd 运行时）
 
 ## 1. 十进制金额运算（防浮点幻觉）
 
@@ -50,3 +50,12 @@ JWT HS256（1h，jti 黑名单登出）；PBKDF2-SHA256 100,000 轮 + 16B 盐 + 
 - 单 Worker 冷启动 <50ms（无重依赖；pdf-lib 与 fontkit 动态 import）
 - 每用户一个 LedgerDO（SQLite）：转账路径 O(1) 索引查询 + 两条 SQL
 - 测试：99 用例（unit 74 + integration 25），15.9s @ workerd
+
+
+## 7. 基金数据生成模型（backend/scripts/gen-fund-data.mjs，确定性）
+
+16 只基金的月度净值由**多因子模型**生成：r_m = α/12 + Σ(w_f · f_y/12 + w_f · shock_f,m) + idio·ε/√12 − 0.08·r_{m-1}。因子年度收益表锚定真实市场史（eq≈MSCI ACWI、gold≈XAU、cnmm≈人民币货基利率下移轨迹、semi/apac/health/energy/reit/embi 各自周期），月度因子噪声（FVOL）还原真实波动量级。**终值校准**：随机路径的区间总收益锚定因子复合目标（含 σ²/2 拖累补偿×0.55），防随机漂移。**指标反算**：returns/年化/夏普/最大回撤全部从生成序列计算（数据自洽，测试可验证）。**10 年预测**为 1200 路径对数正态蒙特卡洛（漂移取 ln(1+fwd)，p50 语义为几何年化）。
+
+## 8. 外汇实时牌价（worker hFxLive）
+
+open.er-api.com 免费层（真实市场汇率，日更）→ KV 缓存 15 分钟（fx:live:v2）→ 失败回退 R2 静态快照（source 字段区分）。fxQuotesFromRates 纯函数：CNY 基准换算（JPY 按 100 单位口径）、buy/sell = mid∓点差（25-45bp 按币种）、spark 七点滚动（展示口径）。

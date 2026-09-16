@@ -4,7 +4,7 @@
 
 ## 目录与覆盖
 
-### unit/（纯函数，74 用例）
+### unit/（纯函数，83 用例）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -17,6 +17,8 @@
 | idempotency.test.js | 同 nonce 重放拒绝、五道 stages 顺序恒定、绿色通道 skipped 标记 |
 | auth-crypto.test.js | JWT 往返/过期/篡改/错密钥、PBKDF2 盐随机、常数时间比较 |
 | card-plan.test.js | 余额区间（30 种子扫描）、四卡守恒、卡面 8 选 4 去重、默认卡唯一、BIN-网络映射 |
+| calc-tools.test.js | 10 款 calc_* 纯函数（复利/贷款/目标/信用卡/退休/通胀/AA/存款对比/汇率/预算分配）：典型值、边界与非法参数 |
+| fund-data.test.js | 16 只基金 JSON 完整性：序列 ≥49 月且三线等长、returns 自洽（since≈期末涨幅）、stats 合理（R1 波动<2.5%、R5>15%）、蒙特卡洛 p10≤p25≤p50≤p75≤p90、披露要素齐全；fxQuotesFromRates 纯函数（JPY 100 口径、点差比例、spark 透传） |
 
 ### integration/（SELF 全栈 + 真实绑定，25 用例）
 
@@ -35,8 +37,8 @@ prompt-injection / replay-attack / authorization-bypass / consent-mutation 四�
 ## 运行结果
 
 ```
-Test Files  18 passed (18)
-     Tests  99 passed (99)
+Test Files  20 passed (20)
+     Tests  159 passed (159)
   Duration   ~16s
 ```
 
