@@ -111,3 +111,8 @@
 /* 卡片头部行窄屏允许换行（如 /wealth 总额 + 赎回按钮不再溢出卡缘）——放宽 .grid 限定为全卡片 */
 .card .row.between { flex-wrap: wrap; row-gap: 6px; }
 .card .row.between .btn { white-space: nowrap; }
+
+/* /wealth/funds 列表（#grid）：窄屏改一行一卡——16 只基金的卡内三列统计在半宽轨道易挤压（右侧留出按钮列） */
+@media (max-width: 767px) {
+  #grid.grid-2 { grid-template-columns: 1fr; }
+}
