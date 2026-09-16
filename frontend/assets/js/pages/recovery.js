@@ -1,6 +1,10 @@
-/* recovery.js — P23 找回密码（三步流程可视化：验证身份 → 设置新密码 → 完成） */
+/* recovery.js — P23 找回密码（三步流程可视化：验证身份 → 设置新密码 → 完成）
+ * 红线：本页与 /api/auth/recover 流程绝不出现"旧密码/当前密码"字段（忘记密码的人无法提供旧密码）。
+ * 2026-09 任务 A：补确认密码框（bindEyes 双框），两次不一致本地拦截；重置成功后服务端下线全部旧会话。 */
 S.router.register("recovery", async () => {
   const c = document.getElementById("content");
+  const pwInput = (id) => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="new-password">
+      <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
   c.innerHTML = `<div class="auth-wrap"><img class="logo" src="/assets/images/suveoo-logo-long.svg" alt="Suveoo">
     <div class="card">
       <h2>${S.fmt.escape(S.t("rec.title"))}</h2>
@@ -14,7 +18,8 @@ S.router.register("recovery", async () => {
           <div class="field-hint">${S.fmt.escape(S.t("rec.passportHint"))}</div></label>
         <label class="field"><span class="lb">${S.fmt.escape(S.t("reg.code"))}</span>
           <div class="row"><input class="input mono" id="v-code" maxlength="6" inputmode="numeric"><button class="btn btn-light" id="v-send" style="flex:none">${S.fmt.escape(S.t("reg.getCode"))}</button></div></label>
-        <label class="field"><span class="lb">${S.fmt.escape(S.t("rec.newPass"))}</span><input class="input" type="password" id="v-pw"></label>
+        <label class="field"><span class="lb">${S.fmt.escape(S.t("rec.newPass"))}</span>${pwInput("v-pw")}</label>
+        <label class="field"><span class="lb">${S.fmt.escape(S.t("common.confirmPass"))}</span>${pwInput("v-pw2")}</label>
         <button class="btn btn-primary btn-block" id="v-go">${S.fmt.escape(S.t("rec.submit"))}</button>
       </div>
       <div id="rec-done" hidden>
@@ -35,6 +40,7 @@ S.router.register("recovery", async () => {
     el.classList.toggle("now", s === n);
   });
   setStep(1);
+  S.ui.bindEyes(c);
   document.getElementById("v-email").addEventListener("input", () => setStep(document.getElementById("v-email").value && document.getElementById("v-code").value ? 2 : 1));
   document.getElementById("v-send").onclick = async () => {
     const email = document.getElementById("v-email").value.trim();
@@ -44,6 +50,10 @@ S.router.register("recovery", async () => {
   };
   document.getElementById("v-go").onclick = async () => {
     const pw = document.getElementById("v-pw").value;
+    const pw2 = document.getElementById("v-pw2").value;
+    /* 本地校验：格式 → 两次一致（不一致不发请求，停留本页） */
+    if (!/^\S{8,32}$/.test(pw)) { S.ui.toast(S.t("reg.pwRule"), true); document.getElementById("v-pw").focus(); return; }
+    if (pw !== pw2) { S.ui.toast(S.t("common.pwMismatch"), true); document.getElementById("v-pw2").focus(); return; }
     setStep(2);
     const r = await S.api.post("/api/auth/recover", {
       email: document.getElementById("v-email").value.trim(),

@@ -37,9 +37,9 @@ prompt-injection / replay-attack / authorization-bypass / consent-mutation 四�
 ## 运行结果
 
 ```
-Test Files  24 passed (24)
-     Tests  186 passed (186)
-  Duration   ~21s
+Test Files  27 passed (27)
+     Tests  207 passed (207)
+  Duration   ~24s
 ```
 
 2026-09-17（第十一轮）新增集成测试文件：
@@ -52,3 +52,8 @@ Test Files  24 passed (24)
 ## SuveooBench
 
 评测脚本位 `backend/tests/bench/generate-benchmark.js`（扩展中）；当前看板数据 `frontend/assets/data/benchmark.json` 由集成用例指标汇总生成，/ai/benchmark 可视化。
+
+2026-09-17（第十二轮）新增测试：
+- tests/integration/security-credential.test.js（8）——改密三态（缺当前密码 400 / 错密码 401 / 全对 200+新 token 且同码不烧）、会话纪元（旧 token 401、新 token 200、部署前无 epo 旧令牌按纪元 0 于 bump 后失效）、2FA 三态（关缺密码 400 / 错密码 401 / 对密码 200；开仅 OTP）、找回密码（请求体无旧密码键、重置后双设备 JWT 全 401、新密码可登录）
+- tests/unit/schema-migration.test.js（3）——columnMigrations 幂等列迁移清单（老库/已迁移/半迁移；DDL 保持老表结构，新旧 DO 同路径）
+- tests/integration/card-ledger.test.js（10）——挂卡断言（转账默认/指定卡、跨用户入账侧、缴费/理财/换汇）、信用支付四态（借记不动+欠款累加+可用减少+挂卡；超额 INSUFFICIENT_CREDIT；购汇欠款按人民币计入+结汇拒信用卡；信用卡不可作入账目标）、还款闭环（动态金额确认卡/默认借记扣款/欠款清零/memo 含金额/NO_DEBT 409；AI 通道 bill_pay 无金额动态补齐）、单卡真过滤分页（25 条 20+5 两页、他卡不串、不存在卡空返回）、demo 种子（信用欠款 863247 精确、本月流水 card 无 NULL、四卡各归各）

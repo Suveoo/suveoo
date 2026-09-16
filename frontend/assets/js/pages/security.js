@@ -1,7 +1,9 @@
-/* security.js — P29 安全中心 */
+/* security.js — P29 安全中心（A1/A2：改密与关闭 2FA 须当前密码；改密成功就地换新纪元 token） */
 S.router.register("security", async ({ user }) => {
   const c = document.getElementById("content");
   const sec = (await S.api.get("/api/security")).data ?? {};
+  const pwInput = (id, ac = "new-password") => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="${ac}">
+      <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("sec.title"))}</h1>${S.sim.banner()}
     <div class="card">
       <div class="list-row"><span class="avatar">${S.ui.icon("lock", 14)}</span>
@@ -17,9 +19,8 @@ S.router.register("security", async ({ user }) => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("sec.audit"))}</h2></div>
     <div class="card" id="audit">${S.ui.skeleton(4)}</div>`;
   document.getElementById("chg").onclick = () => {
-    const pwInput = (id) => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="new-password">
-        <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.changePass"))}</h2>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.curPass"))}</span>${pwInput("cp-cur", "current-password")}</label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("consent.otp"))}</span>
         <div class="gc-otp"><input class="input mono" id="cp-otp" maxlength="6"><button class="btn btn-light" id="cp-send" style="flex:none">${S.fmt.escape(S.t("consent.getCode"))}</button></div></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.newPass"))}（8-32）</span>${pwInput("cp-pw")}</label>
@@ -33,26 +34,63 @@ S.router.register("security", async ({ user }) => {
       S.ui.toast(r.status === 429 ? S.t("consent.tooFast") : S.t("consent.codeSent"), r.status === 429);
     };
     m.el.querySelector("#ok").onclick = async () => {
+      const cur = m.el.querySelector("#cp-cur").value;
       const pw = m.el.querySelector("#cp-pw").value;
       const pw2 = m.el.querySelector("#cp-pw2").value;
+      /* 本地校验顺序：新密码格式 → 两次一致 → 提交（当前密码正确性由服务端裁决） */
       if (!/^\S{8,32}$/.test(pw)) { S.ui.toast(S.t("reg.pwRule"), true); return; }
       if (pw !== pw2) { S.ui.toast(S.t("common.pwMismatch"), true); m.el.querySelector("#cp-pw2").focus(); return; }
-      const r2 = await S.api.patch("/api/security/password", { otp: m.el.querySelector("#cp-otp").value.trim(), new_password: pw });
-      if (r2.ok) { m.close(); S.ui.toast(S.t("common.opOk")); }
-      else S.ui.toast(r2.data?.error?.message ?? r2.data?.error?.code ?? "failed", true);
+      if (!cur) { S.ui.toast(S.t("sec.curPassBad"), true); m.el.querySelector("#cp-cur").focus(); return; }
+      const r2 = await S.api.patch("/api/security/password", { otp: m.el.querySelector("#cp-otp").value.trim(), current_password: cur, new_password: pw });
+      if (r2.ok) {
+        /* 改密成功：其他设备全部下线，本设备就地换新纪元 token（不掉线） */
+        if (r2.data?.token) S.api.token = r2.data.token;
+        m.close();
+        S.ui.toast(S.t("common.opOk"));
+      } else {
+        const code = r2.data?.error?.code;
+        S.ui.toast(code === "WRONG_OLD_PASSWORD" ? S.t("sec.curPassBad") : r2.data?.error?.message ?? r2.data?.error?.code ?? "failed", true);
+      }
     };
   };
+  /* 关闭 2FA 的小弹窗：服务端返回 PASSWORD_REQUIRED 时收集当前密码后重试（与改密弹窗同款密码框） */
+  const curPassModal = () => new Promise((resolve) => {
+    const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.curPass"))}</h2>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.curPass"))}</span>${pwInput("tfa-cur", "current-password")}</label>
+      <div class="modal-actions"><button class="btn btn-ghost" id="cc-x">${S.fmt.escape(S.t("common.cancel"))}</button>
+      <button class="btn btn-primary" id="cc-ok">${S.fmt.escape(S.t("common.confirm"))}</button></div>`);
+    S.ui.bindEyes(m.el);
+    m.el.querySelector("#cc-x").onclick = () => { m.close(); resolve(null); };
+    m.el.querySelector("#cc-ok").onclick = () => { const v = m.el.querySelector("#tfa-cur").value; m.close(); resolve(v || null); };
+  });
   document.getElementById("tfa").onchange = async (e) => {
+    const enabling = e.target.checked;
+    const revert = () => { e.target.checked = !enabling; };
     const otp = await S.ctl.otp({
       email: user?.email,
       send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
     });
-    if (!otp) { e.target.checked = !e.target.checked; return; }
-    const r = await S.api.post("/api/security/2fa", { enabled: e.target.checked, otp });
+    if (!otp) { revert(); return; }
+    let body = { enabled: enabling, otp };
+    if (!enabling) {
+      /* 关闭是降安全操作：先按 OTP 提交，服务端要求当前密码（PASSWORD_REQUIRED）时补收重试 */
+      const probe = await S.api.post("/api/security/2fa", body);
+      if (probe.ok) { S.ui.toast(S.t("common.opOk")); return; }
+      const code = probe.data?.error?.code;
+      if (code !== "PASSWORD_REQUIRED") { revert(); S.ui.toast(r2msg(probe), true); return; }
+      const pw = await curPassModal();
+      if (!pw) { revert(); return; }
+      body.current_password = pw;
+    }
+    const r = await S.api.post("/api/security/2fa", body);
     if (r.ok) S.ui.toast(S.t("common.opOk"));
-    else { e.target.checked = !e.target.checked; S.ui.toast(r2msg(r), true); }
+    else { revert(); S.ui.toast(r2msg(r), true); }
   };
-  const r2msg = (r) => r.data?.error?.message ?? r.data?.error?.code ?? "failed";
+  const r2msg = (r) => {
+    const code = r?.data?.error?.code;
+    if (code === "WRONG_OLD_PASSWORD") return S.t("sec.curPassBad");
+    return r?.data?.error?.message ?? r?.data?.error?.code ?? "failed";
+  };
   const a = await S.api.get("/api/audit/me");
   document.getElementById("audit").innerHTML = (a.data?.audit ?? []).map((x) => `
     <div class="list-row"><span class="avatar mono small">${S.ui.icon("doc", 12)}</span>

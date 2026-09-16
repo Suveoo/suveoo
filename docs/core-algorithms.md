@@ -1,6 +1,6 @@
 # Suveoo — 核心算法说明
 
-> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 159 个 vitest 用例，跑在真实 workerd 运行时）
+> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 207 个 vitest 用例，跑在真实 workerd 运行时）
 
 ## 1. 十进制金额运算（防浮点幻觉）
 
@@ -71,3 +71,10 @@ open.er-api.com 免费层（真实市场汇率，日更）→ KV 缓存 15 分�
 
 - `navScaled4`/`marketValueCents`：净值 ×10⁴ 放大 BigInt，先乘后除 floor（禁浮点）。赎回回款、持仓页 value、overview 估值、MPC holdings 市值共用同一公式——显示值 === 回款额。
 - `fxNormalizeArgs`：服务端 hFxLive 牌价（购汇 sell / 结汇 buy，×10⁴ BigInt），JPY 每 100 日元口径（unit=100）；双腿金额（CNY 分/外币分）由服务端换算后传入 DO，客户端 rate 不参与结算。
+
+## 9. 会话纪元与信用卡账本（2026-09-17 第十二轮）
+
+- **会话纪元（session epoch）**：profile.session_epoch（INTEGER DEFAULT 0，columnMigrations 幂等迁移）× JWT claims.epo（注册=0/登录/MFA 三签发路径）。requireSession 对每个已登录请求校验 `claims.epo ?? 0 === profile.session_epoch`——改密/找回密码成功后 DO op bumpEpoch（+1），该用户全部既有 JWT 立即失效（全设备下线）；改密响应签发新纪元 token，当前设备不掉线。部署前签发的旧令牌无 epo 声明，按纪元 0 参与比较（首次 bump 后同样失效）。
+- **信用支付额度数学**：信用卡 balance 记欠款；可用额度 = limit − balance − held（cardAvailable 信用感知，与 INVARIANT_BALANCE 守卫同源）。信用消费（转账/购汇）欠款 += 金额（整数分），借记余额不动；超额比较 `amt > limit − balance` → INSUFFICIENT_CREDIT。
+- **全额还款动态结算**：credit-repay 还款额 = 当前欠款全额（BigInt(balance_cents)），从默认借记卡扣款（校验余额）→ 信用卡 balance 清零；账单列表/REST 缴费/AI bill_pay 三通道金额同源（centsToStr 十进制）。
+- **单卡明细过滤**：`SELECT * FROM tx WHERE card = ? ORDER BY ts DESC LIMIT 20 OFFSET ?`（迁移前行 card=NULL 不出现）。

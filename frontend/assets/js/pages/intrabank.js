@@ -28,20 +28,26 @@ S.router.register("intrabank", async () => {
 
   const cards = (await S.api.get("/api/cards")).data?.cards ?? [];
   const debits = cards.filter((x) => x.kind === "debit");
+  /* 付款卡列表含信用卡（B3 信用支付）：信用标签徽章 + 显示可用额度而非余额 */
+  const payFrom = cards.filter((x) => (x.kind === "debit" || x.kind === "credit") && x.status === "ACTIVE");
   let fromSlug = presetFrom || (debits.find((d) => d.is_default) ?? debits[0])?.slug;
   const fromBox = document.getElementById("t-from");
   const renderFrom = () => {
-    fromBox.innerHTML = debits.map((d) => `
+    fromBox.innerHTML = payFrom.map((d) => `
       <label class="row card card-pad-sm" style="cursor:pointer;gap:10px;margin:0">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""} ${d.status !== "ACTIVE" ? "disabled" : ""}>
         <img class="bc-art" src="/${d.art}" alt="" style="width:64px;height:40px">
-        <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(d.network)} · ${S.fmt.escape(S.t("cards.classIc", d.class_label))}</div></div>
-        <div class="mono small">${S.fmt.escape(S.t("transfer.available"))} ¥${d.balance}${d.held ? `（${S.fmt.escape(S.t("genui.budget"))} ¥${d.held}）` : ""}</div>
+        <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b>
+          <div class="muted small">${S.fmt.escape(d.network)} · ${S.fmt.escape(d.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", d.class_label))}</div></div>
+        <div style="text-align:right">
+          ${d.kind === "credit" ? `<div>${S.ui.badge(S.t("cards.creditTag"), "badge-navy")}</div>` : ""}
+          <div class="mono small">${S.fmt.escape(S.t("transfer.available"))} ¥${d.kind === "credit" ? S.fmt.escape(d.available) : S.fmt.escape(d.balance)}${d.held ? `（${S.fmt.escape(S.t("genui.budget"))} ¥${d.held}）` : ""}</div>
+        </div>
       </label>`).join("");
     S.ui.$$("[name=from]", fromBox).forEach((r) => { r.onchange = () => (fromSlug = r.value); });
   };
   renderFrom();
-  if (!debits.length) { document.getElementById("t-go").disabled = true; }
+  if (!payFrom.length) { document.getElementById("t-go").disabled = true; }
 
   /* 收款方真实性错误的行内提示（服务端结构化 code → i18n；不再笼统 toast） */
   const showErr = (r) => {
@@ -51,6 +57,7 @@ S.router.register("intrabank", async () => {
       NAME_MISMATCH: S.t("transfer.nameMismatch"),
       INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
       PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
+      INSUFFICIENT_CREDIT: S.t("transfer.insufficientCredit"),
     };
     const box = document.getElementById("t-err");
     box.style.display = "flex";

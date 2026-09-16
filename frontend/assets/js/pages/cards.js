@@ -18,7 +18,9 @@ S.router.register("cards", async () => {
         <div class="bc-main"><a href="/account/card/${cd.slug}/settings" title="${S.fmt.escape(S.t("cards.openSettings"))}" style="flex:none;display:block"><img class="bc-art" src="/${cd.art}" alt="${S.fmt.escape(S.t("cards.openSettings"))}"></a>
           <div><div class="muted small">${S.fmt.escape(cd.kind === "credit" ? S.t("cards.creditLeft") : S.t("cards.balance"))}</div>
             <b class="mono" style="font-size:22px">¥ ${S.fmt.escape(mask(cd.kind === "credit" ? (cd.available ?? cd.balance) : cd.balance))}</b>
-            ${cd.limit ? `<div class="muted small">${S.fmt.escape(S.t("cards.creditLimit"))} ¥ ${cd.limit}</div>` : ""}</div></div>
+            ${cd.kind === "credit"
+              ? `<div class="muted small">${S.fmt.escape(S.t("cards.outstanding"))} ¥ ${S.fmt.escape(mask(cd.balance))} · ${S.fmt.escape(S.t("cards.creditLimit"))} ¥ ${cd.limit}</div>`
+              : ""}</div></div>
         <div class="bc-btns">
           <a class="bc-btn" href="/account/card/${cd.slug}/history">${S.ui.icon("list", 13)} ${S.fmt.escape(S.t("cards.history"))}</a>
           <a class="bc-btn" href="/transfer/intrabank?from=${cd.slug}">${S.ui.icon("send", 13)} ${S.fmt.escape(S.t("cards.transfer"))}</a>

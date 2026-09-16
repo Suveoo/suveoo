@@ -30,7 +30,7 @@ S.router.register("fx", async () => {
   let fx = { quotes: [] };
   let curSel, cardSel;
   let dir = "buy";
-  let debits = [];
+  const allCards = []; /* 全部卡片（结算卡选项按方向过滤） */
   const quoteOf = (code) => fx.quotes.find((q) => q.code === code) ?? fx.quotes[0];
   const renderMeta = () => {
     const u = document.getElementById("upd");
@@ -104,6 +104,28 @@ S.router.register("fx", async () => {
     box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(msg)}</div>`;
   };
   const hideErr = () => { const b = document.getElementById("x-err"); b.style.display = "none"; b.innerHTML = ""; };
+  /* 结算卡选项（B3）：购汇=支付卡（借记 + 信用卡信用支付，信用显示可用额度）；结汇=收款卡（仅借记）。
+   * 方向切换时重建列表，已选卡在新方向不可用时回落默认借记卡。 */
+  const buildCardSelect = () => {
+    const list = dir === "buy"
+      ? allCards.filter((x) => (x.kind === "debit" || x.kind === "credit") && x.status === "ACTIVE")
+      : allCards.filter((x) => x.kind === "debit" && x.status === "ACTIVE");
+    const keep = list.some((x) => x.slug === cardSel?.value) ? cardSel.value : (list.find((x) => x.is_default) ?? list[0])?.slug;
+    const fresh = S.ctl.select({
+      label: dir === "buy" ? S.t("fx.payCard") : S.t("fx.receiveCard"),
+      options: list.map((d) => ({
+        v: d.slug,
+        label: d.kind === "credit"
+          ? `${d.number} · ${S.t("cards.creditTag")} · ${S.t("transfer.available")} ¥${d.available}`
+          : `${d.number} · ¥${d.balance}`,
+      })),
+      value: keep,
+    });
+    fresh.id = "x-card";
+    fresh.addEventListener("input", calc);
+    document.getElementById("x-card").replaceWith(fresh);
+    cardSel = fresh;
+  };
   const load = async (refresh = false) => {
     const r = await fetch(`/api/fx${refresh ? "?refresh=1" : ""}`);
     fx = (await r.json().catch(() => fx)) ?? fx;
@@ -117,7 +139,7 @@ S.router.register("fx", async () => {
     await load(true);
     document.getElementById("refresh").disabled = false;
   };
-  S.ui.$$("[data-dir]").forEach((t) => { t.onclick = () => { dir = t.dataset.dir; hideErr(); S.ui.$$("[data-dir]").forEach((x) => x.classList.toggle("active", x === t)); calc(); }; });
+  S.ui.$$("[data-dir]").forEach((t) => { t.onclick = () => { dir = t.dataset.dir; hideErr(); S.ui.$$("[data-dir]").forEach((x) => x.classList.toggle("active", x === t)); calc(); buildCardSelect(); }; });
   document.getElementById("x-amt").oninput = () => { hideErr(); calc(); };
   document.getElementById("x-go").onclick = async () => {
     hideErr();
@@ -136,22 +158,15 @@ S.router.register("fx", async () => {
       await load();
     } else {
       const reason = r.data?.reason ?? r.data?.error?.code ?? null;
-      showErr(reason === "INSUFFICIENT_FX" ? S.t("fx.insufficientFx") : reason === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.error?.message ?? S.t("common.opFailed"));
+      showErr(reason === "INSUFFICIENT_FX" ? S.t("fx.insufficientFx")
+        : reason === "INSUFFICIENT_CREDIT" ? S.t("transfer.insufficientCredit")
+        : reason === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.error?.message ?? S.t("common.opFailed"));
     }
   };
-  /* 初始化：牌价 + 结算卡选择（借记卡列表，默认卡预选）+ 外币余额 */
+  /* 初始化：牌价 + 结算卡选择（购汇含信用卡信用支付；结汇仅借记）+ 外币余额 */
   await load();
-  const cards = (await S.api.get("/api/cards")).data?.cards ?? [];
-  debits = cards.filter((x) => x.kind === "debit" && x.status === "ACTIVE");
-  const def = debits.find((d) => d.is_default) ?? debits[0];
-  cardSel = S.ctl.select({
-    label: S.t("fx.payCard"),
-    options: debits.map((d) => ({ v: d.slug, label: `${d.number} · ¥${d.balance}` })),
-    value: def?.slug,
-  });
-  cardSel.id = "x-card";
-  cardSel.addEventListener("input", calc);
-  document.getElementById("x-card").replaceWith(cardSel);
+  allCards.push(...(((await S.api.get("/api/cards")).data?.cards) ?? []));
+  buildCardSelect();
   await loadBalances();
   calc();
 });

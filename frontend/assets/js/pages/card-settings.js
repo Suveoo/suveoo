@@ -25,6 +25,10 @@ S.router.register("card-settings", async () => {
       <div class="section-title" style="margin-top:8px"><h3>${S.fmt.escape(S.t("card.repayInfo"))}</h3></div>
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cs.repayCycle"))}</span><span class="v mono">${S.fmt.escape(S.t("cs.repayCycleVal"))}</span></div>
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLimit"))}</span><span class="v mono">¥ ${cd.limit}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.outstanding"))}</span><span class="v mono">¥ ${cd.balance}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLeft"))}</span><span class="v mono">¥ ${cd.available}</span></div>
+      <button class="btn btn-primary" id="cs-repay" style="margin-top:10px">${S.ui.icon("check", 14)} ${S.fmt.escape(S.t("cards.repay"))}</button>
+      <p class="muted small" style="margin-top:6px">${S.fmt.escape(S.t("cards.repayNote"))}</p>
       <h3 style="margin-top:16px">${S.fmt.escape(S.t("card.geo"))}</h3>
       <p class="muted small">${S.fmt.escape(S.t("cs.geoNote"))}</p>
       <label class="row" style="gap:8px"><span class="switch"><input type="checkbox" id="cs-geo"><span class="tk"></span></span><span class="small">${S.fmt.escape(S.t("cs.geoLabel"))}</span></label>` : `
@@ -90,5 +94,14 @@ S.router.register("card-settings", async () => {
     const r2 = await S.api.post(`/api/cards/${slug}/${intent}`, { otp });
     if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
     else S.ui.toast(r2.data?.reason ?? "failed", true);
+  };
+  /* 立即还款：走 credit-repay 账单缴费（黄级确认卡），金额=当前欠款全额（服务端动态取） */
+  const repayBtn = document.getElementById("cs-repay");
+  if (repayBtn) repayBtn.onclick = async () => {
+    repayBtn.disabled = true;
+    const r2 = await S.api.mutate("/api/bills/credit-repay/pay", {}, { action: "bill_pay", subject: S.t("cards.repaySubject") });
+    if (r2.cancelled) { repayBtn.disabled = false; return; }
+    if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("cards.repaid", r2.data.result?.repaid ?? "")); setTimeout(() => location.reload(), 900); }
+    else { S.ui.toast(r2.data?.error?.message ?? r2.data?.reason ?? "failed", true); repayBtn.disabled = false; }
   };
 });
