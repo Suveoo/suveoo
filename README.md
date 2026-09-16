@@ -31,7 +31,7 @@ Suveoo AI 对话页（AA 分账 / 账单归因 / 理财推荐 / 卡片围栏 / �
 
 ### 2.2 基础设施
 
-Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service。前端为无构建 MPA + PWA（三语 zh-CN/zh-TW/en-US）。
+Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Telegram 运维通知（tgFire，waitUntil 生命周期保障）。前端为无构建 MPA + PWA（三语 zh-CN/zh-TW/en-US）。
 
 ## 3. 架构和部署简介
 
@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service。前
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 99 用例（真实 workerd 运行时）
+npm test                  # 159 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -50,7 +50,7 @@ npm test                  # 99 用例（真实 workerd 运行时）
 cd backend
 npx wrangler deploy                     # Worker（路由 suveoo.com/* 已配置）
 node scripts/deploy-frontend.mjs        # 前端全量上传 R2（put+get 回验）
-curl -X POST https://suveoo.com/api/demo/seed   # 注入演示种子（DEMO_MODE=true 时）
+curl -X POST https://suveoo.com/api/demo/seed   # 注入演示种子（DEMO_MODE=true 时；可选 body {"email":"..."} 为任意已注册账户灌全板块仿真数据）
 ```
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
@@ -137,7 +137,9 @@ D:\suveoo\
 │   │       └── generate-benchmark.js          # SuveooBench：生成 case → 跑批 → 产出 frontend/assets/data/benchmark.json
 │   │
 │   └── scripts\
-│       ├── deploy-frontend.mjs                # frontend/ 全量上传 R2（wrangler r2 object put 循环）
+│       ├── deploy-frontend.mjs                # frontend/ 全量上传 R2（wrangler r2 object put 循环；--filter 按路径过滤增量）
+│       ├── gen-fund-data.mjs                  # 16 只基金数据生成器（多因子模型 + 终值校准 + 蒙特卡洛预测，固定种子幂等）
+│       ├── subset-cjk.mjs.py                  # Noto Sans SC 可变字体 → 静态 GB2312 子集（PDF 报告嵌入用，fontTools）
 │       └── seed-demo-data.mjs                 # 注入演示账户种子（pages.md §10.2）
 │
 └── frontend\                                  # ★ 整目录 = R2 根（suveoo-bank-r2）
@@ -254,18 +256,21 @@ D:\suveoo\
     │   ├── fonts\                             # 自托管可变字体 TTF（源自 google/fonts，zh-TW 必需 Noto Sans TC）
     │   │   ├── inter-variable.ttf            # ~0.9MB 拉丁与数字
     │   │   ├── noto-sans-sc.ttf              # ~17.8MB 简体中文（后续可做 woff2 子集化，见 To Do H）
+    │   │   ├── noto-sans-sc-report.ttf       # ~2.2MB 静态 GB2312 子集（scripts/subset-cjk.mjs.py 产物，PDF 报告嵌入）
     │   │   ├── noto-sans-tc.ttf              # ~11.9MB 繁体中文
     │   │   └── noto-sans-mono.ttf            # ~1.7MB 等宽（金额/卡号/trace_id）
     │   │
-    │   └── data\                              # 公共数据（前端 fetch 与 Worker MCP 工具共读）
-    │       ├── funds\                         # 8 只基金（pages.md §10.1）
-    │       │   ├── global-mixed-1.json  global-money-1.json  em-gov-bond.json
-    │       │   ├── global-mixed-2.json  global-equity-index.json  apac-tech.json
-    │       │   └── esg-bond.json  gold-index.json
-    │       ├── deposits\                      # 6 档存款
+    │   └── data\                              # 公共数据（前端 fetch 与 Worker MCP 工具共读；请求带 ?v= 部署版本绕缓存）
+    │       ├── funds\                         # 16 只基金（pages.md §10.1；scripts/gen-fund-data.mjs 生成）
+    │       │   ├── global-money-1.json  global-short-bond.json  esg-bond.json
+    │       │   ├── cn-dividend.json  consumer-staples.json  quant-neutral.json
+    │       │   ├── em-gov-bond.json  global-mixed-1.json  reit-global.json
+    │       │   ├── global-mixed-2.json  global-equity-index.json  gold-index.json
+    │       │   └── healthcare-bio.json  new-energy.json  apac-tech.json  ai-semi.json
+    │       ├── deposits\                      # 6 档存款（含计息方式/提前支取/转存/保障/阶梯字段）
     │       │   ├── demand.json  notice-7d.json  term-3m.json
     │       │   └── term-6m.json  term-1y.json  term-3y.json
-    │       ├── fx.json                        # 10 币种牌价 + sparkline
+    │       ├── fx.json                        # 10 币种牌价快照（运行时 /api/fx 实时化，此文件为回退源）
     │       ├── scenarios.json                 # home 预测 + /ai 欢迎 chips（六场景）
     │       ├── announcements.json             # 官方公告（/about）
     │       ├── faq.json                       # FAQ（/help）
@@ -290,7 +295,7 @@ D:\suveoo\
     │   ├── index.html                         # P04
     │   ├── funds\
     │   │   ├── index.html                     # P15
-    │   │   ├── global-mixed-1\index.html … gold-index\index.html   # P16 ×8（同模板）
+    │   │   ├── global-mixed-1\ … gold-index\ … ai-semi\index.html  # P16 ×16（同模板，R1-R5 全梯度）
     │   ├── deposits\
     │   │   ├── index.html                     # P17
     │   │   └── demand\index.html … term-3y\index.html              # P18 ×6（同模板）
