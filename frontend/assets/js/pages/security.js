@@ -17,19 +17,27 @@ S.router.register("security", async ({ user }) => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("sec.audit"))}</h2></div>
     <div class="card" id="audit">${S.ui.skeleton(4)}</div>`;
   document.getElementById("chg").onclick = () => {
+    const pwInput = (id) => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="new-password">
+        <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.changePass"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("consent.otp"))}</span>
         <div class="gc-otp"><input class="input mono" id="cp-otp" maxlength="6"><button class="btn btn-light" id="cp-send" style="flex:none">${S.fmt.escape(S.t("consent.getCode"))}</button></div></label>
-      <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.newPass"))}（8-32）</span><input class="input" type="password" id="cp-pw"></label>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.newPass"))}（8-32）</span>${pwInput("cp-pw")}</label>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("common.confirmPass"))}</span>${pwInput("cp-pw2")}</label>
       <div class="modal-actions"><button class="btn btn-ghost" id="cx">${S.fmt.escape(S.t("common.cancel"))}</button>
       <button class="btn btn-primary" id="ok">${S.fmt.escape(S.t("common.save"))}</button></div>`);
+    S.ui.bindEyes(m.el);
     m.el.querySelector("#cx").onclick = m.close;
     m.el.querySelector("#cp-send").onclick = async () => {
       const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: user?.email?.includes("*") ? undefined : user?.email });
       S.ui.toast(r.status === 429 ? S.t("consent.tooFast") : S.t("consent.codeSent"), r.status === 429);
     };
     m.el.querySelector("#ok").onclick = async () => {
-      const r2 = await S.api.patch("/api/security/password", { otp: m.el.querySelector("#cp-otp").value.trim(), new_password: m.el.querySelector("#cp-pw").value });
+      const pw = m.el.querySelector("#cp-pw").value;
+      const pw2 = m.el.querySelector("#cp-pw2").value;
+      if (!/^\S{8,32}$/.test(pw)) { S.ui.toast(S.t("reg.pwRule"), true); return; }
+      if (pw !== pw2) { S.ui.toast(S.t("common.pwMismatch"), true); m.el.querySelector("#cp-pw2").focus(); return; }
+      const r2 = await S.api.patch("/api/security/password", { otp: m.el.querySelector("#cp-otp").value.trim(), new_password: pw });
       if (r2.ok) { m.close(); S.ui.toast(S.t("common.opOk")); }
       else S.ui.toast(r2.data?.error?.message ?? r2.data?.error?.code ?? "failed", true);
     };

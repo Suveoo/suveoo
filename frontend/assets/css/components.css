@@ -106,6 +106,11 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 
 .eye-toggle { background: none; border: none; cursor: pointer; padding: 4px; color: var(--color-ink-2); vertical-align: middle; }
 .eye-toggle svg { width: 18px; height: 18px; }
+/* 密码输入行：眼睛按钮绝对定位右缘，input 右侧留白防文字压图标 */
+.pw-field { position: relative; display: block; }
+.pw-field .input { width: 100%; padding-right: 44px; }
+.pw-field .eye-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.pw-field .eye-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; border-radius: 4px; }
 
 .banner { border-radius: var(--r-card); padding: var(--sp-3) var(--sp-4); font-size: var(--fs-12); color: var(--color-ink-2); background: var(--color-surface); display: flex; gap: 8px; align-items: flex-start; margin-bottom: var(--sp-4); }
 .banner svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }

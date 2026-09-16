@@ -120,7 +120,8 @@ S.chrome = {
             <li><a href="/wealth">${S.fmt.escape(S.t("nav.wealth"))}</a></li><li><a href="/ai">Suveoo AI</a></li></ul></div>
           <div><h4>${S.fmt.escape(S.t("footer.support"))}</h4><ul>
             <li><a href="/help">${S.fmt.escape(S.t("footer.help"))}</a></li><li><a href="/contact">${S.fmt.escape(S.t("footer.contact"))}</a></li>
-            <li><a href="/notifications">${S.fmt.escape(S.t("footer.notifications"))}</a></li></ul></div>
+            <li><a href="/notifications">${S.fmt.escape(S.t("footer.notifications"))}</a></li>
+            <li><a href="/about">${S.fmt.escape(S.t("footer.about"))}</a></li></ul></div>
           <div><h4>${S.fmt.escape(S.t("footer.legal"))}</h4><ul>
             <li><a href="/terms">${S.fmt.escape(S.t("legal.terms"))}</a></li><li><a href="/privacy-policy">${S.fmt.escape(S.t("legal.privacy"))}</a></li>
             <li><a href="/cookie-privacy">${S.fmt.escape(S.t("legal.cookie"))}</a></li>

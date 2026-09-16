@@ -19,7 +19,8 @@ S.i18n = {
       const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
       const u = (f) => `/i18n/${f}.json${av ? "?v=" + av : ""}`;
       const load = (f) => fetch(u(f)).then((r) => (r.ok ? r.json() : {}));
-      const list = this.lang === "zh-CN" ? ["zh-CN"] : [this.lang, "zh-CN"];
+      /* zh-CN 在前兜底、目标语言在后覆盖：目标语言缺失键才回退中文（顺序反了会把整个目标词典吞成中文） */
+      const list = this.lang === "zh-CN" ? ["zh-CN"] : ["zh-CN", this.lang];
       const parts = await Promise.all(list.map((f) => withTimeout(load(f))));
       this.dict = Object.assign({}, ...parts.filter(Boolean));
       document.documentElement.lang = this.lang;

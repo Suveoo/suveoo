@@ -26,6 +26,20 @@ S.ui = {
     return `<div class="empty"><img src="/assets/images/illustrations/empty-state.svg" alt=""><p>${S.fmt.escape(text)}</p>${actionHtml}</div>`;
   },
   badge(text, cls = "badge-gray") { return `<span class="badge ${cls}">${S.fmt.escape(text)}</span>`; },
+  /* 密码框眼睛按钮：button[data-eye="<inputId>"] 点击切换 text/password 并换图标（注册与安全中心改密共用） */
+  bindEyes(scope) {
+    (scope ?? document).querySelectorAll("button[data-eye]").forEach((b) => {
+      b.onclick = () => {
+        const input = document.getElementById(b.dataset.eye);
+        if (!input) return;
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        b.innerHTML = S.ui.icon(show ? "eye-off" : "eye", 18);
+        b.setAttribute("aria-label", S.t(show ? "common.hidePass" : "common.showPass"));
+        b.title = S.t(show ? "common.hidePass" : "common.showPass");
+      };
+    });
+  },
   /* 预测问题 chip 尾部的灰色回勾箭头（自绘 SVG，跟随最后一个字） */
   chipGo: `<svg class="chip-go" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 10 5 14l4 4"/><path d="M5 14h10a4 4 0 0 0 4-4V7"/></svg>`,
   tierBadge(tier) {

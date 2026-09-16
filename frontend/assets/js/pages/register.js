@@ -114,17 +114,23 @@ S.router.register("register", async () => {
 
   function step3() {
     setStep(3);
+    const pwInput = (id) => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="new-password">
+        <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
     pane.innerHTML = `<h2>${S.fmt.escape(S.t("reg.step3"))}</h2>
-      ${field(S.t("reg.newPass"), "r-pw", 'type="password" autocomplete="new-password"')}
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("reg.newPass"))}</span>${pwInput("r-pw")}</label>
       <div class="progressbar"><i id="r-str" style="width:0"></i></div>
+      <label class="field" style="margin-top:14px"><span class="lb">${S.fmt.escape(S.t("common.confirmPass"))}</span>${pwInput("r-pw2")}</label>
       <button class="btn btn-primary btn-block" id="r-go" style="margin-top:16px">${S.fmt.escape(S.t("common.submit"))}</button>`;
+    S.ui.bindEyes(pane);
     document.getElementById("r-pw").oninput = (e) => {
       const v2 = e.target.value;
       document.getElementById("r-str").style.width = `${Math.min(100, v2.length * 6)}%`;
     };
     document.getElementById("r-go").onclick = () => {
       const pw = document.getElementById("r-pw").value;
-      if (!/^\S{8,32}$/.test(pw)) { S.ui.toast(S.t("reg.pwRule"), true); return; }
+      const pw2 = document.getElementById("r-pw2").value;
+      if (!/^\S{8,32}$/.test(pw)) { S.ui.toast(S.t("reg.pwRule"), true); document.getElementById("r-pw").focus(); return; }
+      if (pw !== pw2) { S.ui.toast(S.t("common.pwMismatch"), true); document.getElementById("r-pw2").focus(); return; }
       state.password = pw;
       step4();
     };
