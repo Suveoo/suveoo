@@ -1,10 +1,12 @@
 /* downloads.js — P28 月度报告（pdf-lib 服务端生成；含数据口径说明与状态徽章） */
 S.router.register("downloads", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("dl.title"))}</h1>${S.sim.banner()}
-    <div class="banner">${S.ui.icon("doc", 16)}<div>${S.fmt.escape(S.t("dl.hint"))}</div></div>
-    <div class="card" style="margin-top:12px">
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("dl.dataNoteLb"))}</span><span class="v small">${S.fmt.escape(S.t("dl.dataNote"))}</span></div>
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("dl.title"))}</h1>
+    <div class="card dl-note">
+      <div class="row" style="gap:10px;align-items:flex-start">
+        <span class="avatar" style="flex:none">${S.ui.icon("doc", 14)}</span>
+        <div class="small muted" style="line-height:1.65;min-width:0">${S.fmt.escape(S.t("dl.noteCompact"))}</div>
+      </div>
     </div>
     <div class="card" style="margin-top:12px">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get("/api/reports");

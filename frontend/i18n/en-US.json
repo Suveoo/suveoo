@@ -214,6 +214,7 @@
   "dl.download": "Download",
   "dl.gen": "Generate PDF",
   "dl.hint": "Reports include the monthly asset snapshot and all transactions (simulated).",
+  "dl.noteCompact": "This is a simulated banking system with no real funds involved. Monthly statements are generated server-side with pdf-lib and contain the month’s asset snapshot and transactions; data is simulated and not a real statement.",
   "dl.statementNote": "Suveoo monthly statement (simulated data)",
   "dl.statusPending": "Not generated",
   "dl.statusReady": "Ready",

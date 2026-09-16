@@ -214,6 +214,7 @@
   "dl.download": "下载",
   "dl.gen": "生成 PDF",
   "dl.hint": "报告包含当月资产快照与全部交易流水（模拟数据）。",
+  "dl.noteCompact": "这是模拟银行系统，不涉及真实资金行为。月度报告由服务端 pdf-lib 生成，含当月资产快照与交易流水；数据为模拟口径，不构成真实对账单。",
   "dl.statementNote": "Suveoo 月度账单（模拟数据）",
   "dl.statusPending": "待生成",
   "dl.statusReady": "已生成",
