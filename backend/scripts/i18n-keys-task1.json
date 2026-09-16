@@ -1,0 +1,23 @@
+{
+  "zh-CN": {
+    "genui.verified": "收款方已验证",
+    "payees.hintReal": "仅支持已开户的 Suveoo 用户：请填写真实户名与完整 16 位卡号",
+    "payees.unverified": "待验证",
+    "transfer.acctNotFound": "该卡号不是 Suveoo 已开户账户，请核对后重试",
+    "transfer.nameMismatch": "收款人姓名与该卡号注册户名不符"
+  },
+  "zh-TW": {
+    "genui.verified": "收款方已驗證",
+    "payees.hintReal": "僅支援已開戶的 Suveoo 用戶：請填寫真實戶名與完整 16 位卡號",
+    "payees.unverified": "待驗證",
+    "transfer.acctNotFound": "該卡號不是 Suveoo 已開戶帳戶，請核對後重試",
+    "transfer.nameMismatch": "收款人姓名與該卡號註冊戶名不符"
+  },
+  "en-US": {
+    "genui.verified": "Recipient verified",
+    "payees.hintReal": "Only Suveoo account holders are supported: enter the real account name and full 16-digit card number",
+    "payees.unverified": "Unverified",
+    "transfer.acctNotFound": "This card number is not a Suveoo account. Please check and retry.",
+    "transfer.nameMismatch": "The recipient name does not match the registered name of this card number."
+  }
+}

@@ -17,8 +17,9 @@ S.router.register("payees", async () => {
       ${list.map((p) => `
       <div class="list-row">
         <span class="avatar">${S.fmt.escape(p.name.slice(0, 1))}</span>
-        <div class="grow"><b>${S.fmt.escape(p.name)}</b><div class="muted small mono">${S.fmt.escape(p.account)}</div></div>
-        <button class="btn btn-sm btn-light go" data-id="${p.id}">${S.ui.icon("send", 12)} ${S.fmt.escape(S.t("payees.transfer"))}</button>
+        <div class="grow"><b>${S.fmt.escape(p.name)}</b><div class="muted small mono">${S.fmt.escape(p.account ?? "—")}</div></div>
+        ${p.verified === false ? S.ui.badge(S.t("payees.unverified"), "badge-gray") : ""}
+        <button class="btn btn-sm btn-light go" data-id="${p.id}" ${p.verified === false ? "disabled title=" + S.fmt.escape(S.t("payees.unverified")) : ""}>${S.ui.icon("send", 12)} ${S.fmt.escape(S.t("payees.transfer"))}</button>
         <button class="bc-btn del" data-id="${p.id}" title="${S.fmt.escape(S.t("common.delete"))}">${S.ui.icon("x", 13)}</button>
       </div>`).join("")}`).join("") || S.ui.empty(S.t("common.noData"));
     S.ui.$$(".go").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
@@ -31,10 +32,17 @@ S.router.register("payees", async () => {
       };
     });
   };
+  /* 收款方真实性错误的映射提示（服务端结构化 code → i18n） */
+  const tgtErr = (reason) => ({
+    ACCOUNT_NOT_FOUND: S.t("transfer.acctNotFound"),
+    NAME_MISMATCH: S.t("transfer.nameMismatch"),
+    INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
+  }[reason] ?? null);
   document.getElementById("add").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("payees.add"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span><input class="input" id="p-name" placeholder="${S.fmt.escape(S.t("payees.namePh"))}"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.accountNo"))}</span><input class="input mono" id="p-acct" placeholder="${S.fmt.escape(S.t("payees.accountPh"))}" maxlength="16"></label>
+      <div class="field-hint">${S.fmt.escape(S.t("payees.hintReal"))}</div>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.group"))}</span>
         <span id="p-group"></span></label>
       <div class="modal-actions"><button class="btn btn-ghost" id="cx">${S.fmt.escape(S.t("common.cancel"))}</button>
@@ -50,7 +58,7 @@ S.router.register("payees", async () => {
       const r2 = await S.api.mutate("/api/payees", body);
       if (r2.cancelled) return;
       if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); render(); }
-      else S.ui.toast(r2.data?.reason ?? "failed", true);
+      else S.ui.toast(tgtErr(r2.data?.reason ?? r2.data?.error?.code) ?? r2.data?.error?.message ?? r2.data?.reason ?? "failed", true);
     };
   };
   render();

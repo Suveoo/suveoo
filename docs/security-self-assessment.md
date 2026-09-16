@@ -45,11 +45,19 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 | R-05 | 红级强验证当前为邮箱 OTP；Passkey/WebAuthn 未实现 | 路线图（原规划仅一条 FIDO2 流程） | 下一迭代：WebAuthn passkey 作为红级第二因子 |
 | R-06 | 越狱/注入检测为启发式（金丝雀 + provenance 规则），非学习型分类器 | 按框架纪律未过度宣称 | Taint 能力模型从架构上阻断授权面（攻击成功率测试为 0） |
 | R-07 | `cardTx` 明细为模拟聚合（未按卡过滤） | Demo 简化 | 下一迭代：tx 表加 card 列 |
-| R-08 | 演示种子接口 `/api/demo/seed` 在 DEMO_MODE=true 时无鉴权 | 决赛演示需要幂等重置 | 决赛后关闭 DEMO_MODE；生产化时加管理员鉴权 |
+| R-08 | ~~演示种子接口 `/api/demo/seed` 在 DEMO_MODE=true 时无鉴权~~ **已修复（2026-09-17）**：现需请求头 `x-admin-token` 与 secret ADMIN_TOKEN 匹配（常数时间比较，**fail-closed**——未配置 secret 一律 403），DEMO_MODE 门保留为双重门；成功调用写 AUDIT_KV 审计；支持 `{"inspect":true}` 只读巡检 | 已缓解 | 轮换：`printf '%s' '<新值>' \| npx wrangler secret put ADMIN_TOKEN` |
 | R-09 | 邮件失败不阻塞主流程（仅日志） | 设计取舍 | 验证码场景用户可 60s 后重试；站内通知兜底 |
 | R-10 | wrangler r2 put 偶发假成功 | 已遇并修复 | 上传脚本 put 后 get 回验 + 退避重传 |
 
 ## 3. 测试证据
 
-- 99 个用例全绿（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离）
+- 186 个用例全绿（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离）
 - 对抗用例：注入样本拦截、重放拦截、授权绕过（AI 硬上限/未知工具/红级无 OTP）、同意突变失效——见 `backend/tests/{unit,attack,integration}`
+
+## 4. 2026-09-17 新增安全机制（第十一轮）
+
+1. **收款方真实性三重校验**（`resolveTransferTarget`，REST 与 AI/MCP 同规、编译 IR 之前执行）：16 位 Luhn 格式 → registry 卡号存在 → 户名严格匹配；`ACCOUNT_NOT_FOUND` / `NAME_MISMATCH` / `INVALID_CARD_FORMAT` 结构化返回。终结"编造卡号/错名转账"；收款人新增同规（payee_manage add）。
+2. **跨用户转账双记**：转出方 DO 先给收款方 DO `credit`（余额+IN 流水+通知，trace_id 幂等去重），credit 成功才扣款——不存在"只扣不加"；"加而不扣"仅剩预检与扣款之间毫秒窗并发的理论边界（已披露）。
+3. **完整卡号 reveal**：仅 requireSession 后属主自查（每用户 DO 局部卡表天然隔离）；AI 通道不返回完整卡号（card_status_query 只给设置页深链）。
+4. **换汇服务端牌价结算**：客户端 rate 不参与结算（伪造无效）；双腿金额由服务端 ×10⁴ BigInt 换算，JPY 每 100 日元口径。
+5. **执行层业务失败语义**：DO 返回业务错误（余额/外币不足等）时不再误报 EXECUTED，统一 BLOCKED + 结构化 reason。

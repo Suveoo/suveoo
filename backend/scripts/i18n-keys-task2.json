@@ -1,0 +1,20 @@
+{
+  "zh-CN": {
+    "cards.copy": "复制",
+    "cards.copied": "已复制",
+    "cards.fullNumber": "完整卡号",
+    "cards.openSettings": "查看与设置"
+  },
+  "zh-TW": {
+    "cards.copy": "複製",
+    "cards.copied": "已複製",
+    "cards.fullNumber": "完整卡號",
+    "cards.openSettings": "查看與設定"
+  },
+  "en-US": {
+    "cards.copy": "Copy",
+    "cards.copied": "Copied",
+    "cards.fullNumber": "Full card number",
+    "cards.openSettings": "View & settings"
+  }
+}

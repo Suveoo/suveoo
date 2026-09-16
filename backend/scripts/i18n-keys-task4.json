@@ -1,0 +1,26 @@
+{
+  "zh-CN": {
+    "fx.availForeign": "可用外币余额 {0} {1}",
+    "fx.insufficientFx": "该币种外币余额不足，请先购汇或调低结汇金额",
+    "fx.myBalances": "我的外币余额",
+    "fx.noBalances": "暂无外币持仓，可在上方兑换器购汇",
+    "fx.payCard": "支付卡（购汇扣款）",
+    "fx.receiveCard": "收款卡（结汇入账）"
+  },
+  "zh-TW": {
+    "fx.availForeign": "可用外幣餘額 {0} {1}",
+    "fx.insufficientFx": "該幣種外幣餘額不足，請先購匯或調低結匯金額",
+    "fx.myBalances": "我的外幣餘額",
+    "fx.noBalances": "暫無外幣持倉，可在上方兌換器購匯",
+    "fx.payCard": "支付卡（購匯扣款）",
+    "fx.receiveCard": "收款卡（結匯入帳）"
+  },
+  "en-US": {
+    "fx.availForeign": "Available foreign balance {0} {1}",
+    "fx.insufficientFx": "Insufficient foreign currency balance. Buy the currency first or lower the amount.",
+    "fx.myBalances": "My foreign currency balances",
+    "fx.noBalances": "No foreign currency yet — buy in the converter above",
+    "fx.payCard": "Pay with card (buy)",
+    "fx.receiveCard": "Receive card (sell proceeds)"
+  }
+}

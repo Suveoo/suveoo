@@ -22,6 +22,7 @@ S.router.register("intrabank", async () => {
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.memo"))}</span>
         <input class="input" id="t-memo" maxlength="60"></label>
       <div class="field-hint">${S.fmt.escape(S.t("transfer.memoHint"))}</div>
+      <div id="t-err" class="banner" style="display:none;background:var(--color-red-bg);color:var(--color-red)"></div>
       <button class="btn btn-primary btn-block" id="t-go" style="margin-top:16px">${S.ui.icon("send", 16)} ${S.fmt.escape(S.t("transfer.submit"))}</button>
     </div>`;
 
@@ -42,19 +43,36 @@ S.router.register("intrabank", async () => {
   renderFrom();
   if (!debits.length) { document.getElementById("t-go").disabled = true; }
 
+  /* 收款方真实性错误的行内提示（服务端结构化 code → i18n；不再笼统 toast） */
+  const showErr = (r) => {
+    const reason = r?.data?.reason ?? r?.data?.error?.code ?? null;
+    const map = {
+      ACCOUNT_NOT_FOUND: S.t("transfer.acctNotFound"),
+      NAME_MISMATCH: S.t("transfer.nameMismatch"),
+      INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
+      PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
+    };
+    const box = document.getElementById("t-err");
+    box.style.display = "flex";
+    box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(map[reason] ?? r?.data?.error?.message ?? S.t("transfer.failed"))}</div>`;
+  };
+  const hideErr = () => { const b = document.getElementById("t-err"); b.style.display = "none"; b.innerHTML = ""; };
+
   /* 收款人选择 / 本人互转 */
   document.getElementById("pick-payee").onclick = async () => {
     const r = await S.api.get("/api/payees");
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("payees.title"))}</h2><div id="pp-list">${S.ui.skeleton(3)}</div>`, { large: false });
     m.el.querySelector("#pp-list").innerHTML = (r.data?.payees ?? []).map((p) => `
-      <div class="list-row" style="cursor:pointer" data-id="${p.id}" data-name="${S.fmt.escape(p.name)}" data-acct="${p.account}">
+      <div class="list-row" style="cursor:${p.verified === false ? "not-allowed" : "pointer"}" data-id="${p.id}" data-name="${S.fmt.escape(p.name)}" data-acct="${p.account ?? ""}" data-ok="${p.verified === false ? "0" : "1"}">
         <span class="avatar">${S.fmt.escape(p.name.slice(0, 1))}</span>
-        <div class="grow"><b>${S.fmt.escape(p.name)}</b><div class="muted small mono">${S.fmt.escape(p.account)}</div></div>
-        <span class="badge badge-gray">${S.fmt.escape(p.group_label ?? "")}</span></div>`).join("") || S.ui.empty(S.t("common.noData"));
+        <div class="grow"><b>${S.fmt.escape(p.name)}</b><div class="muted small mono">${S.fmt.escape(p.account ?? "—")}</div></div>
+        ${p.verified === false ? S.ui.badge(S.t("payees.unverified"), "badge-gray") : `<span class="badge badge-gray">${S.fmt.escape(p.group_label ?? "")}</span>`}</div>`).join("") || S.ui.empty(S.t("common.noData"));
     S.ui.$$(".list-row", m.el).forEach((row) => {
       row.onclick = () => {
+        if (row.dataset.ok === "0") { S.ui.toast(S.t("payees.unverified"), true); return; } /* 未迁移的旧 payee：拦截使用 */
         document.getElementById("t-name").value = row.dataset.name;
         document.getElementById("t-acct").value = row.dataset.acct;
+        hideErr();
         m.close();
       };
     });
@@ -89,8 +107,9 @@ S.router.register("intrabank", async () => {
     const acct = document.getElementById("t-acct").value.replace(/\s/g, "");
     const amount = document.getElementById("t-amt").value.trim();
     const memo = document.getElementById("t-memo").value.trim();
+    hideErr();
     if (!name || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) { S.ui.toast(S.t("transfer.fillNameAmount"), true); return; }
-    if (!selfTransfer && !/^\d{16}$/.test(acct)) { S.ui.toast(S.t("transfer.invalidAccount"), true); return; }
+    if (!selfTransfer && !/^\d{16}$/.test(acct)) { showErr({ data: { reason: "INVALID_CARD_FORMAT" } }); return; }
     const body = selfTransfer
       ? { to_card: selfTransfer, amount, memo: memo || undefined, from_card: fromSlug }
       : { recipient_name: name, recipient_account: acct, amount, memo: memo || undefined, from_card: fromSlug };
@@ -112,7 +131,9 @@ S.router.register("intrabank", async () => {
         <div class="modal-actions"><a class="btn btn-ghost" href="/transfer/history">${S.fmt.escape(S.t("pay.history"))}</a>
         <button class="btn btn-primary" onclick="location.reload()">${S.fmt.escape(S.t("common.done"))}</button></div>`);
     } else {
-      S.ui.toast(r.data?.error?.message ?? r.data?.reason ?? S.t("transfer.failed"), true);
+      /* 收款方真实性拦截等业务拒绝：行内红条呈现结构化原因 */
+      showErr(r);
+      S.ui.toast(S.t("transfer.failed"), true);
     }
   };
 });

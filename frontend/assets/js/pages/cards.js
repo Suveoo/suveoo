@@ -15,7 +15,7 @@ S.router.register("cards", async () => {
         <div class="bc-top"><div><b class="bc-num">${S.fmt.escape(cd.number)}</b>
           <div class="muted small">${S.fmt.escape(cd.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", cd.class_label))} · ${S.fmt.escape(cd.network)}</div></div>
           <div>${cd.is_default ? S.ui.badge(S.t("cards.default"), "badge-navy") : ""} ${cd.status === "FROZEN" ? S.ui.badge("FROZEN", "badge-red") : ""}${cd.held ? `<span class="badge badge-yellow">${S.ui.icon("lock", 12)} ${S.fmt.escape(cd.held)}</span>` : ""}</div></div>
-        <div class="bc-main"><img class="bc-art" src="/${cd.art}" alt="">
+        <div class="bc-main"><a href="/account/card/${cd.slug}/settings" title="${S.fmt.escape(S.t("cards.openSettings"))}" style="flex:none;display:block"><img class="bc-art" src="/${cd.art}" alt="${S.fmt.escape(S.t("cards.openSettings"))}"></a>
           <div><div class="muted small">${S.fmt.escape(cd.kind === "credit" ? S.t("cards.creditLeft") : S.t("cards.balance"))}</div>
             <b class="mono" style="font-size:22px">¥ ${S.fmt.escape(mask(cd.kind === "credit" ? (cd.available ?? cd.balance) : cd.balance))}</b>
             ${cd.limit ? `<div class="muted small">${S.fmt.escape(S.t("cards.creditLimit"))} ¥ ${cd.limit}</div>` : ""}</div></div>

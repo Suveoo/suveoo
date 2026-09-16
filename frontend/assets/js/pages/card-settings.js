@@ -10,7 +10,14 @@ S.router.register("card-settings", async () => {
   const isCredit = cd.kind === "credit";
   pane.innerHTML = `
     <div class="bc-main" style="margin-bottom:16px"><img class="bc-art" src="/${cd.art}" alt="">
-      <div><b class="mono">${S.fmt.escape(cd.number)}</b><div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}</div></div></div>
+      <div>
+        <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+          <b class="mono" id="cs-num">${S.fmt.escape(cd.number)}</b>
+          <button class="eye-toggle" id="cs-eye" title="${S.fmt.escape(S.t("cards.fullNumber"))}" aria-label="${S.fmt.escape(S.t("cards.fullNumber"))}">${S.ui.icon("eye", 18)}</button>
+          <button class="btn btn-sm btn-light" id="cs-copy" hidden>${S.ui.icon("copy", 13)} ${S.fmt.escape(S.t("cards.copy"))}</button>
+        </div>
+        <div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}</div>
+      </div></div>
     <label class="field"><span class="lb">${S.fmt.escape(S.t("card.alias"))}</span>
       <div class="row"><input class="input" id="cs-alias" value="${S.fmt.escape(cd.alias ?? "")}"><button class="btn btn-light" id="cs-alias-go" style="flex:none">${S.fmt.escape(S.t("common.save"))}</button></div></label>
     ${cd.is_default ? S.ui.badge(S.t("cards.default"), "badge-navy") : `<button class="btn btn-ghost btn-sm" id="cs-default">${S.fmt.escape(S.t("card.setDefault"))}</button>`}
@@ -28,6 +35,35 @@ S.router.register("card-settings", async () => {
     <div class="row" style="margin-top:20px">
       <button class="btn btn-danger" id="cs-fz">${S.ui.icon("snow", 14)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}（RED）</button>
     </div>`;
+  /* 完整卡号：默认掩码；点击眼睛才调用 reveal 端点取完整 16 位，展开后可复制，再点收回 */
+  const numEl = document.getElementById("cs-num");
+  const eyeBtn = document.getElementById("cs-eye");
+  const copyBtn = document.getElementById("cs-copy");
+  let fullNumber = null, revealed = false;
+  const fmtGroups = (n16) => String(n16).replace(/(\d{4})(?=\d)/g, "$1 ");
+  eyeBtn.onclick = async () => {
+    if (!revealed) {
+      if (!fullNumber) {
+        const r = await S.api.get(`/api/cards/${slug}/reveal`);
+        if (!r.ok || !r.data?.number) { S.ui.toast(S.t("common.loadFailed"), true); return; }
+        fullNumber = r.data.number;
+      }
+      numEl.textContent = fmtGroups(fullNumber);
+      eyeBtn.innerHTML = S.ui.icon("eye-off", 18);
+      copyBtn.hidden = false;
+      revealed = true;
+    } else {
+      numEl.textContent = cd.number;
+      eyeBtn.innerHTML = S.ui.icon("eye", 18);
+      copyBtn.hidden = true;
+      revealed = false;
+    }
+  };
+  copyBtn.onclick = async () => {
+    if (!fullNumber) return;
+    try { await navigator.clipboard.writeText(fullNumber); S.ui.toast(S.t("cards.copied")); }
+    catch { S.ui.toast(S.t("common.opFailed"), true); }
+  };
   document.getElementById("cs-alias-go").onclick = async () => {
     const r2 = await S.api.mutate(`/api/cards/${slug}`, { alias: document.getElementById("cs-alias").value.trim() || undefined });
     if (!r2.cancelled) S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("common.opOk") : r2.data?.reason ?? "failed", r2.data?.status !== "EXECUTED");

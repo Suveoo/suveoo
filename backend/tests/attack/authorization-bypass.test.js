@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { newCardNumber, signJwt } from "../../worker-main.js";
+import { signJwt } from "../../worker-main.js";
 
-/** 越权攻击：伪造/过期令牌、跨用户资源访问（grant、卡、账本）。 */
+/** 越权攻击：伪造/过期令牌、跨用户资源访问（grant、卡、账本）。
+ *  任务一后收款方须为真实 Suveoo 账户（realTarget 造真实收款人），断言语义不变。 */
 const BASE = "https://suveoo.com";
 const PASSWORD = "jinrongkeji2026";
 
@@ -18,10 +19,23 @@ async function lastCode(email) {
   const mails = JSON.parse((await env.MAIL_OUTBOX.get(`outbox:${email}`)) ?? "[]");
   return /\b(\d{6})\b/.exec(mails.at(-1)?.text ?? "")?.[1] ?? null;
 }
-async function registerUser(email) {
+async function registerUser(email, name = "测试用户") {
   await post("/api/auth/email-code", { scene: "register", email });
   const code = await lastCode(email);
-  return j(await post("/api/auth/register", { email, code, name: "测试用户", password: PASSWORD, risk_answers: [3, 3, 4, 3, 4], aml_consented: true }));
+  return j(await post("/api/auth/register", { email, code, name, password: PASSWORD, risk_answers: [3, 3, 4, 3, 4], aml_consented: true }));
+}
+async function doOp(instance, payload) {
+  return env.LEDGER.get(env.LEDGER.idFromName(instance)).fetch("https://x/", {
+    method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+    body: JSON.stringify(payload),
+  }).then((r) => r.json());
+}
+async function realTarget(tag, name) {
+  const email = `${tag}@test.dev`;
+  const out = await registerUser(email, name);
+  const cards = await doOp(`u:${out.user_id}`, { op: "getCards" });
+  const debit = cards.cards.find((c) => c.kind === "debit" && Number(c.is_default) === 1) ?? cards.cards.find((c) => c.kind === "debit");
+  return { account: debit.number, name, token: out.token };
 }
 const get = (path, token) => SELF.fetch(BASE + path, { headers: token ? { authorization: `Bearer ${token}` } : {} });
 
@@ -57,11 +71,11 @@ describe("跨用户越权", () => {
   it("用户 B 盗用用户 A 的 grant_hash → KV 按用户绑定 → GRANT_NOT_FOUND", async () => {
     const a = await registerUser("ab-a@test.dev");
     const b = await registerUser("ab-b@test.dev");
-    const s1 = await j(await post("/api/transfers/intrabank", { recipient_account: newCardNumber(), recipient_name: "张三", amount: "300" }, a.token));
+    const tgt = await realTarget("ab-payee", "张三");
+    const body = { recipient_account: tgt.account, recipient_name: tgt.name, amount: "300" };
+    const s1 = await j(await post("/api/transfers/intrabank", body, a.token));
     expect(s1.status).toBe("INPUT_REQUIRED");
-    const stolen = await post("/api/transfers/intrabank", {
-      recipient_account: newCardNumber(), recipient_name: "张三", amount: "300", grant_hash: s1.grant.grant_hash,
-    }, b.token);
+    const stolen = await post("/api/transfers/intrabank", { ...body, grant_hash: s1.grant.grant_hash }, b.token);
     expect(stolen.status).toBe(403);
     expect((await j(stolen)).reason).toBe("GRANT_NOT_FOUND");
   });
@@ -89,8 +103,8 @@ describe("跨用户越权", () => {
   it("用户 B 查 A 的转账流水 → 只见自己的账本", async () => {
     const a = await registerUser("ab-e@test.dev");
     const b = await registerUser("ab-f@test.dev");
-    const acct = newCardNumber({ bin: "622288" });
-    const body = { recipient_account: acct, recipient_name: "张三", amount: "300" };
+    const tgt = await realTarget("ab-e-payee", "张三");
+    const body = { recipient_account: tgt.account, recipient_name: tgt.name, amount: "300" };
     const s1 = await j(await post("/api/transfers/intrabank", body, a.token));
     const done = await j(await post("/api/transfers/intrabank", { ...body, grant_hash: s1.grant.grant_hash }, a.token));
     expect(done.status).toBe("EXECUTED");

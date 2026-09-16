@@ -59,3 +59,15 @@ JWT HS256（1h，jti 黑名单登出）；PBKDF2-SHA256 100,000 轮 + 16B 盐 + 
 ## 8. 外汇实时牌价（worker hFxLive）
 
 open.er-api.com 免费层（真实市场汇率，日更）→ KV 缓存 15 分钟（fx:live:v2）→ 失败回退 R2 静态快照（source 字段区分）。fxQuotesFromRates 纯函数：CNY 基准换算（JPY 按 100 单位口径）、buy/sell = mid∓点差（25-45bp 按币种）、spark 七点滚动（展示口径）。
+
+
+## 9. 转账真实性与跨用户双记（第十一轮）
+
+- `resolveTransferTarget`：三重校验单一真相源——16 位 Luhn（复用 luhnCheckDigit）→ registry `userByCard` 存在性 → `profile.name` 严格相等（trim）；本人卡放行（同卡自转双层拦 SAME_CARD）。接入 `preValidateIntent`（runGuarded 顶部、compileToIR 之前，REST 与 AI/MCP 同规）与 executeIntent 执行层复核。
+- 双记顺序：预检转出卡 → 对方 DO `credit`（加余额 + IN 流水 + 通知，trace_id 幂等去重）→ 本地扣款 + OUT 流水。"只扣不加"不可能；"加而不扣"为毫秒窗并发理论边界（预检+测试覆盖规避）。
+- 演示人物落户 `ensureDemoPersonas`：13 人真实账户（占位邮箱、口令哈希掺 JWT_SECRET）、幂等（findUser 命中跳过），种子收款人卡号全部指向真实账户。
+
+## 10. 市值结算与换汇整数运算（第十一轮）
+
+- `navScaled4`/`marketValueCents`：净值 ×10⁴ 放大 BigInt，先乘后除 floor（禁浮点）。赎回回款、持仓页 value、overview 估值、MPC holdings 市值共用同一公式——显示值 === 回款额。
+- `fxNormalizeArgs`：服务端 hFxLive 牌价（购汇 sell / 结汇 buy，×10⁴ BigInt），JPY 每 100 日元口径（unit=100）；双腿金额（CNY 分/外币分）由服务端换算后传入 DO，客户端 rate 不参与结算。

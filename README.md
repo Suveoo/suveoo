@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 159 用例（真实 workerd 运行时）
+npm test                  # 186 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -50,7 +50,9 @@ npm test                  # 159 用例（真实 workerd 运行时）
 cd backend
 npx wrangler deploy                     # Worker（路由 suveoo.com/* 已配置）
 node scripts/deploy-frontend.mjs        # 前端全量上传 R2（put+get 回验）
-curl -X POST https://suveoo.com/api/demo/seed   # 注入演示种子（DEMO_MODE=true 时；可选 body {"email":"..."} 为任意已注册账户灌全板块仿真数据）
+# 注入演示种子（DEMO_MODE=true 且 x-admin-token 与 secret ADMIN_TOKEN 匹配，fail-closed；
+# 可选 body {"email":"..."} 为任意已注册账户灌全板块仿真数据、{"inspect":true} 只读巡检查收款人合法性）
+curl -X POST -H "x-admin-token: <ADMIN_TOKEN>" https://suveoo.com/api/demo/seed
 ```
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
@@ -722,7 +724,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 - **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 调用 Anthropic Messages API 并通过其 MCP 连接器（`mcp_servers: {suveoo: {url: https://suveoo.com/mcp, auth: Bearer <用户JWT>}}`）把 12+N 个工具暴露给模型；模型产生的工具调用回到本 Worker `/mcp`，每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
 - **SSE 事件类型**：`token`（文本增量）、`genui_event`（卡片）、`trust_event`（控制台，§2.11）、`done`（含 trace 汇总与耗时）、`error`。
 - 会话存储：会话摘要 + 消息存 ledger-do（用户分区），Trust Console 事件流随消息回放。
-- MCP Tool Registry（最终版 = 9.6 §4.4 的 12 个 + 场景补齐 + 计算器与存款目录，共 23 个 + 10 个 calc_*；全部在 worker-main.js 区块④注册；系统提示词规则 8 要求产品类问题必须先查工具、禁止凭记忆编造数字）：
+- MCP Tool Registry（最终版 = 9.6 §4.4 的 12 个 + 场景补齐 + 计算器与存款目录，共 25 个 + 10 个 calc_*；全部在 worker-main.js 区块④注册；系统提示词规则 8 要求产品类问题必须先查工具、禁止凭记忆编造数字、赎回/外币/卡号类问答按工具返回口径作答）：
 
 | # | 工具名 | 等级 | 说明 |
 |---|--------|------|------|
@@ -733,22 +735,23 @@ Consent Binding 全流程（与既定安全决策一致）：
 | 5 | card_status_query | 绿 | 卡状态/限额/围栏 |
 | 6 | subscription_scan | 绿 | 订阅扫描+使用评分 |
 | 7 | split_bill_calculate | 绿 | AA 精确计算（服务端十进制数学模块，禁浮点） |
-| 8 | contacts_search | 绿 | 收款人匹配（脱敏） |
-| 9 | fx_quote_query | 绿 | 实时外汇牌价（open.er-api.com 真实市场汇率日更 + KV 15 分钟缓存 + 静态回退；买/卖/中间价与 7 点走势） |
-| 10 | deposit_product_query | 绿 | 六档存款方案（利率/起存/计息方式/提前支取规则/转存/最近调价） |
-| 11 | invoice_ocr_extract | 绿 | 保留注册，低优先级（票据场景已降级） |
-| 12 | transfer_execute | 黄/红 | 转账 |
-| 13 | card_limit_adjust | 黄 | 限额（含地理围栏 TTL 参数） |
-| 14 | subscription_cancel | 黄 | 订阅解约 |
-| 15 | payee_manage | 黄 | 收款人增删改 |
-| 16 | autopay_manage | 黄 | 自动扣款开关 |
-| 17 | fx_exchange | 黄/红 | 结汇购汇 |
-| 18 | funds_lock | 黄 | 资金锁定（场景 6） |
-| 19 | scheduled_task_create | 黄 | 定时/长程任务建立 |
-| 20 | wealth_product_purchase | 红 | 申购 |
-| 21 | wealth_product_redeem | 红 | 赎回 |
-| 22 | card_freeze / card_unfreeze | 红 | 冻结/解冻（两个注册名） |
-| 23 | ecommerce_order_mock | 红 | 演示商户下单（场景 6，仅 DEMO_MODE） |
+| 9 | contacts_search | 绿 | 收款人匹配（脱敏；仅返回已通过真实性校验的收款人，卡号均为真实 Suveoo 账户） |
+| 10 | fx_quote_query | 绿 | 实时外汇牌价（open.er-api.com 真实市场汇率日更 + KV 15 分钟缓存 + 静态回退；买/卖/中间价与 7 点走势） |
+| 11 | fx_balance_query | 绿 | 各币种外币余额（含按实时买入价折算的人民币参考值） |
+| 12 | deposit_product_query | 绿 | 六档存款方案（利率/起存/计息方式/提前支取规则/转存/最近调价） |
+| 13 | invoice_ocr_extract | 绿 | 保留注册，低优先级（票据场景已降级） |
+| 14 | transfer_execute | 黄/红 | 转账（收款方必须是真实 Suveoo 用户：姓名与卡号匹配；ACCOUNT_NOT_FOUND / NAME_MISMATCH 如实返回） |
+| 15 | card_limit_adjust | 黄 | 限额（含地理围栏 TTL 参数） |
+| 16 | subscription_cancel | 黄 | 订阅解约 |
+| 17 | payee_manage | 黄 | 收款人增删改（新增需真实 Suveoo 户名 + 卡号匹配） |
+| 18 | autopay_manage | 黄 | 自动扣款开关 |
+| 19 | fx_exchange | 黄/红 | 结汇购汇（服务端实时牌价结算：购汇卖出价/结汇买入价、JPY 每 100 日元口径、可选 from_card；红/黄按 CNY 腿分级） |
+| 20 | funds_lock | 黄 | 资金锁定（场景 6） |
+| 21 | scheduled_task_create | 黄 | 定时/长程任务建立 |
+| 22 | wealth_product_purchase | 红 | 申购 |
+| 23 | wealth_product_redeem | 红 | 赎回（按市值结算：本金 × 当前净值 ÷ 成本净值，浮盈浮亏实时兑现） |
+| 24 | card_freeze / card_unfreeze | 红 | 冻结/解冻（两个注册名） |
+| 25 | ecommerce_order_mock | 红 | 演示商户下单（场景 6，仅 DEMO_MODE） |
 
 另有一组 `calc_*` 绿色纯计算工具（复利/贷款/目标储蓄/信用卡还款/退休/通胀/AA/存款对比/汇率换算/预算分配共 10 款），全部 AI 可调并返回图形化工具深链。
 
@@ -953,11 +956,12 @@ Consent Binding 全流程（与既定安全决策一致）：
 | GET /api/dashboard?range | 用户 | 绿 | 图表数据+洞察叙事 |
 | GET /api/dashboard/insight | 用户 | 绿 | home 洞察卡 |
 | GET /api/cards / /api/cards/{slug} | 用户 | 绿 | |
+| GET /api/cards/{slug}/reveal | 用户 | — | 完整 16 位卡号（属主隔离；卡片设置页眼睛展开时调用） |
 | GET /api/cards/{slug}/transactions | 用户 | 绿 | 游标分页 |
 | POST /api/cards/{slug}/freeze / unfreeze | 用户 | 红 | |
 | POST /api/cards/{slug}/limits | 用户 | 黄 | 含 geo_fence 参数 |
 | PATCH /api/cards/{slug} | 用户 | 黄 | 别名/默认卡 |
-| POST /api/transfers/intrabank(+/confirm) | 用户 | 黄/红 | §4.4 |
+| POST /api/transfers/intrabank(+/confirm) | 用户 | 黄/红 | §4.4；收款方须为真实 Suveoo 用户（Luhn+存在+户名匹配），跨用户双记（对方 DO credit） |
 | GET /api/transfers(/{tx_id}) | 用户 | 绿 | |
 | GET/POST/DELETE /api/schedules(/{id}) | 用户 | 黄 | 预约转账 |
 | GET/PATCH /api/transfer-limits | 用户 | 黄 | |
@@ -969,11 +973,12 @@ Consent Binding 全流程（与既定安全决策一致）：
 | GET /api/wealth/holdings | 用户 | 绿 | |
 | POST /api/wealth/purchase / redeem | 用户 | 红 | |
 | GET /api/fx | 公开 | 绿 | 实时牌价（er-api 日更 + KV 15min + 回退快照；?refresh=1 强刷） |
-| POST /api/fx/exchange | 用户 | 黄/红 | |
+| GET /api/fx/balances | 用户 | 绿 | 各币种外币余额（含按买入价折算 CNY 参考） |
+| POST /api/fx/exchange | 用户 | 黄/红 | 服务端实时牌价结算（JPY 每 100 口径；可选 from_card 结算卡；sell 传 amount_foreign） |
 | POST /api/ai/chat (SSE) | 用户 | — | §5.3；限流 30 次/分 |
 | GET /api/ai/sessions(/{id}) | 用户 | 绿 | 会话历史 |
 | GET /api/tasks(/{id})；POST /api/tasks/{id}/cancel | 用户 | 黄 | 长程任务 |
-| POST /api/demo/inject-failure | 用户 | — | 仅 DEMO_MODE |
+| POST /api/demo/inject-failure | 用户 | — | 仅 DEMO_MODE（session 内本人任务；调用写审计） |
 | GET /api/notifications(+unread-count)；POST /api/notifications/read | 用户 | — | |
 | GET /api/reports；POST /api/reports/{yyyy-mm} | 用户 | — | pdf-lib 生成 |
 | GET /api/security；PATCH（改密）；POST 2fa/passkeys；DELETE sessions | 用户 | 红 | |
@@ -1020,7 +1025,10 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 存款（6 档）：活期 0.20%、7 天通知 0.45%、3M 1.05%、6M 1.25%、1Y 1.45%、3Y 1.85%。
 
-### 13.2 演示种子（`POST /api/demo/seed`，DEMO_MODE 守卫，幂等）
+### 13.2 演示种子（`POST /api/demo/seed`，DEMO_MODE + x-admin-token 双门，幂等）
+
+- **鉴权**：请求头 `x-admin-token` 必须与 secret `ADMIN_TOKEN` 匹配（常数时间比较，**fail-closed**：未配置 secret 一律 403 ADMIN_FORBIDDEN）；成功调用写 AUDIT_KV 审计（admin_seed / 目标 email / IP / UA）。`{"inspect":true}` 为只读巡检：枚举 registry 全部用户并标记各账户收款人卡号合法性。
+- **演示人物落户**：每次灌种自动把 13 个演示人物（张三/李四/王五/房东陈叔/女儿/陈嘉玮/林芷晴/周慕言/吴雅婷/郑皓文/苏婉宁/赵砚秋/沈建平）创建为真实 Suveoo 账户（pinyin@demo.suveoo.com 占位邮箱、每户 1 张借记卡 ¥2-8 万带分、幂等），种子收款人的卡号全部指向这些真实账户——转账即真实跨户双记。占位邮箱无收件箱，入账邮件发出即视为送达。
 
 - **demo@suveoo.com**（密码 jinrongkeji2026，已免 2FA）：`genDemoSeedRich` 固定种子生成 —— 120 天 395 笔流水（真实商户语料 + 月度锚点：工资/房租/生活费/车贷/信用卡还款/聚餐 AA/差旅报销/理财申赎/购汇 + 真人名转账）、12 收款人（张三/李四/王五/房东陈叔/女儿等竞赛话术人物 + 陈嘉玮/林芷晴等 7 个真实感扩充）、8 账单、10 订阅（含 Keep 沉睡演示与爱奇艺 Dark Pattern 角标）、12 只持仓（原 3 只 README 口径 + 新系列 5 只）、9 通知、3 长程任务。**竞赛锚点保留**：火锅 ¥860 AA memo、注入攻击 memo、生日订花任务（默认卡锁款 ¥600）。
 - **任意已注册账户**：`POST /api/demo/seed {"email":"..."}` → `genUserSeedData`（120 天全板块仿真数据；不改动密码/2FA/卡片）。
@@ -1047,9 +1055,9 @@ Consent Binding 全流程（与既定安全决策一致）：
 ④ MCP Tool Gateway（createMcpHandler + §5.3 工具注册表 + resources + prompts）
 ④.5 BankAction IR 编译器（compileToIR：toolName+args+ctx → Typed IR）
 ④.6 Suveoo Verification Runtime（verify：五道验证器，返回 VERIFIED/BLOCKED/INPUT_REQUIRED）
-⑤ Saga / Ledger 交互封装（DO stub 调用、检查点、补偿注册表）
+⑤ Saga / Ledger 交互封装（DO stub 调用、检查点、补偿注册表；跨用户转账双记：transfer op 先经 #crossCredit 给对方 DO 入账（credit op，trace_id 幂等）再扣款）
 ⑥ 外部集成适配器（Anthropic/OpenAI/Qwen LLM 代理、Email 适配、演示商户 mock、pdf-lib 专业报告【矢量 logo/摘要封面/斑马纹明细/子集中文字体】、外汇实时源 er-api + KV 缓存回退、Telegram 通知 tgFire）
-⑦ 工具函数（十进制金额数学、哈希、日志、错误、响应构建、种子生成器 genDemoSeedRich/genUserSeedData、汇率牌价换算 fxQuotesFromRates）
+⑦ 工具函数（十进制金额数学、哈希、日志、错误、响应构建、种子生成器 genDemoSeedRich/genUserSeedData/ensureDemoPersonas（演示人物落户）、汇率牌价换算 fxQuotesFromRates/fxNormalizeArgs（换汇双腿整数换算）、收款方真实性校验 resolveTransferTarget、市值结算 navScaled4/marketValueCents）
 ```
 
 ### 14.3 缓存与安全头
@@ -1073,6 +1081,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v4（2026-09-17）：安全与真实化五连修——演示端点管理员令牌（x-admin-token 双门 fail-closed + 审计 + inspect 只读巡检）；转账/收款人真实化（Luhn+registry 存在+户名匹配三重校验单一真相源，REST 与 AI 通道同规；跨用户转账双记——对方 DO 先 credit 再扣款、资金守恒、入账邮件自动送达注册邮箱；13 个演示人物落户为真实账户，存量收款人全量迁移归零）；卡片设置页查看完整卡号（reveal 端点 + 眼睛/复制 + 卡图直达设置 + AI 只给深链不回卡号）；理财赎回按市值结算（本金×当前净值÷成本净值整数运算，显示值=回款额，redeem_value/unrealized_pnl 进 AI 工具）；外汇实时结算（删除 690 硬编码，服务端买卖价×10⁴ BigInt、JPY 每 100 口径、可选结算卡、外币余额卡与 fx_balance_query、fx_exchange 首次注册进 AI 工具表、兑换器 JPY 口径修正）；执行层业务失败不再误报 EXECUTED；测试 159 → 186。
 - v3（2026-09-16）：财富产品 v2 与运营强化——基金扩至 16 只（多因子模型数据：4-14 年月度净值锚定真实市场史、基准对比、风险指标、10 年蒙特卡洛预测；详情页九区块重构；新增短债/红利/必需消费/量化中性/REITs/医疗/新能源/半导体 AI 八只）；存款条款与试算器升级（复利对照/实际购买力/阶梯策略）；外汇实时化（er-api + KV 缓存 + 回退，买卖价结算口径）；AI 工具增强（deposit_product_query 新增、wealth_product_query 扩 16 只、fx 实时、系统提示词规则 8）；Telegram 运维通知全场景（waitUntil 修复注册丢失）；种子端点泛化（任意账户灌数据）；原生控件清零（S.ctl 自绘下拉/OTP）；确认密码与眼睛切换组件；月度报告 PDF 专业版（矢量 logo/子集中文字体）；i18n 合并顺序修复与移动端适配（safe-area/viewport-fit、funds 单列、卡片行换行）；测试 99 → 159。
 - v2（2026-09-11）：全量重写——补全 /ai 三页（对话/任务/看板）与 Trust Console、GenUI 11 卡目录；新增 P07 订阅页、P29 安全中心、P30 通知页、P13/P14、offline/404、根路径规则；明确全部 API、数据文件、卡号分配规则、双通道一致性原则、Consent 服务端查表校验、i18n/GA4/cookie 机制、动态卡路由重写规则；修正原文档编号重复（原 1.2.2/1.2.3 重复）与"核心服务入口"空列表等模棱两可处。
 - v1（2026-09-10 前后）：初版页面清单。

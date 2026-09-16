@@ -37,10 +37,17 @@ prompt-injection / replay-attack / authorization-bypass / consent-mutation 四�
 ## 运行结果
 
 ```
-Test Files  20 passed (20)
-     Tests  159 passed (159)
-  Duration   ~16s
+Test Files  24 passed (24)
+     Tests  186 passed (186)
+  Duration   ~21s
 ```
+
+2026-09-17（第十一轮）新增集成测试文件：
+- tests/integration/demo-admin.test.js（6）——演示端点管理员令牌 fail-closed/三连鉴权/审计落盘/inspect 巡检
+- tests/integration/card-reveal.test.js（3）——完整卡号 reveal（16 位非掩码、属主隔离、401/404）
+- tests/integration/wealth-redeem.test.js（6）——赎回市值结算涨/平/跌精确断言 + API 端到端（显示值=回款额）+ marketValueCents 纯函数
+- tests/integration/fx-exchange.test.js（6）——购汇/结汇实时牌价结算（KV 预置牌价确定性）、JPY 每 100 专项、指定 from_card 扣该卡、INSUFFICIENT_FX 拦截、伪造 rate 无效、MCP 同数学
+- transfer-flow.test.js 新增"收款方真实性校验与跨用户双记"组（假卡/Luhn/错姓名/双记±守恒含入账邮件/payee 拦截与通过/同卡拦截）；transfer-flow/attack 四文件全部改用 realTarget（真实收款方）模式，断言语义不变
 
 ## SuveooBench
 

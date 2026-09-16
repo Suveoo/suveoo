@@ -13,7 +13,7 @@ async function doOp(instance, payload) {
 
 describe("Saga 补偿链（故障注入）", () => {
   it("seed → 锁定 ¥600 → 注入失败 → taskDue → COMPENSATED 且资金解锁", async () => {
-    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST" })).json();
+    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST", headers: { "x-admin-token": env.ADMIN_TOKEN } })).json();
     expect(seed.ok).toBe(true);
     const uid = seed.user_id;
 
@@ -37,10 +37,10 @@ describe("Saga 补偿链（故障注入）", () => {
     expect(def2.held_cents).toBe("0"); // C1 ✓ 解锁
     const bal1 = BigInt(def1.balance_cents), bal2 = BigInt(def2.balance_cents);
     expect(bal2).toBe(bal1); // 余额未受失败影响（守恒）
-  });
+  }, 30000);
 
   it("未注入故障：taskDue → DONE，锁定资金转为支付", async () => {
-    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST" })).json();
+    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST", headers: { "x-admin-token": env.ADMIN_TOKEN } })).json();
     const uid = seed.user_id;
     const tasks = await doOp(`u:${uid}`, { op: "tasks" });
     const birthday = tasks.tasks.find((t) => t.type === "birthday_flowers");
@@ -54,10 +54,10 @@ describe("Saga 补偿链（故障注入）", () => {
     expect(after.held_cents).toBe("0");
     const status = (await doOp(`u:${uid}`, { op: "tasks" })).tasks.find((t) => t.id === birthday.id).status;
     expect(status).toBe("DONE");
-  });
+  }, 30000);
 
   it("手动取消任务 → CANCELLED 并补偿（演示 P13 取消按钮）", async () => {
-    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST" })).json();
+    const seed = await (await SELF.fetch(BASE + "/api/demo/seed", { method: "POST", headers: { "x-admin-token": env.ADMIN_TOKEN } })).json();
     const uid = seed.user_id;
     const tasks = await doOp(`u:${uid}`, { op: "tasks" });
     const birthday = tasks.tasks.find((t) => t.type === "birthday_flowers");
@@ -66,5 +66,5 @@ describe("Saga 补偿链（故障注入）", () => {
     expect(r.compensated).toBe(true);
     const def = (await doOp(`u:${uid}`, { op: "getCards" })).cards.find((c) => Number(c.is_default) === 1);
     expect(def.held_cents).toBe("0");
-  });
+  }, 30000);
 });

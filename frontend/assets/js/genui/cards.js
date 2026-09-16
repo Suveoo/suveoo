@@ -32,8 +32,10 @@ S.genuiCards = {
     const rawAmt = p.amount_cny ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
     /* "ALL" 全额赎回占位无数值可显示，以文案替代，避免渲染 ¥ NaN */
     const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : S.t("genui.redeemAll");
+    /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
+    const verifiedBadge = c.action == null || c.action === "transfer_execute" ? (c.params?.verified ? ` ${S.ui.badge(S.t("genui.verified"), "badge-green")}` : "") : "";
     return `<div class="genui-card">
-      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(meta.title)} ${S.ui.tierBadge(c.tier)}</div>
+      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(meta.title)} ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
       <div class="gc-amount">${amtText}</div>
       ${S.genuiCards.kv([
         ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
