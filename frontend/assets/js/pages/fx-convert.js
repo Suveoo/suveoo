@@ -1,7 +1,7 @@
 /* fx-convert.js — 外汇兑换计算器（dir=buy/sell,ccy,amount）：十币种买卖价双向换算 + 点差 */
 S.router.register("fx-convert", async () => {
   const c = document.getElementById("content");
-  const fx = (await S.api.json("/assets/data/fx.json")) ?? { quotes: [] };
+  const fx = (await (await fetch("/api/fx")).json().catch(() => null)) ?? { quotes: [] }; /* 实时牌价（服务端带静态回退） */
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.fxName"))}</h1>
     <div class="card" style="max-width:520px">
       <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.direction"))}</span>

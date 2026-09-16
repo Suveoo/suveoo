@@ -1,3 +1,24 @@
-{ "slug": "demand", "name": "活期存款", "term": "随时", "rate": 0.20, "min": "¥0.01", "rules": "随时存取",
-  "rate_history": [{ "date": "2026-06-20", "rate": 0.10 }, { "date": "2025-12-01", "rate": 0.00 }],
-  "notice": "存款利率为模拟数据。" }
+{
+  "auto_renew": false,
+  "insurance": "本息合计 50 万元以内受存款保险全额保障（模拟）",
+  "interest_type": "按日计息、按月结转",
+  "ladder": "作为应急与日常底层流动性，建议保留 3-6 个月支出额度。",
+  "min": "¥0.01",
+  "name": "活期存款",
+  "notice": "存款利率为模拟数据。",
+  "rate": 0.2,
+  "rate_history": [
+    {
+      "date": "2026-06-20",
+      "rate": 0.1
+    },
+    {
+      "date": "2025-12-01",
+      "rate": 0
+    }
+  ],
+  "rules": "随时存取",
+  "slug": "demand",
+  "term": "随时",
+  "withdrawal": "随时支取，不计违约成本"
+}

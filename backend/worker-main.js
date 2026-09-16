@@ -247,6 +247,7 @@ export const TOOL_REGISTRY = {
   split_bill_calculate:   { tier: RISK.GREEN },
   contacts_search:        { tier: RISK.GREEN },
   fx_quote_query:         { tier: RISK.GREEN },
+  deposit_product_query:  { tier: RISK.GREEN },
   invoice_ocr_extract:    { tier: RISK.GREEN },
   calc_compound_savings:  { tier: RISK.GREEN },
   calc_loan_compare:      { tier: RISK.GREEN },
@@ -674,6 +675,71 @@ async function hEmailCode(request, env) {
   return json({ ok: true, expires_in: r.expiresIn, cooldown: 60 });
 }
 function escHtml(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+/* ===== 外汇实时牌价（open.er-api.com 免费层，日更市场汇率；KV 缓存 15 分钟；失败回退静态 fx.json） ===== */
+const FX_META = [
+  ["USD", "美元", "/flags/us.svg", 35], ["EUR", "欧元", "/flags/eu.svg", 40], ["JPY", "日元（100）", "/flags/jp.svg", 45],
+  ["GBP", "英镑", "/flags/gb.svg", 45], ["HKD", "港币", "/flags/hk.svg", 25], ["SGD", "新加坡元", "/flags/sg.svg", 35],
+  ["AUD", "澳大利亚元", "/flags/au.svg", 40], ["CAD", "加拿大元", "/flags/ca.svg", 38], ["CHF", "瑞士法郎", "/flags/ch.svg", 40],
+  ["NZD", "新西兰元", "/flags/nz.svg", 45],
+];
+const FX_CACHE_KEY = "fx:live:v2", FX_SPARK_KEY = "fx:spark:v2", FX_TTL = 900; /* v2：spark 口径修正（JPY 展示口径），弃用 v1 旧键 */
+/** rates（1 CNY = X 外币）→ 10 币种买卖中间价（每 1 外币兑 CNY；JPY 为每 100）。纯函数，供单测。 */
+export function fxQuotesFromRates(rates, sparkMap = {}, meta = FX_META) {
+  const out = [];
+  for (const [code, name, flag, spreadBp] of meta) {
+    const perCny = Number(rates[code]);
+    if (!Number.isFinite(perCny) || perCny <= 0) continue;
+    const unit = code === "JPY" ? 100 : 1;
+    const mid = (unit / perCny);
+    const s = spreadBp / 10000;
+    /* spark 统一存展示口径值（JPY 与 mid 同为每 100 日元兑 CNY） */
+    const spark = Array.isArray(sparkMap[code]) && sparkMap[code].length ? sparkMap[code] : Array(7).fill(+mid.toFixed(2));
+    out.push({
+      code, name, flag,
+      buy: (mid * (1 - s)).toFixed(4), sell: (mid * (1 + s)).toFixed(4), mid: mid.toFixed(4),
+      spark: spark.map((v) => Number(v)),
+    });
+  }
+  return out;
+}
+async function hFxLive(env, { refresh = false } = {}) {
+  const cached = await env.SESSION_KV.get(FX_CACHE_KEY, "json").catch(() => null);
+  if (cached && !refresh && Date.now() - Date.parse(cached.ts) < FX_TTL * 1000) return cached.payload;
+  try {
+    const r = await fetch("https://open.er-api.com/v6/latest/CNY", { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error(`er-api ${r.status}`);
+    const data = await r.json();
+    if (data?.result !== "success" || !data.rates) throw new Error("er-api bad payload");
+    const sparkMap = (await env.SESSION_KV.get(FX_SPARK_KEY, "json").catch(() => null)) ?? {};
+    const quotes = fxQuotesFromRates(data.rates, sparkMap);
+    if (quotes.length < 10) throw new Error(`er-api incomplete: ${quotes.length}`);
+    /* 更新 7 点迷你走势（展示口径：与牌价 mid 一致，JPY 为每 100 日元兑 CNY） */
+    for (const q of quotes) {
+      const v = +Number(q.mid).toFixed(2);
+      const arr = [...(sparkMap[q.code] ?? []), v].slice(-7);
+      sparkMap[q.code] = arr;
+    }
+    await env.SESSION_KV.put(FX_SPARK_KEY, JSON.stringify(sparkMap)).catch(() => {});
+    const payload = {
+      base: "CNY", source: "live", provider: "ExchangeRate-API（open.er-api.com）",
+      updated_at: new Date(data.time_last_update_unix * 1000).toISOString(),
+      fetched_at: new Date().toISOString(),
+      quotes,
+      note: "实时市场汇率（数据源每日更新，本行牌价 15 分钟缓存）；买卖价差为模拟银行加点。这是模拟银行系统。",
+    };
+    await env.SESSION_KV.put(FX_CACHE_KEY, JSON.stringify({ ts: new Date().toISOString(), payload }), { expirationTtl: FX_TTL + 60 }).catch(() => {});
+    return payload;
+  } catch (e) {
+    logEvent("warn", "fx.live_failed", { message: e?.message });
+    if (cached) return cached.payload;
+    const obj = await env.ASSETS.get("assets/data/fx.json").catch(() => null);
+    if (!obj) return { base: "CNY", source: "unavailable", quotes: [], note: "汇率数据暂不可用" };
+    const fx = await new Response(obj.body).json();
+    return { ...fx, source: "fallback", note: "实时源不可用，已回退至最近一次快照。这是模拟银行系统。" };
+  }
+}
+
 
 /* ===== Telegram 通知（开户/登录/风险操作/写操作执行等关键事件；无配置或失败均静默） ===== */
 async function tgNotify(env, html) {
@@ -1239,9 +1305,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       return guardResponse(g);
     }
     if (path === "/api/fx" && method === "GET") {
-      const obj = await env.ASSETS.get("assets/data/fx.json").catch(() => null);
-      if (!obj) return apiError("NOT_FOUND", "fx data missing", 404);
-      return json(await new Response(obj.body).json());
+      return json(await hFxLive(env, { refresh: url.searchParams.get("refresh") === "1" }));
     }
     if (path === "/api/fx/exchange" && method === "POST") {
       const b = await readJsonBody(request);
@@ -1326,7 +1390,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
 }
 
 async function fundNavs(env) {
-  const ids = ["global-mixed-1", "global-money-1", "em-gov-bond", "global-mixed-2", "global-equity-index", "apac-tech", "esg-bond", "gold-index"];
+  const ids = ["global-money-1","global-short-bond","esg-bond","cn-dividend","consumer-staples","quant-neutral","em-gov-bond","global-mixed-1","reit-global","global-mixed-2","global-equity-index","gold-index","healthcare-bio","new-energy","apac-tech","ai-semi"];
   const out = {};
   for (const id of ids) {
     const f = await fundMeta(env, id);
@@ -1666,7 +1730,8 @@ const MCP_TOOLS = [
   { name: "subscription_scan", desc: "扫描订阅扣费与使用评分", args: { lookback_days: { type: "number" } } },
   { name: "split_bill_calculate", desc: "AA 分账精确计算", args: { total: { type: "string" }, participants: { type: "array" }, adjustments: { type: "object" } } },
   { name: "contacts_search", desc: "按姓名搜索常用收款人", args: { name: { type: "string" } } },
-  { name: "fx_quote_query", desc: "查询外汇牌价", args: { currency: { type: "string" } } },
+  { name: "fx_quote_query", desc: "查询外汇实时牌价（买/卖/中间价，数据源为真实市场汇率日更+15 分钟缓存）。currency 可选过滤币种", args: { currency: { type: "string" } } },
+  { name: "deposit_product_query", desc: "查询六档存款方案（活期/通知/3月/6月/1年/3年）：利率、起存、计息方式、提前支取规则。用户问“存款利率多少/哪种存款划算”时先查此工具，再用 calc_deposit_compare 测算", args: {} },
   { name: "invoice_ocr_extract", desc: "（低优先）票据结构化提取", args: { image_url: { type: "string" } } },
   { name: "calc_compound_savings", desc: "复利储蓄计算：用户问“本金加每月追加存 N 年后有多少钱/多少利息”时使用。principal=本金（CNY），rate=年利率百分数（3 即 3%），years=年限，monthly=每月追加（默认 0），freq=复利频率 1 年/4 季/12 月（默认 12）", args: { principal: { type: "number" }, rate: { type: "number" }, years: { type: "number" }, monthly: { type: "number" }, freq: { type: "number" } } },
   { name: "calc_loan_compare", desc: "贷款对比计算：用户问房贷/贷款月供、等额本息与等额本金差别、总利息时使用。amount=贷款金额（CNY），rate=年利率百分数（3.1 即 3.1%），years=年限", args: { amount: { type: "number" }, rate: { type: "number" }, years: { type: "number" } } },
@@ -1814,15 +1879,31 @@ async function mcpGreen(env, ctxInfo, name, args) {
     case "transaction_history": return await UU({ op: "transfers", cursor: "0", days: args.days ?? 30, category: args.category ?? null });
     case "bill_analysis": return await UU({ op: "dashboard" });
     case "wealth_product_query": {
-      const ids = ["global-mixed-1", "global-money-1", "em-gov-bond", "global-mixed-2", "global-equity-index", "apac-tech", "esg-bond", "gold-index"];
+      const ids = ["global-money-1","global-short-bond","esg-bond","cn-dividend","consumer-staples","quant-neutral","em-gov-bond","global-mixed-1","reit-global","global-mixed-2","global-equity-index","gold-index","healthcare-bio","new-energy","apac-tech","ai-semi"];
       const out = [];
       for (const id of ids) {
         const f = await fundMeta(env, id);
         if (!f) continue;
         if (args.risk_level && Number(f.risk_level) !== Number(args.risk_level)) continue;
-        out.push({ product_id: id, name: f.name, risk_level: f.risk_level, returns_6m: f.returns?.["6m"], returns_1y: f.returns?.["1y"], min_invest: f.min_invest, fee: f.fee });
+        out.push({
+          product_id: id, name: f.name, risk_level: f.risk_level, asset_class: f.asset_class ?? null,
+          returns_1y: f.returns?.["1y"] ?? null, returns_3y: f.returns?.["3y"] ?? null, returns_5y: f.returns?.["5y"] ?? null, returns_since: f.returns?.since ?? null,
+          ann_vol: f.stats?.ann_vol ?? null, max_drawdown: f.stats?.max_drawdown ?? null, sharpe: f.stats?.sharpe ?? null,
+          min_invest: f.min_invest, fee_total: f.fee?.total ?? f.fee ?? null, benchmark: f.benchmark ?? null,
+          proj_10y_p50: f.projection?.p50?.[10] ?? null, inception: f.inception ?? null,
+        });
       }
-      return { products: out };
+      return { products: out, note: "共 16 只基金（R1-R5）；returns 单位 %；proj_10y_p50 为 1 元投资 10 年中位终值（蒙特卡洛）。" };
+    }
+    case "deposit_product_query": {
+      const out = [];
+      for (const s of ["demand", "notice-7d", "term-3m", "term-6m", "term-1y", "term-3y"]) {
+        const obj = await env.ASSETS.get(`assets/data/deposits/${s}.json`).catch(() => null);
+        if (!obj) continue;
+        const d = await new Response(obj.body).json();
+        out.push({ product_id: s, name: d.name, term: d.term, rate: d.rate, min: d.min, interest_type: d.interest_type ?? null, withdrawal: d.withdrawal ?? null, auto_renew: d.auto_renew ?? null, latest_rate_change: d.rate_history?.[0] ?? null });
+      }
+      return { deposits: out, note: "六档存款（模拟利率）；定期为单利、提前支取按活期计息；推荐组合可用 calc_deposit_compare 测算。" };
     }
     case "wealth_holdings_query": {
       const r = await UU({ op: "holdings" });
@@ -1848,10 +1929,8 @@ async function mcpGreen(env, ctxInfo, name, args) {
       return { payees: (r.payees ?? []).filter((p) => !kw || p.name.includes(kw)) };
     }
     case "fx_quote_query": {
-      const obj = await env.ASSETS.get("assets/data/fx.json").catch(() => null);
-      if (!obj) return { quotes: [] };
-      const fx = await new Response(obj.body).json();
-      return { quotes: args.currency ? fx.quotes.filter((q) => q.code === args.currency) : fx.quotes, updated_at: fx.updated_at };
+      const fx = await hFxLive(env);
+      return { quotes: args.currency ? fx.quotes.filter((q) => q.code === String(args.currency).toUpperCase()) : fx.quotes, updated_at: fx.updated_at, source: fx.source, provider: fx.provider };
     }
     case "split_bill_calculate": {
       const total = toCents(String(args.total ?? "0"));
@@ -1900,7 +1979,8 @@ const AI_SYSTEM_PROMPT = `你是 Suveoo 银行的智能助理（模拟银行系�
 4) 工具返回 INPUT_REQUIRED 时，向用户原样展示快照（金额、收款人、grant 前缀）并等待用户在界面上确认，绝不要替用户确认或重试执行。
 5) 工具返回 OTP_REQUIRED（红级）时，提示用户在确认卡中获取并填写邮箱验证码。
 6) 工具返回 BLOCKED 时如实告知拦截原因。绝不编造交易结果；所有结果以工具返回为准。
-7) 遇到储蓄/贷款/还款/通胀/分账/汇率/退休/预算分配等计算类问题，优先调用 calc_* 工具取得精确结果（不要自行心算）。工具返回结果中的 link 必须原样附在回答末尾：每个链接独占一行、纯 URL 形式（格式“图形化页面：<URL>”，URL 是完整可解析的 https 地址，一行内除该前缀与 URL 外不加任何文字）；一次回答用到多个工具时，每个链接各占一行，全部置于回答最后一行之后。`;
+7) 遇到储蓄/贷款/还款/通胀/分账/汇率/退休/预算分配等计算类问题，优先调用 calc_* 工具取得精确结果（不要自行心算）。工具返回结果中的 link 必须原样附在回答末尾：每个链接独占一行、纯 URL 形式（格式“图形化页面：<URL>”，URL 是完整可解析的 https 地址，一行内除该前缀与 URL 外不加任何文字）；一次回答用到多个工具时，每个链接各占一行，全部置于回答最后一行之后。
+8) 理财与产品类问题（选基金、风险等级、历史/长期收益对比、存款利率、外汇牌价）必须先调用 wealth_product_query / deposit_product_query / fx_quote_query 获取产品数据再作答，不得凭记忆编造数字；引用基金收益时注明“历史业绩不代表未来”，长期展望引用 proj_10y_p50 时说明是蒙特卡洛中位情景。外汇牌价来自真实市场数据（日更+缓存），回答时注明更新时间。`;
 
 /** Messages API 工具定义（由 MCP_TOOLS 注册表生成；模型名手动配置，不走 /v1/models）。 */
 function llmToolDefs() {
@@ -2120,6 +2200,9 @@ function genUserSeedData(rng) {
     { fund: "gold-index", amount_cents: "1528364", cost_nav: "1.7420" },
     { fund: "esg-bond", amount_cents: "1142055", cost_nav: "1.0421" },
     { fund: "apac-tech", amount_cents: "816732", cost_nav: "1.5890" },
+    /* 2026-09 扩充系列持仓（医疗 + REITs） */
+    { fund: "healthcare-bio", amount_cents: "472913", cost_nav: "2.1050" },
+    { fund: "reit-global", amount_cents: "268104", cost_nav: "1.3520" },
   ];
   const notifs = [
     { type: "SECURITY", title: "新设备登录提醒", body: "您的账户于一台新 Windows 设备完成登录。如非本人操作，请立即修改密码。" },
@@ -2242,6 +2325,12 @@ function genDemoSeedRich(rng) {
     { fund: "global-mixed-1", amount_cents: "5000000", cost_nav: "1.0210" },
     { fund: "global-money-1", amount_cents: "2000000", cost_nav: "1.0012" },
     { fund: "gold-index", amount_cents: "800000", cost_nav: "1.0830" },
+    /* 2026-09 扩充系列持仓（新 8 只中配置 5 只，非整金额、cost_nav 对齐新序列量级） */
+    { fund: "global-short-bond", amount_cents: "418367", cost_nav: "1.0520" },
+    { fund: "cn-dividend", amount_cents: "1263842", cost_nav: "1.4210" },
+    { fund: "consumer-staples", amount_cents: "905218", cost_nav: "1.9130" },
+    { fund: "reit-global", amount_cents: "352640", cost_nav: "1.1880" },
+    { fund: "ai-semi", amount_cents: "128457", cost_nav: "3.2040" },
     { fund: "em-gov-bond", amount_cents: "418367", cost_nav: "1.0421" },
     { fund: "apac-tech", amount_cents: "816732", cost_nav: "1.5890" },
     { fund: "global-equity-index", amount_cents: "305914", cost_nav: "1.8450" },
@@ -2377,8 +2466,7 @@ export default {
     if (url.pathname === "/api/ai/chat") return handleAiChat(request, env, ctx);
     if (url.pathname.startsWith("/mcp")) return handleMcp(request, env, url, ctx);
     if (url.pathname === "/api/fx" && request.method === "GET") {
-      const obj = await env.ASSETS.get("assets/data/fx.json").catch(() => null);
-      return obj ? json(await new Response(obj.body).json()) : apiError("NOT_FOUND", "fx data missing", 404);
+      return json(await hFxLive(env, { refresh: url.searchParams.get("refresh") === "1" }));
     }
     if (url.pathname === "/api/contact" && request.method === "POST") {
       const b = await readJsonBody(request).catch(() => ({}));

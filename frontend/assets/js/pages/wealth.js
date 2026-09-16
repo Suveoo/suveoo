@@ -55,7 +55,7 @@ S.router.register("wealth", async () => {
       <div class="muted small">${S.fmt.escape(d.term)} · ${S.fmt.escape(S.t("deps.minFrom", d.min))}</div>
       <a class="btn btn-sm btn-light" style="margin-top:10px" href="/wealth/deposits/${d.slug}">${S.fmt.escape(S.t("deps.detail"))}</a>
     </div>`).join("");
-  const fx = (await S.api.json("/assets/data/fx.json")) ?? { quotes: [] };
+  const fx = (await (await fetch("/api/fx")).json().catch(() => null)) ?? { quotes: [] }; /* 实时牌价（服务端带静态回退） */
   document.getElementById("fx").innerHTML = fx.quotes.slice(0, 4).map((q) => `
     <div class="list-row"><img class="fx-flag" src="${q.flag}" alt=""> <b>${S.fmt.escape(q.name)}</b>
       <span class="grow"></span><span class="mono">${q.mid}</span> ${S.charts.spark(q.spark, { color: "auto" })}</div>`).join("");

@@ -16,7 +16,7 @@ S.router.register("deposits", async () => {
     <div class="card">
       <div class="row between"><b>${S.fmt.escape(d.name)}</b><span class="fret">${d.rate}%</span></div>
       <div class="muted small" style="margin:6px 0">${S.fmt.escape(S.t("deps.term"))}：${S.fmt.escape(d.term)} · ${S.fmt.escape(S.t("deps.minFrom", d.min))}</div>
-      <div class="muted small">${S.fmt.escape(d.rules)}</div>
+      <div class="muted small">${S.fmt.escape(d.rules)}${d.interest_type ? " · " + S.fmt.escape(d.interest_type) : ""}</div>
       <a class="btn btn-sm btn-light" style="margin-top:10px" href="/wealth/deposits/${d.slug}">${S.fmt.escape(S.t("deps.detail"))}</a>
     </div>`).join("");
   /* 对比表：与 deposit-compare 工具同口径（期限内滚动存满整期 + 剩余按活期） */

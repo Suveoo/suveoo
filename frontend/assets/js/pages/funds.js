@@ -29,8 +29,10 @@ S.router.register("funds", async () => {
       <div class="row between">
         <div><div class="muted small">${S.fmt.escape(S.t("wealth.m6"))}</div><div class="fret">+${f.returns["6m"]}%</div></div>
         <div><div class="muted small">${S.fmt.escape(S.t("wealth.m12"))}</div><div class="fret">+${f.returns["1y"]}%</div></div>
+        ${f.returns["3y"] != null ? `<div><div class="muted small">${S.fmt.escape(S.t("funds.m36"))}</div><div class="fret">+${f.returns["3y"]}%</div></div>` : ""}
         <div style="text-align:right"><div class="muted small">${S.fmt.escape(S.t("funds.minInvest"))}</div><div class="mono">${S.fmt.escape(f.min_invest)}</div></div>
       </div>
+      ${f.asset_class ? `<div class="muted small" style="margin-top:8px">${S.ui.badge(f.asset_class, "badge-gray")}</div>` : ""}
       <div class="row" style="margin-top:12px"><a class="btn btn-sm btn-light" href="/wealth/funds/${f.slug}">${S.fmt.escape(S.t("funds.detail"))}</a></div>
     </div>`;
   const render = () => {

@@ -231,7 +231,8 @@ S.chrome = {
 
 /* 财富共享助手（wealth/fund-detail/deposit-detail 页共用，全站加载） */
 S.wealth = {
-  FUND_IDS: ["global-mixed-1", "global-money-1", "em-gov-bond", "global-mixed-2", "global-equity-index", "apac-tech", "esg-bond", "gold-index"],
+  /* 16 只基金（R1→R5 排序）：前 8 只为原系列，后 8 只为 2026-09 扩充系列 */
+  FUND_IDS: ["global-money-1", "global-short-bond", "esg-bond", "cn-dividend", "consumer-staples", "quant-neutral", "em-gov-bond", "global-mixed-1", "reit-global", "global-mixed-2", "global-equity-index", "gold-index", "healthcare-bio", "new-energy", "apac-tech", "ai-semi"],
   DEP_IDS: ["demand", "notice-7d", "term-3m", "term-6m", "term-1y", "term-3y"],
 };
 
