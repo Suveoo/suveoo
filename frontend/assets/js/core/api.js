@@ -52,11 +52,17 @@ S.api = {
   del(path, body) { return this.req("DELETE", path, body); },
   /** 静态数据请求：超时 + 换连接重试；最终失败返回 null（调用方以 if (!data) 兜底） */
   async json(path, { timeoutMs = 8000, retries = 1 } = {}) {
+    /* /assets/data/* 追加部署版本参数：绕开 HTTP/SW 的 cache-first（版本随 HTML v= 递增） */
+    let url = path;
+    if (path.startsWith("/assets/data/")) {
+      const v = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
+      if (v) url = path + (path.includes("?") ? "&" : "?") + "v=" + v;
+    }
     for (let i = 0; i <= retries; i++) {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const res = await fetch(path, { signal: ctrl.signal, cache: "no-store" });
+        const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
         clearTimeout(timer);
         if (!res.ok) return null;
         return await res.json();

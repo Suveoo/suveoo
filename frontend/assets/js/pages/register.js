@@ -146,8 +146,10 @@ S.router.register("register", async () => {
       risk_answers: state.answers, aml_consented: true,
     });
     if (!r.ok) {
+      /* 失败不整页刷新（会丢失已填的身份/验证码/8 题测评/合规勾选）：回到密码步原样重试 */
       pane.innerHTML = `<h2>${S.fmt.escape(S.t("common.loadFailed"))}</h2><p class="muted small">${S.fmt.escape(r.data?.error?.message ?? r.data?.error?.code ?? "")}</p>
-        <button class="btn btn-ghost btn-block" onclick="location.reload()">${S.fmt.escape(S.t("common.retry"))}</button>`;
+        <button class="btn btn-primary btn-block" id="r-back">${S.fmt.escape(S.t("common.retry"))}</button>`;
+      document.getElementById("r-back").onclick = () => step3();
       return;
     }
     S.api.token = r.data.token;

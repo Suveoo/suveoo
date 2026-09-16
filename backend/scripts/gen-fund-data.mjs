@@ -402,7 +402,10 @@ for (const spec of FUNDS) {
   const fund = {
     slug: spec.slug, name: spec.name, code: spec.code, risk_level: spec.risk_level,
     inception: `${spec.inception.y}-${String(spec.inception.m).padStart(2, "0")}-01`,
-    nav: navR[n - 1], day_change: +((navR[n - 1] / navR[n - 2] - 1) * 100).toFixed(2),
+    nav: navR[n - 1],
+    /* day_change = 当日涨跌：独立于月度序列的小幅日波动（±0.9% 内，随波动率缩放）——
+     * 误用月度环比会令 /account、/home 的"今日收益"出现百分之几十的异常值 */
+    day_change: +((rng() - 0.5) * 2 * Math.min(0.9, 0.15 + stats.ann_vol / 40)).toFixed(2),
     returns: { "1m": ret(1), "3m": ret(3), "6m": ret(6), "1y": ret(12), "3y": ret(36), "5y": ret(60), since: +pct(navs[n - 1], 1).toFixed(2) },
     asset_class: spec.asset_class, benchmark: spec.benchmark, strategy: spec.strategy,
     min_invest: spec.min_invest, fee: { ...spec.fee }, dividend_policy: spec.dividend_policy,

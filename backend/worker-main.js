@@ -950,6 +950,7 @@ export async function handleSession(request, env) {
   return json({
     user_id: p.user_id, email: maskEmail(p.email), name: p.name, pr_level: p.pr_level,
     twofa_enabled: p.twofa_enabled === 1, unread_notifications: unread.count ?? 0,
+    created_at: p.created_at ?? null, /* /account 个人卡"开户日期"来源（getProfile 原本就返回，此前未透传导致恒显"—"） */
     notice: "这是模拟银行系统，不涉及真实资金行为。",
   });
 }
@@ -1417,18 +1418,30 @@ function guardResponse(g) {
   return json({ status: "BLOCKED", reason: g.blockReason ?? g.reason ?? "BLOCKED", stages: g.stages, trace_id: g.ir?.trace_id }, 403);
 }
 
-/* ---- pdf-lib 月度报告 ---- */
+/* ---- pdf-lib 月度报告（专业版：矢量 logo 复刻 / 摘要封面 / 分类条形 / 斑马纹明细 / 页码页脚 / 长文本截断） ---- */
+/* logo 形状取自 frontend/assets/images/suveoo-logo-long.svg（pdf-lib 不支持嵌 SVG，故按原 path 矢量重绘，视觉一致且任意缩放清晰） */
+const LOGO_TILE_PATH = "M215 0H809A215 215 0 0 1 1024 215V809A215 215 0 0 1 809 1024H215A215 215 0 0 1 0 809V215A215 215 0 0 1 215 0Z";
+const LOGO_MARK_PATH = "M605.4 512H336.8c-63.2 0-110.6-47.4-110.6-110.6s47.4-110.6 110.6-110.6H637M257.8 733.2h426.6c63.2 0 110.6-47.4 110.6-110.6S747.6 512 684.4 512h-79M336.8 812.2l-79-79 79-79m460.98-363.4a79 79 0 1 0-158 0 79 79 0 1 0 158 0";
 async function generateReport(env, ctxInfo, month) {
-  const { userId } = ctxInfo;
+  const { userId, email } = ctxInfo;
+  const prof = (await U(env, userId)({ op: "getProfile" })).profile ?? {};
   const data = await U(env, userId)({ op: "reportData", month });
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  // 中文用 Noto Sans SC 子集（R2 字体）
+  const NAVY = rgb(0.118, 0.165, 0.471), INK2 = rgb(0.4, 0.4, 0.4), LINE = rgb(0.898, 0.898, 0.902), SURFACE = rgb(0.969, 0.969, 0.973), GREEN = rgb(0.122, 0.478, 0.302), RED = rgb(0.753, 0.224, 0.169);
+  const pdfLogo = (page, x, topY, size) => {
+    const s = size / 1024;
+    page.drawSvgPath(LOGO_TILE_PATH, { x, y: topY, scale: s, color: NAVY });
+    page.drawSvgPath(LOGO_MARK_PATH, { x, y: topY, scale: s, borderColor: rgb(1, 1, 1), borderWidth: 79 });
+  };
   let cjk = null;
   try {
-    const fontObj = await env.ASSETS.get("assets/fonts/noto-sans-sc.ttf").catch(() => null);
+    /* 优先用预子集静态字体（GB2312 全量+ASCII，2.2MB）：variable TTF 经 fontkit 运行时子集会丢字形；
+     * 预子集由 scripts/subset-cjk.mjs.py（fontTools instancer + subsetter）生成 */
+    const fontObj = (await env.ASSETS.get("assets/fonts/noto-sans-sc-report.ttf").catch(() => null))
+      ?? (await env.ASSETS.get("assets/fonts/noto-sans-sc.ttf").catch(() => null));
     if (fontObj) {
       const fontkit = (await import("@pdf-lib/fontkit")).default;
       doc.registerFontkit(fontkit);
@@ -1436,27 +1449,133 @@ async function generateReport(env, ctxInfo, month) {
     }
   } catch (e) { logEvent("warn", "report.cjk_fallback", { message: e?.message }); }
   const F = (t, size, f = font) => ({ t: String(t), size, f: cjk && /[\u4e00-\u9fff]/.test(String(t)) ? cjk : f });
-
-  let page = doc.addPage([595.28, 841.89]);
-  let y = 800;
-  const line = (item, x = 50, color = rgb(0, 0, 0)) => {
-    if (y < 60) { page = doc.addPage([595.28, 841.89]); y = 800; }
-    page.drawText(item.t, { x, y, size: item.size, font: item.f, color });
-    y -= item.size + 8;
+  const W = (item) => item.f.widthOfTextAtSize(item.t, item.size);
+  /* 长文本截断（防溢出页宽）——中文走 cjk 宽度测量 */
+  const clip = (item, maxW) => {
+    if (W(item) <= maxW) return item.t;
+    let s = item.t;
+    while (s.length > 1 && item.f.widthOfTextAtSize(s + "...", item.size) > maxW) s = s.slice(0, -1);
+    return s + "...";
   };
-  page.drawRectangle({ x: 0, y: 806, width: 595.28, height: 36, color: rgb(0.118, 0.165, 0.471) });
-  page.drawText("Suveoo Monthly Statement", { x: 50, y: 817, size: 16, font: bold, color: rgb(1, 1, 1) });
-  y = 780;
-  line(F(`Month: ${month}`, 12));
-  line(F(`User: ${userId}`, 12));
-  line(F(`Total OUT: CNY ${data.total_out}`, 12));
-  line(F(`Total IN: CNY ${data.total_in}`, 12));
-  line(F(`Transactions: ${data.txs.length}`, 12));
-  y -= 10; line(F("---- Transactions ----", 12, bold));
-  for (const t of data.txs.slice(0, 120)) {
-    line(F(`${t.ts?.slice(0, 10)}  ${t.direction === "IN" ? "+" : "-"}CNY ${t.amount}  ${t.counterparty ?? ""}  ${t.category ?? ""}`, 9));
+  const fmtC = (cents) => {
+    const n = Number(cents ?? 0) / 100;
+    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const PW = 595.28, PH = 841.89, MX = 50;
+  let pages = [];
+  const newPage = () => { const p = doc.addPage([PW, PH]); pages.push(p); return p; };
+  let page = newPage();
+  let y = 0;
+
+  /* ---- 页脚（每页，最后统一画） ---- */
+  const drawFooters = () => {
+    pages.forEach((p, i) => {
+      p.drawLine({ start: { x: MX, y: 46 }, end: { x: PW - MX, y: 46 }, thickness: 0.5, color: LINE });
+      const L = F("这是模拟银行系统，不涉及真实资金行为 · Simulated data · Suveoo", 7.5, font);
+      p.drawText(L.t, { x: MX, y: 34, size: L.size, font: L.f, color: INK2 });
+      const R = F(`第 ${i + 1} 页 / 共 ${pages.length} 页`, 7.5, font);
+      p.drawText(R.t, { x: PW - MX - W(R), y: 34, size: R.size, font: R.f, color: INK2 });
+    });
+  };
+  /* ---- 明细页页眉 ---- */
+  const txHeader = (p) => {
+    pdfLogo(p, MX, 795, 26);
+    const t = F("Suveoo", 13, bold);
+    p.drawText(t.t, { x: MX + 34, y: 802, size: t.size, font: t.f, color: NAVY });
+    const s = F(`${month} · 交易明细`, 10, font);
+    p.drawText(s.t, { x: PW - MX - W(s), y: 803, size: s.size, font: s.f, color: INK2 });
+    p.drawLine({ start: { x: MX, y: 786 }, end: { x: PW - MX, y: 786 }, thickness: 1, color: NAVY });
+    return 766;
+  };
+
+  /* ==== P1：品牌摘要封面 ==== */
+  const txs = data.txs ?? []; /* 声明在块外：明细表段也要用（try 块级作用域） */
+  try {
+  /* drawSvgPath 的 y 为 path 顶部（向下生长）：tile 占 782→698，避让 650 起的标题区 */
+  pdfLogo(page, MX, 782, 84);
+  let brand = F("Suveoo", 30, bold);
+  page.drawText(brand.t, { x: MX + 100, y: 738, size: brand.size, font: brand.f, color: NAVY });
+  let sub = F("Agentic Banking Control Plane", 10, font);
+  page.drawText(sub.t, { x: MX + 101, y: 722, size: sub.size, font: sub.f, color: INK2 });
+  let title = F(`${month} 月度账户报告`, 22, bold);
+  page.drawText(title.t, { x: MX, y: 650, size: title.size, font: title.f, color: rgb(0, 0, 0) });
+  const genAt = F(`账户：${userId} · ${email ?? ""}`, 10, font);
+  page.drawText(genAt.t, { x: MX, y: 628, size: genAt.size, font: genAt.f, color: INK2 });
+  const genAt2 = F(`客户姓名：${prof.name ?? "—"} · 生成时间：${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC`, 10, font);
+  page.drawText(genAt2.t, { x: MX, y: 612, size: genAt2.size, font: genAt2.f, color: INK2 });
+
+  /* 摘要四格卡 */
+  const net = Number(data.total_in ?? 0) - Number(data.total_out ?? 0);
+  const cards = [
+    [F("本月支出（CNY）", 9), F(fmtC(data.total_out), 17, bold), RED],
+    [F("本月收入（CNY）", 9), F(fmtC(data.total_in), 17, bold), GREEN],
+    [F("净现金流（CNY）", 9), F((net >= 0 ? "+" : "") + fmtC(net), 17, bold), net >= 0 ? GREEN : RED],
+    [F("交易笔数", 9), F(String(txs.length), 17, bold), rgb(0, 0, 0)],
+  ];
+  const CW = (PW - MX * 2 - 30) / 4;
+  cards.forEach(([lb, v, c], i) => {
+    const x = MX + i * (CW + 10);
+    page.drawRectangle({ x, y: 520, width: CW, height: 64, color: SURFACE, borderColor: LINE, borderWidth: 0.5 });
+    page.drawText(lb.t, { x: x + 10, y: 564, size: lb.size, font: lb.f, color: INK2 });
+    page.drawText(v.t, { x: x + 10, y: 534, size: v.size, font: v.f, color: c });
+  });
+
+  /* 支出分类 Top6 条形 */
+  let cy = 486;
+  const sec = F("支出分类构成", 12, bold);
+  page.drawText(sec.t, { x: MX, y: cy, size: sec.size, font: sec.f, color: rgb(0, 0, 0) });
+  cy -= 22;
+  const byCat = {};
+  for (const t of txs) if (t.direction === "OUT") byCat[t.category ?? "其他"] = (byCat[t.category ?? "其他"] ?? 0) + Number(t.amount_cents);
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const catMax = cats[0]?.[1] ?? 1;
+  const BAR_MAX = PW - MX * 2 - 150;
+  for (const [name, cents] of cats) {
+    const lb = F(clip(F(name, 9.5), 90), 9.5);
+    page.drawText(lb.t, { x: MX, y: cy, size: lb.size, font: lb.f, color: rgb(0, 0, 0) });
+    const amt = F("¥ " + fmtC(cents), 9.5, font);
+    page.drawText(amt.t, { x: PW - MX - W(amt), y: cy, size: amt.size, font: amt.f, color: rgb(0, 0, 0) });
+    page.drawRectangle({ x: MX + 96, y: cy - 1.5, width: Math.max(2, (cents / catMax) * BAR_MAX), height: 8, color: NAVY });
+    cy -= 20;
   }
-  for (let i = 1; i <= doc.getPageCount(); i++) doc.getPage(i - 1).drawText("Simulated data - Suveoo", { x: 50, y: 30, size: 8, font, color: rgb(0.6, 0.6, 0.6) });
+  const note = F("分类按交易记录的 category 字段汇总（最多 6 类）；流水明细取该月最近 500 笔中的前 120 笔。", 8.5, font);
+  page.drawText(note.t, { x: MX, y: cy - 6, size: note.size, font: note.f, color: INK2 });
+  } catch (e) { logEvent("error", "report.p1", { message: e?.message }); throw e; }
+
+  /* ==== P2+：交易明细表 ==== */
+  const COLS = { date: 66, desc: 236, cat: 62, amt: 96 };
+  const drawRow = (cells, opts = {}) => {
+    if (y < 70) { page = newPage(); y = txHeader(page); }
+    if (opts.zebra) page.drawRectangle({ x: MX - 6, y: y - 5, width: PW - MX * 2 + 12, height: 17, color: SURFACE });
+    const d = F(cells.date, 8.5, font);
+    page.drawText(d.t, { x: MX, y, size: d.size, font: d.f, color: opts.head ? NAVY : rgb(0, 0, 0) });
+    const desc = F(opts.head ? cells.desc : clip(F(cells.desc ?? "", 8.5), COLS.desc), 8.5, opts.head ? bold : font);
+    page.drawText(desc.t, { x: MX + COLS.date + 8, y, size: desc.size, font: desc.f, color: opts.head ? NAVY : rgb(0, 0, 0) });
+    const cat = F(opts.head ? cells.cat : clip(F(cells.cat ?? "", 8.5), COLS.cat), 8.5, opts.head ? bold : font);
+    page.drawText(cat.t, { x: MX + COLS.date + COLS.desc + 16, y, size: cat.size, font: cat.f, color: opts.head ? NAVY : INK2 });
+    const amt = F(cells.amt, 8.5, opts.head ? bold : font);
+    page.drawText(amt.t, { x: PW - MX - W(amt), y, size: amt.size, font: amt.f, color: opts.head ? NAVY : (cells.in ? GREEN : RED) });
+    y -= 17;
+  };
+  page = newPage();
+  y = txHeader(page);
+  try {
+  drawRow({ date: F("日期", 8.5).t, desc: "描述 / 对手方", cat: "类别", amt: "金额（CNY）" }, { head: true });
+  page.drawLine({ start: { x: MX, y: y + 10 }, end: { x: PW - MX, y: y + 10 }, thickness: 0.75, color: NAVY });
+  y -= 6;
+  txs.forEach((t, i) => {
+    const cents = Number(t.amount_cents ?? 0);
+    drawRow({
+      date: String(t.ts ?? "").slice(5, 10),
+      desc: t.counterparty ?? t.memo ?? "—",
+      cat: t.category ?? "—",
+      amt: (t.direction === "IN" ? "+" : "-") + fmtC(cents),
+      in: t.direction === "IN",
+    }, { zebra: i % 2 === 1 });
+  });
+  } catch (e) { logEvent("error", "report.table", { message: e?.message }); throw e; }
+
+  drawFooters();
   const bytes = await doc.save();
   await env.ASSETS.put(`reports/${userId}/${month}.pdf`, bytes, { httpMetadata: { contentType: "application/pdf" } });
   await U(env, userId)({ op: "audit", action: "report_generated", detail: { month }, channel: "form", trace_id: newTraceId() });
@@ -2647,20 +2766,23 @@ export class LedgerDO {
         case "overview": {
           const cards = this.#rows(sql.exec("SELECT * FROM cards ORDER BY is_default DESC, slug")).map(publicCard);
           const bal = this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(balance_cents AS INTEGER)),0) AS s FROM cards WHERE kind='debit'"))[0]?.s ?? 0;
-          let costTotal = 0n, valueTotal = 0n;
+          let costTotal = 0n, valueTotal = 0n, dayPnl = 0n;
           for (const h of this.#rows(sql.exec("SELECT * FROM holdings"))) {
             const principal = BigInt(h.amount_cents);
             const nav = input.fundNavs?.[h.fund]?.nav, cost = Number(h.cost_nav ?? 1);
             costTotal += principal;
-            valueTotal += nav ? BigInt((Number(principal) * Number(nav) / cost).toFixed(0)) : principal;
+            const value = nav ? BigInt((Number(principal) * Number(nav) / cost).toFixed(0)) : principal;
+            valueTotal += value;
+            /* 今日浮动 = 持仓市值 × 当日涨跌（day_change 为日波动百分数）——此前误用累计浮盈冒充"今日收益" */
+            const dc = Number(input.fundNavs?.[h.fund]?.day_change ?? 0);
+            dayPnl += BigInt((Number(value) * dc / 100).toFixed(0));
           }
-          const pnl = valueTotal - costTotal; // 今日浮动盈亏（近似，模拟行情）
-          const pnlPct = costTotal > 0n ? (Number(pnl) / Number(costTotal) * 100) : 0;
+          const pnlPct = costTotal > 0n ? (Number(dayPnl) / Number(costTotal) * 100) : 0;
           const unread = this.#rows(sql.exec("SELECT COUNT(*) AS c FROM notifications WHERE read = 0"))[0]?.c ?? 0;
           return json({
             total_balance: centsToStr(BigInt(bal)), holdings_total: centsToStr(valueTotal),
             total_assets: centsToStr(BigInt(bal) + valueTotal),
-            today_pnl: { amount: (pnl >= 0n ? "+" : "") + centsToStr(pnl), percent: (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%" },
+            today_pnl: { amount: (dayPnl >= 0n ? "+" : "") + centsToStr(dayPnl), percent: (pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "%" },
             cards, unread, notice: "这是模拟银行系统，不涉及真实资金行为。",
           });
         }
