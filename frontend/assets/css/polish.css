@@ -177,9 +177,12 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     box-shadow: 0 6px 24px rgba(15, 23, 42, .16);
   }
   @media (min-width: 768px) {
+    /* 平板纵向（768-1023）：side drawer 显示，恢复 248px 让位（外层 padding 简写会覆盖掉 layout.css 的让位值，
+       曾导致对话内容被抽屉盖住）；输入条与全屏抽屉同步避开抽屉列与 64px 桌面 header */
     .mobile-tabs { top: 64px; }
-    .chat-composer { bottom: calc(10px + env(safe-area-inset-bottom)); }
-    body[data-page="ai"] .page { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+    .chat-composer { left: calc(248px + var(--sp-3)); right: var(--sp-4); bottom: calc(10px + env(safe-area-inset-bottom)); }
+    body[data-page="ai"] .page { padding: var(--sp-6) var(--sp-4) calc(120px + env(safe-area-inset-bottom)) calc(248px + var(--sp-6)); }
+    .trust-console { top: 64px; }
   }
   /* 控制台全屏抽屉（内部自滚：flex 链补 min-height:0）。
      不再 inset:0 贴满屏幕：顶部避开移动 header（56px+刘海安全区）、底部避开底导航（64px+手势条安全区）——
@@ -223,17 +226,11 @@ body.tc-open { overflow: hidden; }
 .chip { line-height: 1.4; }
 .chip-go { width: 13px; height: 13px; margin-left: 5px; vertical-align: -2px; color: var(--color-ink-2); flex: none; }
 
-/* ===== 13. 控制台抽屉底部返回条（仅移动/平板） ===== */
-@media (max-width: 1023px) {
-  .tc-back-bar {
-    flex: none;
-    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--color-line);
-    background: #fff;
-  }
+/* ===== 13. 控制台抽屉打开时底导航整体置于抽屉之上（仅 /ai 页；AI 圆钮负 margin 突入抽屉保持可点，几何上其余三钮不与抽屉重叠） ===== */
+@media (max-width: 767px) {
+  body[data-page="ai"] .bottom-nav { z-index: calc(var(--z-modal) + 20); }
   .trust-console .tc-events { padding-bottom: 12px; }
 }
-@media (min-width: 1024px) { .tc-back-bar { display: none; } }
 
 /* ===== 14. 预测问题 chip 之间的间距收紧（行距 6px、移动端再收紧；chip 内部行距不变） ===== */
 .hero-chips, .chat-chips { gap: 6px 8px; }

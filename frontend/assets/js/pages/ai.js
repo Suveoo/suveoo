@@ -76,10 +76,6 @@ S.router.register("ai", async ({ user }) => {
       const close = S.ui.el(`<button class="tc-close">${S.ui.icon("x", 14)} ${S.fmt.escape(S.t("ai.backToChat"))}</button>`);
       head.prepend(close);
       close.onclick = () => setOpen(false);
-      /* 底部固定主按钮：抽屉内滚到任何位置都能一键返回对话 */
-      const bar = S.ui.el(`<div class="tc-back-bar"><button class="btn btn-primary btn-block">${S.ui.icon("arrow-left", 16)} ${S.fmt.escape(S.t("ai.backToChat"))}</button></div>`);
-      tc.appendChild(bar);
-      bar.querySelector("button").onclick = () => setOpen(false);
     }
     consoleTab && (consoleTab.onclick = () => setOpen(true));
     chatTab && (chatTab.onclick = () => setOpen(false));

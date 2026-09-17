@@ -2407,17 +2407,101 @@ function llmToolDefs() {
   return MCP_TOOLS.map((t) => ({ name: t.name, description: t.desc, input_schema: { type: "object", properties: t.args } }));
 }
 
-/** 调用 Messages API（Anthropic 兼容；非流式——流式仅面向浏览器）。 */
-async function llmMessages(env, messages, tools) {
+/** 消费 Messages API 流式 SSE：text_delta 即时回调 onText；tool_use 的 input_json_delta 聚合为完整 JSON
+ *  （content_block_stop 时才 parse——工具执行永远拿到完整参数）。返回与非流式响应同形状 { content, stop_reason }。 */
+export async function consumeLlmSse(res, onText) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  const blocks = new Map(); /* index -> block（text 累加 / tool_use 存 _json 串） */
+  const content = [];
+  let stopReason = null;
+  let sawText = false;
+  const handle = (evt) => {
+    switch (evt.type) {
+      case "content_block_start": {
+        const b = evt.content_block ?? {};
+        blocks.set(evt.index, b.type === "tool_use" ? { ...b, _json: "" } : { ...b });
+        break;
+      }
+      case "content_block_delta": {
+        const b = blocks.get(evt.index);
+        if (!b) break;
+        if (evt.delta?.type === "text_delta" && evt.delta.text) { b.text = (b.text ?? "") + evt.delta.text; sawText = true; onText(evt.delta.text); }
+        else if (evt.delta?.type === "input_json_delta") b._json = (b._json ?? "") + (evt.delta.partial_json ?? "");
+        break;
+      }
+      case "content_block_stop": {
+        const b = blocks.get(evt.index);
+        if (!b) break;
+        if (b.type === "tool_use") {
+          try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; }
+          delete b._json;
+        }
+        content[evt.index] = b;
+        break;
+      }
+      case "message_delta": if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason; break;
+      case "error": {
+        const err = new Error(`LLM stream error: ${evt.error?.message ?? "unknown"}`);
+        err.partial = sawText ? content.filter(Boolean) : null;
+        throw err;
+      }
+    }
+  };
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let sep;
+    while ((sep = buf.indexOf("\n\n")) !== -1) {
+      const chunk = buf.slice(0, sep);
+      buf = buf.slice(sep + 2);
+      const data = chunk.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("");
+      if (!data) continue;
+      try { handle(JSON.parse(data)); } catch (e) { if (e?.partial !== undefined) throw e; /* 非 error 事件的解析失败跳过（如注释行/心跳） */ }
+    }
+  }
+  return { content: content.filter(Boolean), stop_reason: stopReason ?? "end_turn" };
+}
+
+/** 调用 Messages API（Anthropic 兼容）。流式优先：提供 onText 时加 stream:true，边收 content_block_delta
+ *  边回调下发（worker 转发、浏览器打字机平滑只是观感层）；工具轮次由 consumeLlmSse 聚合完整 JSON 后才执行。
+ *  上游不支持流式（非 SSE 响应/请求被拒）自动回退非流式；流中途 error 且已有部分文本时返回部分结果不重放。 */
+export async function llmMessages(env, messages, tools, onText) {
   const base = (env.LLM_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "");
   const model = env.LLM_MODEL ?? "claude-haiku-4.5";
   const key = env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY;
   if (!key) return { err: "LLM_API_KEY not configured" };
-  const res = await fetch(`${base}/v1/messages`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model, max_tokens: 2048, system: AI_SYSTEM_PROMPT, messages, ...(tools?.length ? { tools } : {}) }),
-  });
+  const headers = { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" };
+  const payload = { model, max_tokens: 2048, system: AI_SYSTEM_PROMPT, messages, ...(tools?.length ? { tools } : {}) };
+
+  if (onText) {
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify({ ...payload, stream: true }) });
+    if (res.ok && (res.headers.get("content-type") ?? "").includes("text/event-stream")) {
+      try {
+        const out = await consumeLlmSse(res, onText);
+        logEvent("info", "ai.llm_stream", { ok: true });
+        return { out, streamed: true };
+      } catch (e) {
+        if (e?.partial?.length) { /* 已下发的 token 不撤回：把聚合到的部分作为本轮结果 */
+          logEvent("warn", "ai.llm_stream", { ok: "partial", message: e?.message });
+          return { out: { content: e.partial, stop_reason: "stream_error" }, streamed: true };
+        }
+        logEvent("warn", "ai.llm_stream", { ok: "fallback", message: e?.message });
+      }
+    } else if (res.ok) {
+      /* 网关忽略 stream 参数直接回整段 JSON：就地消化，不再补一发非流式请求 */
+      logEvent("warn", "ai.llm_stream", { ok: "degraded", content_type: res.headers.get("content-type") });
+      return { out: await res.json() };
+    } else {
+      logEvent("warn", "ai.llm_stream", { ok: "fallback", status: res.status, content_type: res.headers.get("content-type") });
+    }
+    /* 回退前释放流式响应体 */
+    try { await res.body?.cancel(); } catch { /* ignore */ }
+  }
+
+  const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(payload) });
   if (!res.ok) return { err: `LLM upstream ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}` };
   return { out: await res.json() };
 }
@@ -2457,11 +2541,12 @@ export async function handleAiChat(request, env, ctx) {
         const msgs = [...history, { role: "user", content: text }];
         let assistantText = "";
         for (let round = 0; round < 8; round++) {
-          const { out, err } = await llmMessages(env, msgs, tools);
+          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }));
           if (err) { send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
           const content = out.content ?? [];
           const textPart = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
-          if (textPart) { assistantText += (assistantText ? "\n" : "") + textPart; send({ type: "token", text: textPart }); }
+          /* 流式路径 token 已随 delta 下发；非流式回退时整段一次性补发 */
+          if (textPart) { assistantText += (assistantText ? "\n" : "") + textPart; if (!streamed) send({ type: "token", text: textPart }); }
           const toolUses = content.filter((b) => b.type === "tool_use");
           if (!toolUses.length) break;
 
