@@ -704,14 +704,14 @@ Consent Binding 全流程（与既定安全决策一致）：
 ### 8.1 版面
 
 - **PC（≥1024px）双栏**：左栏 flex=1 对话区；右栏 400px Trust Console（可折叠为 48px 窄条，折叠时仅显示五道验证器状态灯竖排）。
-- **Mobile / 窄平板**：顶部 segmented control「对话 | 控制台」切换；GenUI 卡片全宽；Trust Console 同构。
+- **Mobile / 窄平板**：顶部 segmented control「对话 | 控制台」切换；GenUI 卡片全宽；Trust Console 同构；控制台为全屏抽屉，几何上避开移动 header（56px+刘海安全区）与底部导航（64px+手势条安全区）——真机 webview 系统栏层叠不可控，几何让位最稳。
 - URL 参数：`?q=` 预填首条消息自动发送；`?ctx=<json|token>` 页面上下文条（显示"来自基金详情页：global-mixed-1"，可移除）。
 
 ### 8.2 对话区
 
 1. **消息流**：
   - 用户消息：右对齐黑底白字圆角气泡。
-  - AI 消息：左对齐白底灰边气泡，**流式打字机输出**（token 级 SSE）。
+  - AI 消息：左对齐白底灰边气泡，**打字机输出**（前端缓冲：token 事件到达后按每帧 12 字 rAF 渐进渲染 Markdown；done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序——上游 LLM 当前整块下发，该层令观感与真流式一致，切真流式后同样平滑毛刺）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
   - AI 头像 = `suveoo-ai-logo.svg` 32px。
   - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
@@ -830,10 +830,12 @@ Consent Binding 全流程（与既定安全决策一致）：
 ### 10.1 `/account`（P05 账户中心首页，需登录）
 
 1. 个人卡：头像（首字母大圆）+ 姓名 + 客户等级 chip + Email（掩码）+ 开户日期。
-2. 功能宫格：我的卡片（P24）、仪表盘（P27）、安全中心（P29）、月度报告（P28）、通知（P30）、转账限额（P11）。
-3. 偏好区：语言切换（同 header 容器）、「Cookie Preferences」按钮（重开弹窗）、时区显示（只读）。
-4. 「退出登录」按钮（黄确认）。
-5. SimNotice footnote。
+2. 资产概要：总资产/今日收益（/api/overview）+ 余额/理财持仓两行；**外币资产合计（折 CNY）行仅当确有外币持仓时渲染**（/api/fx/balances 汇总 cny_estimate，账户级口径，点击直达 /wealth/fx）。
+3. 最近 5 笔流水（/api/transfers）。
+4. 功能宫格：我的卡片（P24）、仪表盘（P27）、安全中心（P29）、月度报告（P28）、通知（P30）、转账限额（P11）。
+5. 偏好区：语言切换（同 header 容器）、「Cookie Preferences」按钮（重开弹窗）、时区显示（只读）。
+6. 「退出登录」按钮（黄确认）。
+7. SimNotice footnote。
 
 ### 10.2 `/account/login`（P21）
 
@@ -1083,6 +1085,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.2（2026-09-17）：四项体验修复——P05 资产概要增**外币资产合计（折 CNY）行**（账户级口径、仅当确有外币持仓时渲染、点击直达 /wealth/fx）；/ai 移动**控制台抽屉几何让位**（顶部避开 header 56px+刘海安全区、底部避开底导航 64px+手势条安全区——真机 webview 系统栏层叠不可控，PC DevTools 无法复现）；AI 回答**打字机缓冲**（token 到达后每帧 12 字 rAF 渐进渲染 Markdown；done 待打字追平再收尾、GenUI 插卡前先追平保序——上游整块下发下观感与真流式一致）；/ai 移动**滚动锚定最后一条消息**（预留底导航实际高度 +12px、只向下不回滚，不再滚到文档底把 footer 拉进视口）。i18n +1 键（acct.fxAssets，810×4）。
 - v5（2026-09-17）：凭证安全与信用卡账本双任务——**任务 A 凭证缺口**：改密须当前密码+邮箱 OTP+新密码（OTP 非消费式校验，密码错不烧码）；关闭 2FA 须当前密码（开启保持仅 OTP）；找回密码补确认密码框且全流程零旧密码字段（红线）；**会话纪元（session epoch）**：profile.session_epoch 列（幂等迁移）+ JWT epo 声明 + requireSession 全量校验，改密/找回成功 bumpEpoch → 全设备下线、改密响应返回新纪元 token 本设备不掉线；AI 系统提示词补"密码类问题引导页面、不代行"（自测 0 工具调用）。**任务 B 交易挂卡与信用卡账本**：tx 加 card 列（幂等迁移），全部写流水路径挂卡（转账/换汇/缴费/理财申赎/商户/长程任务/跨用户入账/种子——日常消费 4 借记卡轮转）；**信用卡成为支付工具**：转账与购汇可选信用卡（校验可用额度、消费计入欠款、不动借记余额，超额 INSUFFICIENT_CREDIT；结汇入账仅借记卡）；**还款闭环**：credit-repay 动态取当前欠款全额（账单页/REST/AI 三通道同额；MCP bill_pay 修复为可无金额调用）、默认借记卡扣款清零欠款、卡片设置页"立即还款"黄卡；**单卡明细真过滤真分页**（cardTx 按 card 字段 20 条/页 next_cursor，chips/柱图基于该卡数据）；种子信用卡初始欠款 demo ¥8,632.47 / unper ¥5,183.29；AI 同步（card_status_query 欠款/最近消费语义、transfer_execute/fx_exchange 信用支付、bill_pay 动态金额、bill_analysis by_card 归因、系统提示词规则 8 信用卡段；三条自测通过）；顺手修账单确认卡 100 倍金额显示与 AI bill_pay 恒被拦两个存量缺陷、.cardwall 360px 溢出；测试 186 → 207（security-credential 11 + card-ledger 10 + schema-migration 3）。
 - v4（2026-09-17）：安全与真实化五连修——演示端点管理员令牌（x-admin-token 双门 fail-closed + 审计 + inspect 只读巡检）；转账/收款人真实化（Luhn+registry 存在+户名匹配三重校验单一真相源，REST 与 AI 通道同规；跨用户转账双记——对方 DO 先 credit 再扣款、资金守恒、入账邮件自动送达注册邮箱；13 个演示人物落户为真实账户，存量收款人全量迁移归零）；卡片设置页查看完整卡号（reveal 端点 + 眼睛/复制 + 卡图直达设置 + AI 只给深链不回卡号）；理财赎回按市值结算（本金×当前净值÷成本净值整数运算，显示值=回款额，redeem_value/unrealized_pnl 进 AI 工具）；外汇实时结算（删除 690 硬编码，服务端买卖价×10⁴ BigInt、JPY 每 100 口径、可选结算卡、外币余额卡与 fx_balance_query、fx_exchange 首次注册进 AI 工具表、兑换器 JPY 口径修正）；执行层业务失败不再误报 EXECUTED；测试 159 → 186。
 - v3（2026-09-16）：财富产品 v2 与运营强化——基金扩至 16 只（多因子模型数据：4-14 年月度净值锚定真实市场史、基准对比、风险指标、10 年蒙特卡洛预测；详情页九区块重构；新增短债/红利/必需消费/量化中性/REITs/医疗/新能源/半导体 AI 八只）；存款条款与试算器升级（复利对照/实际购买力/阶梯策略）；外汇实时化（er-api + KV 缓存 + 回退，买卖价结算口径）；AI 工具增强（deposit_product_query 新增、wealth_product_query 扩 16 只、fx 实时、系统提示词规则 8）；Telegram 运维通知全场景（waitUntil 修复注册丢失）；种子端点泛化（任意账户灌数据）；原生控件清零（S.ctl 自绘下拉/OTP）；确认密码与眼睛切换组件；月度报告 PDF 专业版（矢量 logo/子集中文字体）；i18n 合并顺序修复与移动端适配（safe-area/viewport-fit、funds 单列、卡片行换行）；测试 99 → 159。
