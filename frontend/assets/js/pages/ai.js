@@ -108,6 +108,7 @@ S.router.register("ai", async ({ user }) => {
   async function send(text) {
     if (busy || !text.trim()) return;
     busy = true;
+    setBusyUI(true);
     bubble("user", text);
     S.ui.$("#chips")?.remove();
     const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
@@ -117,7 +118,7 @@ S.router.register("ai", async ({ user }) => {
        该层缓冲令观感与真流式一致，且未来切真流式后同样平滑网络毛刺。
        done 到达时若打字未追平，等追平再 finish（保证 autoOpen 等收尾看到完整文本）。 */
     const CHARS_PER_FRAME = 12;
-    let raw = "", shown = 0, donePending = false, tkFrame = null;
+    let raw = "", shown = 0, donePending = false, tkFrame = null, errored = false;
     const renderAt = () => {
       aiMsg.classList.add("md");
       aiMsg.innerHTML = S.md.render(raw.slice(0, shown));
@@ -141,14 +142,16 @@ S.router.register("ai", async ({ user }) => {
     };
     const finish = () => {
       aiMsg.classList.remove("thinking");
-      if (!raw) aiMsg.textContent = S.t("ai.done");
-      else renderAt();
+      /* errored 时错误文案已由 onError 写入气泡——绝不能用"（完成）"覆盖（用户会误以为转账成功） */
+      if (!raw && !errored) aiMsg.textContent = S.t("ai.done");
+      else if (raw) renderAt();
       /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
       if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
         const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
         if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
       }
       busy = false;
+      setBusyUI(false);
     };
     await S.chat.send(text, {
       onToken: (t) => { raw += t; kick(); },
@@ -159,13 +162,14 @@ S.router.register("ai", async ({ user }) => {
         if (card && card.component === "transfer_confirmation" && card.grant_hash) attachConfirm(card, aiMsg);
       },
       onTrust: (ev) => S.trust.onEvent(ev),
-      onError: (msg) => { flush(); aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); busy = false; },
+      onError: (msg) => { flush(); errored = true; aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); },
       onDone: () => {
         donePending = true;
         if (tkFrame == null) finish(); /* 已追平（或空回复）立即收尾；否则由 tick 追平后调用 */
       },
     });
     busy = false;
+    setBusyUI(false);
   }
 
   /* GenUI 确认卡：回传 grant_hash 完成两段式（AI 通道） */
@@ -206,7 +210,16 @@ S.router.register("ai", async ({ user }) => {
   }
 
   const input = document.getElementById("chat-in");
-  document.getElementById("chat-go").onclick = () => { const v = input.value; input.value = ""; send(v); };
+  const goBtn = document.getElementById("chat-go");
+  /* 流式进行中：发送按钮切换为"停止"——中断挂起/冗长的请求（AbortController），已到内容保留 */
+  const setBusyUI = (on) => {
+    goBtn.innerHTML = on ? S.ui.icon("stop", 16) : S.ui.icon("send", 16);
+    goBtn.setAttribute("aria-label", on ? S.t("ai.stop") : "");
+  };
+  goBtn.onclick = () => {
+    if (busy) { S.chat.stop(); return; }
+    const v = input.value; input.value = ""; send(v);
+  };
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { const v = input.value; input.value = ""; send(v); } });
   if (!user) {
     location.replace("/account/login?next=/ai");

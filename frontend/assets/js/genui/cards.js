@@ -19,7 +19,7 @@ S.genuiCards = {
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
   transfer_confirmation(c) {
-    const p = { ...(c.snapshot?.params ?? {}), recipient_display: c.params?.recipient_display, recipient_name: c.params?.recipient_name ?? c.snapshot?.params?.recipient_name };
+    const p = { ...(c.snapshot?.params ?? {}), recipient_display: c.params?.recipient_display, recipient_name: c.params?.recipient_name ?? c.snapshot?.params?.recipient_name, from_card_display: c.params?.from_card_display ?? c.snapshot?.params?.from_card_display };
     const meta = c.action == null ? this.confirmMeta.transfer_execute : (this.confirmMeta[c.action] ?? this.confirmMeta.generic);
     /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号 */
     let subject = c.subject ?? null;
@@ -39,6 +39,7 @@ S.genuiCards = {
       <div class="gc-amount">${amtText}</div>
       ${S.genuiCards.kv([
         ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
+        ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
         ...(p.currency != null ? [["Currency", p.currency]] : []),

@@ -1097,6 +1097,7 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     message: TGT_ERR_MSG[code] ?? code,
   });
   if (intent === "transfer_execute") {
+    if (args.recipient != null && typeof args.recipient === "object") return reject("INVALID_CARD_FORMAT"); // 对象形收款人（模型偶发）：显式拒绝，不留畸形参数通道
     const rec = String(args.recipient ?? "");
     if (rec.startsWith("self:")) return null; // 本人互转：同 DO 内守恒，无需对方校验
     let account = null, name = null;
@@ -1119,6 +1120,16 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
       const from = args.from_card ? cards.find((c) => c.slug === args.from_card) : cards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
       if (from && from.number === account) return reject("SAME_CARD");
     }
+    return null;
+  }
+  if (intent === "scheduled_task_create" && (args.task_type ?? "scheduled_transfer") === "scheduled_transfer") {
+    /* 预约转账与即时转账同一收款人真实性口径（Luhn+registry+户名匹配）：建单即拦截编造卡号，
+       否则到点执行时资金会流向不存在的账户（无对手方入账，凭空消失） */
+    const b = args.transfer ?? {};
+    const account = b.recipient_account ?? null, name = b.recipient_name ?? null;
+    if (account == null || name == null) return null; // 非转账型长程任务（订花等）不在此口径
+    const t = await resolveTransferTarget(env, { name, account, selfUserId: ctxInfo.userId });
+    if (!t.ok) return reject(t.code);
     return null;
   }
   if (intent === "payee_manage" && args.action === "add") {
@@ -1378,7 +1389,8 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       return guardResponse(g);
     }
     if (path === "/api/transfers" && method === "GET") {
-      const r = await UU({ op: "transfers", cursor: url.searchParams.get("cursor") ?? "0", from: url.searchParams.get("from"), to: url.searchParams.get("to") });
+      const scope = url.searchParams.get("scope");
+      const r = await UU({ op: "transfers", cursor: url.searchParams.get("cursor") ?? "0", scope: (scope === "all" || scope === "transfers") ? scope : null, from: url.searchParams.get("from"), to: url.searchParams.get("to") });
       return json(r);
     }
 
@@ -2155,8 +2167,14 @@ async function airingDrain(env, sid) {
  * 工具执行共享路径：/mcp 端点与 AI 聊天循环共用（含 airing 事件推送）。
  * 返回 { text, isError } —— 即 JSON-RPC content[0].text 语义。
  */
-async function mcpExecuteTool(env, ctxInfo, name, args, sid) {
+async function mcpExecuteTool(env, ctxInfo, name, args, sid, { exposeGrant = true } = {}) {
   if (args && typeof args === "object" && args.currency === "RMB") args = { ...args, currency: "CNY" }; // 模型常用 RMB，归一为 CNY
+  /* 转账：模型偶尔把 recipient 传成对象（{"id":94}）而非 payee:94 字符串——先归一，
+     否则畸形参数绕过收款人真实性前置校验（account=null 直接放行） */
+  if (name === "transfer_execute" && args?.recipient != null && typeof args.recipient === "object") {
+    const pid = args.recipient.id ?? args.recipient.payee_id;
+    args = { ...args, recipient: pid != null ? `payee:${pid}` : String(args.recipient) };
+  }
   /* 换汇：成交按服务端实时牌价归一（购汇 sell / 结汇 buy，JPY 每 100 口径），与 REST 通道同一数学 */
   if (name === "fx_exchange") {
     const n = await fxNormalizeArgs(env, args);
@@ -2205,11 +2223,16 @@ async function mcpExecuteTool(env, ctxInfo, name, args, sid) {
   if (g.status === "INPUT_REQUIRED") {
     const card = await genuiCardFor(env, ctxInfo, g);
     await airingPush(env, sid, { kind: "genui", type: "genui_event", card });
-    return { text: JSON.stringify({ status: "INPUT_REQUIRED", grant: { grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, snapshot: g.grant.snapshot }, card, confirm: `用户确认后，携带 grant_hash 与原参数重试 ${name}` }), isError: false };
+    if (exposeGrant) {
+      /* /mcp 用户侧编程通道（持用户 JWT，等价表单通道的两段式）：返回完整 grant 供二次提交 */
+      return { text: JSON.stringify({ status: "INPUT_REQUIRED", grant: { grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, snapshot: g.grant.snapshot }, card, confirm: `用户确认后，携带 grant_hash 与原参数重试 ${name}` }), isError: false };
+    }
+    /* 模型侧（聊天循环）：tool_result 不含完整 grant_hash 也不含卡内 hash——确认权硬属于界面用户点击 */
+    return { text: JSON.stringify({ status: "INPUT_REQUIRED", grant: { grant_prefix: g.grant.grant_hash.slice(0, 8), expires_at: g.grant.expires_at, snapshot: g.grant.snapshot }, confirm: `确认卡已展示给用户，等待用户在界面上点击确认（grant ${g.grant.grant_hash.slice(0, 8)}…）；不要携带 grant_hash 重试` }), isError: false };
   }
   if (g.status === "OTP_REQUIRED") {
     await airingPush(env, sid, { kind: "genui", type: "genui_event", card: { component: "blocked_notice", reason: "OTP_REQUIRED", message: "红级操作需邮箱验证码" } });
-    return { text: JSON.stringify({ status: "OTP_REQUIRED", message: "红级操作需先获取邮箱验证码（redstep），用户输入后带 otp 重试" }), isError: false };
+    return { text: JSON.stringify({ status: "OTP_REQUIRED", message: "红级操作需要强验证：验证码由用户在确认卡界面获取并填写，确认由用户界面完成，不要携带 otp 重试" }), isError: false };
   }
   await airingPush(env, sid, { kind: "genui", type: "genui_event", card: { component: "blocked_notice", reason: g.blockReason ?? g.reason ?? "BLOCKED" } });
   return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, stages: g.stages }), isError: true };
@@ -2257,6 +2280,14 @@ async function genuiCardFor(env, ctxInfo, g) {
     }
     /* 校验前置后此卡只会为真实对手方生成：verified 供前端展示"收款方已验证"徽章 */
     p.verified = true;
+  }
+  /* 付款卡展示名：from_card 为空/空串 = 默认借记卡（与执行端同语义）；信用卡标注"信用支付" */
+  if (["transfer_execute", "bill_pay", "ecommerce_order_mock", "fx_exchange"].includes(g.ir.intent)) {
+    try {
+      const cards = (await U(env, ctxInfo.userId)({ op: "getCards" })).cards ?? [];
+      const fc = p.from_card ? cards.find((c) => c.slug === p.from_card) : cards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
+      p.from_card_display = fc ? `${fc.class_label}（尾号 ${String(fc.number ?? "").slice(-4)}）${fc.kind === "credit" ? " · 信用支付" : ""}` : p.from_card ?? null;
+    } catch { /* 卡列表查询失败不阻塞出卡 */ }
   }
   if (g.ir.intent === "transfer_execute" || g.ir.intent === "bill_pay" || g.ir.intent === "ecommerce_order_mock") {
     return { component: "transfer_confirmation", issuer: "verified_ir", tier: g.tier, action: g.ir.intent, snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: p, trace_id: g.ir.trace_id };
@@ -2450,8 +2481,17 @@ export async function consumeLlmSse(res, onText) {
   };
   let buf = "";
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    let value;
+    try {
+      const r = await reader.read();
+      if (r.done) break;
+      value = r.value;
+    } catch (e) {
+      /* 网络/超时中断：已聚合的文本块随异常抛给上层（有内容则按部分结果收场，不重放 token） */
+      const partial = content.filter(Boolean);
+      if (partial.length) { e.partial = partial; throw e; }
+      throw e;
+    }
     buf += dec.decode(value, { stream: true });
     let sep;
     while ((sep = buf.indexOf("\n\n")) !== -1) {
@@ -2475,9 +2515,11 @@ export async function llmMessages(env, messages, tools, onText) {
   if (!key) return { err: "LLM_API_KEY not configured" };
   const headers = { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" };
   const payload = { model, max_tokens: 2048, system: AI_SYSTEM_PROMPT, messages, ...(tools?.length ? { tools } : {}) };
+  /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中" */
+  const TIMEOUT_MS = 45_000;
 
   if (onText) {
-    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify({ ...payload, stream: true }) });
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify({ ...payload, stream: true }), signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (res.ok && (res.headers.get("content-type") ?? "").includes("text/event-stream")) {
       try {
         const out = await consumeLlmSse(res, onText);
@@ -2501,7 +2543,7 @@ export async function llmMessages(env, messages, tools, onText) {
     try { await res.body?.cancel(); } catch { /* ignore */ }
   }
 
-  const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(payload) });
+  const res = await fetch(`${base}/v1/messages`, { method: "POST", headers, body: JSON.stringify(payload), signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) return { err: `LLM upstream ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}` };
   return { out: await res.json() };
 }
@@ -2540,9 +2582,11 @@ export async function handleAiChat(request, env, ctx) {
         const tools = llmToolDefs();
         const msgs = [...history, { role: "user", content: text }];
         let assistantText = "";
+        let hadError = false;
+        let pendingGrantTools = new Set(); /* 已产出确认卡/OTP 门工具：防模型无视规则 4 重复发起同一笔 */
         for (let round = 0; round < 8; round++) {
           const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }));
-          if (err) { send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
+          if (err) { hadError = true; await flushAiring(); send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
           const content = out.content ?? [];
           const textPart = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
           /* 流式路径 token 已随 delta 下发；非流式回退时整段一次性补发 */
@@ -2553,19 +2597,40 @@ export async function handleAiChat(request, env, ctx) {
           msgs.push({ role: "assistant", content });
           const toolResults = [];
           for (const tu of toolUses) {
-            /* 本地转发一次 tools/call（与 /mcp 端点同一执行路径，含 airing 事件） */
-            const r = await mcpExecuteTool(env, { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null }, tu.name, tu.input ?? {}, sid);
+            if (pendingGrantTools.has(tu.name)) {
+              /* 确认卡已在手：把等待用户的语义作为 tool_result 回给模型，不再重复走守卫 */
+              toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: JSON.stringify({ status: "ALREADY_PENDING", message: "该操作的确认卡已生成并展示给用户，正在等待用户在界面上确认。请勿再次调用本工具，直接告知用户在确认卡中操作即可。" }) });
+              continue;
+            }
+            /* 确认权硬隔离：grant_hash/otp 只属于界面上的用户（attachConfirm 直连 /mcp），
+               模型在聊天循环里携带一律剥离——防模型从 tool_result 拿到 hash 后"替用户确认" */
+            const modelInput = { ...(tu.input ?? {}) };
+            delete modelInput.grant_hash;
+            delete modelInput.otp;
+            /* 本地转发一次 tools/call（与 /mcp 端点同一执行路径，含 airing 事件）；
+               exposeGrant:false —— 模型侧 tool_result 不含完整 grant（确认权硬隔离） */
+            const r = await mcpExecuteTool(env, { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null }, tu.name, modelInput, sid, { exposeGrant: false });
             toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: r.text, ...(r.isError ? { is_error: true } : {}) });
+            try {
+              const st = JSON.parse(r.text)?.status;
+              if (st === "INPUT_REQUIRED" || st === "OTP_REQUIRED") pendingGrantTools.add(tu.name);
+            } catch { /* 非 JSON 工具输出忽略 */ }
             await flushAiring();
           }
+          if (!toolResults.length) break;
           msgs.push({ role: "user", content: toolResults });
         }
 
-        history.push({ role: "user", content: text }, { role: "assistant", content: assistantText || "（本次无文本输出）" });
+        /* 上游故障时确认卡可能已发但模型解释文本缺失——服务端兜底一句，用户不至于对着无解释的卡片 */
+        if (hadError && pendingGrantTools.size) send({ type: "token", text: "（网络波动，上面的回复可能不完整；如有确认卡请直接在卡片上操作。）" });
+        /* 失败轮不落空回复进历史：只保留 user 侧，下轮模型可自然重答 */
+        if (hadError && !assistantText) history.push({ role: "user", content: text });
+        else history.push({ role: "user", content: text }, { role: "assistant", content: assistantText || "（本次无文本输出）" });
         await env.SESSION_KV.put(hkey, JSON.stringify(history.slice(-16)), { expirationTtl: 3600 });
         send({ type: "done", sid });
       } catch (e) {
         logEvent("error", "ai.chat_failed", { message: e?.message });
+        await flushAiring().catch(() => {});
         send({ type: "error", code: "AI_CHAT_INTERNAL", message: e?.message });
         send({ type: "done" });
       }
@@ -3302,9 +3367,13 @@ export class LedgerDO {
           return json({ ok: true, tx_id: txId });
         }
         case "transfers": {
+          /* scope=transfers 仅转账类（转账记录页）；scope=all 全量收支（交易记录页）；
+             缺省保持历史口径（主动收支：转账/订阅/缴费/理财/外汇/购物 + 全部入账）——AI transaction_history 等沿用 */
+          const where = input.scope === "transfers" ? "WHERE category = '转账'"
+            : input.scope === "all" ? "" 
+            : "WHERE category IN ('转账','订阅','生活服务','贷款','信用','理财','外汇','购物') OR direction='IN'";
           const rows = this.#rows(sql.exec(
-            `SELECT * FROM tx WHERE category IN ('转账','订阅','生活服务','贷款','信用','理财','外汇','购物') OR direction='IN'
-             ORDER BY ts DESC LIMIT ? OFFSET ?`, 20, Number(input.cursor ?? 0)));
+            `SELECT * FROM tx ${where} ORDER BY ts DESC LIMIT ? OFFSET ?`, 20, Number(input.cursor ?? 0)));
           return json({ txs: rows, next_cursor: rows.length === 20 ? String(Number(input.cursor ?? 0) + 20) : null });
         }
         case "todayOutCents": {
@@ -3569,7 +3638,9 @@ export class LedgerDO {
           }
           if (t.type === "scheduled_transfer") {
             const b = p.transfer ?? p;
-            const from = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
+            /* 付款卡：优先用户在建单时选择的 from_card（仅借记卡且状态正常），缺省/失配回落默认借记卡 */
+            const from = (b.from_card ? this.#rows(sql.exec("SELECT * FROM cards WHERE slug = ? AND kind='debit' AND status='ACTIVE'", b.from_card))[0] : null)
+              ?? this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
             const amt = BigInt(toCents(String(b.amount ?? "0")));
             if (amt > BigInt(from.balance_cents)) { this.#notify(sql, "TASK", "预约转账失败", "余额不足，任务标记失败。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "INSUFFICIENT_BALANCE" }); }
             sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(from.balance_cents) - amt), from.slug);

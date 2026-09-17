@@ -39,7 +39,7 @@ S.chrome = {
        顶部顺序：Suveoo AI → 「最近」独立平铺区（新用户以 5 条最常用填充）→ 主页 → 收付 → 财富 → 账户 */
     const SUB = {
       home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
-      pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
+      pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/account/transactions", "list", "pay.txHistory"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
       wealth: [["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
       account: user
         ? [["/account/dashboard", "chart", "dash.title"], ["/account/cards", "card", "acct.grid.cards"], ["/account/security", "shield", "sec.title"], ["/account/downloads", "download", "acct.downloads"]]

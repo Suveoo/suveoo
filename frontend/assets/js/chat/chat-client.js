@@ -2,18 +2,28 @@
 S.chat = {
   sid: null,
   sending: false,
+  _ctrl: null, /* 当前请求的 AbortController（停止按钮入口） */
+  stop() { if (this._ctrl) this._ctrl.abort(); },
   async send(text, { onToken, onGenui, onTrust, onDone, onError } = {}) {
     if (this.sending || !text.trim()) return;
     this.sending = true;
+    const ctrl = new AbortController();
+    this._ctrl = ctrl;
+    /* 回调异常隔离：单个 handler 抛错（如某张卡渲染失败）只损失该事件，不再杀掉整条流
+       ——此前的全局 try/catch 会把渲染异常吞成 onError，用户只看到一个无解释的"完成"。 */
+    const safe = (fn) => { try { fn(); } catch (e) { console.error("[chat] handler error", e); } };
+    let ended = false;
+    const finish = () => { if (!ended) { ended = true; this._ctrl = null; safe(() => onDone?.()); } };
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "content-type": "application/json", ...(S.api.token ? { authorization: `Bearer ${S.api.token}` } : {}) },
         body: JSON.stringify({ text, session_id: this.sid }),
+        signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
         const msg = res.status === 401 ? S.t("ai.needLogin") : `HTTP ${res.status}`;
-        onError?.(msg); onDone?.(); return;
+        safe(() => onError?.(msg)); finish(); return;
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -29,19 +39,21 @@ S.chat = {
           if (!line) continue;
           let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
           if (ev.type === "session") this.sid = ev.sid;
-          else if (ev.type === "token") onToken?.(ev.text);
-          else if (ev.type === "genui_event") onGenui?.(ev.card);
-          else if (ev.type === "trust_event") onTrust?.(ev.event);
-          else if (ev.type === "error") onError?.(ev.message || ev.code);
-          else if (ev.type === "done") onDone?.(ev);
+          else if (ev.type === "token") safe(() => onToken?.(ev.text));
+          else if (ev.type === "genui_event") safe(() => onGenui?.(ev.card));
+          else if (ev.type === "trust_event") safe(() => onTrust?.(ev.event));
+          else if (ev.type === "error") safe(() => onError?.(ev.message || ev.code));
+          else if (ev.type === "done") finish();
         }
       }
-      onDone?.();
+      finish();
     } catch (e) {
-      onError?.(e.message ?? "network");
-      onDone?.();
+      /* 用户主动停止不算错误：只走 onDone 收尾（部分文本保留展示） */
+      if (!ctrl.signal.aborted) safe(() => onError?.(e.message ?? "network"));
+      finish();
     } finally {
       this.sending = false;
+      this._ctrl = null;
     }
   },
 };

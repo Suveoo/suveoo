@@ -17,7 +17,7 @@ S.router.register("account", async ({ user }) => {
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("acct.overview"))}</h2><a class="more" href="/account/dashboard">${S.fmt.escape(S.t("acct.dashboard"))} →</a></div>
     <div class="card" id="ov">${S.ui.skeleton(2)}</div>
-    <div class="section-title"><h2>${S.fmt.escape(S.t("acct.recent"))}</h2><a class="more" href="/transfer/history">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("acct.recent"))}</h2><a class="more" href="/account/transactions">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card" id="recent">${S.ui.skeleton(3)}</div>
     <div class="grid grid-4" style="margin-top:16px">
       ${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi">${S.ui.icon(ic, 22)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}
@@ -48,9 +48,9 @@ S.router.register("account", async ({ user }) => {
         ${fxSum > 0 ? `<a class="gc-kv" href="/wealth/fx"><span class="muted">${S.fmt.escape(S.t("acct.fxAssets"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(fxSum.toFixed(2))} →</span></a>` : ""}
       </div>
     </div>` : S.ui.empty(S.t("common.loadFailed"));
-  /* 最近 5 笔流水：复用 /api/transfers（与转账记录同源） */
+  /* 最近 5 笔流水：全量收支（与 /account/transactions 交易记录页同源） */
   const rcBox = document.getElementById("recent");
-  const rc = await S.api.get("/api/transfers");
+  const rc = await S.api.get("/api/transfers?scope=all");
   rcBox.innerHTML = rc.ok ? ((rc.data.txs ?? []).slice(0, 5).map((t) => `
     <div class="list-row">
       <span class="avatar">${S.ui.icon(t.direction === "IN" ? "plus" : "pay", 14)}</span>

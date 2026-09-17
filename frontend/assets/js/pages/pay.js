@@ -12,12 +12,13 @@ S.router.register("pay", async () => {
     <div class="mini-actions">
       <a class="mini-action" href="/transfer/intrabank-scheduled">${S.ui.icon("clock", 16)}${S.fmt.escape(S.t("pay.scheduled"))}</a>
       <a class="mini-action" href="/transfer/history">${S.ui.icon("list", 16)}${S.fmt.escape(S.t("pay.history"))}</a>
+      <a class="mini-action" href="/account/transactions">${S.ui.icon("doc", 16)}${S.fmt.escape(S.t("pay.txHistory"))}</a>
       <a class="mini-action" href="/transfer/limits">${S.ui.icon("lock", 16)}${S.fmt.escape(S.t("pay.limits"))}</a>
       <a class="mini-action" href="/pay/bills">${S.ui.icon("doc", 16)}${S.fmt.escape(S.t("pay.billsEntry"))}</a>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("pay.payees"))}</h2><a class="more" href="/transfer/payees">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="hscroll payees" id="payees">${S.ui.skeleton(2)}</div>
-    <div class="section-title"><h2>${S.fmt.escape(S.t("pay.recent"))}</h2><a class="more" href="/transfer/history">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("pay.recentAll"))}</h2><a class="more" href="/account/transactions">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card" id="recent">${S.ui.skeleton(3)}</div>`;
   document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.hotpotAA"));
   const showDis = () => S.ui.modal(`<h2>${S.fmt.escape(S.t("common.more"))}</h2><p class="muted">${S.fmt.escape(S.t("home.crossDisabled"))}</p>${S.sim.footnote()}`);
@@ -35,7 +36,7 @@ S.router.register("pay", async () => {
       </div>`).join("") || S.ui.empty(S.t("common.noData"));
     S.ui.$$(".pay-now").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
   }
-  const tr = await S.api.get("/api/transfers");
+  const tr = await S.api.get("/api/transfers?scope=all");
   if (tr.ok) {
     document.getElementById("recent").innerHTML = (tr.data.txs ?? []).slice(0, 5).map((t) => `
       <div class="list-row"><img src="/assets/images/suveoo-logo-circular.svg" width="32" height="32" alt="">

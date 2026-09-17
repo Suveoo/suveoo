@@ -7,6 +7,8 @@ S.genui = {
       return null;
     }
     const fn = S.genuiCards[card.component] ?? S.genuiCards.fallback;
-    return S.ui.el(fn(card));
+    /* 必须 .call(S.genuiCards, …)：卡片方法内部用 this.confirmMeta/this.kv 取元数据，
+       裸调用 fn(card) 会丢 this（AI 通道确认卡曾因此整链抛错 → 被 SSE catch 吞成 onError） */
+    return S.ui.el(fn.call(S.genuiCards, card));
   },
 };

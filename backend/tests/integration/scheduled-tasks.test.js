@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SELF, env } from "cloudflare:test";
 import { newCardNumber, toCents } from "../../worker-main.js";
 
-/** 预约转账：建立（黄级两段式）→ SagaDO alarm 唤醒执行 → 状态与余额核对。 */
+/** 预约转账：建立（黄级两段式 + 收款人真实性校验）→ SagaDO alarm 唤醒执行 → 状态/余额/付款卡核对。 */
 const BASE = "https://suveoo.com";
 const PASSWORD = "jinrongkeji2026";
 
@@ -18,22 +18,31 @@ async function lastCode(email) {
   const mails = JSON.parse((await env.MAIL_OUTBOX.get(`outbox:${email}`)) ?? "[]");
   return /\b(\d{6})\b/.exec(mails.at(-1)?.text ?? "")?.[1] ?? null;
 }
-async function registerUser(email) {
+async function registerUser(email, name = "定时测试") {
   await post("/api/auth/email-code", { scene: "register", email });
-  const r = await post("/api/auth/register", { email, code: await lastCode(email), name: "定时测试", password: PASSWORD, risk_answers: [3, 3, 3, 3, 3], aml_consented: true });
+  const r = await post("/api/auth/register", { email, code: await lastCode(email), name, password: PASSWORD, risk_answers: [3, 3, 3, 3, 3], aml_consented: true });
   return j(r);
 }
+const cardsOf = async (uid) => (await env.LEDGER.get(env.LEDGER.idFromName(`u:${uid}`)).fetch("https://x/", {
+  method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+  body: JSON.stringify({ op: "getCards" }),
+}).then((r) => r.json())).cards;
+const cardBal = async (uid, slug) => (await cardsOf(uid)).find((c) => c.slug === slug).balance_cents;
 
 describe("预约转账（长程任务）", () => {
-  it("建立 → alarm 到点执行 → DONE，余额扣减；重复规则 RESCHEDULED", async () => {
-    const email = "st1@test.dev";
-    const out = await registerUser(email);
+  it("建立（真实对手方+指定付款卡）→ 到点执行 → 指定卡余额扣减", async () => {
+    const out = await registerUser("st1@test.dev", "定时甲");
+    const to = await registerUser("st1to@test.dev", "收款丙");
     const H = { authorization: `Bearer ${out.token}` };
-    const overviewBefore = await j(await SELF.fetch(BASE + "/api/overview", { headers: H }));
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const myCards = await cardsOf(out.user_id);
+    const def = myCards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
+    const other = myCards.find((c) => c.kind === "debit" && c.slug !== def.slug);
+    const before = await cardBal(out.user_id, other.slug);
 
     const body = {
-      recipient_account: newCardNumber({ bin: "622288" }),
-      recipient_name: "女儿", amount: "200", memo: "生活费",
+      recipient_account: toDebit.number, recipient_name: "收款丙",
+      amount: "200", memo: "生活费", from_card: other.slug,
       execute_at: new Date(Date.now() + 2500).toISOString(), repeat: "once",
     };
     const s1 = await j(await post("/api/schedules", body, out.token));
@@ -41,7 +50,6 @@ describe("预约转账（长程任务）", () => {
     const s2 = await j(await post("/api/schedules", { ...body, grant_hash: s1.grant.grant_hash }, out.token));
     expect(s2.status).toBe("EXECUTED");
 
-    // 等待 SagaDO alarm（2.5s 后）
     let task = null;
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 700));
@@ -51,18 +59,28 @@ describe("预约转账（长程任务）", () => {
     }
     expect(task).toBeTruthy();
     expect(task.status).toBe("DONE");
-
-    const overviewAfter = await j(await SELF.fetch(BASE + "/api/overview", { headers: H }));
-    expect(toCents(overviewAfter.total_balance)).toBe(toCents(overviewBefore.total_balance) - toCents("200"));
+    /* 指定付款卡扣款（from_card 生效），而非默认卡 */
+    expect(BigInt(await cardBal(out.user_id, other.slug))).toBe(BigInt(before) - toCents("200"));
   }, 30000);
 
-  it("到期前取消 → CANCELLED，不执行", async () => {
-    const email = "st2@test.dev";
-    const out = await registerUser(email);
-    const H = { authorization: `Bearer ${out.token}` };
+  it("编造收款卡号 → 建单即拦（与即时转账同一真实性口径）", async () => {
+    const out = await registerUser("st3@test.dev", "定时乙");
     const body = {
-      recipient_account: newCardNumber({ bin: "622288" }),
-      recipient_name: "张三", amount: "100",
+      recipient_account: newCardNumber({ bin: "622288" }), recipient_name: "不存在的人",
+      amount: "100", execute_at: new Date(Date.now() + 20000).toISOString(), repeat: "once",
+    };
+    const s1 = await j(await post("/api/schedules", body, out.token));
+    expect(s1.status).toBe("BLOCKED"); /* BIZ_REJECT 在 HTTP 层映射为 BLOCKED + 结构化 reason */
+    expect(["ACCOUNT_NOT_FOUND", "NAME_MISMATCH"]).toContain(s1.reason);
+  });
+
+  it("到期前取消 → CANCELLED，不执行", async () => {
+    const out = await registerUser("st2@test.dev", "定时丁");
+    const to = await registerUser("st2to@test.dev", "收款戊");
+    const H = { authorization: `Bearer ${out.token}` };
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const body = {
+      recipient_account: toDebit.number, recipient_name: "收款戊", amount: "100",
       execute_at: new Date(Date.now() + 20000).toISOString(), repeat: "once",
     };
     const s1 = await j(await post("/api/schedules", body, out.token));

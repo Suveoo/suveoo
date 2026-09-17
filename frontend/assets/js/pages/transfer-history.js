@@ -1,9 +1,9 @@
-/* transfer-history.js — P10 转账记录 */
+/* transfer-history.js — P10 转账记录（仅转账类流水；全量收支见 /account/transactions） */
 S.router.register("transfer-history", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("pay.history"))}</h1>
     <div class="card">${S.ui.skeleton(6)}</div>`;
-  const r = await S.api.get("/api/transfers");
+  const r = await S.api.get("/api/transfers?scope=transfers");
   const el = c.querySelector(".card");
   if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
   const txs = r.data.txs ?? [];
@@ -37,7 +37,7 @@ S.router.register("transfer-history", async () => {
   if (cursor) {
     mw.innerHTML = `<button class="btn btn-ghost" id="more">${S.fmt.escape(S.t("common.more"))}</button>`;
     document.getElementById("more").onclick = async () => {
-      const r2 = await S.api.get(`/api/transfers?cursor=${cursor}`);
+      const r2 = await S.api.get(`/api/transfers?scope=transfers&cursor=${cursor}`);
       render(r2.data?.txs ?? []);
       cursor = r2.data?.next_cursor;
       if (!cursor) mw.innerHTML = "";
