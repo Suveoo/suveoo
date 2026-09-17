@@ -2760,9 +2760,6 @@ function genUserSeedData(rng) {
     /* 一笔大额异常消费（供账单归因/离群检测演示） */
     if (d === 40) txs.push({ ts: iso(day.getTime(), 15, 36), amount_cents: String(toCents("8299.00")), direction: "OUT", counterparty: "数码旗舰店", category: "购物", memo: "平板电脑（教育优惠）", status: "SUCCESS", channel: "card", trace_id: null });
   }
-  /* 当日已发生一笔大额消费（2-4 小时前，非整）：使"今天"日累计 OUT 立即处于红级区间（>¥1,000）——
-     self-seed 账户当天任何转账都进入红级强验证（OTP 框 + 邮件验证码），黄/红分级演示随时可控 */
-  txs.push({ ts: new Date(now - (2 * 3600000 + Math.floor(rng() * 7200000))).toISOString(), amount_cents: String(toCents(amt(1180, 1460))), direction: "OUT", counterparty: "银泰百货（杭州）", category: "购物", memo: "秋装与家居用品", status: "SUCCESS", channel: "card", trace_id: null, card: `debit-card-${1 + Math.floor(rng() * 4)}` });
   /* 卡号由 seedDemo 的演示人物落户统一分配（ensureDemoPersonas → 真实 Suveoo 账户） */
   const payees = [
     { name: "沈建平", account: null, group_label: "房东", email: null },
@@ -2931,9 +2928,6 @@ export function genDemoSeedRich(rng) {
     if (d === 38) txs.push({ ts: iso(day.getTime(), 11, 15), amount_cents: String(toCents("996.00")), direction: "OUT", counterparty: "Marcus Wang", category: "转账", memo: "多伦多冰球装备转运费", status: "SUCCESS", channel: "form", trace_id: null });
     if (d === 26) txs.push({ ts: iso(day.getTime(), 20, 58), amount_cents: String(toCents("436.00")), direction: "IN", counterparty: "沈建平", category: "转账", memo: "老同学聚会有余款退回", status: "SUCCESS", channel: "form", trace_id: null });
   }
-  /* 当日已发生一笔大额消费（2-4 小时前，非整）：保证重灌后"今天"日累计 OUT 即处红级区间（>¥1,000）——
-     demo 当天任何转账都会进入红级强验证（OTP 框 + 邮件验证码），黄/红分级演示随时可控 */
-  txs.push({ ts: new Date(now - (2 * 3600000 + Math.floor(rng() * 7200000))).toISOString(), amount_cents: String(toCents(amt(1180, 1460))), direction: "OUT", counterparty: "深圳湾万象城", category: "购物", memo: "设计师品牌秋装与香氛礼品", status: "SUCCESS", channel: "card", trace_id: null, card: `debit-card-${1 + Math.floor(rng() * 4)}` });
   const payees = [
     /* 竞赛场景锚点收款人（home chips 话术引用，保留原名）；卡号由演示人物落户统一分配 */
     { name: "张三", account: null, group_label: "朋友", email: null },
