@@ -31,6 +31,12 @@ describe("demo mogul 种子剖面", () => {
     expect(again.payees.map((p) => p.name).join()).toBe(seed.payees.map((p) => p.name).join());
   });
 
+  it("当日日累计 OUT > ¥1,000（重灌当日任何转账即红级——OTP 框与验证码邮件演示随时可控）", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const sum = seed.txs.filter((t) => t.direction === "OUT" && t.ts.startsWith(today)).reduce((a, t) => a + BigInt(t.amount_cents), 0n);
+    expect(sum).toBeGreaterThan(100000n);
+  });
+
   it("三城房产：深圳/上海/杭州月供与物业管家齐全", () => {
     const txN = names(seed.txs);
     expect(txN.has("招商银行·深圳（房贷代扣）")).toBe(true);

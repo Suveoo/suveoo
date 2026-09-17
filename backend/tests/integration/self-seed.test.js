@@ -59,6 +59,12 @@ describe("self-seed（/demo-lab 隐藏入口）", () => {
     expect(r1.verification).toEqual({ payees_expected: r1.verification.payees_expected, payees_actual: r1.verification.payees_expected, payees_all_real: true, tx_count: r1.tx_count });
     expect(r1.verification.payees_actual).toBe(r1.verification.payees_expected);
     expect(r1.verification.payees_actual).toBeGreaterThanOrEqual(2);
+    /* 当日日累计 OUT > ¥1,000：self-seed 账户当天任何转账进入红级（OTP 框 + 邮件验证码） */
+    const todayCents = (await env.LEDGER.get(env.LEDGER.idFromName(`u:${member.user_id}`)).fetch("https://x/", {
+      method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+      body: JSON.stringify({ op: "todayOutCents" }),
+    }).then((x) => x.json())).cents;
+    expect(BigInt(todayCents)).toBeGreaterThan(100000n);
 
     /* 回读：每位收款人卡号都能在 registry 命中（真实账户） */
     const H = { authorization: `Bearer ${member.token}` };
