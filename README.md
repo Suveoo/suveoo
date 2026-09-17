@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 222 用例（真实 workerd 运行时）
+npm test                  # 225 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -362,6 +362,7 @@ D:\suveoo\
 | P20 | `/wealth/tools` | 金融计算工具 | 否 | — |
 | P21 | `/account/login` | 登录 | 否 | — |
 | P37 | `/account/transactions` | 交易记录（全量收支） | 是 | — |
+| L01 | `/demo-lab` | 数据注入实验室（队员隐藏入口 · noindex · 密码门 suveoo_data_injection） | 是 | 自助灌入（DEMO_MODE 门，仅本人账户） |
 | P22 | `/account/register` | 注册与开户 | 否 | — |
 | P23 | `/account/recovery` | 忘记密码 | 否 | — |
 | P24 | `/account/cards` | 卡片管理 | 是 | 冻结/解冻（红）、限额（黄） |
@@ -1090,6 +1091,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.7（2026-09-17）：强制换图 + 卡号复制兜底 + **/demo-lab 队员隐藏灌数据入口**——**ai-hero.svg 强制换图**：插画引用跟随页面资产版本（`?v=b110`），新 URL 全员 miss 回源 R2——所有用户 100% 看到新 logo（实测 hero src 带版本参数；今后更新该插画只需 bump 版本）；**卡号复制**：`S.ui.copy()` clipboard API + textarea/execCommand 双保险（部分移动 webview 拒绝异步剪贴板 API 时静默失败）；**/demo-lab**（L01，noindex 不进导航/sitemap，密码门 `suveoo_data_injection`）：GET `/api/demo/self-seed` 实时数据源快照（SEED_VERSION 自查 + 逐收款人掩码卡号/分组/拟真度 + 指定账户缺失提示 + 注入量预估——数据源变动自动跟随永不失效）；POST 只灌**本人**账户（DEMO_MODE + 登录态，无可分享 token，AUDIT_KV 审计，waitUntil 客户端断开保活）；收款人=registry 动态枚举（全部 suveoo 域名账户含 31 personas + 指定团队账户谢宇洲/黄嗣仁置顶；张三/李四/王五/女儿/房东陈叔/演示用户沉底；排除本人）；种子通用人名映射为真实收款人；结果核对面板（expected vs actual + 差异告警）。**workerd DO 不支持显式 BEGIN/COMMIT**（实测踩坑）——原子性由幂等整段重灌兜底（中断最坏=中间态，重跑自愈）。实测全流程：密码门/错码 toast/34 人预检/7.8s 运行/34-34 全真实核对；demo 账户已恢复官方 mogul 口径。测试 222 → 225；i18n 818 → 856×4（demoLab.* 38 键）。
 - v3.6（2026-09-17）：demo **mogul 拟真种子**（worker-only）——演示人物 13 → **31 个真实账户**（深圳科技圈/上海金融艺术圈/杭州生活圈 + 三城物业管家 + 5 位海外人脉 Kevin Zhang/Emily Chen/Daniel Wu/Sofia Liu/Marcus Wang，收款人 31/31 真实卡号）；流水 395 → **596 笔**（12 类加权商户池含六大爱好：运动健身/音乐乐器/数码科技/游戏装备/潮流收藏/生活美学；**三城房产**月供深圳湾 ¥28,453.27/静安 ¥19,236.84/文三 ¥13,572.51 + 三城水电燃气 + 管家物业费；**信用卡外币消费**（Amazon/骏河屋/Airbnb 等 memo 注明原币计价）+ 留学/差旅购汇；人脉转账 20+ 笔）；订阅 10 → **21**（海外 Spotify/PS Plus/XGP/Switch Online/Adobe CC 按 USD≈7.18 折算 + 国内全家桶；三条订阅暗模式角标）；账单 +3 房贷；任务 3 → 6；通知 14；**外币余额三币种**（USD 3,847.62/EUR 2,150.35/HKD 8,860.20，seedDemo op 支持 fx_balances 清库重灌）；竞赛锚点全保留。测试 217 → 222（seed-mogul：量级/锚点可复现/三城/六爱好海外/折算口径）。
 - v3.5（2026-09-17）：确认卡备注行与 AI 预约转账全流程——**确认卡增备注行**（所有确认卡显示 memo；预约卡另增执行时间/重复行；卡片参数合并改为外层服务端 params 全量覆盖 snapshot，逐字段追加的合并清单反复漏字段）；**AI 预约转账修复**：`genuiCardFor` 对 INPUT_REQUIRED 一律出 `transfer_confirmation` 确认卡（此前 scheduled_task_create 落到无任何操作的 `card_setting_confirm` 静态卡——"点不动的卡片设置确认"；wealth_*/收款人管理等守卫 intent 同乘此修复）；scheduled transfer 子对象展开到卡面 + 模型顶层字段/对象形收款人（`{id}`/`{id,name}`、recipient 与 recipient_name 两位置）归一；MCP 工具描述重写（transfer 形状/真实性/ISO 时间/禁止 grant 重试）；**过去 execute_at 拒绝**（INVALID_SCHEDULE_TIME——模型把"后天"算成过去日期时 saga alarm 会立即执行）。生产闭环实测：AI 指令 → 预约确认卡七项（标题/金额/收款人/付款卡/备注/执行时间/重复）→ 点击确认 → 任务中心 PENDING（补偿链+锁定预算+双时区）。测试 215 → 217；i18n 813 → 818×4。
 - v3.4（2026-09-17）：AI 转账确认链修复与交易记录拆分——**AI 通道确认卡自 v4 起从未渲染成功**（genui renderer 裸调用卡片方法丢 `this`，`transfer_confirmation` 抛 TypeError 被 SSE 客户端全局 catch 吞成 onError，`finish()` 又用"（完成）"覆盖错误文本保留红样式——用户看到无解释的红色"完成"且无确认卡无转账）：renderer 改 `fn.call(S.genuiCards, card)`；chat-client 回调逐个隔离 + AbortController（`S.chat.stop`，流式中发送按钮变"停止"，用户停止≠错误）；ai.js errored 标志防覆盖；worker `llmMessages` 双路径 45s 超时（qwen 网关间歇性挂起曾让 SSE 永挂"思考中"）。**确认权硬隔离**：聊天循环剥离模型传入的 `grant_hash`/`otp`，模型侧 tool_result 仅 8 位 grant 前缀不含卡——模型物理上无法"替用户确认"（/mcp 用户 JWT 编程通道保持完整 grant 两段式）；同工具 pending 期重复调用 `ALREADY_PENDING` 回绝；error 路径 flushAiring + 兜底提示、失败轮不写空 assistant 历史。确认卡增**付款卡行**（from_card 空=默认借记卡、信用支付标注）；模型传对象 recipient 归一+拒绝（曾绕过真实性校验）。**交易记录拆分**：`/api/transfers?scope=transfers|all` 三口径；新页 `/account/transactions`（P37 全量收支）；`/transfer/history` 名实相符仅转账；/pay 双入口+最近列表全量口径；/account「查看全部」与侧栏同步。**预约转账**：表单付款卡选择（仅借记卡）+ 执行端按 `from_card` 扣款（此前硬编码默认卡）+ 建单收款人真实性校验（编造卡号此前可到点扣款资金凭空消失）。测试 213 → 215；i18n 810 → 813×4（pay.txHistory/pay.recentAll/genui.fromCard）。
