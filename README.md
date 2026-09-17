@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 213 用例（真实 workerd 运行时）
+npm test                  # 215 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -349,7 +349,7 @@ D:\suveoo\
 | P07 | `/pay/subscriptions` | 订阅管理 | 是 | 解约（黄） |
 | P08 | `/transfer/intrabank` | 行内转账 | 是 | 转账（黄 ≤¥1,000 日累计 / 红 >¥1,000） |
 | P09 | `/transfer/intrabank-scheduled` | 预约转账（行内） | 是 | 建立预约（黄） |
-| P10 | `/transfer/history` | 转账记录 | 是 | — |
+| P10 | `/transfer/history` | 转账记录（仅转账类流水） | 是 | — |
 | P11 | `/transfer/limits` | 转账限额 | 是 | 调整限额（黄） |
 | P12 | `/transfer/payees` | 常用收款人管理 | 是 | 增删改（黄） |
 | P13 | `/ai/tasks` | 长程任务中心 | 是 | 取消任务（触发补偿） |
@@ -361,6 +361,7 @@ D:\suveoo\
 | P19 | `/wealth/fx` | 外汇牌价与兑换 | 是 | 结汇/购汇（黄/红） |
 | P20 | `/wealth/tools` | 金融计算工具 | 否 | — |
 | P21 | `/account/login` | 登录 | 否 | — |
+| P37 | `/account/transactions` | 交易记录（全量收支） | 是 | — |
 | P22 | `/account/register` | 注册与开户 | 否 | — |
 | P23 | `/account/recovery` | 忘记密码 | 否 | — |
 | P24 | `/account/cards` | 卡片管理 | 是 | 冻结/解冻（红）、限额（黄） |
@@ -625,13 +626,14 @@ Consent Binding 全流程（与既定安全决策一致）：
 2. **三大转账按钮**（横排三张等宽卡片，上 48px SVG 下文字）：
   - **行内转账**（正常样式）→ `/transfer/intrabank`。
   - **跨行转账 / 跨境汇款**（灰色样式）：点击弹模态（文案同 §3.1-3 的跨行提示），不跳转。
-3. **次级功能行**（四个文字+icon 按钮横排 wrap）：
-  - 预约转账 → `/transfer/intrabank-scheduled`
-  - 转账记录 → `/transfer/history`
+3. **次级功能行**（五个文字+icon 按钮横排 wrap）：
+  - 预约转账 → `/transfer/intrabank-scheduled`（表单含**付款卡选择**，仅借记卡）
+  - 转账记录 → `/transfer/history`（仅转账类流水）
+  - 交易记录 → `/account/transactions`（全量收支）
   - 转账限额 → `/transfer/limits`
   - 账单与订阅 → `/pay/bills`
 4. **常用收款人**：标题行 + 「查看全部及管理」→ `/transfer/payees`。横向卡片列表（mobile 可横滑）：每卡 = 圆形首字母头像 + 姓名 + 尾号账号 + 卡片右下「转账」小按钮（带当前页上下文跳 `/transfer/intrabank?payee={id}`）。数据 `GET /api/payees?limit=6`。
-5. **最近转账**：标题 + 「查看全部」→ `/transfer/history`。列表每条：左侧 Suveoo 圆形 logo（`assets/images/suveoo-logo-circular.svg`，32px）+ 收款人 + 日期 → 右侧 `-¥266.67`（mono，鸽子灰注释"已到账/处理中"）。数据 `GET /api/transfers?limit=5`。
+5. **最近交易**：标题 + 「查看全部」→ `/account/transactions`。列表每条：左侧 Suveoo 圆形 logo（`assets/images/suveoo-logo-circular.svg`，32px）+ 收款人 + 日期 → 右侧 `-¥266.67`（mono，鸽子灰注释"已到账/处理中"）。数据 `GET /api/transfers?scope=all`（前 5 条）。
 
 ### 7.2 `/pay/bills`（P06 账单支付）
 
@@ -669,17 +671,18 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ### 7.5 `/transfer/intrabank-scheduled`（P09 预约转账）
 
-- 页面结构 = P08 表单 + **时间设定区**：日期选择器 + 时间选择（粒度 5 分钟）+ 重复规则（单次/每周/每月）。
+- 页面结构 = P08 表单 + **付款卡选择**（仅借记卡，信用支付是即时消费语义不进长程任务；到点按所选卡扣款，失配回落默认借记卡）+ **时间设定区**：日期选择器 + 时间选择（粒度 5 分钟）+ 重复规则（单次/每月）。
 - **时区双显**：选定时刻同时显示「您的时区 2026-10-01 09:00」与「北京时间 (UTC+8) 2026-10-01 09:00」两行，并注明执行以 UTC 存储的服务端定时器为准。
 - 标题明确「行内转账预约」（SimNotice footnote）。
+- **收款人真实性**：建单即校验（Luhn+registry+户名匹配，与 P08 同一口径）——编造卡号直接行内红条拦截（ACCOUNT_NOT_FOUND / NAME_MISMATCH），不留到执行期才失败。
 - 提交走黄级确认；建立后进入 `/ai/tasks` 任务列表（复用 scheduled_task 卡片），到期由 saga-do 闹钟唤醒执行；可在任务中心取消（触发补偿=删除预约，不动账）。
-- API：`POST /api/schedules`、`GET /api/schedules`、`DELETE /api/schedules/{id}`。
+- API：`POST /api/schedules`（body 含 `from_card`）、`GET /api/schedules`、`DELETE /api/schedules/{id}`。
 
-### 7.6 `/transfer/history`（P10 转账记录）
+### 7.6 `/transfer/history`（P10 转账记录）与 `/account/transactions`（交易记录）
 
-- 顶部筛选条：时间范围（近 7 天/1 月/3 月/自定义）、方向（全部/支出/收入）、状态（全部/成功/处理中/失败）、卡筛选。列表：日期分组头 + 交易行（对方名 + 状态 + 金额 mono + 备注截断）。行点击展开详情面板：流水号、双方卡号掩码、备注、手续费、Merkle 存证 ID、**经手渠道**（AI 会话 trace_id / 经典表单）——展示"AI 或人工发起"的透明度。
-- 分页：游式加载（cursor），每页 20。导出 CSV 按钮（本地生成）。
-- API：`GET /api/transfers?cursor&from&to&dir&status&card`。
+- **P10 转账记录**（`/transfer/history`）：仅转账类流水（`GET /api/transfers?scope=transfers`，category='转账'，含跨用户入账与预约转账任务）。行点击展开详情面板：流水号、收款方、备注、**经手渠道**（AI 会话 trace_id / 经典表单 / 长程任务）。分页 cursor 每页 20。
+- **交易记录**（`/account/transactions`，P37）：全量收支（`GET /api/transfers?scope=all`——转账/消费/缴费/理财/外汇/订阅一切流水），与 P05「最近交易·查看全部」同源跳转。行点击详情面板含**分类**与渠道行；分页同。
+- API：`GET /api/transfers?scope=transfers|all&cursor&from&to`（scope 缺省 = 历史口径"主动收支"，AI 工具 transaction_history 沿用）。
 
 ### 7.7 `/transfer/limits`（P11 转账限额）
 
@@ -717,12 +720,13 @@ Consent Binding 全流程（与既定安全决策一致）：
   - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
 2. **空态/欢迎屏**：AI hero 插画（`illustrations/ai-hero.svg`）+ 欢迎语 + 6 个场景 chips（来自 `assets/data/scenarios.json`，覆盖赛题六场景各一条）+ 「查看评测看板」链接（/ai/benchmark）。
-3. **输入区**：胶囊输入框（高 52）+ 发送按钮（SVG 箭头）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话历史侧拉列表（最近 20 个会话，`GET /api/ai/sessions`）。
-4. **中断与接管**：流式输出期间显示「停止」按钮 → 中断当前 agent 步骤（服务端收到 abort 后挂起 DAG 于检查点，可续跑）；每条黄/红确认卡自带「取消」。
+3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话历史侧拉列表（最近 20 个会话，`GET /api/ai/sessions`）。
+4. **中断与接管**：流式输出期间发送按钮切换为「停止」（stop 图标 + aria-label，`S.chat.stop()` 经 AbortController 中断请求——已到达的部分文本保留展示，用户主动停止不算错误）；每条黄/红确认卡自带「取消」。错误事件以红色气泡完整呈现错误信息（不会被"完成"占位覆盖）；单个 GenUI 卡渲染异常只损失该卡，不中断流。
 
 ### 8.3 技术实现（关键）
 
-- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream`。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
+- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream`；两条路径均 45s 超时兜底（网关挂起不再永挂"思考中"）。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
+- **确认权硬隔离（AI 通道）**：黄/红操作的 consent grant 完整 hash 只随 GenUI 确认卡下发**浏览器**（用户点击 attachConfirm 直连 `/mcp` 携带 grant_hash 完成两段式）；聊天循环内模型传入的 `grant_hash`/`otp` 一律剥离，模型侧 `INPUT_REQUIRED` 的 tool_result 仅含 8 位 grant 前缀且不含卡——模型物理上无法"替用户确认"（规则 4 提示词之外的硬约束）。同一工具在确认卡 pending 期间的重复调用以 `ALREADY_PENDING` tool_result 回绝。`/mcp` 端点（用户 JWT 编程通道）保持完整 grant 两段式语义。
 - **SSE 事件类型**：`token`（文本增量）、`genui_event`（卡片）、`trust_event`（控制台，§2.11）、`done`（含 trace 汇总与耗时）、`error`。
 - 会话存储：会话摘要 + 消息存 ledger-do（用户分区），Trust Console 事件流随消息回放。
 - MCP Tool Registry（最终版 = 9.6 §4.4 的 12 个 + 场景补齐 + 计算器与存款目录，共 25 个 + 10 个 calc_*；全部在 worker-main.js 区块④注册；系统提示词规则 8 要求产品类问题必须先查工具、禁止凭记忆编造数字、赎回/外币/卡号类问答按工具返回口径作答）：
@@ -1086,6 +1090,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.4（2026-09-17）：AI 转账确认链修复与交易记录拆分——**AI 通道确认卡自 v4 起从未渲染成功**（genui renderer 裸调用卡片方法丢 `this`，`transfer_confirmation` 抛 TypeError 被 SSE 客户端全局 catch 吞成 onError，`finish()` 又用"（完成）"覆盖错误文本保留红样式——用户看到无解释的红色"完成"且无确认卡无转账）：renderer 改 `fn.call(S.genuiCards, card)`；chat-client 回调逐个隔离 + AbortController（`S.chat.stop`，流式中发送按钮变"停止"，用户停止≠错误）；ai.js errored 标志防覆盖；worker `llmMessages` 双路径 45s 超时（qwen 网关间歇性挂起曾让 SSE 永挂"思考中"）。**确认权硬隔离**：聊天循环剥离模型传入的 `grant_hash`/`otp`，模型侧 tool_result 仅 8 位 grant 前缀不含卡——模型物理上无法"替用户确认"（/mcp 用户 JWT 编程通道保持完整 grant 两段式）；同工具 pending 期重复调用 `ALREADY_PENDING` 回绝；error 路径 flushAiring + 兜底提示、失败轮不写空 assistant 历史。确认卡增**付款卡行**（from_card 空=默认借记卡、信用支付标注）；模型传对象 recipient 归一+拒绝（曾绕过真实性校验）。**交易记录拆分**：`/api/transfers?scope=transfers|all` 三口径；新页 `/account/transactions`（P37 全量收支）；`/transfer/history` 名实相符仅转账；/pay 双入口+最近列表全量口径；/account「查看全部」与侧栏同步。**预约转账**：表单付款卡选择（仅借记卡）+ 执行端按 `from_card` 扣款（此前硬编码默认卡）+ 建单收款人真实性校验（编造卡号此前可到点扣款资金凭空消失）。测试 213 → 215；i18n 810 → 813×4（pay.txHistory/pay.recentAll/genui.fromCard）。
 - v3.3（2026-09-17）：真流式落地与平板遮挡修复——**真流式**：`llmMessages` 加 `stream:true` 流式优先，Worker 边收 `content_block_delta` 边转发 `token` 事件（生产实测纯文本 21 个 token 事件/单事件最长 9 字符，此前 1 事件整段）；工具调用轮由 SSE 消费器聚合 `input_json_delta` 为完整 JSON 后才执行（实测工具轮 105 个 token 事件 + 2 组 PROPOSED/RESULT）；**三级自动回退**（请求被拒重发非流式 / 网关忽略 stream 回 JSON 就地消化 / 流中途 error 已有文本返回部分不重放——第二条由新增单测抓出原设计会多发一次请求的缺陷）+ 观测日志 `ai.llm_stream`；前端打字机缓冲（12 字/帧 rAF）保留为平滑层。**平板纵向（768-1023px）side drawer 遮挡**：根因是 §11 移动样式 `padding` 简写打回 248px 让位——补齐 page 四值 padding、固定输入条 `left: calc(248px+sp-3)`、控制台抽屉 `top:64px`（实测 820px 间隙 24px 零遮挡）。**控制台抽屉去冗余**：删底部「← 返回对话」蓝条（顶部 × 保留）；底导航整体置抽屉之上（z 320>310，AI 圆钮突入抽屉仍可点——子项单独提 z 出不了父层叠上下文，必须提整条）。测试 207 → 213（llm-stream 6 条）。
 - v3.2（2026-09-17）：四项体验修复——P05 资产概要增**外币资产合计（折 CNY）行**（账户级口径、仅当确有外币持仓时渲染、点击直达 /wealth/fx）；/ai 移动**控制台抽屉几何让位**（顶部避开 header 56px+刘海安全区、底部避开底导航 64px+手势条安全区——真机 webview 系统栏层叠不可控，PC DevTools 无法复现）；AI 回答**打字机缓冲**（token 到达后每帧 12 字 rAF 渐进渲染 Markdown；done 待打字追平再收尾、GenUI 插卡前先追平保序——上游整块下发下观感与真流式一致）；/ai 移动**滚动锚定最后一条消息**（预留底导航实际高度 +12px、只向下不回滚，不再滚到文档底把 footer 拉进视口）。i18n +1 键（acct.fxAssets，810×4）。
 - v5（2026-09-17）：凭证安全与信用卡账本双任务——**任务 A 凭证缺口**：改密须当前密码+邮箱 OTP+新密码（OTP 非消费式校验，密码错不烧码）；关闭 2FA 须当前密码（开启保持仅 OTP）；找回密码补确认密码框且全流程零旧密码字段（红线）；**会话纪元（session epoch）**：profile.session_epoch 列（幂等迁移）+ JWT epo 声明 + requireSession 全量校验，改密/找回成功 bumpEpoch → 全设备下线、改密响应返回新纪元 token 本设备不掉线；AI 系统提示词补"密码类问题引导页面、不代行"（自测 0 工具调用）。**任务 B 交易挂卡与信用卡账本**：tx 加 card 列（幂等迁移），全部写流水路径挂卡（转账/换汇/缴费/理财申赎/商户/长程任务/跨用户入账/种子——日常消费 4 借记卡轮转）；**信用卡成为支付工具**：转账与购汇可选信用卡（校验可用额度、消费计入欠款、不动借记余额，超额 INSUFFICIENT_CREDIT；结汇入账仅借记卡）；**还款闭环**：credit-repay 动态取当前欠款全额（账单页/REST/AI 三通道同额；MCP bill_pay 修复为可无金额调用）、默认借记卡扣款清零欠款、卡片设置页"立即还款"黄卡；**单卡明细真过滤真分页**（cardTx 按 card 字段 20 条/页 next_cursor，chips/柱图基于该卡数据）；种子信用卡初始欠款 demo ¥8,632.47 / unper ¥5,183.29；AI 同步（card_status_query 欠款/最近消费语义、transfer_execute/fx_exchange 信用支付、bill_pay 动态金额、bill_analysis by_card 归因、系统提示词规则 8 信用卡段；三条自测通过）；顺手修账单确认卡 100 倍金额显示与 AI bill_pay 恒被拦两个存量缺陷、.cardwall 360px 溢出；测试 186 → 207（security-credential 11 + card-ledger 10 + schema-migration 3）。
