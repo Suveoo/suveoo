@@ -181,17 +181,22 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     .chat-composer { bottom: calc(10px + env(safe-area-inset-bottom)); }
     body[data-page="ai"] .page { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
   }
-  /* 控制台全屏抽屉（内部自滚：flex 链补 min-height:0） */
+  /* 控制台全屏抽屉（内部自滚：flex 链补 min-height:0）。
+     不再 inset:0 贴满屏幕：顶部避开移动 header（56px+刘海安全区）、底部避开底导航（64px+手势条安全区）——
+     真机 webview 上系统栏/导航条与 fixed 层叠不可控，几何让位是最稳的修法（PC DevTools 无法复现该遮挡）。 */
   .trust-console {
     position: fixed;
-    inset: 0;
+    top: calc(56px + env(safe-area-inset-top));
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
     z-index: calc(var(--z-modal) + 10);
-    height: 100dvh;
+    height: auto;
     max-height: none;
     border-radius: 0;
     border: none;
     display: none;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: 0;
   }
   .trust-console.open { display: flex; animation: fade-in .18s ease-out both; }
   .tc-head { position: sticky; top: 0; background: #fff; z-index: 2; }

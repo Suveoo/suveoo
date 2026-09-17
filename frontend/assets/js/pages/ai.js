@@ -86,10 +86,16 @@ S.router.register("ai", async ({ user }) => {
   }
 
   const thread = document.getElementById("thread");
-  /* 移动端（≤1023）为自然页面滚动：滚页面而非内滚容器 */
+  /* 移动端（≤1023）为自然页面滚动：锚定最后一条消息而非文档底（文档底会把 footer 三栏拉进视口）；
+     预留 = 底导航实际高度（offsetHeight 已含手势条 safe-area padding）+ 12px 余量；只向下不回滚 */
   const scroll = () => {
     if (window.matchMedia("(max-width: 1023px)").matches) {
-      window.scrollTo(0, document.documentElement.scrollHeight);
+      const last = thread.lastElementChild;
+      if (!last) return;
+      const bn = document.querySelector(".bottom-nav");
+      const reserve = (bn ? bn.offsetHeight : 64) + 12;
+      const target = Math.ceil(last.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + reserve);
+      if (target > window.scrollY) window.scrollTo(0, target);
       return;
     }
     thread.scrollTop = thread.scrollHeight;
@@ -111,38 +117,56 @@ S.router.register("ai", async ({ user }) => {
     const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
     S.trust.evt("CHAT", null, text.slice(0, 60));
     S.ga4.event("ai_chat_start", { entry: "composer" });
-    /* 流式 Markdown：累积原文、节流重渲（160ms），结束时全量渲染一次 */
-    let raw = "";
-    let renderTimer = null;
-    const renderNow = () => {
-      clearTimeout(renderTimer); renderTimer = null;
-      if (!raw) return;
+    /* 打字机缓冲：token 整段到达后按每帧 12 字渐进渲染（rAF）——上游 LLM 当前为整块下发，
+       该层缓冲令观感与真流式一致，且未来切真流式后同样平滑网络毛刺。
+       done 到达时若打字未追平，等追平再 finish（保证 autoOpen 等收尾看到完整文本）。 */
+    const CHARS_PER_FRAME = 12;
+    let raw = "", shown = 0, donePending = false, tkFrame = null;
+    const renderAt = () => {
       aiMsg.classList.add("md");
-      aiMsg.innerHTML = S.md.render(raw);
+      aiMsg.innerHTML = S.md.render(raw.slice(0, shown));
       scroll();
     };
-    const renderSoon = () => { if (!renderTimer) renderTimer = setTimeout(renderNow, 160); };
+    const tick = () => {
+      if (shown < raw.length) {
+        shown = Math.min(raw.length, shown + CHARS_PER_FRAME);
+        renderAt();
+        tkFrame = requestAnimationFrame(tick);
+      } else {
+        tkFrame = null;
+        if (donePending) finish();
+      }
+    };
+    const kick = () => { if (tkFrame == null && shown < raw.length) tkFrame = requestAnimationFrame(tick); };
+    const flush = () => {
+      if (tkFrame != null) { cancelAnimationFrame(tkFrame); tkFrame = null; }
+      shown = raw.length;
+      if (raw) renderAt();
+    };
+    const finish = () => {
+      aiMsg.classList.remove("thinking");
+      if (!raw) aiMsg.textContent = S.t("ai.done");
+      else renderAt();
+      /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
+      if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
+        const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
+        if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
+      }
+      busy = false;
+    };
     await S.chat.send(text, {
-      onToken: (t) => { raw += t; renderSoon(); },
+      onToken: (t) => { raw += t; kick(); },
       onGenui: (card) => {
-        renderNow();
+        flush(); /* 卡片插入前先追平当前文本，保持"文→卡"顺序自然 */
         const node = S.genui.render(card);
         if (node) { node.style.maxWidth = "82%"; node.style.alignSelf = "flex-start"; thread.appendChild(node); scroll(); }
         if (card && card.component === "transfer_confirmation" && card.grant_hash) attachConfirm(card, aiMsg);
       },
       onTrust: (ev) => S.trust.onEvent(ev),
-      onError: (msg) => { clearTimeout(renderTimer); renderTimer = null; aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); },
+      onError: (msg) => { flush(); aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); busy = false; },
       onDone: () => {
-        clearTimeout(renderTimer); renderTimer = null;
-        aiMsg.classList.remove("thinking");
-        if (!raw) aiMsg.textContent = S.t("ai.done");
-        else renderNow();
-        /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
-        if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
-          const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
-          if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
-        }
-        busy = false;
+        donePending = true;
+        if (tkFrame == null) finish(); /* 已追平（或空回复）立即收尾；否则由 tick 追平后调用 */
       },
     });
     busy = false;

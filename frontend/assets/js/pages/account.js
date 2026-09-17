@@ -34,6 +34,9 @@ S.router.register("account", async ({ user }) => {
   /* 资产概要：复用 /api/overview（与仪表盘同源同口径） */
   const ovBox = document.getElementById("ov");
   const ov = await S.api.get("/api/overview");
+  /* 外币资产（账户级，折 CNY 参考值）：仅当确有外币持仓时渲染该行，点击直达 /wealth/fx */
+  const fxb = await S.api.get("/api/fx/balances").catch(() => null);
+  const fxSum = fxb && fxb.ok ? (fxb.data.balances ?? []).reduce((a, x) => a + Number(x.cny_estimate ?? 0), 0) : 0;
   ovBox.innerHTML = ov.ok ? `
     <div class="row between" style="gap:12px;flex-wrap:wrap">
       <div><div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))}（CNY）</div>
@@ -42,6 +45,7 @@ S.router.register("account", async ({ user }) => {
       <div style="text-align:right">
         <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("acct.balance"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.total_balance)}</span></div>
         <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.holdings_total)}</span></div>
+        ${fxSum > 0 ? `<a class="gc-kv" href="/wealth/fx"><span class="muted">${S.fmt.escape(S.t("acct.fxAssets"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(fxSum.toFixed(2))} →</span></a>` : ""}
       </div>
     </div>` : S.ui.empty(S.t("common.loadFailed"));
   /* 最近 5 笔流水：复用 /api/transfers（与转账记录同源） */
