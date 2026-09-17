@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 215 用例（真实 workerd 运行时）
+npm test                  # 217 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -717,7 +717,7 @@ Consent Binding 全流程（与既定安全决策一致）：
   - 用户消息：右对齐黑底白字圆角气泡。
   - AI 消息：左对齐白底灰边气泡，**真流式输出**（Worker 对上游 Messages API 加 `stream:true`，边收 `content_block_delta` 边以 `token` 事件转发——生产实测纯文本 21 个 token 事件/单事件最长 9 字符、工具轮 105 个 token 事件；前端打字机缓冲作平滑层：token 到达后按每帧 12 字 rAF 渐进渲染 Markdown，done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序；工具调用轮由 Worker 聚合完整 JSON 后才执行）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
   - AI 头像 = `suveoo-ai-logo.svg` 32px。
-  - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。
+  - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。转账/预约确认卡展示：金额、收款人（已验证徽章）、付款卡、备注、（预约另含执行时间与重复规则）、追踪号与 grant 前缀；AI 通道一切黄级 INPUT_REQUIRED 均出确认卡并挂「确认/取消」（含理财申购、收款人管理等守卫操作）。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
 2. **空态/欢迎屏**：AI hero 插画（`illustrations/ai-hero.svg`）+ 欢迎语 + 6 个场景 chips（来自 `assets/data/scenarios.json`，覆盖赛题六场景各一条）+ 「查看评测看板」链接（/ai/benchmark）。
 3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话历史侧拉列表（最近 20 个会话，`GET /api/ai/sessions`）。
@@ -1090,6 +1090,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.5（2026-09-17）：确认卡备注行与 AI 预约转账全流程——**确认卡增备注行**（所有确认卡显示 memo；预约卡另增执行时间/重复行；卡片参数合并改为外层服务端 params 全量覆盖 snapshot，逐字段追加的合并清单反复漏字段）；**AI 预约转账修复**：`genuiCardFor` 对 INPUT_REQUIRED 一律出 `transfer_confirmation` 确认卡（此前 scheduled_task_create 落到无任何操作的 `card_setting_confirm` 静态卡——"点不动的卡片设置确认"；wealth_*/收款人管理等守卫 intent 同乘此修复）；scheduled transfer 子对象展开到卡面 + 模型顶层字段/对象形收款人（`{id}`/`{id,name}`、recipient 与 recipient_name 两位置）归一；MCP 工具描述重写（transfer 形状/真实性/ISO 时间/禁止 grant 重试）；**过去 execute_at 拒绝**（INVALID_SCHEDULE_TIME——模型把"后天"算成过去日期时 saga alarm 会立即执行）。生产闭环实测：AI 指令 → 预约确认卡七项（标题/金额/收款人/付款卡/备注/执行时间/重复）→ 点击确认 → 任务中心 PENDING（补偿链+锁定预算+双时区）。测试 215 → 217；i18n 813 → 818×4。
 - v3.4（2026-09-17）：AI 转账确认链修复与交易记录拆分——**AI 通道确认卡自 v4 起从未渲染成功**（genui renderer 裸调用卡片方法丢 `this`，`transfer_confirmation` 抛 TypeError 被 SSE 客户端全局 catch 吞成 onError，`finish()` 又用"（完成）"覆盖错误文本保留红样式——用户看到无解释的红色"完成"且无确认卡无转账）：renderer 改 `fn.call(S.genuiCards, card)`；chat-client 回调逐个隔离 + AbortController（`S.chat.stop`，流式中发送按钮变"停止"，用户停止≠错误）；ai.js errored 标志防覆盖；worker `llmMessages` 双路径 45s 超时（qwen 网关间歇性挂起曾让 SSE 永挂"思考中"）。**确认权硬隔离**：聊天循环剥离模型传入的 `grant_hash`/`otp`，模型侧 tool_result 仅 8 位 grant 前缀不含卡——模型物理上无法"替用户确认"（/mcp 用户 JWT 编程通道保持完整 grant 两段式）；同工具 pending 期重复调用 `ALREADY_PENDING` 回绝；error 路径 flushAiring + 兜底提示、失败轮不写空 assistant 历史。确认卡增**付款卡行**（from_card 空=默认借记卡、信用支付标注）；模型传对象 recipient 归一+拒绝（曾绕过真实性校验）。**交易记录拆分**：`/api/transfers?scope=transfers|all` 三口径；新页 `/account/transactions`（P37 全量收支）；`/transfer/history` 名实相符仅转账；/pay 双入口+最近列表全量口径；/account「查看全部」与侧栏同步。**预约转账**：表单付款卡选择（仅借记卡）+ 执行端按 `from_card` 扣款（此前硬编码默认卡）+ 建单收款人真实性校验（编造卡号此前可到点扣款资金凭空消失）。测试 213 → 215；i18n 810 → 813×4（pay.txHistory/pay.recentAll/genui.fromCard）。
 - v3.3（2026-09-17）：真流式落地与平板遮挡修复——**真流式**：`llmMessages` 加 `stream:true` 流式优先，Worker 边收 `content_block_delta` 边转发 `token` 事件（生产实测纯文本 21 个 token 事件/单事件最长 9 字符，此前 1 事件整段）；工具调用轮由 SSE 消费器聚合 `input_json_delta` 为完整 JSON 后才执行（实测工具轮 105 个 token 事件 + 2 组 PROPOSED/RESULT）；**三级自动回退**（请求被拒重发非流式 / 网关忽略 stream 回 JSON 就地消化 / 流中途 error 已有文本返回部分不重放——第二条由新增单测抓出原设计会多发一次请求的缺陷）+ 观测日志 `ai.llm_stream`；前端打字机缓冲（12 字/帧 rAF）保留为平滑层。**平板纵向（768-1023px）side drawer 遮挡**：根因是 §11 移动样式 `padding` 简写打回 248px 让位——补齐 page 四值 padding、固定输入条 `left: calc(248px+sp-3)`、控制台抽屉 `top:64px`（实测 820px 间隙 24px 零遮挡）。**控制台抽屉去冗余**：删底部「← 返回对话」蓝条（顶部 × 保留）；底导航整体置抽屉之上（z 320>310，AI 圆钮突入抽屉仍可点——子项单独提 z 出不了父层叠上下文，必须提整条）。测试 207 → 213（llm-stream 6 条）。
 - v3.2（2026-09-17）：四项体验修复——P05 资产概要增**外币资产合计（折 CNY）行**（账户级口径、仅当确有外币持仓时渲染、点击直达 /wealth/fx）；/ai 移动**控制台抽屉几何让位**（顶部避开 header 56px+刘海安全区、底部避开底导航 64px+手势条安全区——真机 webview 系统栏层叠不可控，PC DevTools 无法复现）；AI 回答**打字机缓冲**（token 到达后每帧 12 字 rAF 渐进渲染 Markdown；done 待打字追平再收尾、GenUI 插卡前先追平保序——上游整块下发下观感与真流式一致）；/ai 移动**滚动锚定最后一条消息**（预留底导航实际高度 +12px、只向下不回滚，不再滚到文档底把 footer 拉进视口）。i18n +1 键（acct.fxAssets，810×4）。
