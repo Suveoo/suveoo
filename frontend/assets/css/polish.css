@@ -461,3 +461,18 @@ body.tc-open { overflow: hidden; }
 .dl-payee { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-line); border-radius: 10px; background: #fff; }
 .dl-payee.low { opacity: .68; background: var(--color-surface); }
 .dl-verify { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+
+/* 18.1 demo-lab：三卡片纵向间距 + 使用说明分节排版（标题行独立不折行，正文缩进浅色块，虚线分隔） */
+body[data-page="demo-lab"] #content > .card { margin-bottom: 22px; }
+body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
+.dl-doc { display: flex; flex-direction: column; margin-top: 4px; }
+.dl-doc-item { padding: 12px 2px 12px 0; border-bottom: 1px dashed var(--color-line); }
+.dl-doc-item:first-child { padding-top: 6px; }
+.dl-doc-item:last-child { border-bottom: none; padding-bottom: 2px; }
+.dl-doc-t { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--color-navy); margin-bottom: 6px; }
+.dl-doc-t .ic { flex: none; }
+.dl-doc-b { margin: 0 0 0 23px; color: var(--color-ink-2); font-size: var(--fs-14); line-height: 1.72; }
+@media (max-width: 767px) {
+  .dl-doc-b { margin-left: 0; }
+  body[data-page="demo-lab"] #content > .card { margin-bottom: 16px; }
+}

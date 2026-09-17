@@ -62,13 +62,19 @@ S.router.register("demo-lab", async ({ user }) => {
           </div>`).join("")}</div>`;
       document.getElementById("dl-doc").innerHTML = `
         <h2>${S.ui.icon("info", 16)} ${S.fmt.escape(S.t("demoLab.docTitle"))}</h2>
-        <ul class="help-ul" style="margin-top:8px">
-          <li><b>${S.fmt.escape(S.t("demoLab.docRealTitle"))}</b> — ${S.fmt.escape(S.t("demoLab.docReal"))}</li>
-          <li><b>${S.fmt.escape(S.t("demoLab.docIdemTitle"))}</b> — ${S.fmt.escape(S.t("demoLab.docIdem"))}</li>
-          <li><b>${S.fmt.escape(S.t("demoLab.docAtomicTitle"))}</b> — ${S.fmt.escape(S.t("demoLab.docAtomic"))}</li>
-          <li><b>${S.fmt.escape(S.t("demoLab.docScopeTitle"))}</b> — ${S.fmt.escape(S.t("demoLab.docScope"))}</li>
-          <li><b>${S.fmt.escape(S.t("demoLab.docUsageTitle"))}</b> — ${S.fmt.escape(S.t("demoLab.docUsage"))}</li>
-        </ul>`;
+        <div class="dl-doc">
+          ${[
+            ["users", "demoLab.docRealTitle", "demoLab.docReal"],
+            ["check", "demoLab.docIdemTitle", "demoLab.docIdem"],
+            ["shield", "demoLab.docAtomicTitle", "demoLab.docAtomic"],
+            ["lock", "demoLab.docScopeTitle", "demoLab.docScope"],
+            ["clock", "demoLab.docUsageTitle", "demoLab.docUsage"],
+          ].map(([ic, tk, bk]) => `
+          <div class="dl-doc-item">
+            <div class="dl-doc-t">${S.ui.icon(ic, 15)} ${S.fmt.escape(S.t(tk))}</div>
+            <p class="dl-doc-b">${S.fmt.escape(S.t(bk))}</p>
+          </div>`).join("")}
+        </div>`;
       const runBox = document.getElementById("dl-run");
       runBox.innerHTML = `
         <h2>${S.ui.icon("gear", 16)} ${S.fmt.escape(S.t("demoLab.runTitle"))}</h2>

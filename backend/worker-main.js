@@ -3121,8 +3121,8 @@ async function ensureDemoPersonas(env) {
 const SEED_VERSION = "2026-09-17.r17";
 /* 明显拟真的演示人名（张三李四类话术人物）——收款人列表排尾部 */
 const LOW_REALISM_NAMES = new Set(["张三", "李四", "王五", "女儿", "房东陈叔", "演示用户"]);
-/* 指定必含的团队真实账户（存在才纳入；不存在自动跳过并在预检标注） */
-const SELF_SEED_DESIGNATED = ["unperishability@gmail.com", "10donothack@gmail.com"];
+/* 指定必含的团队真实账户（存在才纳入；置顶排序；组别按人指定） */
+const SELF_SEED_DESIGNATED = { "unperishability@gmail.com": "团队", "10donothack@gmail.com": "朋友" };
 
 /** 动态收款人数据源：全部 suveoo 域名拟真账户（含 demo.suveoo.com 人物）+ 指定团队账户；
  *  每人取真实姓名（profile）与借记卡号（getCards）；排除本人；拟真度排序（假的在尾）。 */
@@ -3131,7 +3131,7 @@ async function buildSelfSeedPayees(env, selfEmail) {
   const byEmail = new Map(users.map((u) => [u.email, u]));
   const emails = [
     /* 指定团队账户（真实队友）置顶——拟真度最高；其后 suveoo 域名拟真账户；明显话术人物稳定排序自然沉底 */
-    ...SELF_SEED_DESIGNATED.filter((e) => e !== selfEmail && byEmail.has(e)),
+    ...Object.keys(SELF_SEED_DESIGNATED).filter((e) => e !== selfEmail && byEmail.has(e)),
     ...users.filter((u) => /@(demo\.)?suveoo\.com$/i.test(u.email) && u.email !== selfEmail).map((u) => u.email),
   ];
   const seen = new Set([selfEmail.toLowerCase()]);
@@ -3146,10 +3146,7 @@ async function buildSelfSeedPayees(env, selfEmail) {
       const debit = (cards.cards ?? []).find((c) => c.kind === "debit" && c.status === "ACTIVE");
       if (!debit) continue;
       const name = prof.profile?.name ?? email.split("@")[0];
-      const group = SELF_SEED_DESIGNATED.includes(email) ? "团队"
-        : /^[A-Za-z]/.test(name) ? "海外"
-        : name.includes("管家") ? "生活缴费"
-        : /@(demo\.)?suveoo\.com$/i.test(email) ? "朋友" : "朋友";
+      const group = SELF_SEED_DESIGNATED[email] ?? (/^[A-Za-z]/.test(name) ? "海外" : name.includes("管家") ? "生活缴费" : "朋友");
       out.push({ name, account: debit.number, group_label: group, email, low: LOW_REALISM_NAMES.has(name) });
     } catch { /* 单人查询失败跳过，不阻塞数据源 */ }
   }
@@ -3342,7 +3339,7 @@ export default {
       /* GET 预检（数据源快照，不写数据）：页面打开即拉取——数据源未来更新后版本号/清单随之变化，自查可见 */
       if (request.method === "GET") {
         const src = await buildSelfSeedPayees(env, claims.email);
-        const missing = SELF_SEED_DESIGNATED.filter((e) => e !== claims.email && !src.some((p) => p.group_label === "团队" && p.email === e));
+        const missing = Object.keys(SELF_SEED_DESIGNATED).filter((e) => e !== claims.email && !src.some((p) => p.email === e));
         return json({
           ok: true, seed_version: SEED_VERSION, email: claims.email,
           payee_source: src.map((p) => ({ name: p.name, account_masked: `**** ${String(p.account).slice(-4)}`, group: p.group_label, realism: p.low ? "low" : "high", email: p.email })),
