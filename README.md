@@ -117,6 +117,7 @@ D:\suveoo\
 │   ├── wrangler.test.toml                     # vitest-pool-workers 测试环境（无 send_email，+MAIL_OUTBOX）
 │   ├── vitest.config.js                       # cloudflareTest 插件 + cloudflarePool（真实 workerd 测试）
 │   ├── package.json                           # agents / @modelcontextprotocol/server / zod / pdf-lib / vitest / wrangler
+│   ├── package-lock.json
 │   ├── .dev.vars.example                      # 本地密钥模板（.dev.vars 实体已 gitignore）
 │   │
 │   ├── tests\
@@ -132,7 +133,9 @@ D:\suveoo\
 │   │   │   ├── fund-data.test.js              # 16 基金因子模型数据（历史统计/蒙特卡洛）
 │   │   │   ├── schema-migration.test.js       # tx.card / session_epoch 幂等迁移
 │   │   │   ├── llm-stream.test.js             # llmMessages 真流式（SSE 解析/工具 JSON 聚合/三级回退）
-│   │   │   └── card-plan.test.js              # 开户方案生成（余额区间/卡面去重/组装映射）
+│   │   │   ├── card-plan.test.js              # 开户方案生成（余额区间/卡面去重/组装映射）
+│   │   │   ├── calc-tools.test.js
+│   │   │   └── seed-mogul.test.js
 │   │   ├── integration\                       # SELF + 真实 KV/R2/DO（miniflare，逐测试隔离）
 │   │   │   ├── registration-provisioning.test.js  # 注册发卡/登录2FA/找回/限流 全链路
 │   │   │   ├── static-routing.test.js         # R2 查找顺序/动态卡路由/缓存头/304/404
@@ -158,10 +161,17 @@ D:\suveoo\
 │   └── scripts\
 │       ├── deploy-frontend.mjs                # frontend/ 全量上传 R2（wrangler r2 object put 循环；--filter 按路径过滤增量）
 │       ├── gen-fund-data.mjs                  # 16 只基金数据生成器（多因子模型 + 终值校准 + 蒙特卡洛预测，固定种子幂等）
+│       ├── gen-tool-pages.mjs
 │       ├── subset-cjk.mjs.py                  # Noto Sans SC 可变字体 → 静态 GB2312 子集（PDF 报告嵌入用，fontTools）
 │       ├── seed-demo-data.mjs                 # 注入演示账户种子（pages.md §10.2）
 │       ├── i18n-add.mjs                       # i18n 批量加键+全键重排+四文件校验（第十一轮）
-│       └── i18n-keys-task{1,2,4}.json         # 第十一轮各任务新增 i18n 键（5+4+6）
+│       ├── i18n-add-tc.mjs
+│       ├── i18n-keys-task1.json               # 第十一轮各任务新增 i18n 键（5+4+6）
+│       ├── i18n-keys-task2.json
+│       ├── -keys-task4.json
+│       ├── i18n-phase3-add.mjs
+│       ├── noto-sans-sc-report.ttf
+│       └── pdf-repro.mjs
 │
 └── frontend\                                  # ★ 整目录 = R2 根（suveoo-bank-r2）
     ├── index.html                             # / → 跳转 /home（meta refresh + JS）
