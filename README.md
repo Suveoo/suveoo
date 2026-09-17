@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 207 用例（真实 workerd 运行时）
+npm test                  # 213 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -704,14 +704,15 @@ Consent Binding 全流程（与既定安全决策一致）：
 ### 8.1 版面
 
 - **PC（≥1024px）双栏**：左栏 flex=1 对话区；右栏 400px Trust Console（可折叠为 48px 窄条，折叠时仅显示五道验证器状态灯竖排）。
-- **Mobile / 窄平板**：顶部 segmented control「对话 | 控制台」切换；GenUI 卡片全宽；Trust Console 同构；控制台为全屏抽屉，几何上避开移动 header（56px+刘海安全区）与底部导航（64px+手势条安全区）——真机 webview 系统栏层叠不可控，几何让位最稳。
+- **平板纵向（768-1023px）**：side drawer 与桌面同款显示，对话区 `padding-left: calc(248px + var(--sp-6))` 让位；底部固定输入条 `left: calc(248px + var(--sp-3))`；控制台全屏抽屉 `top: 64px`（桌面 header 高）。
+- **Mobile（≤767px）**：顶部 segmented control「对话 | 控制台」切换；GenUI 卡片全宽；Trust Console 同构；控制台为全屏抽屉，几何上避开移动 header（56px+刘海安全区）与底部导航（64px+手势条安全区）——真机 webview 系统栏层叠不可控，几何让位最稳；抽屉打开时底部导航整体置于抽屉之上（z 320 > 310，Suveoo AI 圆钮突入抽屉仍可见可点），返回入口为抽屉顶部「× 返回对话」。
 - URL 参数：`?q=` 预填首条消息自动发送；`?ctx=<json|token>` 页面上下文条（显示"来自基金详情页：global-mixed-1"，可移除）。
 
 ### 8.2 对话区
 
 1. **消息流**：
   - 用户消息：右对齐黑底白字圆角气泡。
-  - AI 消息：左对齐白底灰边气泡，**打字机输出**（前端缓冲：token 事件到达后按每帧 12 字 rAF 渐进渲染 Markdown；done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序——上游 LLM 当前整块下发，该层令观感与真流式一致，切真流式后同样平滑毛刺）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
+  - AI 消息：左对齐白底灰边气泡，**真流式输出**（Worker 对上游 Messages API 加 `stream:true`，边收 `content_block_delta` 边以 `token` 事件转发——生产实测纯文本 21 个 token 事件/单事件最长 9 字符、工具轮 105 个 token 事件；前端打字机缓冲作平滑层：token 到达后按每帧 12 字 rAF 渐进渲染 Markdown，done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序；工具调用轮由 Worker 聚合完整 JSON 后才执行）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
   - AI 头像 = `suveoo-ai-logo.svg` 32px。
   - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
@@ -721,7 +722,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ### 8.3 技术实现（关键）
 
-- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 调用 Anthropic Messages API 并通过其 MCP 连接器（`mcp_servers: {suveoo: {url: https://suveoo.com/mcp, auth: Bearer <用户JWT>}}`）把 12+N 个工具暴露给模型；模型产生的工具调用回到本 Worker `/mcp`，每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
+- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream`。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
 - **SSE 事件类型**：`token`（文本增量）、`genui_event`（卡片）、`trust_event`（控制台，§2.11）、`done`（含 trace 汇总与耗时）、`error`。
 - 会话存储：会话摘要 + 消息存 ledger-do（用户分区），Trust Console 事件流随消息回放。
 - MCP Tool Registry（最终版 = 9.6 §4.4 的 12 个 + 场景补齐 + 计算器与存款目录，共 25 个 + 10 个 calc_*；全部在 worker-main.js 区块④注册；系统提示词规则 8 要求产品类问题必须先查工具、禁止凭记忆编造数字、赎回/外币/卡号类问答按工具返回口径作答）：
@@ -1085,6 +1086,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.3（2026-09-17）：真流式落地与平板遮挡修复——**任务 1 真流式**：`llmMessages` 加 `stream:true` 流式优先，Worker 边收 `content_block_delta` 边转发 `token` 事件（生产实测纯文本 21 个 token 事件/单事件最长 9 字符，此前 1 事件整段）；工具调用轮由 SSE 消费器聚合 `input_json_delta` 为完整 JSON 后才执行（实测工具轮 105 个 token 事件 + 2 组 PROPOSED/RESULT）；**三级自动回退**（请求被拒重发非流式 / 网关忽略 stream 回 JSON 就地消化 / 流中途 error 已有文本返回部分不重放——第二条由新增单测抓出原设计会多发一次请求的缺陷）+ 观测日志 `ai.llm_stream`；前端打字机缓冲（12 字/帧 rAF）保留为平滑层。**任务 2 平板纵向（768-1023px）side drawer 遮挡**：根因是 §11 移动样式 `padding` 简写打回 248px 让位——补齐 page 四值 padding、固定输入条 `left: calc(248px+sp-3)`、控制台抽屉 `top:64px`（实测 820px 间隙 24px 零遮挡）。**任务 3 控制台抽屉去冗余**：删底部「← 返回对话」蓝条（顶部 × 保留）；底导航整体置抽屉之上（z 320>310，AI 圆钮突入抽屉仍可点——子项单独提 z 出不了父层叠上下文，必须提整条）。测试 207 → 213（llm-stream 6 条）。
 - v3.2（2026-09-17）：四项体验修复——P05 资产概要增**外币资产合计（折 CNY）行**（账户级口径、仅当确有外币持仓时渲染、点击直达 /wealth/fx）；/ai 移动**控制台抽屉几何让位**（顶部避开 header 56px+刘海安全区、底部避开底导航 64px+手势条安全区——真机 webview 系统栏层叠不可控，PC DevTools 无法复现）；AI 回答**打字机缓冲**（token 到达后每帧 12 字 rAF 渐进渲染 Markdown；done 待打字追平再收尾、GenUI 插卡前先追平保序——上游整块下发下观感与真流式一致）；/ai 移动**滚动锚定最后一条消息**（预留底导航实际高度 +12px、只向下不回滚，不再滚到文档底把 footer 拉进视口）。i18n +1 键（acct.fxAssets，810×4）。
 - v5（2026-09-17）：凭证安全与信用卡账本双任务——**任务 A 凭证缺口**：改密须当前密码+邮箱 OTP+新密码（OTP 非消费式校验，密码错不烧码）；关闭 2FA 须当前密码（开启保持仅 OTP）；找回密码补确认密码框且全流程零旧密码字段（红线）；**会话纪元（session epoch）**：profile.session_epoch 列（幂等迁移）+ JWT epo 声明 + requireSession 全量校验，改密/找回成功 bumpEpoch → 全设备下线、改密响应返回新纪元 token 本设备不掉线；AI 系统提示词补"密码类问题引导页面、不代行"（自测 0 工具调用）。**任务 B 交易挂卡与信用卡账本**：tx 加 card 列（幂等迁移），全部写流水路径挂卡（转账/换汇/缴费/理财申赎/商户/长程任务/跨用户入账/种子——日常消费 4 借记卡轮转）；**信用卡成为支付工具**：转账与购汇可选信用卡（校验可用额度、消费计入欠款、不动借记余额，超额 INSUFFICIENT_CREDIT；结汇入账仅借记卡）；**还款闭环**：credit-repay 动态取当前欠款全额（账单页/REST/AI 三通道同额；MCP bill_pay 修复为可无金额调用）、默认借记卡扣款清零欠款、卡片设置页"立即还款"黄卡；**单卡明细真过滤真分页**（cardTx 按 card 字段 20 条/页 next_cursor，chips/柱图基于该卡数据）；种子信用卡初始欠款 demo ¥8,632.47 / unper ¥5,183.29；AI 同步（card_status_query 欠款/最近消费语义、transfer_execute/fx_exchange 信用支付、bill_pay 动态金额、bill_analysis by_card 归因、系统提示词规则 8 信用卡段；三条自测通过）；顺手修账单确认卡 100 倍金额显示与 AI bill_pay 恒被拦两个存量缺陷、.cardwall 360px 溢出；测试 186 → 207（security-credential 11 + card-ledger 10 + schema-migration 3）。
 - v4（2026-09-17）：安全与真实化五连修——演示端点管理员令牌（x-admin-token 双门 fail-closed + 审计 + inspect 只读巡检）；转账/收款人真实化（Luhn+registry 存在+户名匹配三重校验单一真相源，REST 与 AI 通道同规；跨用户转账双记——对方 DO 先 credit 再扣款、资金守恒、入账邮件自动送达注册邮箱；13 个演示人物落户为真实账户，存量收款人全量迁移归零）；卡片设置页查看完整卡号（reveal 端点 + 眼睛/复制 + 卡图直达设置 + AI 只给深链不回卡号）；理财赎回按市值结算（本金×当前净值÷成本净值整数运算，显示值=回款额，redeem_value/unrealized_pnl 进 AI 工具）；外汇实时结算（删除 690 硬编码，服务端买卖价×10⁴ BigInt、JPY 每 100 口径、可选结算卡、外币余额卡与 fx_balance_query、fx_exchange 首次注册进 AI 工具表、兑换器 JPY 口径修正）；执行层业务失败不再误报 EXECUTED；测试 159 → 186。
