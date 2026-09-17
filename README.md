@@ -159,7 +159,9 @@ D:\suveoo\
 │       ├── deploy-frontend.mjs                # frontend/ 全量上传 R2（wrangler r2 object put 循环；--filter 按路径过滤增量）
 │       ├── gen-fund-data.mjs                  # 16 只基金数据生成器（多因子模型 + 终值校准 + 蒙特卡洛预测，固定种子幂等）
 │       ├── subset-cjk.mjs.py                  # Noto Sans SC 可变字体 → 静态 GB2312 子集（PDF 报告嵌入用，fontTools）
-│       └── seed-demo-data.mjs                 # 注入演示账户种子（pages.md §10.2）
+│       ├── seed-demo-data.mjs                 # 注入演示账户种子（pages.md §10.2）
+│       ├── i18n-add.mjs                       # i18n 批量加键+全键重排+四文件校验（第十一轮）
+│       └── i18n-keys-task{1,2,4}.json         # 第十一轮各任务新增 i18n 键（5+4+6）
 │
 └── frontend\                                  # ★ 整目录 = R2 根（suveoo-bank-r2）
     ├── index.html                             # / → 跳转 /home（meta refresh + JS）
