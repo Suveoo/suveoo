@@ -2,6 +2,8 @@
 S.router.register("ai", async ({ user }) => {
   const c = document.getElementById("content");
   const q = new URLSearchParams(location.search).get("q");
+  /* 插画资源跟随 HTML 资产版本（?v=bNN）——R2 内容更新后 bump 版本即对所有用户强制换图（浏览器/SW 缓存按 URL 命中） */
+  const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
   c.innerHTML = `
     <div class="ai-layout">
       <section class="chat-area card" style="padding:0">
@@ -9,7 +11,7 @@ S.router.register("ai", async ({ user }) => {
         <div id="pane-chat" style="display:flex;flex-direction:column;flex:1;min-height:0">
           <div class="chat-thread" id="thread">
             <div class="ai-welcome">
-              <img src="/assets/images/illustrations/ai-hero.svg" alt="">
+              <img src="/assets/images/illustrations/ai-hero.svg${av ? "?v=" + av : ""}" alt="">
               <h2>${S.fmt.escape(S.t("ai.welcome"))}</h2>
             </div>
             <div class="chat-chips" id="chips"></div>

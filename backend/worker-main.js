@@ -3117,6 +3117,46 @@ async function ensureDemoPersonas(env) {
   return out;
 }
 
+/* ===== 队员隐藏数据入口（/demo-lab）：数据源动态构建 + 自助灌入端点（DEMO_MODE + 登录态，只能灌自己） ===== */
+const SEED_VERSION = "2026-09-17.r17";
+/* 明显拟真的演示人名（张三李四类话术人物）——收款人列表排尾部 */
+const LOW_REALISM_NAMES = new Set(["张三", "李四", "王五", "女儿", "房东陈叔", "演示用户"]);
+/* 指定必含的团队真实账户（存在才纳入；不存在自动跳过并在预检标注） */
+const SELF_SEED_DESIGNATED = ["unperishability@gmail.com", "10donothack@gmail.com"];
+
+/** 动态收款人数据源：全部 suveoo 域名拟真账户（含 demo.suveoo.com 人物）+ 指定团队账户；
+ *  每人取真实姓名（profile）与借记卡号（getCards）；排除本人；拟真度排序（假的在尾）。 */
+async function buildSelfSeedPayees(env, selfEmail) {
+  const users = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "listUsers" })).users ?? [];
+  const byEmail = new Map(users.map((u) => [u.email, u]));
+  const emails = [
+    /* 指定团队账户（真实队友）置顶——拟真度最高；其后 suveoo 域名拟真账户；明显话术人物稳定排序自然沉底 */
+    ...SELF_SEED_DESIGNATED.filter((e) => e !== selfEmail && byEmail.has(e)),
+    ...users.filter((u) => /@(demo\.)?suveoo\.com$/i.test(u.email) && u.email !== selfEmail).map((u) => u.email),
+  ];
+  const seen = new Set([selfEmail.toLowerCase()]);
+  const out = [];
+  for (const email of emails) {
+    if (seen.has(email.toLowerCase())) continue;
+    seen.add(email.toLowerCase());
+    const u = byEmail.get(email);
+    try {
+      const prof = await ledgerOp(env, userInstance(u.user_id), { op: "getProfile" });
+      const cards = await ledgerOp(env, userInstance(u.user_id), { op: "getCards" });
+      const debit = (cards.cards ?? []).find((c) => c.kind === "debit" && c.status === "ACTIVE");
+      if (!debit) continue;
+      const name = prof.profile?.name ?? email.split("@")[0];
+      const group = SELF_SEED_DESIGNATED.includes(email) ? "团队"
+        : /^[A-Za-z]/.test(name) ? "海外"
+        : name.includes("管家") ? "生活缴费"
+        : /@(demo\.)?suveoo\.com$/i.test(email) ? "朋友" : "朋友";
+      out.push({ name, account: debit.number, group_label: group, email, low: LOW_REALISM_NAMES.has(name) });
+    } catch { /* 单人查询失败跳过，不阻塞数据源 */ }
+  }
+  out.sort((a, b) => Number(a.low) - Number(b.low));
+  return out;
+}
+
 async function seedDemo(env, targetEmail, opts = {}) {
   const demoEmail = "demo@suveoo.com";
   const email = targetEmail && EMAIL_RE.test(targetEmail) ? targetEmail.trim().toLowerCase() : demoEmail;
@@ -3160,12 +3200,21 @@ async function seedDemo(env, targetEmail, opts = {}) {
   } else {
     ({ txs, payees, bills, subs, holdings, notifs, tasks, credit_debt_cents: creditDebt } = genUserSeedData(seededRng(Date.now() & 0xffff)));
   }
-  /* 演示人物落户：种子 payees 的 account 全部指向真实 Suveoo 卡号（同名人物跨账户指向同一人） */
-  const personas = await ensureDemoPersonas(env);
-  let unlinkedPayees = 0;
-  for (const p of payees) {
-    if (personas[p.name]) p.account = personas[p.name].card;
-    else { p.account = null; unlinkedPayees++; }
+  /* 队员自助灌入（/demo-lab）：收款人改用动态数据源（suveoo 域名拟真账户 + 指定团队账户），
+     并把种子 txs 里的通用人名替换为高拟真收款人（房租/AA 等收款方随之真实） */
+  if (opts.payeesOverride?.length) {
+    const map = opts.payeeNameMap ?? {};
+    for (const t of txs) if (map[t.counterparty]) t.counterparty = map[t.counterparty];
+    payees = opts.payeesOverride.map((p) => ({ name: p.name, account: p.account, group_label: p.group_label, email: null }));
+  } else {
+    /* 演示人物落户：种子 payees 的 account 全部指向真实 Suveoo 卡号（同名人物跨账户指向同一人） */
+    const personas = await ensureDemoPersonas(env);
+    var unlinkedPayees = 0;
+    for (const p of payees) {
+      if (personas[p.name]) p.account = personas[p.name].card;
+      else { p.account = null; unlinkedPayees++; }
+    }
+    var personasCount = Object.keys(personas).length;
   }
   const r = await ledgerOp(env, userInstance(userId), { op: "seedDemo", txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt });
   if (isDemo) await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读；真实账户 2FA 状态不动
@@ -3175,8 +3224,21 @@ async function seedDemo(env, targetEmail, opts = {}) {
       await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "schedule", user_id: userId, task_id: t.id, execute_at: t.execute_at }) });
     }
   }
-  if (!isDemo) return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, personas: Object.keys(personas).length, unlinked_payees: unlinkedPayees, note: "全板块仿真数据已灌入（幂等，覆盖流水/收款人/账单/订阅/持仓/通知/任务；不改动密码、2FA 与卡片；收款人已指向真实演示人物账户）。" });
-  return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, personas: Object.keys(personas).length, unlinked_payees: unlinkedPayees, note: "演示增强种子已就绪（幂等；竞赛锚点保留，全板块加量；收款人为真实演示人物账户）。密码 jinrongkeji2026（演示账户已免 2FA）；自注册账户强制邮箱 2FA。" });
+  /* 自查核对：回读关键板块与数据源比对（self-seed 页面呈现；不匹配即报告，便于发现数据源漂移） */
+  let verification = null;
+  if (opts.selfSeed) {
+    const after = await ledgerOp(env, userInstance(userId), { op: "payees" });
+    const nums = (after.payees ?? []).map((p) => p.account).filter((a) => /^\d{16}$/.test(String(a ?? "")));
+    const found = nums.length ? ((await ledgerOp(env, REGISTRY_INSTANCE, { op: "cardsOf", numbers: nums })).found ?? {}) : {};
+    verification = {
+      payees_expected: payees.length, payees_actual: (after.payees ?? []).length,
+      payees_all_real: (after.payees ?? []).length > 0 && (after.payees ?? []).every((p) => found[p.account]),
+      tx_count: txs.length,
+    };
+  }
+  if (opts.selfSeed) return json({ ok: r.ok, user_id: userId, email, seed_version: SEED_VERSION, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, verification, note: "自助灌入完成（幂等；收款人为真实存在的 Suveoo 账户）。" });
+  if (!isDemo) return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, personas: personasCount ?? 0, unlinked_payees: unlinkedPayees ?? 0, note: "全板块仿真数据已灌入（幂等，覆盖流水/收款人/账单/订阅/持仓/通知/任务；不改动密码、2FA 与卡片；收款人已指向真实演示人物账户）。" });
+  return json({ ok: r.ok, user_id: userId, email, tx_count: txs.length, payees: payees.length, bills: bills.length, subscriptions: subs.length, holdings: holdings.length, tasks: tasks.length, personas: personasCount ?? 0, unlinked_payees: unlinkedPayees ?? 0, note: "演示增强种子已就绪（幂等；竞赛锚点保留，全板块加量；收款人为真实演示人物账户）。密码 jinrongkeji2026（演示账户已免 2FA）；自注册账户强制邮箱 2FA。" });
 }
 
 /* ================================================================
@@ -3271,6 +3333,43 @@ export default {
         detail: { email: email ?? "demo@suveoo.com", ip: clientIpOf(request), ua: (request.headers.get("user-agent") ?? "").slice(0, 120) },
       });
       return await seedDemo(env, email, { inspect: b.inspect === true });
+    }
+    /* 队员自助灌入（/demo-lab 页面）：DEMO_MODE 门 + 登录态——只能灌自己账户，无任何 token 可分享 */
+    if (url.pathname === "/api/demo/self-seed" && (request.method === "GET" || request.method === "POST")) {
+      if (env.DEMO_MODE !== "true") return apiError("FORBIDDEN", "DEMO_MODE off", 403);
+      const claims = await requireSession(request, env);
+      if (!claims) return apiError("UNAUTHORIZED", "invalid session", 401);
+      /* GET 预检（数据源快照，不写数据）：页面打开即拉取——数据源未来更新后版本号/清单随之变化，自查可见 */
+      if (request.method === "GET") {
+        const src = await buildSelfSeedPayees(env, claims.email);
+        const missing = SELF_SEED_DESIGNATED.filter((e) => e !== claims.email && !src.some((p) => p.group_label === "团队" && p.email === e));
+        return json({
+          ok: true, seed_version: SEED_VERSION, email: claims.email,
+          payee_source: src.map((p) => ({ name: p.name, account_masked: `**** ${String(p.account).slice(-4)}`, group: p.group_label, realism: p.low ? "low" : "high", email: p.email })),
+          payee_count: src.length,
+          designated_missing: missing,
+          estimate: { txs: "360-480（随机生成，每次不同）", bills: 8, subscriptions: 7, holdings: 7, tasks: 3, notifications: 6 },
+        });
+      }
+      /* POST 执行：seedDemo op 事务原子（中断即全回滚、账户保持原样可重试）；waitUntil 保证客户端断开也执行完 */
+      const job = (async () => {
+        const src = await buildSelfSeedPayees(env, claims.email);
+        if (!src.length) return apiError("NO_PAYEE_SOURCE", "数据源为空：suveoo 域名下暂无其他拟真账户", 409);
+        /* 种子通用人名 → 高拟真收款人轮换（房租/AA 等收款方随之真实；同名人物映射到自身） */
+        const high = src.filter((p) => !p.low);
+        const pool = high.length ? high : src;
+        const genericNames = ["沈建平", "陈嘉玮", "林芷晴", "周慕言", "吴雅婷", "郑皓文", "苏婉宁"];
+        const payeeNameMap = {};
+        genericNames.forEach((n, i) => { payeeNameMap[n] = pool[i % pool.length].name; });
+        return await seedDemo(env, claims.email, { selfSeed: true, payeesOverride: src, payeeNameMap });
+      })();
+      ctx.waitUntil(job.catch((e) => logEvent("error", "self_seed_orphan", { message: e?.message })));
+      const r = await job;
+      await audit(env, {
+        action: "self_seed",
+        detail: { email: claims.email, ip: clientIpOf(request), ua: (request.headers.get("user-agent") ?? "").slice(0, 120) },
+      });
+      return r;
     }
     if (url.pathname.startsWith("/api/")) {
       const claims = await requireSession(request, env);
@@ -3823,7 +3922,9 @@ export class LedgerDO {
         case "chatUpsert": { sql.exec("INSERT OR REPLACE INTO chats(id, title, ts) VALUES(?,?,?)", input.id, input.title ?? "", NOW); return json({ ok: true }); }
         case "chats": { return json({ chats: this.#rows(sql.exec("SELECT * FROM chats ORDER BY ts DESC LIMIT 20")) }); }
         case "seedDemo": {
-          for (const q of ["DELETE FROM tx", "DELETE FROM payees", "DELETE FROM bills", "DELETE FROM subscriptions", "DELETE FROM holdings", "DELETE FROM notifications", "DELETE FROM tasks", "DELETE FROM user_audit", "DELETE FROM chats", "DELETE FROM fx_balances"]) sql.exec(q);
+          /* workerd DO 不支持显式 BEGIN/COMMIT（sql.exec 会拒绝）——原子性由幂等整段重灌兜底：
+             任何中断（客户端断开/DO 重启）最坏留下"部分表已换"的中间态，重跑一次 seed 完全自愈，永无不可恢复状态 */
+            for (const q of ["DELETE FROM tx", "DELETE FROM payees", "DELETE FROM bills", "DELETE FROM subscriptions", "DELETE FROM holdings", "DELETE FROM notifications", "DELETE FROM tasks", "DELETE FROM user_audit", "DELETE FROM chats", "DELETE FROM fx_balances"]) sql.exec(q);
           /* 卡归属：种子 tx 显式 card 原样写入（日常消费在借记卡间轮转），card 为 null 时挂默认借记卡（锚点/入账） */
           const defCard = (this.#rows(sql.exec("SELECT slug FROM cards WHERE is_default = 1 AND kind='debit'"))[0] ?? {}).slug ?? "debit-card-1";
           for (const t of input.txs) sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,?,?,?,?,?,?,?,?)",

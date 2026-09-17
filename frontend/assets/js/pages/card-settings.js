@@ -65,8 +65,8 @@ S.router.register("card-settings", async () => {
   };
   copyBtn.onclick = async () => {
     if (!fullNumber) return;
-    try { await navigator.clipboard.writeText(fullNumber); S.ui.toast(S.t("cards.copied")); }
-    catch { S.ui.toast(S.t("common.opFailed"), true); }
+    if (await S.ui.copy(fullNumber)) S.ui.toast(S.t("cards.copied"));
+    else S.ui.toast(S.t("common.opFailed"), true);
   };
   document.getElementById("cs-alias-go").onclick = async () => {
     const r2 = await S.api.mutate(`/api/cards/${slug}`, { alias: document.getElementById("cs-alias").value.trim() || undefined });

@@ -3,6 +3,21 @@ S.ui = {
   $: (sel, root = document) => root.querySelector(sel),
   $$: (sel, root = document) => [...root.querySelectorAll(sel)],
   el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; },
+  /* 复制到剪贴板：clipboard API 失败/不可用（部分移动 webview、非聚焦文档）回落 execCommand */
+  async copy(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* 落到兜底 */ }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch { return false; }
+  },
   icon(name, size = 20) { return `<svg class="ic" width="${size}" height="${size}" aria-hidden="true"><use href="/assets/icons/sprite.svg#i-${name}"/></svg>`; },
   clear(node) { while (node.firstChild) node.removeChild(node.firstChild); },
   toast(msg, isErr = false) {

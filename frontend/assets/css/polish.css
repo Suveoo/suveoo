@@ -450,3 +450,14 @@ body.tc-open { overflow: hidden; }
   .hscroll.deps .fund-card, .hscroll.payees .fund-card { min-width: 0 !important; max-width: none !important; }
   .hscroll.payees .fund-card[style] { min-width: 0 !important; }
 }
+
+/* ===== 18. /demo-lab 队员隐藏数据入口（实验室风格：深色 hero + 密码门 + 数据源清单） ===== */
+.dl-hero { background: linear-gradient(135deg, var(--color-navy) 0%, #0b1220 100%); color: #fff; border-radius: 16px; padding: 28px 24px; margin-bottom: 16px; text-align: center; }
+.dl-hero h1 { color: #fff; font-size: 22px; margin: 10px 0 4px; }
+.dl-hero p { color: rgba(255, 255, 255, .72); margin: 0; }
+.dl-badge { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-12); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: rgba(255, 255, 255, .85); border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; padding: 4px 12px; }
+.dl-lock .input { text-align: center; font-size: 16px; letter-spacing: .06em; }
+.dl-payees { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.dl-payee { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--color-line); border-radius: 10px; background: #fff; }
+.dl-payee.low { opacity: .68; background: var(--color-surface); }
+.dl-verify { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
