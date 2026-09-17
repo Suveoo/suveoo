@@ -74,6 +74,62 @@ describe("预约转账（长程任务）", () => {
     expect(["ACCOUNT_NOT_FOUND", "NAME_MISMATCH"]).toContain(s1.reason);
   });
 
+  it("MCP 通道（AI 确认卡路径）：顶层字段归一 → transfer_confirmation 确认卡（含收款人/付款卡/备注/执行时间）→ grant 确认建立任务", async () => {
+    const out = await registerUser("st4@test.dev", "定时己");
+    const to = await registerUser("st4to@test.dev", "收款庚");
+    const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const myCards = await cardsOf(out.user_id);
+    const other = myCards.find((c) => c.kind === "debit" && Number(c.is_default) !== 1);
+
+    /* 模型把收款人放顶层（无 transfer 子对象）——服务端归一 */
+    const c1 = await j(await SELF.fetch(`${BASE}/mcp?sid=st4`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: {
+        task_type: "scheduled_transfer", title: "预约转账 · 收款庚", amount: "66.60",
+        execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once",
+        recipient_name: "收款庚", recipient_account: toDebit.number, memo: "MCP 卡片验证", from_card: other.slug,
+      } },
+    }) }));
+    const inner1 = JSON.parse(c1.result.content[0].text);
+    expect(inner1.status).toBe("INPUT_REQUIRED");
+    /* 确认卡路由修复：不再落到 card_setting_confirm（无确认操作的错卡） */
+    expect(inner1.card.component).toBe("transfer_confirmation");
+    expect(inner1.card.action).toBe("scheduled_task_create");
+    expect(inner1.card.params.recipient_display).toContain("收款庚");
+    expect(inner1.card.params.from_card_display).toContain(String(other.number).slice(-4));
+    expect(inner1.card.params.memo).toBe("MCP 卡片验证");
+    expect(inner1.grant.grant_hash).toBeTruthy();
+
+    const c2 = await j(await SELF.fetch(`${BASE}/mcp?sid=st4`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 2, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: {
+        task_type: "scheduled_transfer", title: "预约转账 · 收款庚", amount: "66.60",
+        execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once", transfer: { recipient_name: "收款庚", recipient_account: toDebit.number, amount: "66.60", memo: "MCP 卡片验证", from_card: other.slug },
+        grant_hash: inner1.grant.grant_hash,
+      } },
+    }) }));
+    const inner2 = JSON.parse(c2.result.content[0].text);
+    expect(inner2.status).toBe("EXECUTED");
+    const tasks = await j(await SELF.fetch(BASE + "/api/tasks", { headers: { authorization: `Bearer ${out.token}` } }));
+    const t = tasks.tasks.find((x) => x.type === "scheduled_transfer");
+    expect(t).toBeTruthy();
+    expect(t.status).toBe("PENDING");
+  });
+
+  it("过去时间建预约 → INVALID_SCHEDULE_TIME（模型把'后天'算成过去日期时立即执行违背预约语义）", async () => {
+    const out = await registerUser("st5@test.dev", "定时辛");
+    const to = await registerUser("st5to@test.dev", "收款壬");
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const body = {
+      recipient_account: toDebit.number, recipient_name: "收款壬", amount: "50",
+      execute_at: new Date(Date.now() - 3600_000).toISOString(), repeat: "once",
+    };
+    const s1 = await j(await post("/api/schedules", body, out.token));
+    expect(s1.status).toBe("BLOCKED");
+    expect(s1.reason).toBe("INVALID_SCHEDULE_TIME");
+  });
+
   it("到期前取消 → CANCELLED，不执行", async () => {
     const out = await registerUser("st2@test.dev", "定时丁");
     const to = await registerUser("st2to@test.dev", "收款戊");

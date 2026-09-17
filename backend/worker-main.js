@@ -1123,6 +1123,9 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     return null;
   }
   if (intent === "scheduled_task_create" && (args.task_type ?? "scheduled_transfer") === "scheduled_transfer") {
+    /* 预约时间须在未来（模型偶发把"后天"算成过去日期 → saga alarm 立即触发，违背预约语义） */
+    const when = Date.parse(args.execute_at ?? "");
+    if (Number.isFinite(when) && when < Date.now()) return reject("INVALID_SCHEDULE_TIME");
     /* 预约转账与即时转账同一收款人真实性口径（Luhn+registry+户名匹配）：建单即拦截编造卡号，
        否则到点执行时资金会流向不存在的账户（无对手方入账，凭空消失） */
     const b = args.transfer ?? {};
@@ -2132,7 +2135,7 @@ const MCP_TOOLS = [
   { name: "fx_exchange", desc: "结汇/购汇（黄/红级）。结算按服务端实时牌价（购汇用卖出价、结汇用买入价，JPY 为每 100 日元口径），客户端传入的 rate 不参与结算。buy 需 amount_cny（人民币金额）；sell 需 amount_foreign（卖出外币金额，只给 amount_cny 时按买入价反推）；可选 from_card 指定结算卡（缺省默认卡；购汇方向可选信用卡=信用支付，欠款按人民币金额计入信用卡、不动借记余额；结汇入账仅借记卡）。外币余额可先查 fx_balance_query", args: { direction: { type: "string" }, currency: { type: "string" }, amount_cny: { type: "string" }, amount_foreign: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "bill_pay", desc: "缴纳账单。通常只需 bill_id（金额由服务端按账单补齐）；credit-repay 为信用卡全额还款，金额动态取当前信用卡欠款（bill 静态金额仅供参考），无欠款时返回 NO_DEBT。还款从默认借记卡扣款并清零信用卡欠款", args: { bill_id: { type: "string" }, amount: { type: "string" } } },
   { name: "funds_lock", desc: "锁定资金（长程任务预授权）", args: { amount: { type: "string" }, reason: { type: "string" }, task_id: { type: "number" } } },
-  { name: "scheduled_task_create", desc: "建立定时/长程任务（预约转账、生日订花等）", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
+  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type 固定 \"scheduled_transfer\"，收款信息放 transfer 对象（顶层同名字段会被服务端归一）：transfer={recipient_name, recipient_account(16位卡号), amount(两位小数字符串如 66.60), memo?, from_card?(卡 slug，缺省默认借记卡)}——收款人必须是真实 Suveoo 用户且姓名与卡号匹配（与 transfer_execute 同口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601（含时区），repeat 取 \"once\"|\"monthly\"。黄级：确认卡会出现，等待用户在界面点击确认，绝不要携带 grant_hash/otp 重试。生日订花等非转账任务用 task_type=\"birthday_flower\"+item/amount。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
   { name: "wealth_product_purchase", desc: "申购理财（红级）", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "wealth_product_redeem", desc: "赎回理财（红级）。赎回按当前净值对成本净值比例结算（浮盈浮亏实时兑现，整数运算），回款入默认借记卡；预计回款额可先查 wealth_holdings_query 的 redeem_value", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
@@ -2169,11 +2172,17 @@ async function airingDrain(env, sid) {
  */
 async function mcpExecuteTool(env, ctxInfo, name, args, sid, { exposeGrant = true } = {}) {
   if (args && typeof args === "object" && args.currency === "RMB") args = { ...args, currency: "CNY" }; // 模型常用 RMB，归一为 CNY
-  /* 转账：模型偶尔把 recipient 传成对象（{"id":94}）而非 payee:94 字符串——先归一，
-     否则畸形参数绕过收款人真实性前置校验（account=null 直接放行） */
-  if (name === "transfer_execute" && args?.recipient != null && typeof args.recipient === "object") {
-    const pid = args.recipient.id ?? args.recipient.payee_id;
-    args = { ...args, recipient: pid != null ? `payee:${pid}` : String(args.recipient) };
+  /* 转账：模型偶尔把收款人传成对象（{"id":94} / {"id":94,"name":"…"}，出现在 recipient 或 recipient_name
+     任一位置）——统一归一为 payee:N 字符串 + 纯文本姓名，否则畸形参数绕过收款人真实性前置校验 */
+  if (name === "transfer_execute") {
+    for (const k of ["recipient", "recipient_name"]) {
+      const v = args?.[k];
+      if (v == null || typeof v !== "object") continue;
+      const pid = v.id ?? v.payee_id;
+      const nm = typeof v.name === "string" ? v.name : (typeof args.recipient_name === "object" ? args.recipient_name.name : undefined);
+      if (pid != null) args = { ...args, recipient: `payee:${pid}`, ...(nm != null ? { recipient_name: nm } : {}) };
+      else if (k === "recipient") args = { ...args, recipient: String(v) };
+    }
   }
   /* 换汇：成交按服务端实时牌价归一（购汇 sell / 结汇 buy，JPY 每 100 口径），与 REST 通道同一数学 */
   if (name === "fx_exchange") {
@@ -2197,6 +2206,11 @@ async function mcpExecuteTool(env, ctxInfo, name, args, sid, { exposeGrant = tru
       amt = centsToStr(debt);
     }
     args = { ...args, amount: amt };
+  }
+  /* 预约转账：模型常把收款人字段放顶层而非 transfer 子对象——归一为执行端期望的形状 */
+  if (name === "scheduled_task_create" && (args.task_type ?? "scheduled_transfer") === "scheduled_transfer" && args.transfer == null) {
+    const acct = args.recipient_account ?? (typeof args.recipient === "string" && /^\d{16}$/.test(args.recipient) ? args.recipient : null);
+    args = { ...args, transfer: { recipient_name: args.recipient_name ?? null, recipient_account: acct ?? null, amount: args.amount ?? null, memo: args.memo ?? null, from_card: args.from_card ?? null } };
   }
   const provenance = args.__provenance ?? null;
   await airingPush(env, sid, { kind: "trust", type: "trust_event", event: { kind: "PROPOSED", tool: name, args: JSON.stringify(args).slice(0, 300) } });
@@ -2281,21 +2295,25 @@ async function genuiCardFor(env, ctxInfo, g) {
     /* 校验前置后此卡只会为真实对手方生成：verified 供前端展示"收款方已验证"徽章 */
     p.verified = true;
   }
+  /* 预约转账：收款人/付款卡在 transfer 子对象里——展开为确认卡展示字段 */
+  if (g.ir.intent === "scheduled_task_create") {
+    const b = p.transfer ?? {};
+    if (b.recipient_name) p.recipient_display = `${b.recipient_name}（**** ${String(b.recipient_account ?? "").slice(-4)}）`;
+    p.memo = b.memo ?? p.memo ?? null;
+    p.from_card = b.from_card ?? null;
+  }
   /* 付款卡展示名：from_card 为空/空串 = 默认借记卡（与执行端同语义）；信用卡标注"信用支付" */
-  if (["transfer_execute", "bill_pay", "ecommerce_order_mock", "fx_exchange"].includes(g.ir.intent)) {
+  if (["transfer_execute", "bill_pay", "ecommerce_order_mock", "fx_exchange", "scheduled_task_create"].includes(g.ir.intent)) {
     try {
       const cards = (await U(env, ctxInfo.userId)({ op: "getCards" })).cards ?? [];
       const fc = p.from_card ? cards.find((c) => c.slug === p.from_card) : cards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
       p.from_card_display = fc ? `${fc.class_label}（尾号 ${String(fc.number ?? "").slice(-4)}）${fc.kind === "credit" ? " · 信用支付" : ""}` : p.from_card ?? null;
     } catch { /* 卡列表查询失败不阻塞出卡 */ }
   }
-  if (g.ir.intent === "transfer_execute" || g.ir.intent === "bill_pay" || g.ir.intent === "ecommerce_order_mock") {
-    return { component: "transfer_confirmation", issuer: "verified_ir", tier: g.tier, action: g.ir.intent, snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: p, trace_id: g.ir.trace_id };
-  }
-  if (g.ir.intent.startsWith("wealth_")) {
-    return { component: "wealth_compare", issuer: "verified_ir", tier: g.tier, action: g.ir.intent, snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: p };
-  }
-  return { component: "card_setting_confirm", issuer: "verified_ir", tier: g.tier, action: g.ir.intent, snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: p };
+  /* INPUT_REQUIRED 一律走 transfer_confirmation 确认卡（前端 attachConfirm 仅为此组件挂确认条）：
+     未列举 intent 落 confirmMeta.generic；此前兜底 card_setting_confirm（卡片设置专用、无确认操作）
+     曾让 AI 通道预约转账/收款人管理等出现"点不动"的错卡 */
+  return { component: "transfer_confirmation", issuer: "verified_ir", tier: g.tier, action: g.ir.intent, snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: p, trace_id: g.ir.trace_id };
 }
 
 async function mcpGreen(env, ctxInfo, name, args) {

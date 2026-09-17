@@ -8,6 +8,7 @@ S.genuiCards = {
     transfer_execute:    { title: "genui.confirmTransfer", icon: "send",     field: "genui.to",       fee: true },
     ecommerce_order_mock:{ title: "genui.confirmTransfer", icon: "pay",      field: "genui.merchant", fee: true },
     bill_pay:            { title: "genui.confirmBillPay",  icon: "pay",      field: "genui.merchant", fee: true },
+    scheduled_task_create:{ title: "genui.confirmSchedule", icon: "clock",   field: "genui.to",       fee: false },
     wealth_product_purchase: { title: "genui.confirmPurchase", icon: "wealth", field: "genui.product", fee: false },
     wealth_product_redeem:   { title: "genui.confirmRedeem",   icon: "wealth", field: "genui.product", fee: false },
     deposit:             { title: "genui.confirmDeposit",  icon: "bank",     field: "genui.product", fee: false },
@@ -19,7 +20,9 @@ S.genuiCards = {
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
   transfer_confirmation(c) {
-    const p = { ...(c.snapshot?.params ?? {}), recipient_display: c.params?.recipient_display, recipient_name: c.params?.recipient_name ?? c.snapshot?.params?.recipient_name, from_card_display: c.params?.from_card_display ?? c.snapshot?.params?.from_card_display };
+    /* 外层 params（genuiCardFor：完整 IR params + 展示字段）全量覆盖 snapshot（仅 authFields）——
+       display/memo/execute_at 等非授权字段一律以服务端展开的外层为准 */
+    const p = { ...(c.snapshot?.params ?? {}), ...(c.params ?? {}) };
     const meta = c.action == null ? this.confirmMeta.transfer_execute : (this.confirmMeta[c.action] ?? this.confirmMeta.generic);
     /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号 */
     let subject = c.subject ?? null;
@@ -40,6 +43,9 @@ S.genuiCards = {
       ${S.genuiCards.kv([
         ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
+        ...(p.memo != null && String(p.memo) !== "" ? [[S.t("genui.memo"), p.memo]] : []),
+        ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
+        ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
         ...(p.currency != null ? [["Currency", p.currency]] : []),

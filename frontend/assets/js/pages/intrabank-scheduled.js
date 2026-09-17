@@ -59,6 +59,7 @@ S.router.register("intrabank-scheduled", async () => {
           NAME_MISMATCH: S.t("transfer.nameMismatch"),
           INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
           PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
+          INVALID_SCHEDULE_TIME: S.t("sch.pastTime"),
         };
         const box = document.getElementById("s-err");
         box.style.display = "flex";
