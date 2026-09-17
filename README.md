@@ -105,6 +105,12 @@ D:\suveoo\
 ├── README.md                                  # 竞赛仓库入口（待完善）
 ├── DEPLOYMENT.md                              # 部署手册
 │
+├── docs\                                      # 竞赛交付文档（作品资料 §四）
+│   ├── architecture.md                        # 系统架构图（含五层拓扑、转账时序）
+│   ├── core-algorithms.md                     # 核心算法说明（IR 编译、五道验证、Saga、分账数学）
+│   ├── security-self-assessment.md            # 安全自评：权限分级实现说明 + 已知风险清单
+│   └── test-cases.md                          # 测试用例说明（bench/attack/integration 索引）
+│
 ├── backend\
 │   ├── worker-main.js                         # ★ 唯一 Worker 入口，七大区块（pages.md §11.2）
 │   ├── wrangler.toml                          # 1 Worker + 2 KV + 1 R2 + 2 DO + send_email + 路由（已配置）
@@ -123,13 +129,24 @@ D:\suveoo\
 │   │   │   ├── idempotency.test.js            # nonce 去重（重复提交拒绝并返原结果）
 │   │   │   ├── money-math.test.js             # 十进制金额运算（AA 分账守恒）
 │   │   │   ├── auth-crypto.test.js            # JWT 签验 / PBKDF2 口令 / 常数时间比较
+│   │   │   ├── fund-data.test.js              # 16 基金因子模型数据（历史统计/蒙特卡洛）
+│   │   │   ├── schema-migration.test.js       # tx.card / session_epoch 幂等迁移
+│   │   │   ├── llm-stream.test.js             # llmMessages 真流式（SSE 解析/工具 JSON 聚合/三级回退）
 │   │   │   └── card-plan.test.js              # 开户方案生成（余额区间/卡面去重/组装映射）
 │   │   ├── integration\                       # SELF + 真实 KV/R2/DO（miniflare，逐测试隔离）
 │   │   │   ├── registration-provisioning.test.js  # 注册发卡/登录2FA/找回/限流 全链路
 │   │   │   ├── static-routing.test.js         # R2 查找顺序/动态卡路由/缓存头/304/404
 │   │   │   ├── transfer-flow.test.js          # （占位，批次④接 MCP 后实现）
-│   │   │   ├── saga-compensation.test.js      # （占位，批次⑤）
-│   │   │   └── scheduled-tasks.test.js        # （占位，批次⑤）
+│   │   │   ├── saga-compensation.test.js      # Saga 补偿链（seed 调用需 x-admin-token）
+│   │   │   ├── scheduled-tasks.test.js        # 预约转账长程任务
+│   │   │   ├── demo-admin.test.js             # 演示端点管理员令牌（fail-closed/审计/inspect）
+│   │   │   ├── card-reveal.test.js            # 完整卡号 reveal（属主隔离）
+│   │   │   ├── wealth-redeem.test.js          # 赎回市值结算（涨/平/跌 + API 端到端）
+│   │   │   ├── fx-exchange.test.js            # 换汇实时牌价结算（JPY 口径/选卡/结汇拦截）
+│   │   │   ├── security-credential.test.js    # 改密/2FA 须当前密码 + 会话纪元全设备下线
+│   │   │   ├── card-ledger.test.js            # 交易挂卡/信用支付/还款闭环/单卡真过滤分页
+│   │   │   ├── tx-scope.test.js               # 交易记录三口径（scope=transfers/all/缺省）
+│   │   │   └── self-seed.test.js             # /demo-lab 自助灌入（动态收款人/真实性核验/幂等）
 │   │   ├── attack\                            # 对抗用例（安全自评证据）
 │   │   │   ├── prompt-injection.test.js       # 商户备注注入 → TAINT BLOCKED
 │   │   │   ├── replay-attack.test.js          # 同 nonce 重放 → REPLAY BLOCKED
@@ -223,6 +240,8 @@ D:\suveoo\
     │   │       ├── pay.js  bills.js  subscriptions.js
     │   │       ├── intrabank.js  intrabank-scheduled.js
     │   │       ├── transfer-history.js  transfer-limits.js  payees.js
+    │   │       ├── transactions.js                   # P37 交易记录（全量收支 /api/transfers?scope=all）
+    │   │       ├── demo-lab.js                      # L01 数据注入实验室（密码门/预检/自助灌入/核对）
     │   │       ├── ai.js  ai-tasks.js  ai-benchmark.js
     │   │       ├── wealth.js  funds.js  fund-detail.js
     │   │       ├── deposits.js  deposit-detail.js  fx.js  tools.js
@@ -314,8 +333,10 @@ D:\suveoo\
     │   │   └── settings\index.html            # P26 模板（/account/card/{slug}/settings）
     │   ├── dashboard\index.html               # P27
     │   ├── downloads\index.html               # P28
-    │   └── security\index.html                # P29
+    │   ├── security\index.html                # P29
+    │   └── transactions\index.html            # P37 交易记录（全量收支，/account/transactions）
     ├── notifications\index.html               # P30
+    ├── demo-lab\index.html                    # L01 数据注入实验室（队员隐藏入口，noindex + 密码门）
     ├── about\index.html                       # P31
     ├── help\index.html                        # P32
     ├── contact\index.html                     # P33
