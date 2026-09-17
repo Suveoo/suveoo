@@ -116,10 +116,11 @@ S.router.register("ai", async ({ user }) => {
     const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
     S.trust.evt("CHAT", null, text.slice(0, 60));
     S.ga4.event("ai_chat_start", { entry: "composer" });
-    /* 打字机缓冲：token 整段到达后按每帧 12 字渐进渲染（rAF）——上游 LLM 当前为整块下发，
-       该层缓冲令观感与真流式一致，且未来切真流式后同样平滑网络毛刺。
+    /* 打字机缓冲：token 到达后按帧渐进渲染 Markdown（rAF）——真流式 token 粒度细，该层平滑网络毛刺；
+       帧步长自适应积压量（12 字/帧起步，积压越大步长越大、上限 48）：长回答尾部不再等
+       固定 12 字/帧追平 2 秒以上，追赶时间收敛到约 1 秒内，同时小步长保持打字观感。
        done 到达时若打字未追平，等追平再 finish（保证 autoOpen 等收尾看到完整文本）。 */
-    const CHARS_PER_FRAME = 12;
+    const BASE_STEP = 12, MAX_STEP = 48;
     let raw = "", shown = 0, donePending = false, tkFrame = null, errored = false;
     const renderAt = () => {
       aiMsg.classList.add("md");
@@ -128,7 +129,7 @@ S.router.register("ai", async ({ user }) => {
     };
     const tick = () => {
       if (shown < raw.length) {
-        shown = Math.min(raw.length, shown + CHARS_PER_FRAME);
+        shown = Math.min(raw.length, shown + Math.min(MAX_STEP, Math.max(BASE_STEP, Math.ceil((raw.length - shown) / 45))));
         renderAt();
         tkFrame = requestAnimationFrame(tick);
       } else {

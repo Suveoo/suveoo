@@ -1,0 +1,120 @@
+[
+  {
+    "n": 1,
+    "scenario": "智能转账",
+    "text": "给赵砚秋转 88 元，备注晚饭AA",
+    "firstTokenMs": 6488,
+    "totalMs": 7242,
+    "tokenEvents": 16,
+    "chars": 66,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "transfer_execute",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 7242,
+    "firstTrustMs": 2906,
+    "answer": "转账已提交：收款人赵砚秋（尾号1269），金额 ¥88.00，备注\"晚饭AA\"。\n\n确认卡已展示给您，请在界面上点击确认以完成转账。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 2,
+    "scenario": "智能转账",
+    "text": "转 1200 给赵砚秋买相机",
+    "firstTokenMs": 8707,
+    "totalMs": 9327,
+    "tokenEvents": 11,
+    "chars": 43,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "transfer_execute",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 9327,
+    "firstTrustMs": 2434,
+    "answer": "转账 1200.00 给赵砚秋（买相机）的确认卡已弹出，请您在界面上点击确认完成支付。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 8,
+    "scenario": "理财操作",
+    "text": "我想申购 5000 元环球货币基金",
+    "firstTokenMs": 8472,
+    "totalMs": 9075,
+    "tokenEvents": 6,
+    "chars": 36,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "wealth_product_purchase",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 9075,
+    "firstTrustMs": 3994,
+    "answer": "您的申购申请已进入流程，确认卡已在您界面展示，请完成点击以提交最终确认。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 12,
+    "scenario": "卡片管理",
+    "text": "冻结 debit-card-2",
+    "firstTokenMs": 3492,
+    "totalMs": 4452,
+    "tokenEvents": 17,
+    "chars": 84,
+    "proposed": 1,
+    "resultEvents": 0,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "card_freeze",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 4452,
+    "firstTrustMs": 2475,
+    "answer": "请确认卡片冻结操作：\n• 操作内容：冻结借记卡 (debit-card-2)\n• 该卡片将暂时停止所有资金进出，解冻后可继续使用。\n\n请在您的确认卡上点击【确认】按钮。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 15,
+    "scenario": "订阅代扣",
+    "text": "帮我把爱奇艺订阅退订了",
+    "firstTokenMs": 3747,
+    "totalMs": 4338,
+    "tokenEvents": 7,
+    "chars": 50,
+    "proposed": 1,
+    "resultEvents": 1,
+    "cards": [],
+    "errors": [],
+    "doneAt": 4338,
+    "firstTrustMs": 2790,
+    "answer": "您的爱奇艺订阅目前已处于**已退订（CANCELLED）**状态，无需重复操作。下次扣费将不再发生。",
+    "httpStatus": 200,
+    "status": "文本+工具"
+  }
+]

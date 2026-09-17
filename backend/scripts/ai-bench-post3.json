@@ -1,0 +1,177 @@
+[
+  {
+    "n": 1,
+    "scenario": "智能转账",
+    "text": "给赵砚秋转 88 元，备注晚饭AA",
+    "firstTokenMs": 11993,
+    "totalMs": 12757,
+    "tokenEvents": 22,
+    "chars": 112,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "transfer_execute",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 12757,
+    "firstTrustMs": 4187,
+    "answer": "转账请求已提交至确认卡。请查看您的确认卡并点击确认，交易详情如下：\n\n*   **收款人**：赵砚秋\n*   **金额**：88.00 元\n*   **备注**：晚饭AA\n*   **Grant 前缀**：8229c2a1…",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 2,
+    "scenario": "智能转账",
+    "text": "转 1200 给赵砚秋买相机",
+    "firstTokenMs": 5908,
+    "totalMs": 6766,
+    "tokenEvents": 29,
+    "chars": 141,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "transfer_execute",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 6766,
+    "firstTrustMs": 3122,
+    "answer": "确认卡已展示给用户，等待用户在界面上点击确认（grant 97f88577…）；不要携带 grant_hash 重试。\n\n图形化页面：https://suveoo.com/confirm?grant=97f88577&expires=2026-09-17T17:53:46.055Z",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 8,
+    "scenario": "理财操作",
+    "text": "我想申购 5000 元环球货币基金",
+    "firstTokenMs": 9529,
+    "totalMs": 10825,
+    "tokenEvents": 33,
+    "chars": 187,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "wealth_product_purchase",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 10825,
+    "firstTrustMs": 4723,
+    "answer": "已成功为您提交申购申请：**5,000.00 元 Suveoo 环球货币基金 1**（产品代码：global-money-1）。\n\n📋 **确认卡信息快照**\n- 动作：申购理财\n- 金额：5,000.00 CNY\n- Grant 前缀：**81003118**\n\n请查收并点击确认卡上的 **「确认」按钮** 完成交易授权。我将在此等待您的确认回执，不会代为点击或重试。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 9,
+    "scenario": "理财操作",
+    "text": "赎回我全部黄金持仓",
+    "firstTokenMs": 8659,
+    "totalMs": 10019,
+    "tokenEvents": 48,
+    "chars": 302,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "RED",
+        "action": "wealth_product_redeem",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 10019,
+    "firstTrustMs": 3389,
+    "answer": "赎回操作已进入确认流程。您的 Suveoo 环球黄金指数基金（gold-index）全部持仓将于确认后按当前净值结算赎回。\n\n**操作快照**\n- 赎回产品：Suveoo 环球黄金指数基金（gold-index）\n- 持仓市值/预计回款：16,921.88 CNY\n- 浮动盈亏：+8,921.88 CNY\n- Grant 前缀：`c39c5316`…\n\n确认卡已展示给您，请在确认卡上点击确认。我将等待您的确认指令后才会执行赎回；在未收到确认前不会携带任何 grant hash 重试或代您操作。\n\n图形化页面：<https://dashboard.suveoo.com/wallet/confirm>",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(RED)"
+  },
+  {
+    "n": 11,
+    "scenario": "卡片管理",
+    "text": "把我的默认卡额度调低到 5000",
+    "firstTokenMs": 13899,
+    "totalMs": 15530,
+    "tokenEvents": 45,
+    "chars": 226,
+    "proposed": 3,
+    "resultEvents": 2,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "YELLOW",
+        "action": "card_limit_adjust",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 15530,
+    "firstTrustMs": 4357,
+    "answer": "已为您将默认借记卡（尾号 6330）的额度调整为 **5000.00 CNY**。\n\n⚠️ 安全提示：相关确认卡已在您的设备中弹出，请查看包含以下信息的安全验证页面：\n- 操作类型：调整卡片限额\n- 目标卡片：默认借记卡 **** 6330\n- 新限额：5000.00 CNY\n- 授权前缀：86ae1bdb…\n\n请在您的手机/电脑确认卡界面上**点击“确认”**完成此修改。我在此无法代为确认或跳过验证步骤，所有操作均以您在验证页面上的最终选择为准。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(YELLOW)"
+  },
+  {
+    "n": 14,
+    "scenario": "订阅代扣",
+    "text": "Netflix 下个月续费提醒我",
+    "firstTokenMs": 9442,
+    "totalMs": 10039,
+    "tokenEvents": 7,
+    "chars": 43,
+    "proposed": 1,
+    "resultEvents": 0,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "YELLOW",
+        "action": "scheduled_task_create",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 10039,
+    "firstTrustMs": 8963,
+    "answer": "请在您的确认卡界面上点击 **确认** 以创建“Netflix 下个月续费”提醒任务。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(YELLOW)"
+  },
+  {
+    "n": 15,
+    "scenario": "订阅代扣",
+    "text": "帮我把爱奇艺订阅退订了",
+    "firstTokenMs": 5406,
+    "totalMs": 6541,
+    "tokenEvents": 26,
+    "chars": 156,
+    "proposed": 2,
+    "resultEvents": 1,
+    "cards": [
+      {
+        "component": "transfer_confirmation",
+        "tier": "YELLOW",
+        "action": "subscription_cancel",
+        "reason": null
+      }
+    ],
+    "errors": [],
+    "doneAt": 6541,
+    "firstTrustMs": 2197,
+    "answer": "爱奇艺黄金 VIP · 连续包月订阅取消申请已提交。\n\n**当前快照：**\n- 操作：取消订阅 - 爱奇艺\n- Grant 前缀：`b3cb3deb…`\n\n请前往**确认卡**查看并点击「确认」完成退订。\n\n如需我协助处理其他订阅（Keep、YouTube Premium、腾讯视频等共 20 项），随时告诉我。",
+    "httpStatus": 200,
+    "status": "INPUT_REQUIRED(YELLOW)"
+  }
+]

@@ -149,4 +149,60 @@ describe("预约转账（长程任务）", () => {
     const after = await j(await SELF.fetch(BASE + "/api/tasks", { headers: H }));
     expect(after.tasks.find((t) => t.id === id).status).toBe("CANCELLED");
   });
+
+  /* 第二十轮：基准暴露的两类浪费轮/能力缺口 */
+  it("MCP：金额只放 transfer 子对象（顶层缺失）→ 反向归一后正常出卡，不再 INVALID_AMOUNT 浪费一轮", async () => {
+    const out = await registerUser("st6@test.dev", "定时癸");
+    const to = await registerUser("st6to@test.dev", "收款子");
+    const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const c1 = await j(await SELF.fetch(`${BASE}/mcp?sid=st6`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: {
+        task_type: "scheduled_transfer", title: "预约转账 · 收款子",
+        execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once",
+        transfer: { recipient_name: "收款子", recipient_account: toDebit.number, amount: "77.00", memo: "反向归一" },
+      } },
+    }) }));
+    const inner = JSON.parse(c1.result.content[0].text);
+    expect(inner.status).toBe("INPUT_REQUIRED");
+    expect(inner.card.params.amount).toBe("77.00");
+  });
+
+  it("MCP：reminder 任务（无金额）→ 出卡确认建立；到期发站内通知（非哑完成）", async () => {
+    const out = await registerUser("st7@test.dev", "定时丑");
+    const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const c1 = await j(await SELF.fetch(`${BASE}/mcp?sid=st7`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: {
+        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: new Date(Date.now() + 2500).toISOString(), repeat: "once",
+      } },
+    }) }));
+    const inner1 = JSON.parse(c1.result.content[0].text);
+    expect(inner1.status).toBe("INPUT_REQUIRED");
+    const c2 = await j(await SELF.fetch(`${BASE}/mcp?sid=st7`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 2, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: {
+        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: new Date(Date.now() + 2500).toISOString(), repeat: "once",
+        grant_hash: inner1.grant.grant_hash,
+      } },
+    }) }));
+    const inner2 = JSON.parse(c2.result.content[0].text);
+    expect(inner2.status).toBe("EXECUTED");
+
+    /* 到期：reminder 发通知并 DONE */
+    let notif = null, task = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 700));
+      const tasks = await j(await SELF.fetch(BASE + "/api/tasks", { headers: { authorization: `Bearer ${out.token}` } }));
+      task = tasks.tasks.find((t) => t.type === "reminder");
+      if (task && task.status !== "PENDING") break;
+    }
+    expect(task).toBeTruthy();
+    expect(task.status).toBe("DONE");
+    const notifs = await j(await SELF.fetch(BASE + "/api/notifications", { headers: { authorization: `Bearer ${out.token}` } }));
+    notif = (notifs.notifications ?? []).find((n) => (n.title ?? "").includes("提醒"));
+    expect(notif).toBeTruthy();
+    expect(notif.body).toContain("Netflix");
+  }, 30000);
 });

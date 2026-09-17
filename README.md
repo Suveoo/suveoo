@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 225 用例（真实 workerd 运行时）
+npm test                  # 235 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -749,17 +749,17 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 1. **消息流**：
   - 用户消息：右对齐黑底白字圆角气泡。
-  - AI 消息：左对齐白底灰边气泡，**真流式输出**（Worker 对上游 Messages API 加 `stream:true`，边收 `content_block_delta` 边以 `token` 事件转发——生产实测纯文本 21 个 token 事件/单事件最长 9 字符、工具轮 105 个 token 事件；前端打字机缓冲作平滑层：token 到达后按每帧 12 字 rAF 渐进渲染 Markdown，done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序；工具调用轮由 Worker 聚合完整 JSON 后才执行）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
+  - AI 消息：左对齐白底灰边气泡，**真流式输出**（Worker 对上游 Messages API 加 `stream:true`，边收 `content_block_delta` 边以 `token` 事件转发——生产实测纯文本 21 个 token 事件/单事件最长 9 字符、工具轮 105 个 token 事件；前端打字机缓冲作平滑层：token 到达后按 rAF 渐进渲染 Markdown，帧步长自适应积压量（12-48 字/帧：长回答尾部追平收敛到约 1 秒内、小步长保持打字观感），done 到达待打字追平再收尾，GenUI 卡插入前先追平保持文卡顺序；工具调用轮由 Worker 聚合完整 JSON 后才执行）。移动端滚动锚定最后一条消息（预留底导航实际高度 +12px，只向下不回滚），不再滚到文档底避免把 footer 拉进视口。
   - AI 头像 = `suveoo-ai-logo.svg` 32px。
   - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。转账/预约确认卡展示：金额、收款人（已验证徽章）、付款卡、备注、（预约另含执行时间与重复规则）、追踪号与 grant 前缀；AI 通道一切黄级 INPUT_REQUIRED 均出确认卡并挂「确认/取消」（含理财申购、收款人管理等守卫操作）。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
 2. **空态/欢迎屏**：AI hero 插画（`illustrations/ai-hero.svg`）+ 欢迎语 + 6 个场景 chips（来自 `assets/data/scenarios.json`，覆盖赛题六场景各一条）+ 「查看评测看板」链接（/ai/benchmark）。
-3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话历史侧拉列表（最近 20 个会话，`GET /api/ai/sessions`）。
+3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话存储（最近 20 个会话，`GET /api/ai/sessions` 返回，前端侧拉列表待接入）。
 4. **中断与接管**：流式输出期间发送按钮切换为「停止」（stop 图标 + aria-label，`S.chat.stop()` 经 AbortController 中断请求——已到达的部分文本保留展示，用户主动停止不算错误）；每条黄/红确认卡自带「取消」。错误事件以红色气泡完整呈现错误信息（不会被"完成"占位覆盖）；单个 GenUI 卡渲染异常只损失该卡，不中断流。
 
 ### 8.3 技术实现（关键）
 
-- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream`；两条路径均 45s 超时兜底（网关挂起不再永挂"思考中"）。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
+- **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；系统提示词每次请求动态前缀注入当前日期（北京时间+星期+相对日期换算指引——模型不知道"今天"就无法换算"下周三"）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream` 与 `ai.llm_payload`（每轮请求体字符数/消息数/工具数）；两条路径均 45s 超时兜底（网关挂起不再永挂"思考中"）。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
 - **确认权硬隔离（AI 通道）**：黄/红操作的 consent grant 完整 hash 只随 GenUI 确认卡下发**浏览器**（用户点击 attachConfirm 直连 `/mcp` 携带 grant_hash 完成两段式）；聊天循环内模型传入的 `grant_hash`/`otp` 一律剥离，模型侧 `INPUT_REQUIRED` 的 tool_result 仅含 8 位 grant 前缀且不含卡——模型物理上无法"替用户确认"（规则 4 提示词之外的硬约束）。同一工具在确认卡 pending 期间的重复调用以 `ALREADY_PENDING` tool_result 回绝。`/mcp` 端点（用户 JWT 编程通道）保持完整 grant 两段式语义。
 - **SSE 事件类型**：`token`（文本增量）、`genui_event`（卡片）、`trust_event`（控制台，§2.11）、`done`（含 trace 汇总与耗时）、`error`。
 - 会话存储：会话摘要 + 消息存 ledger-do（用户分区），Trust Console 事件流随消息回放。
@@ -787,7 +787,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 | 18 | autopay_manage | 黄 | 自动扣款开关 |
 | 19 | fx_exchange | 黄/红 | 结汇购汇（服务端实时牌价结算：购汇卖出价/结汇买入价、JPY 每 100 日元口径、可选 from_card——**购汇方向可选信用卡=信用支付**、结汇仅借记卡；红/黄按 CNY 腿分级） |
 | 20 | funds_lock | 黄 | 资金锁定（场景 6） |
-| 21 | scheduled_task_create | 黄 | 定时/长程任务建立 |
+| 21 | scheduled_task_create | 黄 | 定时/长程任务建立（`task_type="reminder"` 为无金额提醒——到期站内通知；金额只在 transfer 子对象时服务端反向归一到顶层） |
 | 22 | wealth_product_purchase | 红 | 申购 |
 | 23 | wealth_product_redeem | 红 | 赎回（按市值结算：本金 × 当前净值 ÷ 成本净值，浮盈浮亏实时兑现） |
 | 24 | card_freeze / card_unfreeze | 红 | 冻结/解冻（两个注册名） |
@@ -1124,6 +1124,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.8（2026-09-18）：**Suveoo AI 性能实测与系统优化**（先基准后优化，六场景 18 指令实测对比）——**基准**：中位首 token 10,258ms / 总耗时 12,726ms，每轮 LLM 往返 3.5-7s 为主导成本；全轮 `ai.llm_stream` 185/185 ok。**优化后首 token −33% / 总耗时 −21%**（六场景 18 指令同口径复测）。四项后端改动：① **系统提示词保义瘦身**（1693→1474 字符）+ 反编造 URL 硬约束（含 suveoo.com 域内路径）+ 内部术语泄漏治理（grant_hash/INPUT_REQUIRED 不再出现在用户回答，出卡前不得声称确认卡已存在——治幻觉出卡）+ **当前日期注入**（北京时间+星期+相对日期换算指引——模型不知道"今天"则"下周三"退化为反问，实测注入后正确换算出卡）；② **airing 事件环 KV 合并**：每工具调用 7 次读改写 → 1 次单批写；③ **提醒类长程任务** `task_type="reminder"`（无金额豁免双校验，到期发站内通知——"Netflix 续费提醒我"从 BLOCKED(INVALID_AMOUNT) 变为出卡建单）+ transfer.amount 反向归一（金额只在 transfer 子对象时提升顶层，治 INVALID_AMOUNT 浪费轮）；④ 请求体观测量 `ai.llm_payload`（实测首轮 10.7KB）。**前端 v=b114**：打字机帧步长自适应积压量（12→48 字/帧，长回答尾部追平 ~1.9s→~1s）。评估后放弃：工具子集注入（误路由风险 > <1s 收益）、max_tokens/循环上限/历史裁剪（维持现状，依据记录于 notes 第二十轮）、网关失败记忆（零失败样本）。**安全语义锁定测试**：提示词 15 组关键句断言防后续瘦身削弱。红级 OTP 全链路复验（10do：Gmail 真码→EXECUTED TXMU5U4GOPB24854→Telegram 到达）。测试 225 → 235（reminder/反向归一/提示词锁定 +10）。
 - v3.7（2026-09-17）：强制换图 + 卡号复制兜底 + **/demo-lab 队员隐藏灌数据入口**——**ai-hero.svg 强制换图**：插画引用跟随页面资产版本（`?v=b110`），新 URL 全员 miss 回源 R2——所有用户 100% 看到新 logo（实测 hero src 带版本参数；今后更新该插画只需 bump 版本）；**卡号复制**：`S.ui.copy()` clipboard API + textarea/execCommand 双保险（部分移动 webview 拒绝异步剪贴板 API 时静默失败）；**/demo-lab**（L01，noindex 不进导航/sitemap，密码门 `suveoo_data_injection`）：GET `/api/demo/self-seed` 实时数据源快照（SEED_VERSION 自查 + 逐收款人掩码卡号/分组/拟真度 + 指定账户缺失提示 + 注入量预估——数据源变动自动跟随永不失效）；POST 只灌**本人**账户（DEMO_MODE + 登录态，无可分享 token，AUDIT_KV 审计，waitUntil 客户端断开保活）；收款人=registry 动态枚举（全部 suveoo 域名账户含 31 personas + 指定团队账户谢宇洲/黄嗣仁置顶；张三/李四/王五/女儿/房东陈叔/演示用户沉底；排除本人）；种子通用人名映射为真实收款人；结果核对面板（expected vs actual + 差异告警）。**workerd DO 不支持显式 BEGIN/COMMIT**（实测踩坑）——原子性由幂等整段重灌兜底（中断最坏=中间态，重跑自愈）。实测全流程：密码门/错码 toast/34 人预检/7.8s 运行/34-34 全真实核对；demo 账户已恢复官方 mogul 口径。测试 222 → 225；i18n 818 → 856×4（demoLab.* 38 键）。
 - v3.6（2026-09-17）：demo **mogul 拟真种子**（worker-only）——演示人物 13 → **31 个真实账户**（深圳科技圈/上海金融艺术圈/杭州生活圈 + 三城物业管家 + 5 位海外人脉 Kevin Zhang/Emily Chen/Daniel Wu/Sofia Liu/Marcus Wang，收款人 31/31 真实卡号）；流水 395 → **596 笔**（12 类加权商户池含六大爱好：运动健身/音乐乐器/数码科技/游戏装备/潮流收藏/生活美学；**三城房产**月供深圳湾 ¥28,453.27/静安 ¥19,236.84/文三 ¥13,572.51 + 三城水电燃气 + 管家物业费；**信用卡外币消费**（Amazon/骏河屋/Airbnb 等 memo 注明原币计价）+ 留学/差旅购汇；人脉转账 20+ 笔）；订阅 10 → **21**（海外 Spotify/PS Plus/XGP/Switch Online/Adobe CC 按 USD≈7.18 折算 + 国内全家桶；三条订阅暗模式角标）；账单 +3 房贷；任务 3 → 6；通知 14；**外币余额三币种**（USD 3,847.62/EUR 2,150.35/HKD 8,860.20，seedDemo op 支持 fx_balances 清库重灌）；竞赛锚点全保留。测试 217 → 222（seed-mogul：量级/锚点可复现/三城/六爱好海外/折算口径）。
 - v3.5（2026-09-17）：确认卡备注行与 AI 预约转账全流程——**确认卡增备注行**（所有确认卡显示 memo；预约卡另增执行时间/重复行；卡片参数合并改为外层服务端 params 全量覆盖 snapshot，逐字段追加的合并清单反复漏字段）；**AI 预约转账修复**：`genuiCardFor` 对 INPUT_REQUIRED 一律出 `transfer_confirmation` 确认卡（此前 scheduled_task_create 落到无任何操作的 `card_setting_confirm` 静态卡——"点不动的卡片设置确认"；wealth_*/收款人管理等守卫 intent 同乘此修复）；scheduled transfer 子对象展开到卡面 + 模型顶层字段/对象形收款人（`{id}`/`{id,name}`、recipient 与 recipient_name 两位置）归一；MCP 工具描述重写（transfer 形状/真实性/ISO 时间/禁止 grant 重试）；**过去 execute_at 拒绝**（INVALID_SCHEDULE_TIME——模型把"后天"算成过去日期时 saga alarm 会立即执行）。生产闭环实测：AI 指令 → 预约确认卡七项（标题/金额/收款人/付款卡/备注/执行时间/重复）→ 点击确认 → 任务中心 PENDING（补偿链+锁定预算+双时区）。测试 215 → 217；i18n 813 → 818×4。
