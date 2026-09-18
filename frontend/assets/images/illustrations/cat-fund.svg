@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="基金品类 3D 图标">
+  <!-- 理财·基金品类图标 v1：上升柱 + 金币 + 趋势箭头（金族） -->
+  <defs>
+    <linearGradient id="cf-bar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#F5B301"/>
+      <stop offset="1" stop-color="#FFD866"/>
+    </linearGradient>
+    <linearGradient id="cf-coin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFD866"/>
+      <stop offset="1" stop-color="#E09E00"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="48" cy="86" rx="30" ry="6" fill="#A16207" opacity="0.16"/>
+  <rect x="18" y="52" width="14" height="30" rx="4" fill="url(#cf-bar)"/>
+  <rect x="41" y="38" width="14" height="44" rx="4" fill="url(#cf-bar)"/>
+  <rect x="64" y="24" width="14" height="58" rx="4" fill="url(#cf-bar)"/>
+  <path d="M20 44 46 30l14 9 16-18" stroke="#A16207" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.85"/>
+  <path d="M64 20h13v13" stroke="#A16207" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.85"/>
+  <circle cx="76" cy="60" r="11" fill="url(#cf-coin)"/>
+  <circle cx="76" cy="60" r="6.6" fill="none" stroke="#8A5E00" stroke-width="1.4" opacity="0.6"/>
+  <path d="M76 55.5v9M73.8 57.6h4.4M73.8 62.4h4.4" stroke="#8A5E00" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+</svg>

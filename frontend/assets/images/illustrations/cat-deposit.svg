@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="存款品类 3D 图标">
+  <!-- 理财·存款品类图标 v1：存钱罐 + 增长硬币（青族） -->
+  <defs>
+    <linearGradient id="cd-body" x1="16" y1="26" x2="80" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5EEAD4"/>
+      <stop offset="1" stop-color="#0D9488"/>
+    </linearGradient>
+    <linearGradient id="cd-coin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE9A8"/>
+      <stop offset="1" stop-color="#F5B301"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="48" cy="86" rx="28" ry="5.5" fill="#0F766E" opacity="0.16"/>
+  <path d="M30 30c8-8 28-8 36 0 7 7 8 20 2 30-3 5-8 8-8 14v4H36v-4c0-6-5-9-8-14-6-10-5-23 2-30Z" fill="url(#cd-body)"/>
+  <path d="M40 34c5-4 11-4 16 0" stroke="#CCFBF1" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <rect x="52" y="74" width="10" height="8" rx="2.5" fill="#0F766E"/>
+  <rect x="68" y="42" width="7" height="9" rx="2" fill="#99F6E4" opacity="0.9"/>
+  <path d="M76 45.5h5" stroke="#99F6E4" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="42" cy="52" r="4" fill="#0F766E" opacity="0.75"/>
+  <circle cx="54" cy="52" r="4" fill="#0F766E" opacity="0.75"/>
+  <path d="M45 61c2.4 2.4 6.2 2.4 8.6 0" stroke="#0F766E" stroke-width="2.6" stroke-linecap="round" opacity="0.7"/>
+  <ellipse cx="70" cy="22" rx="9" ry="3.4" fill="url(#cd-coin)"/>
+  <path d="M61 22v6c0 1.9 4 3.4 9 3.4s9-1.5 9-3.4v-6" fill="url(#cd-coin)"/>
+  <ellipse cx="70" cy="16" rx="9" ry="3.4" fill="#FFE9A8"/>
+  <path d="M27 18l10-6M29 26l7-2" stroke="#2DD4BF" stroke-width="2.6" stroke-linecap="round" opacity="0.7"/>
+</svg>

@@ -1,4 +1,4 @@
-/* funds.js — P15 全部基金（搜索 + 排序 + 风险 tab） */
+/* funds.js — P15 全部基金（搜索 + 排序 + 风险 tab；E：近12月收益率大数字主视觉，字段零删减） */
 S.router.register("funds", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("funds.title"))}</h1>${S.sim.banner()}
@@ -22,19 +22,28 @@ S.router.register("funds", async () => {
   });
   sortSel.id = "f-sort";
   document.getElementById("f-sort").replaceWith(sortSel);
-  const card = (f) => `
-    <div class="card">
+  /* E：主数字 = 近12月收益率（大数字+单位小字+涨跌色）；6M/3Y/起购/NAV/资产类别全部保留为次级层级 */
+  const card = (f) => {
+    const r12 = Number(f.returns["1y"]);
+    const up = r12 >= 0;
+    return `
+    <div class="card fund-card2">
       <div class="row between"><b>${S.fmt.escape(f.name)}</b>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
-      <div class="muted small mono" style="margin:4px 0 8px">${S.fmt.escape(f.code)} · NAV ${f.nav}</div>
-      <div class="row between">
-        <div><div class="muted small">${S.fmt.escape(S.t("wealth.m6"))}</div><div class="fret">+${f.returns["6m"]}%</div></div>
-        <div><div class="muted small">${S.fmt.escape(S.t("wealth.m12"))}</div><div class="fret">+${f.returns["1y"]}%</div></div>
-        ${f.returns["3y"] != null ? `<div><div class="muted small">${S.fmt.escape(S.t("funds.m36"))}</div><div class="fret">+${f.returns["3y"]}%</div></div>` : ""}
-        <div style="text-align:right"><div class="muted small">${S.fmt.escape(S.t("funds.minInvest"))}</div><div class="mono">${S.fmt.escape(f.min_invest)}</div></div>
+      <div class="muted small mono" style="margin:4px 0 10px">${S.fmt.escape(f.code)} · NAV ${f.nav}</div>
+      <div class="fc-hero bg-tint-gold">
+        <img class="fc-art" src="/assets/images/illustrations/cat-fund.svg?v=${S.ui.v()}" alt="" loading="lazy">
+        <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.m12"))}${S.fmt.escape(S.t("funds.yield"))}</span>
+          <span class="n ${up ? "trend-up" : "trend-down"}">${up ? "+" : ""}${f.returns["1y"]}</span><span class="u ${up ? "trend-up" : "trend-down"}">%</span></div>
+        <div class="fc-hero-sub">
+          <span>${S.fmt.escape(S.t("wealth.m6"))} <b class="mono ${Number(f.returns["6m"]) >= 0 ? "trend-up" : "trend-down"}">+${f.returns["6m"]}%</b></span>
+          ${f.returns["3y"] != null ? `<span>${S.fmt.escape(S.t("funds.m36"))} <b class="mono ${Number(f.returns["3y"]) >= 0 ? "trend-up" : "trend-down"}">+${f.returns["3y"]}%</b></span>` : ""}
+          <span>${S.fmt.escape(S.t("funds.minInvest"))} <b class="mono">${S.fmt.escape(f.min_invest)}</b></span>
+        </div>
       </div>
       ${f.asset_class ? `<div class="muted small" style="margin-top:8px">${S.ui.badge(f.asset_class, "badge-gray")}</div>` : ""}
-      <div class="row" style="margin-top:12px"><a class="btn btn-sm btn-light" href="/wealth/funds/${f.slug}">${S.fmt.escape(S.t("funds.detail"))}</a></div>
+      <div class="row" style="margin-top:12px"><a class="btn btn-sm btn-accent-gold" href="/wealth/funds/${f.slug}">${S.fmt.escape(S.t("funds.detail"))}</a></div>
     </div>`;
+  };
   const render = () => {
     const q = document.getElementById("f-q").value.trim().toLowerCase();
     let list = funds.filter((f) => filter === "ALL" || Number(f.risk_level) === Number(filter));

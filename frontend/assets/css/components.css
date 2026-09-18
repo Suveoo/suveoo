@@ -134,3 +134,64 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .quiz-opt:hover { border-color: var(--color-navy); }
 .quiz-opt.on { border-color: var(--color-navy); background: var(--color-primary-tint); font-weight: 500; }
 .quiz-opt.on::before { border-color: var(--color-navy); box-shadow: inset 0 0 0 3px #fff; background: var(--color-navy); }
+
+/* ===== 设计语言现代化（第二十二轮，notes/webank-design-deconstruct.md）=====
+   彩色按钮 / 渐变卡 / 营销位 / 大数字排版。营销专用，确认卡与 Trust Console 等安全 UI 不套用。 */
+
+/* 彩色按钮：同色系对角渐变 + 深色投影（hover 提亮 g2 为主） */
+.btn-accent-orange, .btn-accent-gold, .btn-accent-violet, .btn-accent-teal, .btn-accent-rose, .btn-accent-sky { color: #fff; }
+.btn-accent-orange { background: linear-gradient(135deg, var(--c-orange-g1), var(--c-orange-g2)); box-shadow: 0 2px 8px rgba(249, 115, 22, .28); }
+.btn-accent-gold { background: linear-gradient(135deg, var(--c-gold-g1), var(--c-gold-g2)); box-shadow: 0 2px 8px rgba(217, 158, 0, .28); color: #4A3200; }
+.btn-accent-violet { background: linear-gradient(135deg, var(--c-violet-g1), var(--c-violet-g2)); box-shadow: 0 2px 8px rgba(124, 58, 237, .28); }
+.btn-accent-teal { background: linear-gradient(135deg, var(--c-teal-g1), var(--c-teal-g2)); box-shadow: 0 2px 8px rgba(13, 148, 136, .28); }
+.btn-accent-rose { background: linear-gradient(135deg, var(--c-rose-g1), var(--c-rose-g2)); box-shadow: 0 2px 8px rgba(225, 29, 72, .26); }
+.btn-accent-sky { background: linear-gradient(135deg, var(--c-sky-g1), var(--c-sky-g2)); box-shadow: 0 2px 8px rgba(14, 143, 224, .28); }
+.btn-accent-orange:hover, .btn-accent-gold:hover, .btn-accent-violet:hover, .btn-accent-teal:hover, .btn-accent-rose:hover, .btn-accent-sky:hover { filter: brightness(1.06); text-decoration: none; }
+
+/* 渐变底工具类（卡头/营销位/徽章底） */
+.bg-grad-orange { background: linear-gradient(135deg, var(--c-orange-g1), var(--c-orange-g2)); }
+.bg-grad-gold { background: linear-gradient(135deg, var(--c-gold-g1), var(--c-gold-g2)); }
+.bg-grad-violet { background: linear-gradient(135deg, var(--c-violet-g1), var(--c-violet-g2)); }
+.bg-grad-teal { background: linear-gradient(135deg, var(--c-teal-g1), var(--c-teal-g2)); }
+.bg-grad-rose { background: linear-gradient(135deg, var(--c-rose-g1), var(--c-rose-g2)); }
+.bg-grad-sky { background: linear-gradient(135deg, var(--c-sky-g1), var(--c-sky-g2)); }
+.bg-grad-navy { background: linear-gradient(135deg, #101851, #1E2A78 55%, #35479E); }
+.bg-tint-orange { background: var(--c-orange-tint); } .bg-tint-gold { background: var(--c-gold-tint); }
+.bg-tint-violet { background: var(--c-violet-tint); } .bg-tint-teal { background: var(--c-teal-tint); }
+.bg-tint-rose { background: var(--c-rose-tint); } .bg-tint-sky { background: var(--c-sky-tint); }
+.tx-orange { color: var(--c-orange-deep); } .tx-gold { color: var(--c-gold-deep); } .tx-violet { color: var(--c-violet-deep); }
+.tx-teal { color: var(--c-teal-deep); } .tx-rose { color: var(--c-rose-deep); } .tx-sky { color: var(--c-sky-deep); }
+
+/* 营销产品卡：渐变通栏 + 白字 + 3D 插画位 + CTA（首页情境推荐/AI 洞察共用骨架） */
+.promo-card { position: relative; border-radius: var(--r-card-lg); overflow: hidden; color: #fff; box-shadow: var(--shadow-lg); display: flex; align-items: stretch; min-height: 128px; }
+.promo-card .pc-body { position: relative; z-index: 1; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.promo-card .pc-tag { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 2px 10px; }
+.promo-card .pc-title { font-size: 17px; font-weight: 700; line-height: 1.35; }
+.promo-card .pc-desc { font-size: 12.5px; color: rgba(255,255,255,.88); line-height: 1.55; }
+.promo-card .pc-cta { margin-top: auto; align-self: flex-start; background: #fff; color: var(--color-ink); border: none; border-radius: 999px; font-weight: 600; font-size: var(--fs-12); padding: 7px 16px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.promo-card .pc-cta:hover { text-decoration: none; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.promo-card .pc-art { position: absolute; right: -6px; bottom: -10px; width: 132px; height: 132px; z-index: 0; opacity: .95; pointer-events: none; }
+@media (max-width: 767px) {
+  .promo-card .pc-art { width: 108px; height: 108px; right: -12px; }
+  .promo-card .pc-body { padding: 14px 16px; }
+}
+
+/* 大数字排版三件套：大数字 + 单位小字 + 标签灰（涨跌色沿用"收入=绿/支出=红"既有语义） */
+.num-xl { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+.num-xl .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+.num-xl.lg .n { font-size: 38px; }
+.num-xl .u { font-size: var(--fs-12); font-weight: 600; color: var(--color-ink-2); }
+.num-xl .lb { display: block; font-size: var(--fs-12); color: var(--color-ink-2); width: 100%; margin-bottom: 2px; }
+.trend-up { color: var(--color-green); }
+.trend-down { color: var(--color-red); }
+.trend-pill { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-12); font-weight: 600; border-radius: 999px; padding: 2px 8px; }
+.trend-pill.up { background: var(--color-green-bg); color: var(--color-green); }
+.trend-pill.down { background: var(--color-red-bg); color: var(--color-red); }
+
+/* 多彩宫格图标底（首页服务宫格按入口轮转 6 色 tint + 同色系深色图标） */
+.qi.qi-orange { background: var(--c-orange-tint); } .qi.qi-orange svg { color: var(--c-orange-deep); }
+.qi.qi-gold { background: var(--c-gold-tint); } .qi.qi-gold svg { color: var(--c-gold-deep); }
+.qi.qi-violet { background: var(--c-violet-tint); } .qi.qi-violet svg { color: var(--c-violet-deep); }
+.qi.qi-teal { background: var(--c-teal-tint); } .qi.qi-teal svg { color: var(--c-teal-deep); }
+.qi.qi-rose { background: var(--c-rose-tint); } .qi.qi-rose svg { color: var(--c-rose-deep); }
+.qi.qi-sky { background: var(--c-sky-tint); } .qi.qi-sky svg { color: var(--c-sky-deep); }

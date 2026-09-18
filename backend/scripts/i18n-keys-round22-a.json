@@ -1,0 +1,14 @@
+{
+  "zh-CN": {
+    "funds.yield": "收益率",
+    "deps.hot": "长期限"
+  },
+  "zh-TW": {
+    "funds.yield": "收益率",
+    "deps.hot": "長期限"
+  },
+  "en-US": {
+    "funds.yield": " return",
+    "deps.hot": "Long term"
+  }
+}

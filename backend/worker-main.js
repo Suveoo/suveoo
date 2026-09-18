@@ -3814,10 +3814,22 @@ export class LedgerDO {
           const monthly = this.#rows(sql.exec(
             `SELECT substr(ts,1,7) AS m, direction, SUM(CAST(amount_cents AS INTEGER)) AS total FROM tx WHERE ts >= datetime('now','-180 days') GROUP BY m, direction ORDER BY m`));
           const anomaly = this.#rows(sql.exec(`SELECT * FROM tx WHERE direction='OUT' AND CAST(amount_cents AS INTEGER) > 300000 ORDER BY ts DESC LIMIT 5`));
+          /* 本月/上月分类收支（交易记录页"结果优先"环比 + 洞察规则共用；UTC 月口径与 monthly 一致） */
+          const thisM = NOW.slice(0, 7);
+          const lastD = new Date(Date.now() - 26 * 86400000).toISOString().slice(0, 7);
+          const byCatMonth = this.#rows(sql.exec(
+            `SELECT substr(ts,1,7) AS m, category, direction, COUNT(*) AS n, SUM(CAST(amount_cents AS INTEGER)) AS total FROM tx
+             WHERE substr(ts,1,7) IN (?, ?) GROUP BY m, category, direction ORDER BY total DESC`, thisM, lastD));
+          /* 近 60 天入账方聚合（洞察规则"月薪入账→定投建议"的确定性信号源） */
+          const incomeRecent = this.#rows(sql.exec(
+            `SELECT counterparty, COUNT(*) AS n, SUM(CAST(amount_cents AS INTEGER)) AS total FROM tx
+             WHERE direction='IN' AND ts >= datetime('now','-60 days') GROUP BY counterparty ORDER BY total DESC LIMIT 8`));
           return json({
             by_category: byCat.map((r) => ({ category: r.category, count: r.n, total: centsToStr(BigInt(r.total ?? 0)) })),
             by_card: byCard.map((r) => ({ card: r.card ?? null, count: r.n, total: centsToStr(BigInt(r.total ?? 0)) })),
-            monthly, anomalies: anomaly, notice: "这是模拟银行系统，不涉及真实资金行为。" });
+            monthly, by_category_month: byCatMonth,
+            income_recent: incomeRecent.map((r) => ({ counterparty: r.counterparty, count: r.n, total: centsToStr(BigInt(r.total ?? 0)) })),
+            anomalies: anomaly, notice: "这是模拟银行系统，不涉及真实资金行为。" });
         }
         case "insight": {
           const sub = this.#rows(sql.exec("SELECT * FROM subscriptions WHERE status = 'ACTIVE' ORDER BY usage_score ASC LIMIT 1"))[0];

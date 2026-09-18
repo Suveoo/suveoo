@@ -15,11 +15,21 @@
   --color-green-bg: #EAF4EF;
   --color-yellow-bg: #FBF3E4;
   --color-red-bg: #F9ECEA;
+  /* 功能色板（营销/品类/权益专用；命名刻意避开 green/yellow/red——三色权限语义色独占上述槽位，见 notes/webank-design-deconstruct.md）
+     每族 4 档：标准 / 深 / 浅底 tint / 渐变 stop ×2（135deg 对角，深在前浅在后） */
+  --c-orange: #F97316; --c-orange-deep: #C2410C; --c-orange-tint: #FFF1E6; --c-orange-g1: #F97316; --c-orange-g2: #FFB020;
+  --c-gold: #D99E00; --c-gold-deep: #A16207; --c-gold-tint: #FDF6E0; --c-gold-g1: #F5B301; --c-gold-g2: #FFD866;
+  --c-violet: #7C3AED; --c-violet-deep: #5B21B6; --c-violet-tint: #F1EAFE; --c-violet-g1: #6D28D9; --c-violet-g2: #A78BFA;
+  --c-teal: #0D9488; --c-teal-deep: #0F766E; --c-teal-tint: #E4F6F3; --c-teal-g1: #0D9488; --c-teal-g2: #2DD4BF;
+  --c-rose: #E11D48; --c-rose-deep: #BE123C; --c-rose-tint: #FDECF1; --c-rose-g1: #E11D48; --c-rose-g2: #FB7185;
+  --c-sky: #0E8FE0; --c-sky-deep: #0369A1; --c-sky-tint: #E7F4FC; --c-sky-g1: #0E8FE0; --c-sky-g2: #38BDF8;
   --font-sans: "Inter", "Noto Sans SC", "Noto Sans TC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Noto Sans Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --fs-12: 12px; --fs-14: 14px; --fs-16: 16px; --fs-20: 20px; --fs-28: 28px; --fs-36: 36px;
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
-  --r-card: 12px; --r-btn: 8px; --r-pill: 24px;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --r-card: 16px; --r-card-lg: 20px; --r-btn: 10px; --r-pill: 24px;
+  --shadow: 0 1px 2px rgba(23, 27, 64, .04), 0 6px 20px rgba(23, 27, 64, .07);
+  --shadow-lg: 0 2px 4px rgba(23, 27, 64, .05), 0 12px 32px rgba(23, 27, 64, .12);
+  --grad-primary: linear-gradient(135deg, #1E2A78, #35479E);
   --z-header: 100; --z-dropdown: 200; --z-modal: 300; --z-toast: 400;
 }

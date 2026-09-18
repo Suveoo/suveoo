@@ -19,6 +19,8 @@ S.ui = {
     } catch { return false; }
   },
   icon(name, size = 20) { return `<svg class="ic" width="${size}" height="${size}" aria-hidden="true"><use href="/assets/icons/sprite.svg#i-${name}"/></svg>`; },
+  /* 当前 HTML 资产版本（?v=bNNN）：JS 内引用图片/插画时拼 ?v= 用——R2 内容更新后 bump 版本即全员换图（第十七轮教训） */
+  v() { return (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1] ?? ""; },
   clear(node) { while (node.firstChild) node.removeChild(node.firstChild); },
   toast(msg, isErr = false) {
     let wrap = document.querySelector(".toast-wrap");

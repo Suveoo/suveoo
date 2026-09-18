@@ -36,14 +36,16 @@ S.router.register("wealth", async () => {
       S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800);
     };
   }
-  /* 基金 / 存款 / 外汇 */
+  /* 基金 / 存款 / 外汇（设计语言现代化：品类插画 + 大数字主视觉，字段零删减） */
   const funds = (await S.fundCache()).filter(Boolean);
   document.getElementById("funds").innerHTML = funds.slice(0, 5).map((f) => `
     <div class="fund-card">
       <div class="fname">${S.fmt.escape(f.name)}</div>
       <div style="margin:8px 0">${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)} <span class="muted small mono">NAV ${f.nav}</span></div>
-      <div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("wealth.m6"))}</div><div class="fret">+${f.returns["6m"]}%</div></div>
-      <div style="text-align:right"><div class="muted small">${S.fmt.escape(S.t("wealth.m12"))}</div><div class="fret">+${f.returns["1y"]}%</div></div></div>
+      <div class="fc-mini bg-tint-gold"><img class="fc-art-sm" src="/assets/images/illustrations/cat-fund.svg?v=${S.ui.v()}" alt="" loading="lazy">
+        <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.m12"))}${S.fmt.escape(S.t("funds.yield"))}</span><span class="n trend-up" style="font-size:22px">+${f.returns["1y"]}</span><span class="u trend-up">%</span></div></div>
+      <div class="row between" style="margin-top:8px"><div><div class="muted small">${S.fmt.escape(S.t("wealth.m6"))}</div><div class="fret">+${f.returns["6m"]}%</div></div>
+      <div style="text-align:right"><div class="muted small">${S.fmt.escape(S.t("funds.minInvest"))}</div><div class="mono small" style="font-weight:600">${S.fmt.escape(f.min_invest)}</div></div></div>
       <div class="row" style="margin-top:10px"><a class="btn btn-sm btn-light" href="/wealth/funds/${f.slug}">${S.fmt.escape(S.t("funds.detail"))}</a>
       <button class="ai-chip ask" data-q="${S.fmt.escape(S.t("wealth.suitPrompt", f.name))}">${S.ui.icon("ai", 12)} AI</button></div>
     </div>`).join("");
@@ -51,7 +53,8 @@ S.router.register("wealth", async () => {
   document.getElementById("deps").innerHTML = deps.map((d) => `
     <div class="fund-card">
       <div class="fname">${S.fmt.escape(d.name)}</div>
-      <div class="fret" style="margin:10px 0">${d.rate}%</div>
+      <div class="fc-mini bg-tint-teal" style="margin:8px 0"><img class="fc-art-sm" src="/assets/images/illustrations/cat-deposit.svg?v=${S.ui.v()}" alt="" loading="lazy">
+        <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("deps.rate"))}</span><span class="n tx-teal" style="font-size:22px">${d.rate}</span><span class="u tx-teal">%</span></div></div>
       <div class="muted small">${S.fmt.escape(d.term)} · ${S.fmt.escape(S.t("deps.minFrom", d.min))}</div>
       <a class="btn btn-sm btn-light" style="margin-top:10px" href="/wealth/deposits/${d.slug}">${S.fmt.escape(S.t("deps.detail"))}</a>
     </div>`).join("");

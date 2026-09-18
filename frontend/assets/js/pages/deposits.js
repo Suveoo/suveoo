@@ -1,4 +1,4 @@
-/* deposits.js — P17 全部存款方案（六方案卡片 + 本金联动到期本息对比表，复用 deposit-compare 口径） */
+/* deposits.js — P17 全部存款方案（E：利率大数字主视觉，条款字段零删减；对比表与 deposit-compare 同口径） */
 S.router.register("deposits", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("deps.title"))}</h1>${S.sim.banner()}<div class="grid grid-2" id="grid">${S.ui.skeleton(4)}</div>
@@ -12,12 +12,17 @@ S.router.register("deposits", async () => {
   const deps = (await Promise.all(["demand", "notice-7d", "term-3m", "term-6m", "term-1y", "term-3y"].map((s) => S.api.json(`/assets/data/deposits/${s}.json`)))).filter(Boolean);
   const grid = document.getElementById("grid");
   if (!deps.length) { grid.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
+  /* E：主数字 = 年利率（大数字+%单位小字）；期限/起购/规则/计息方式全保留为次级 */
   grid.innerHTML = deps.map((d) => `
-    <div class="card">
-      <div class="row between"><b>${S.fmt.escape(d.name)}</b><span class="fret">${d.rate}%</span></div>
-      <div class="muted small" style="margin:6px 0">${S.fmt.escape(S.t("deps.term"))}：${S.fmt.escape(d.term)} · ${S.fmt.escape(S.t("deps.minFrom", d.min))}</div>
-      <div class="muted small">${S.fmt.escape(d.rules)}${d.interest_type ? " · " + S.fmt.escape(d.interest_type) : ""}</div>
-      <a class="btn btn-sm btn-light" style="margin-top:10px" href="/wealth/deposits/${d.slug}">${S.fmt.escape(S.t("deps.detail"))}</a>
+    <div class="card fund-card2">
+      <div class="row between"><b>${S.fmt.escape(d.name)}</b>${d.slug === "term-1y" || d.slug === "term-3y" ? `<span class="badge badge-gray">${S.fmt.escape(S.t("deps.hot"))}</span>` : ""}</div>
+      <div class="fc-hero bg-tint-teal" style="margin-top:10px">
+        <img class="fc-art" src="/assets/images/illustrations/cat-deposit.svg?v=${S.ui.v()}" alt="" loading="lazy">
+        <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("deps.rate"))}</span><span class="n tx-teal">${d.rate}</span><span class="u tx-teal">%</span></div>
+        <div class="fc-hero-sub"><span>${S.fmt.escape(S.t("deps.term"))} <b>${S.fmt.escape(d.term)}</b></span><span>${S.fmt.escape(S.t("funds.minInvest"))} <b>${S.fmt.escape(S.t("deps.minFrom", d.min))}</b></span></div>
+      </div>
+      <div class="muted small" style="margin-top:10px">${S.fmt.escape(d.rules)}${d.interest_type ? " · " + S.fmt.escape(d.interest_type) : ""}</div>
+      <a class="btn btn-sm btn-accent-teal" style="margin-top:10px;align-self:flex-start" href="/wealth/deposits/${d.slug}">${S.fmt.escape(S.t("deps.detail"))}</a>
     </div>`).join("");
   /* 对比表：与 deposit-compare 工具同口径（期限内滚动存满整期 + 剩余按活期） */
   const TERM_M = { demand: 0, "notice-7d": 7 / 30, "term-3m": 3, "term-6m": 6, "term-1y": 12, "term-3y": 36 };

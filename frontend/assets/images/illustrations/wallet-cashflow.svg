@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-label="收支钱包 3D 图标">
+  <!-- 本月收支卡装饰 v1：钱包 + 出入箭头（青/橙双色，收支语义） -->
+  <defs>
+    <linearGradient id="wc-wallet" x1="16" y1="26" x2="80" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5EEAD4"/>
+      <stop offset="1" stop-color="#0D9488"/>
+    </linearGradient>
+    <linearGradient id="wc-chip" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE9A8"/>
+      <stop offset="1" stop-color="#F5B301"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="48" cy="86" rx="28" ry="5.5" fill="#0F766E" opacity="0.16"/>
+  <rect x="16" y="30" width="64" height="48" rx="10" fill="url(#wc-wallet)"/>
+  <path d="M24 30a8 8 0 0 1 8-8h34a6 6 0 0 1 0 12H24" fill="#99F6E4" opacity="0.9"/>
+  <rect x="58" y="44" width="22" height="20" rx="6" fill="#0F766E"/>
+  <circle cx="69" cy="54" r="4.6" fill="url(#wc-chip)"/>
+  <path d="M28 46h18M28 56h12" stroke="#CCFBF1" stroke-width="3.4" stroke-linecap="round" opacity="0.85"/>
+  <path d="M80 12v14m0 0 5-5m-5 5-5-5" stroke="#F97316" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 84v-12m0 0 4.6 4.6M14 72l-4.6 4.6" stroke="#0D9488" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+</svg>
