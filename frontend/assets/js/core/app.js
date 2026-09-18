@@ -5,9 +5,21 @@ S.chrome = {
     { key: "pay", path: "/pay", icon: "pay", section: "main" },
     { key: "wealth", path: "/wealth", icon: "wealth", section: "main" },
   ],
+  /* 静态二级项注册表（account 组随登录态动态构建，见 render；其子项均在 /account 前缀下由兜底逻辑归属）。
+     active() 归属判定优先查此表——路径前缀会误判跨分区注册的二级项（如 /account/transactions 属「收付」） */
+  SUB_STATIC: {
+    home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
+    pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/account/transactions", "list", "pay.txHistory"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
+    wealth: [["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
+  },
   active() {
     const p = location.pathname;
     if (p.startsWith("/ai")) return "ai";
+    /* 二级项归属优先于路径前缀：如 /account/transactions 注册在「收付」组，
+       不得因 /account 前缀被误展开进「我的帐户」 */
+    for (const [sec, list] of Object.entries(this.SUB_STATIC)) {
+      if ((list ?? []).some(([sp]) => p === sp || p.startsWith(sp + "/"))) return sec;
+    }
     if (p.startsWith("/transfer")) return "pay";
     for (const n of this.nav) if (p.startsWith(n.path)) return n.key;
     if (p.startsWith("/account")) return "account";
@@ -38,9 +50,7 @@ S.chrome = {
     /* drawer (PC)：一级全宽（内嵌人字箭头 ∨/>）点击即跳转即展开（单开）；
        顶部顺序：Suveoo AI → 「最近」独立平铺区（新用户以 5 条最常用填充）→ 主页 → 收付 → 财富 → 账户 */
     const SUB = {
-      home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
-      pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/account/transactions", "list", "pay.txHistory"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
-      wealth: [["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
+      ...this.SUB_STATIC,
       account: user
         ? [["/account/dashboard", "chart", "dash.title"], ["/account/cards", "card", "acct.grid.cards"], ["/account/security", "shield", "sec.title"], ["/account/downloads", "download", "acct.downloads"]]
         : [["/account/register", "plus", "login.toRegister"], ["/account/recovery", "help", "login.toRecovery"]],
