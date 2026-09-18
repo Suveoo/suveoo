@@ -179,3 +179,8 @@
   .ai-ins-grid { grid-template-columns: 1fr; gap: 8px; }
   .ai-ins-card { min-height: 0; }
 }
+
+/* ===== 交易记录页"结果优先"结论区（第二十二轮 D） ===== */
+.tx-sum-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+.tx-main-change { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 6px 14px; }
+.tx-main-change svg { color: var(--color-navy); }
