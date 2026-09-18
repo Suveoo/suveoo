@@ -2,7 +2,7 @@
 S.router.register("wealth", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("wealth.title"))}</h1>${S.sim.banner()}
-    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><span class="grow">${S.fmt.escape(S.t("wealth.aiAsk"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
+    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("wealth.aiAsk"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="card">${S.ui.skeleton(3)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.funds"))}</h2><a class="more" href="/wealth/funds">${S.fmt.escape(S.t("wealth.allFunds"))} →</a></div>
     <div class="hscroll" id="funds"></div>

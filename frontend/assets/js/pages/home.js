@@ -1,16 +1,14 @@
-/* home.js — P01 主页（第二十二轮 B 改版：AI 输入+语音 + 情境产品卡 + 本月收支一览；既有区块零删减） */
+/* home.js — P01 主页（第二十三轮 A：hero 极简化——仅保留全宽胶囊输入条，删海军蓝大容器与建议 chips；
+   情境产品卡 + 本月收支 + 既有区块零删减） */
 S.router.register("home", async ({ user }) => {
   const c = document.getElementById("content");
   const q = new URLSearchParams(location.search).get("q");
   if (q) { S.router.ai(q); return; }
   c.innerHTML = `
-    <div class="hero hero-v2">
-      <div class="hero-input" id="hero-input">
-        <img src="/assets/images/suveoo-ai-logo.svg" alt="">
-        <input id="hero-q" placeholder="${S.fmt.escape(S.t("home.heroPlaceholder"))}">
-        <button class="voice-btn" id="hero-mic" type="button">${S.ui.icon("mic", 18)}</button>
-      </div>
-      <div class="hero-chips" id="hero-chips"></div>
+    <div class="hero-input" id="hero-input">
+      <img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
+      <input id="hero-q" placeholder="${S.fmt.escape(S.t("home.heroPlaceholder"))}">
+      <button class="voice-btn" id="hero-mic" type="button">${S.ui.icon("mic", 16)}</button>
     </div>
     <div id="promo" style="margin-top:16px"></div>
     <div id="cashflow" style="margin-top:16px"></div>
@@ -26,35 +24,32 @@ S.router.register("home", async ({ user }) => {
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
     </div>`;
-  /* hero：Enter 提交 + 语音按钮（识别结果填框，不自动发送——用户核对后再回车/点 chip） */
+  /* hero 输入条：Enter 提交 + 语音按钮（识别结果填框，不自动发送——用户核对后再回车） */
   const go = () => { const v = document.getElementById("hero-q").value.trim(); if (v) S.router.ai(v); };
   document.getElementById("hero-input").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   S.voice.bind(document.getElementById("hero-mic"), document.getElementById("hero-q"));
-  S.api.json("/assets/data/scenarios.json").then((d) => { if (!d) return;
-    document.getElementById("hero-chips").innerHTML = d.home.map((s) => `<button class="chip">${S.fmt.escape(s)}${S.ui.chipGo}</button>`).join("");
-    S.ui.$$("#hero-chips .chip").forEach((b) => { b.onclick = () => user ? S.router.ai(b.textContent) : (location.href = "/account/login?next=/ai"); });
-  });
-  /* services：多彩宫格（六色 tint 轮转，微众风格"一屏多彩"） */
-  const qi = ["qi-sky", "qi-orange", "qi-violet", "qi-teal", "qi-gold", "qi-rose"];
+  /* services：多彩渐变宫格（第二十三轮 D：tint 圆底升级为 ic-* 彩色 squircle 图标，七族轮转同族不相邻） */
   const svc = [
-    ["/transfer/intrabank", "pay", S.t("pay.intrabank")],
-    ["disabled:crossBank", "bank", S.t("home.crossBank")],
-    ["disabled:crossBorder", "globe2", S.t("home.crossBorder")],
-    ["/pay/bills", "doc", S.t("home.billsShort")],
-    ["/account/cards", "card", S.t("acct.grid.cards")],
-    ["/wealth/funds", "wealth", S.t("wealth.funds").replace("Suveoo ", "")],
-    ["/wealth/fx", "exchange", S.t("wealth.allFx")],
-    ["/account/downloads", "download", S.t("acct.downloads")],
+    ["/transfer/intrabank", "ic-pay-sky", S.t("pay.intrabank")],
+    ["disabled:crossBank", "ic-bank-teal", S.t("home.crossBank")],
+    ["disabled:crossBorder", "ic-globe-violet", S.t("home.crossBorder")],
+    ["/pay/bills", "ic-doc-orange", S.t("home.billsShort")],
+    ["/account/cards", "ic-card-navy", S.t("acct.grid.cards")],
+    ["/wealth/funds", "ic-wealth-gold", S.t("wealth.funds").replace("Suveoo ", "")],
+    ["/wealth/fx", "ic-exchange-rose", S.t("wealth.allFx")],
+    ["/account/downloads", "ic-download-sky", S.t("acct.downloads")],
   ];
-  document.getElementById("services").innerHTML = svc.map(([href, ic, label], i) => href.startsWith("disabled:")
-    ? `<div class="quick-item disabled" data-dis="${href.slice(9)}"><span class="qi ${qi[i % qi.length]}">${S.ui.icon(ic, 22)}</span><span>${S.fmt.escape(label)}<br><span class="muted" style="font-size:10px">${S.fmt.escape(S.t("common.comingSoon"))}</span></span></div>`
-    : `<a class="quick-item" href="${href}"><span class="qi ${qi[i % qi.length]}">${S.ui.icon(ic, 22)}</span><span>${S.fmt.escape(label)}</span></a>`).join("");
+  document.getElementById("services").innerHTML = svc.map(([href, ic, label]) => href.startsWith("disabled:")
+    ? `<div class="quick-item disabled" data-dis="${href.slice(9)}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}<br><span class="muted" style="font-size:10px">${S.fmt.escape(S.t("common.comingSoon"))}</span></span></div>`
+    : `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("");
   S.ui.$$(".quick-item.disabled").forEach((el) => { el.onclick = () => S.ui.modal(`<h2>${S.fmt.escape(S.t("common.more"))}</h2><p class="muted">${S.fmt.escape(S.t("home.crossDisabled"))}</p>${S.sim.footnote()}`); });
 
   /* 情境产品卡（未登录/无命中 → 通用卡；规则见 core/insights.js，零 LLM） */
   const promoEl = document.getElementById("promo");
   const art = (p) => p ? `<img class="pc-art" src="${p}?v=${S.ui.v()}" alt="" loading="lazy">` : "";
-  const iconArt = (ic) => `<span class="pc-ico">${S.ui.icon(ic, 22)}</span>`;
+  /* promo 无插画时的彩色图标回退：规则引擎 icon 名 → ic-* 彩族（navy 徽标压住彩色渐变卡最稳） */
+  const promoIc = { trend: "ic-trend-teal", card: "ic-card-rose", doc: "ic-doc-sky", ai: "ic-ai-navy", star: "ic-star-gold" };
+  const iconArt = (ic) => `<span class="pc-ico">${S.ui.icon(promoIc[ic] ?? "ic-ai-navy", 40)}</span>`;
   const renderPromo = (it) => {
     const grad = { orange: "bg-grad-orange", gold: "bg-grad-gold", violet: "bg-grad-violet", teal: "bg-grad-teal", rose: "bg-grad-rose", sky: "bg-grad-sky" }[it.tone] ?? "bg-grad-navy";
     promoEl.innerHTML = `<div class="promo-card ${grad}" id="pc-${it.id}">
@@ -138,7 +133,7 @@ S.router.register("home", async ({ user }) => {
   }).catch(() => {});
   const ins = await S.api.get("/api/dashboard/insight");
   if (ins.ok) {
-    document.getElementById("insight").innerHTML = `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt="">
+    document.getElementById("insight").innerHTML = `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
       ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}</p>`).join("")}
       <div style="margin-top:10px"><button class="ai-chip" id="ask-ai">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div></div>`;

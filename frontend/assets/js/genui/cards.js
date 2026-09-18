@@ -87,7 +87,7 @@ S.genuiCards = {
       ${S.genuiCards.kv(Object.entries(c.snapshot?.params ?? {}).map(([k, v]) => [k, String(v)]))}</div>`;
   },
   insight_card(c) {
-    return `<div class="genui-card insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt="">
+    return `<div class="genui-card insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(c.title ?? S.t("genui.insight"))}</b><p class="muted small" style="margin-top:4px">${S.fmt.escape(c.body ?? "")}</p></div></div>`;
   },
   blocked_notice(c) {

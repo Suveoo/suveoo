@@ -2,7 +2,7 @@
 S.router.register("pay", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `
-    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><span class="grow">${S.fmt.escape(S.t("pay.aiTry"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
+    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("pay.aiTry"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="pay-actions">
       <a class="pay-action" href="/transfer/intrabank"><span class="pi">${S.ui.icon("bank", 26)}</span>${S.fmt.escape(S.t("pay.intrabank"))}</a>
       <div class="pay-action disabled" id="dis-cross"><span class="pi">${S.ui.icon("exchange", 26)}</span>${S.fmt.escape(S.t("home.crossBank"))}</div>

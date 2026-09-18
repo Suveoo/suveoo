@@ -1,35 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132" fill="none" role="img" aria-label="AI 洞察装饰 3D 插画">
-  <!-- AI 首屏洞察区装饰 v1：悬浮卡片 + 星光火花（紫族，压渐变卡底） -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132" fill="none" role="img" aria-label="Suveoo AI 洞察徽标">
+  <!-- AI 洞察区头图 v2（第二十三轮 D）：与 ai-hero 同 IP 家族的轻 3D 小徽——渐变 squircle 主形 + 白色四角星，
+       紫族卫星与数据小卡点缀；44px 展示（.ai-ins-head），也作 /ai 加载态徽标（22px）。 -->
   <defs>
-    <linearGradient id="ad-card1" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#EDE9FE"/>
-    </linearGradient>
-    <linearGradient id="ad-bar" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#A78BFA"/>
-      <stop offset="1" stop-color="#6D28D9"/>
+    <linearGradient id="ad-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1E2A78"/>
+      <stop offset="1" stop-color="#38BDF8"/>
     </linearGradient>
     <filter id="ad-shadow" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#2A1650" flood-opacity="0.25"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#101851" flood-opacity="0.25"/>
     </filter>
   </defs>
-  <g filter="url(#ad-shadow)" transform="rotate(-7 60 60)">
-    <rect x="26" y="30" width="62" height="44" rx="8" fill="url(#ad-card1)"/>
-    <rect x="34" y="40" width="30" height="6" rx="3" fill="#C4B5FD"/>
-    <rect x="34" y="52" width="44" height="4.6" rx="2.3" fill="#DDD6FE"/>
-    <rect x="34" y="60" width="36" height="4.6" rx="2.3" fill="#DDD6FE"/>
-    <rect x="34" y="68" width="10" height="10" rx="3" fill="url(#ad-bar)"/>
-    <rect x="47" y="68" width="10" height="10" rx="3" fill="url(#ad-bar)" opacity="0.65"/>
-    <rect x="60" y="68" width="10" height="10" rx="3" fill="url(#ad-bar)" opacity="0.4"/>
+  <g filter="url(#ad-shadow)">
+    <rect x="24" y="26" width="64" height="64" rx="20" fill="url(#ad-bg)"/>
+    <rect x="31" y="32" width="50" height="14" rx="7" fill="#fff" opacity=".16"/>
+    <path d="M56 38l4 11.6L71.6 54 60 58.4 56 70l-4-11.6L40.4 54 52 49.6z" fill="#fff"/>
   </g>
-  <g transform="rotate(9 96 78)">
-    <rect x="74" y="60" width="44" height="32" rx="7" fill="#FFFFFF" opacity="0.92"/>
-    <circle cx="87" cy="72" r="5" fill="#6D28D9" opacity="0.85"/>
-    <rect x="96" y="68" width="16" height="4.4" rx="2.2" fill="#C4B5FD"/>
-    <rect x="82" y="81" width="30" height="4.4" rx="2.2" fill="#EDE9FE"/>
+  <circle cx="98" cy="34" r="8" fill="#A78BFA"/>
+  <circle cx="100.5" cy="31.5" r="2.4" fill="#fff" opacity=".85"/>
+  <circle cx="21" cy="88" r="5" fill="#38BDF8" opacity=".9"/>
+  <g transform="rotate(8 96 92)">
+    <rect x="76" y="76" width="40" height="28" rx="8" fill="#fff"/>
+    <circle cx="88" cy="87" r="4.2" fill="#6D28D9" opacity=".85"/>
+    <rect x="95" y="83.5" width="14" height="3.8" rx="1.9" fill="#C4B5FD"/>
+    <rect x="83" y="94.5" width="26" height="3.8" rx="1.9" fill="#EDE9FE"/>
   </g>
-  <path d="M28 18l2.4 5.6 5.6 2.4-5.6 2.4L28 34l-2.4-5.6L20 26l5.6-2.4L28 18Z" fill="#FFFFFF" opacity="0.9"/>
-  <path d="M108 26l1.8 4.2 4.2 1.8-4.2 1.8-1.8 4.2-1.8-4.2-4.2-1.8 4.2-1.8 1.8-4.2Z" fill="#FFFFFF" opacity="0.65"/>
-  <circle cx="18" cy="52" r="2.6" fill="#FFFFFF" opacity="0.5"/>
-  <circle cx="118" cy="58" r="2" fill="#FFFFFF" opacity="0.4"/>
+  <path d="M28 18l1.5 3.8 3.8 1.5-3.8 1.5-1.5 3.8-1.5-3.8-3.8-1.5 3.8-1.5z" fill="#6D28D9" opacity=".5"/>
+  <circle cx="112" cy="114" r="2.4" fill="#A78BFA" opacity=".55"/>
 </svg>

@@ -92,7 +92,7 @@ S.chrome = {
       <aside class="side-drawer">
         <div class="drawer-group drawer-ai-group${act === "ai" ? " open" : ""}" data-sec="ai">
           <a class="drawer-ai${act === "ai" ? " active" : ""}" href="/ai">
-            <img src="/assets/images/suveoo-ai-logo.svg" alt="">
+            <img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
             <div class="ai-txt"><div class="t">Suveoo AI</div><div class="s">${S.fmt.escape(S.t("ai.drawerSub"))}</div></div>
             <span class="drawer-chev">${chev()}</span>
           </a>
@@ -116,7 +116,7 @@ S.chrome = {
       <nav class="bottom-nav">
         <a class="bn-item${act === "home" ? " active" : ""}" href="/home">${S.ui.icon("home")}<span>${S.t("nav.home")}</span></a>
         <a class="bn-item${act === "pay" ? " active" : ""}" href="/pay">${S.ui.icon("pay")}<span>${S.t("nav.pay")}</span></a>
-        <a class="bn-item bn-ai${act === "ai" ? " active" : ""}" href="/ai"><span class="ai-circle"><img src="/assets/images/suveoo-ai-logo.svg" alt=""></span><span>Suveoo AI</span></a>
+        <a class="bn-item bn-ai${act === "ai" ? " active" : ""}" href="/ai"><span class="ai-circle"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""></span><span>Suveoo AI</span></a>
         <a class="bn-item${act === "wealth" ? " active" : ""}" href="/wealth">${S.ui.icon("wealth")}<span>${S.t("nav.wealth")}</span></a>
         <a class="bn-item${act === "account" ? " active" : ""}" href="${user ? "/account" : "/account/login"}">${S.ui.icon("account")}<span>${user ? S.t("nav.account") : S.t("nav.login")}</span></a>
       </nav>`);

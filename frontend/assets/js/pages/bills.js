@@ -6,7 +6,7 @@ S.router.register("bills", async () => {
     <div class="card" style="margin-top:16px" id="bills">${S.ui.skeleton(4)}</div>`;
   const ins = await S.api.get("/api/dashboard/insight");
   document.getElementById("insight").innerHTML = ins.ok
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><div><b>${S.fmt.escape(S.t("bills.insight"))}</b>
+    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("bills.insight"))}</b>
        ${(ins.data.insights ?? []).map((t) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(t)}</p>`).join("")}</div></div>` : "";
   const r = await S.api.get("/api/bills");
   const el = document.getElementById("bills");

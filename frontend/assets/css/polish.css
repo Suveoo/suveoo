@@ -41,7 +41,7 @@ h2 { letter-spacing: -0.01em; }
 .btn-primary:active:not(:disabled) { box-shadow: none; }
 .btn-danger:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(15, 23, 42, .14); }
 .btn-ghost:hover:not(:disabled) { border-color: #CBD0DA; }
-.quick-item, .pay-action, .fund-card, .mini-action, .hero-input, .chip, .upload-box {
+.quick-item, .pay-action, .fund-card, .mini-action, .hero-input, .upload-box {
   transition: border-color .15s ease, background-color .15s ease, box-shadow .18s ease;
 }
 .quick-item:hover:not(.disabled),
@@ -50,12 +50,13 @@ h2 { letter-spacing: -0.01em; }
   border-color: var(--color-navy);
   box-shadow: 0 3px 14px rgba(15, 23, 42, .07);
 }
-.quick-item:hover:not(.disabled) .qi,
+/* 金刚区彩色 squircle hover 轻微放大（tint 底体系已退役）；pay 三按钮保留原 tint 反馈 */
+.quick-item .qi-wrap svg { transition: transform .15s ease; }
+.quick-item:hover:not(.disabled) .qi-wrap svg { transform: scale(1.08); }
 .pay-action:hover:not(.disabled) .pi {
   background: var(--color-primary-tint);
   box-shadow: inset 0 0 0 1px rgba(30, 42, 120, .18);
 }
-.chip:hover { border-color: var(--color-navy); color: var(--color-navy); background: var(--color-primary-tint); }
 .hero-input:focus-within { box-shadow: 0 0 0 3px var(--color-primary-tint); }
 .bank-card { transition: box-shadow .22s ease; }
 .bank-card:hover { box-shadow: 0 4px 18px rgba(15, 23, 42, .09); }
@@ -97,8 +98,7 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
 @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 480px) {
   h1 { font-size: 24px; }
-  .hero { padding: var(--sp-4); }
-  .hero-input { padding: 10px 14px; }
+  .hero-input { padding: 7px 7px 7px 14px; }
   .card { padding: var(--sp-4); }
   .page { padding-left: var(--sp-4); padding-right: var(--sp-4); }
 }
@@ -132,11 +132,6 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
 
 /* ===== 10. 移动端专项修复 ===== */
 
-/* 10.1 换行文本一律稳定靠左（chip 是 button，默认居中导致换行后"居中失效"观感） */
-.chip { text-align: left; }
-.hero-chips, .chat-chips { align-items: flex-start; }
-.chip { white-space: normal; word-break: break-word; }
-
 /* 10.2 通知下拉：文本列正确撑满并允许换行（此前 .grow 无 flex 定义） */
 .notif-item .grow { flex: 1; min-width: 0; }
 .notif-item .nt { line-height: 1.45; }
@@ -150,7 +145,6 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
   .auth-wrap { margin-top: var(--sp-4); }
   .brand-banner { padding: var(--sp-6) var(--sp-4); }
   .about-banner { padding: var(--sp-6) var(--sp-4); }
-  .hero { padding: var(--sp-4); }
 }
 
 /* ===== 11. 移动端/平板 AI 页：自然页面滚动 + 固定输入条 + 控制台全屏抽屉 ===== */
@@ -222,22 +216,13 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
 @media (min-width: 1024px) { .tc-close { display: none; } }
 body.tc-open { overflow: hidden; }
 
-/* ===== 12. 预测问题 chip：行距收紧 + 尾部灰色回勾箭头 ===== */
-.chip { line-height: 1.4; }
-.chip-go { width: 13px; height: 13px; margin-left: 5px; vertical-align: -2px; color: var(--color-ink-2); flex: none; }
-
 /* ===== 13. 控制台抽屉打开时底导航整体置于抽屉之上（仅 /ai 页；AI 圆钮负 margin 突入抽屉保持可点，几何上其余三钮不与抽屉重叠） ===== */
 @media (max-width: 767px) {
   body[data-page="ai"] .bottom-nav { z-index: calc(var(--z-modal) + 20); }
   .trust-console .tc-events { padding-bottom: 12px; }
 }
 
-/* ===== 14. 预测问题 chip 之间的间距收紧（行距 6px、移动端再收紧；chip 内部行距不变） ===== */
-.hero-chips, .chat-chips { gap: 6px 8px; }
-@media (max-width: 767px) {
-  .hero-chips, .chat-chips { gap: 4px 7px; }
-  .hero-chips .chip, .chat-chips .chip { padding: 4px 12px; }
-}
+/* ===== 14. （第二十三轮：预测问题 chip 体系已退役，原间距规则删除） ===== */
 
 /* ===== 15. 登录页：标题与表单间距 + 密码可见性切换 ===== */
 .auth-wrap .card h2 { margin-bottom: var(--sp-6); }

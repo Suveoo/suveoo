@@ -2,9 +2,10 @@
 S.router.register("account", async ({ user }) => {
   const c = document.getElementById("content");
   const items = [
-    ["/account/cards", "card", S.t("acct.grid.cards")], ["/account/dashboard", "chart", S.t("acct.dashboard")],
-    ["/account/security", "shield", S.t("acct.security")], ["/account/downloads", "download", S.t("acct.downloads")],
-    ["/notifications", "bell", S.t("acct.grid.notif")], ["/transfer/limits", "lock", S.t("pay.limits")],
+    /* 快捷入口宫格（第二十三轮 D：升级 ic-* 彩色 squircle，六族各异不相邻；安全入口用紫族——不占三色权限语义槽） */
+    ["/account/cards", "ic-card-navy", S.t("acct.grid.cards")], ["/account/dashboard", "ic-chart-sky", S.t("acct.dashboard")],
+    ["/account/security", "ic-shield-violet", S.t("acct.security")], ["/account/downloads", "ic-download-orange", S.t("acct.downloads")],
+    ["/notifications", "ic-bell-teal", S.t("acct.grid.notif")], ["/transfer/limits", "ic-lock-gold", S.t("pay.limits")],
   ];
   c.innerHTML = `
     <div class="card">
@@ -20,7 +21,7 @@ S.router.register("account", async ({ user }) => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("acct.recent"))}</h2><a class="more" href="/account/transactions">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card" id="recent">${S.ui.skeleton(3)}</div>
     <div class="grid grid-4" style="margin-top:16px">
-      ${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi">${S.ui.icon(ic, 22)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}
+      ${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}
     </div>
     <div class="card" style="margin-top:16px">
       <h3>${S.fmt.escape(S.t("acct.prefs"))}</h3>

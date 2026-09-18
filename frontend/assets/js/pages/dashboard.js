@@ -1,7 +1,7 @@
 /* dashboard.js — P27 仪表盘（自研 SVG 图表 + AI 解读） */
 S.router.register("dashboard", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><span class="grow">${S.fmt.escape(S.t("dash.aiRead"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
+  c.innerHTML = `<div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("dash.aiRead"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="card" id="ai-read">${S.ui.skeleton(1)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("dash.trend"))}</h2></div>
     <div class="card chart-box" id="d-trend">${S.ui.skeleton(1)}</div>
@@ -17,7 +17,7 @@ S.router.register("dashboard", async () => {
   const d = r.data;
   const ins = await S.api.get("/api/dashboard/insight");
   document.getElementById("ai-read").innerHTML = ins.ok
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><div><b>${S.fmt.escape(S.t("dash.aiRead"))}</b>
+    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("dash.aiRead"))}</b>
        ${(ins.data.insights ?? []).map((t) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(t)}</p>`).join("")}</div></div>` : "";
   /* 支出分类 → 桑基 */
   const palette = ["#1E2A78", "#3A4FA5", "#5B7C99", "#7A6A53", "#2C6E63", "#A44A3F", "#666B8F", "#8C8C9A"];

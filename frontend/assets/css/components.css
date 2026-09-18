@@ -11,7 +11,7 @@
 .btn-sm { padding: 6px 12px; font-size: var(--fs-12); border-radius: 6px; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
-.input, select.input, textarea.input { width: 100%; border: 1px solid var(--color-line); border-radius: var(--r-btn); padding: 10px 14px; font-size: var(--fs-14); font-family: inherit; background: #fff; color: var(--color-ink); }
+.input, select.input, textarea.input { width: 100%; min-width: 0; border: 1px solid var(--color-line); border-radius: var(--r-btn); padding: 10px 14px; font-size: var(--fs-14); font-family: inherit; background: #fff; color: var(--color-ink); }
 .input:focus { border-color: var(--color-navy); outline: none; box-shadow: 0 0 0 3px var(--color-primary-tint); }
 .input-lg { font-size: var(--fs-20); padding: 12px 16px; font-family: var(--font-mono); }
 label.field { display: block; margin-bottom: var(--sp-4); }
@@ -188,10 +188,4 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .trend-pill.up { background: var(--color-green-bg); color: var(--color-green); }
 .trend-pill.down { background: var(--color-red-bg); color: var(--color-red); }
 
-/* 多彩宫格图标底（首页服务宫格按入口轮转 6 色 tint + 同色系深色图标） */
-.qi.qi-orange { background: var(--c-orange-tint); } .qi.qi-orange svg { color: var(--c-orange-deep); }
-.qi.qi-gold { background: var(--c-gold-tint); } .qi.qi-gold svg { color: var(--c-gold-deep); }
-.qi.qi-violet { background: var(--c-violet-tint); } .qi.qi-violet svg { color: var(--c-violet-deep); }
-.qi.qi-teal { background: var(--c-teal-tint); } .qi.qi-teal svg { color: var(--c-teal-deep); }
-.qi.qi-rose { background: var(--c-rose-tint); } .qi.qi-rose svg { color: var(--c-rose-deep); }
-.qi.qi-sky { background: var(--c-sky-tint); } .qi.qi-sky svg { color: var(--c-sky-deep); }
+/* 多彩宫格图标底（tint 圆底体系已于第二十三轮 D 退役——宫格直接用 S.ui.iconC 生成的 ic-* 彩色 squircle） */

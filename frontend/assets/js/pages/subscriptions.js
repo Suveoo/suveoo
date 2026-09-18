@@ -8,7 +8,7 @@ S.router.register("subscriptions", async () => {
   const subs = r.data?.subscriptions ?? [];
   const sleepy = subs.filter((s) => Number(s.usage_score) < 20 && s.status === "ACTIVE");
   document.getElementById("sleepy").innerHTML = sleepy.length
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg" alt=""><div><b>${S.fmt.escape(S.t("subs.sleepy"))}</b>
+    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("subs.sleepy"))}</b>
        ${sleepy.map((s) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(S.t("subs.usageRow", s.merchant, s.usage_score, s.amount))}</p>`).join("")}
        <button class="ai-chip" style="margin-top:8px" id="ask">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div>`
     : `<div class="muted small">—</div>`;

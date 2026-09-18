@@ -34,12 +34,12 @@ CSS 变量命名：`--c-<族>` / `--c-<族>-deep` / `--c-<族>-tint` / `--c-<族
 | `.promo-card` | 渐变营销产品卡：`.pc-tag` 胶囊 + `.pc-title` + `.pc-desc` + `.pc-cta` 白底圆角按钮 + `.pc-art` 3D 插画角标（主页情境卡） |
 | `.num-xl`（`lg`） | 大数字三件套；`.n` 主数字（30/38px mono）+ `.u` 单位 + `.lb` 标签 |
 | `.trend-up/.trend-down/.trend-pill` | 涨跌色与胶囊（up=绿/down=红，沿用既有收支语义） |
-| `.qi-<族>` | 服务宫格图标多彩底（tint 底 + 深色图标，六色轮转） |
+| `.qi-wrap` | 服务宫格图标位（第二十三轮 D：tint 圆底退役，宫格直接用 `ic-*` 彩色 squircle 图标） |
 | `.fc-hero` / `.fc-mini` | 理财卡浅底渐变卡头（大数字 + 插画角标 + 次级字段行） |
-| `.hero-v2` | 主页海军蓝渐变 hero（径向光斑装饰、白色输入框、反白 chips） |
+| `.hero-input` | 主页全宽胶囊输入条（第二十三轮 A：海军蓝 hero 大容器与 chips 已退役，输入条即首屏元素；AI 徽标 + 输入框 + 32px 语音钮） |
 | `.voice-btn` | 语音按钮（`.listening` 红色脉冲=功能性反馈，`.voice-off` 降级态半透明） |
 | `.cf-bar` / `.cf-row` | 本月收支比例条与数字行（绿=收入/藏青=支出） |
-| `.ai-insights` / `.ai-ins-card` | /ai 首屏确定性洞察卡（tint 底大卡、低信息密度、CTA 链接） |
+| `.ai-insights` / `.ai-ins-card` / `.ai-ins-loading` | /ai 首屏确定性洞察卡（tint 底大卡、低信息密度、CTA 链接）与收集期加载态（徽标脉冲 + 三点，第二十三轮 B） |
 | `.tx-sum-row` / `.tx-main-change` | 交易记录页结论区（三数字 + 变化归因胶囊） |
 | `--r-card 16px / --r-card-lg 20px / --r-btn 10px`、`--shadow / --shadow-lg` | 更大圆角与柔和阴影层次 |
 
@@ -52,3 +52,26 @@ CSS 变量命名：`--c-<族>` / `--c-<族>-deep` / `--c-<族>-tint` / `--c-<族
 - **全站级**（自动生效）：圆角/阴影升级、彩色按钮、tint/渐变工具类。
 - **重做页**：主页（hero/产品卡/收支卡/多彩宫格）、/ai（首屏洞察卡/语音）、/account/transactions（结论区）、/wealth + /wealth/funds + /wealth/deposits（大数字卡头/品类插画）。
 - **未动**：安全 UI（确认卡/OTP/Trust Console/安全中心）、登录注册等表单页（仅享受全局圆角阴影）。
+
+## 6. 图标双轨制（第二十三轮 D 新增）
+
+依据微众/国内银行 App 公开设计惯例的行业共识（外圈多彩、内页克制）：
+
+### 线性图标 `i-*`（sprite.svg）
+- 内页/表单/列表/按钮/安全语义处使用；`currentColor` 继承，接口 `S.ui.icon(name, size)` 全站零改动。
+- 规范：24×24 viewBox、安全区 2px（图形含描边占 20×20）、描边 2px、圆角帽/圆角连接、去尖角、单笔连贯优先。
+- 本轮修正越界图标（i-eye/i-eye-off/i-doc/i-snow/i-copy/i-info/i-gear/i-ai 小星/i-users/i-scale）并**补缺 `i-unlock`**（此前 security.js 熔断解锁按钮引用了不存在的 symbol，渲染为空）。
+- sprite 引用带 `?v=bNN`（R2 按 URL 缓存，bump 版本强制换图标）。
+
+### 彩色图标 `ic-<glyph>-<family>`（S.ui.iconC() 内联生成）
+- 金刚区（home 8 格 / account 6 格）、营销位（promo 徽标）、AI 洞察卡使用。
+- 形态：squircle 超椭圆底（rx≈7.5/24）占满 24×24 + 同族 135° 双 stop 渐变（g1→g2，明度差 15-20%）+ 居中 14×14 白色 2px 粗线前景（金族前景深棕 `#4A3200` 保对比）+ 左上白 50-70% 高光小圆（轻立体）。
+- 族分配纪律：同页彩图标 ≤8；**同族不相邻**（home 宫格：sky/teal/violet/orange/navy/gold/rose/sky）。
+- **实现方式教训**：彩色图标不驻 sprite——外部 `<use>` 引用共享渐变 defs 在部分 webview 间歇性不渲染（本轮实测同页时画时不画），改为 `S.ui.iconC()` 内联生成 `<defs>`（实例级唯一 id），100% 可靠。
+- 金族对比：白前景压 #F5B301 渐变对比不足，金族一律深棕前景（与 `.btn-accent-gold` 文字色一致）；其余六族白前景。
+- 前景字形复用线性图标路径（`translate(5 5) scale(.583)` + 组内 stroke-width 3.43 保持视觉 2px），字形/族两轴正交，可自由组合（现有 glyph：pay/bank/globe/doc/card/wealth/exchange/download/trend/star/ai/chart/shield/bell/lock）。
+
+### logo 与 IP 家族（三件套 + favicon）
+- `suveoo-ai-logo.svg`：navy→sky 135° 渐变盾形 + 白色四角星主形 + 小星/光点星轨——20px（hero 输入条）可辨识，34px（侧栏/底导航）细节展开；引用全部带 `?v=`。
+- `ai-hero.svg`（/ai 欢迎区）与 `ai-deco.svg`（洞察区头/加载态徽标）：同一 IP 家族的轻 3D（claymorphism）AI 形象——渐变 squircle 主形 + 白色四角星 + 紫族轨道卫星 + 漂浮数据小卡，柔投影低透明度大扩散。
+- `favicon.svg`：新徽标简化单色版（navy 族渐变 squircle + 白色四角星，16px 可辨）；PNG/ICO 系列未再生成（现代浏览器优先取 SVG，如需全套 PNG 队长可用徽标源文件导出）。

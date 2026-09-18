@@ -1,11 +1,9 @@
 /* pages.css — 页面级布局 */
-/* home hero */
-.hero { background: var(--color-surface); border-radius: 16px; padding: var(--sp-6); }
-.hero-input { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 12px 20px; cursor: text; }
+/* home hero 输入条（第二十三轮 A 极简化：全宽胶囊、无外容器；C 修复：input 可收缩 + 容器防溢出） */
+.hero-input { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 8px 8px 8px 16px; cursor: text; overflow: hidden; }
 .hero-input:focus-within, .hero-input:hover { border-color: var(--color-navy); }
 .hero-input img, .hero-input svg { width: 20px; height: 20px; flex: none; }
-.hero-input input { border: none; outline: none; flex: 1; font-size: var(--fs-16); font-family: inherit; background: transparent; }
-.hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--sp-3); }
+.hero-input input { border: none; outline: none; flex: 1; min-width: 0; font-size: var(--fs-16); font-family: inherit; background: transparent; }
 .assets-block .total { font-family: var(--font-mono); font-size: var(--fs-36); font-weight: 700; letter-spacing: -0.5px; }
 .assets-block .cur { font-size: var(--fs-14); color: var(--color-ink-2); margin-left: 6px; }
 .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); }
@@ -13,8 +11,9 @@
 .quick-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: var(--sp-4) 4px; border-radius: var(--r-card); background: #fff; border: 1px solid var(--color-line); color: var(--color-ink); font-size: var(--fs-12); text-align: center; }
 .quick-item:hover { border-color: var(--color-navy); text-decoration: none; }
 .quick-item.disabled { opacity: .45; cursor: not-allowed; }
-.quick-item .qi { width: 44px; height: 44px; border-radius: 50%; background: var(--color-primary-tint); display: flex; align-items: center; justify-content: center; }
-.quick-item .qi svg { width: 22px; height: 22px; color: var(--color-navy); }
+/* 金刚区图标位（第二十三轮 D：tint 圆底退役，直接放 30px ic-* 彩色 squircle） */
+.quick-item .qi-wrap { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.quick-item .qi-wrap svg { display: block; }
 .brand-banner { border-radius: 16px; overflow: hidden; position: relative; min-height: 200px; display: flex; align-items: center; background: linear-gradient(120deg, #101851, #1E2A78 55%, #35479e); color: #fff; padding: var(--sp-8); }
 .brand-banner .bb-text { max-width: 520px; }
 .brand-banner p { color: rgba(255,255,255,.82); margin: var(--sp-2) 0 var(--sp-4); font-size: var(--fs-14); }
@@ -129,18 +128,9 @@
 .fc-art-sm { position: absolute; right: -6px; bottom: -8px; width: 56px; height: 56px; z-index: 0; opacity: .9; pointer-events: none; }
 .fc-mini .num-xl { position: relative; z-index: 1; }
 
-/* ===== 主页 v2（第二十二轮 B）：渐变 hero + 语音按钮 + 收支一览卡 ===== */
-.hero-v2 { background: linear-gradient(135deg, #101851, #1E2A78 55%, #35479E); color: #fff; border-radius: var(--r-card-lg); position: relative; overflow: hidden; }
-.hero-v2::after { content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122, 143, 255, .35), transparent); pointer-events: none; }
-.hero-v2::before { content: ""; position: absolute; left: -40px; bottom: -110px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(closest-side, rgba(94, 219, 254, .18), transparent); pointer-events: none; }
-.hero-v2 .hero-input { position: relative; z-index: 1; }
-.hero-v2 .hero-chips { position: relative; z-index: 1; }
-.hero-v2 .chip { background: rgba(255,255,255,.13); color: #fff; border-color: rgba(255,255,255,.3); }
-.hero-v2 .chip:hover { background: rgba(255,255,255,.22); color: #fff; border-color: rgba(255,255,255,.5); }
-.hero-v2 .chip .chip-go { color: rgba(255,255,255,.75); }
-
-/* 语音按钮（hero 与 /ai composer 共用）：聆听态红色脉冲 = 功能性反馈 */
-.voice-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; border-radius: 50%; background: transparent; color: var(--color-ink-2); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+/* ===== 语音按钮（hero 与 /ai composer 共用）：聆听态红色脉冲 = 功能性反馈 =====
+   （第二十三轮 C：box-sizing/padding 归零防撑破，36→32px 更纤细） */
+.voice-btn { flex: none; box-sizing: border-box; padding: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; border-radius: 50%; background: transparent; color: var(--color-ink-2); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
 .voice-btn:hover { background: var(--color-primary-tint); color: var(--color-navy); }
 .voice-btn.listening { background: var(--color-red-bg); color: var(--color-red); animation: voice-pulse 1.2s ease-in-out infinite; }
 .voice-btn.voice-off { opacity: .55; }
@@ -160,15 +150,29 @@
 .pc-perks { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
 .pc-perk { display: flex; gap: 10px; align-items: flex-start; }
 .pp-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
-.pc-ico { position: absolute; right: 14px; top: 14px; z-index: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+/* promo 卡右上角彩色徽标位（第二十三轮 D：半透明白圆盘退役，直接 40px ic-* squircle） */
+.pc-ico { position: absolute; right: 12px; top: 12px; z-index: 0; display: inline-flex; align-items: center; justify-content: center; filter: drop-shadow(0 4px 10px rgba(16, 24, 81, .25)); }
 
-/* ===== /ai 首屏洞察卡（第二十二轮 C）：低密度大卡，杜绝密密麻麻小字 ===== */
+/* ===== /ai 首屏洞察卡（第二十二轮 C）：低密度大卡，杜绝密密麻麻小字 =====
+   第二十三轮 B：collect() 期间先渲染加载态（徽标脉冲 + 三点），完成后子元素淡入替换 */
 .ai-insights { margin: 4px 0 8px; }
 .ai-ins-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .ai-ins-head b { font-size: 15px; }
+/* 光学对齐：徽标视觉重心（非边界盒）与单行标题居中——不规则形 -1.5px 补偿 */
+.ai-ins-head img { transform: translateY(-1.5px); }
+.ai-insights.ready > * { animation: rise-in .28s cubic-bezier(.25, .6, .3, 1) both; }
+.ai-ins-loading { display: flex; align-items: center; gap: 10px; padding: 12px 2px; color: var(--color-ink-2); font-size: 13px; }
+.ail-badge { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary-tint); display: inline-flex; align-items: center; justify-content: center; animation: ail-pulse 1.6s ease-in-out infinite; }
+.ail-badge img { width: 22px; height: 22px; }
+.ai-ins-loading .dots { display: inline-flex; gap: 4px; }
+.ai-ins-loading .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-navy); opacity: .35; animation: think-bounce 1.2s infinite; }
+.ai-ins-loading .dots i:nth-child(2) { animation-delay: .15s; }
+.ai-ins-loading .dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes ail-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(30, 42, 120, .12); } 50% { box-shadow: 0 0 0 6px rgba(30, 42, 120, 0); } }
+@media (prefers-reduced-motion: reduce) { .ail-badge, .ai-ins-loading .dots i { animation: none; } .ai-insights.ready > * { animation: none; } }
 .ai-ins-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .ai-ins-card { position: relative; border-radius: 14px; padding: 14px 14px 12px; overflow: hidden; display: flex; gap: 10px; min-height: 118px; }
-.aic-ico { flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,.75); display: inline-flex; align-items: center; justify-content: center; }
+.aic-ico { flex: none; display: inline-flex; align-items: center; justify-content: center; }
 .aic-art { position: absolute; right: -10px; bottom: -12px; width: 86px; height: 86px; opacity: .85; pointer-events: none; }
 .aic-body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .aic-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; }
