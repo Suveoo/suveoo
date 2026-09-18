@@ -41,7 +41,7 @@ Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Tel
 cd backend
 npm install
 npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 235 用例（真实 workerd 运行时）
+npm test                  # 238 用例（真实 workerd 运行时）
 ```
 
 ### 3.2 部署简要说明
@@ -947,6 +947,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 3. **风险承受能力**：当前 PR 等级 chip + 「重新评估」（重测问卷，更新后影响理财适当性匹配）。
 4. **登录设备与会话**：当前会话标记"本设备"，其他会话列表（设备/位置/时间）+ 「下线」。
 5. **操作审计**：本人可见的审计事件流（时间、动作、渠道、trace_id、结果、grant_hash 前 12 位）——把 Merkle 审计链以用户可读方式透出（监管可解释性卖点）。`GET /api/audit/me`。
+6. **异常熔断（Circuit Breaker）**：实时状态卡（正常绿态显示三类可疑信号计数 n/阈值；锁定红条显示剩余分钟 + 「邮箱验证码提前解锁」流）。触发口径：**OTP 连错 5 次 / 提示注入拦截 2 次 / 确认凭据（grant）篡改重放 3 次**（24h 窗口累计；业务性失败如余额不足/收款人不存在不计入，演示不会误触；成功写操作清零 OTP 连错但攻击计数不洗白）。锁定期间**一切黄/红写操作拒绝**（REST 429 CIRCUIT_LOCKED + 剩余分钟；AI 通道 tool_result 引导模型向用户解释），**查询类不受影响**；触发即站内+邮件通知+审计（circuit_tripped），解锁审计（circuit_unlocked），或 CIRCUIT_LOCK_SECONDS（默认 900s）到期自愈。AI 通道被闸时 Trust Console 出红色 **CIRCUIT** 事件行。API：`GET/POST /api/security/circuit`。
 
 ---
 
@@ -1026,6 +1027,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 | GET /api/reports；POST /api/reports/{yyyy-mm} | 用户 | — | pdf-lib 生成 |
 | GET /api/security；PATCH（改密：current_password+OTP+新密码，成功返回新纪元 token）；POST 2fa（关闭须 current_password；开启仅 OTP）；DELETE sessions | 用户 | 红 | 会话纪元（JWT epo × profile.session_epoch）全量校验 |
 | GET /api/audit/me | 用户 | 绿 | 本人审计流 |
+| GET /api/security/circuit（状态）；POST（{action:"send"} 发码 / {code} 验码解锁） | 用户 | 绿 | 异常熔断状态与邮箱 OTP 提前解锁（scene=cbunlock） |
 | POST /api/contact | 公开 | — | 转发 support@ |
 | GET /api/health；GET /api/version | 公开 | — | 部署验收用 |
 
@@ -1124,6 +1126,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.9（2026-09-18）：**异常熔断（Circuit Breaker）——赛题五大安全机制的最后一块拼图**——赛题 §三.2 五项安全机制（幻觉防护/注入防御/操作审计/**异常熔断**/沙箱）至此全部实现。可疑信号在 runGuarded 出口单点分类计数（24h 窗口）：**OTP 连错 5 次 / 提示注入拦截 2 次 / grant 篡改重放 3 次触发**；业务性失败（余额不足/收款人不存在/限额）刻意不计（演示不误触）；成功写清 OTP 连错但攻击计数不洗白。锁定期间黄/红写操作全拒（REST 429 CIRCUIT_LOCKED + minutesLeft；AI 通道 tool_result 引导模型解释），**GREEN 查询不受影响**；触发即站内+邮件+审计，支持邮箱验证码提前解锁（新 email scene cbunlock + 安全中心熔断卡）或 CIRCUIT_LOCK_SECONDS（默认 900s）到期自愈；AI 通道被闸时 Trust Console 出红色 **CIRCUIT** 事件行（评审直读）。生产实测：demo 红级错码 ×5 触发 → 写 429/查询 200/安全中心卡 5/5 计数+解锁按钮/AI 通道 CIRCUIT 红行+模型解释。测试 235 → 238；i18n 856 → 871×4（circuit.* 15 键）。
 - v3.8（2026-09-18）：**Suveoo AI 性能实测与系统优化**（先基准后优化，六场景 18 指令实测对比）——**基准**：中位首 token 10,258ms / 总耗时 12,726ms，每轮 LLM 往返 3.5-7s 为主导成本；全轮 `ai.llm_stream` 185/185 ok。**优化后首 token −33% / 总耗时 −21%**（六场景 18 指令同口径复测）。四项后端改动：① **系统提示词保义瘦身**（1693→1474 字符）+ 反编造 URL 硬约束（含 suveoo.com 域内路径）+ 内部术语泄漏治理（grant_hash/INPUT_REQUIRED 不再出现在用户回答，出卡前不得声称确认卡已存在——治幻觉出卡）+ **当前日期注入**（北京时间+星期+相对日期换算指引——模型不知道"今天"则"下周三"退化为反问，实测注入后正确换算出卡）；② **airing 事件环 KV 合并**：每工具调用 7 次读改写 → 1 次单批写；③ **提醒类长程任务** `task_type="reminder"`（无金额豁免双校验，到期发站内通知——"Netflix 续费提醒我"从 BLOCKED(INVALID_AMOUNT) 变为出卡建单）+ transfer.amount 反向归一（金额只在 transfer 子对象时提升顶层，治 INVALID_AMOUNT 浪费轮）；④ 请求体观测量 `ai.llm_payload`（实测首轮 10.7KB）。**前端 v=b114**：打字机帧步长自适应积压量（12→48 字/帧，长回答尾部追平 ~1.9s→~1s）。评估后放弃：工具子集注入（误路由风险 > <1s 收益）、max_tokens/循环上限/历史裁剪（维持现状，依据记录于 notes 第二十轮）、网关失败记忆（零失败样本）。**安全语义锁定测试**：提示词 15 组关键句断言防后续瘦身削弱。红级 OTP 全链路复验（10do：Gmail 真码→EXECUTED TXMU5U4GOPB24854→Telegram 到达）。测试 225 → 235（reminder/反向归一/提示词锁定 +10）。
 - v3.7（2026-09-17）：强制换图 + 卡号复制兜底 + **/demo-lab 队员隐藏灌数据入口**——**ai-hero.svg 强制换图**：插画引用跟随页面资产版本（`?v=b110`），新 URL 全员 miss 回源 R2——所有用户 100% 看到新 logo（实测 hero src 带版本参数；今后更新该插画只需 bump 版本）；**卡号复制**：`S.ui.copy()` clipboard API + textarea/execCommand 双保险（部分移动 webview 拒绝异步剪贴板 API 时静默失败）；**/demo-lab**（L01，noindex 不进导航/sitemap，密码门 `suveoo_data_injection`）：GET `/api/demo/self-seed` 实时数据源快照（SEED_VERSION 自查 + 逐收款人掩码卡号/分组/拟真度 + 指定账户缺失提示 + 注入量预估——数据源变动自动跟随永不失效）；POST 只灌**本人**账户（DEMO_MODE + 登录态，无可分享 token，AUDIT_KV 审计，waitUntil 客户端断开保活）；收款人=registry 动态枚举（全部 suveoo 域名账户含 31 personas + 指定团队账户谢宇洲/黄嗣仁置顶；张三/李四/王五/女儿/房东陈叔/演示用户沉底；排除本人）；种子通用人名映射为真实收款人；结果核对面板（expected vs actual + 差异告警）。**workerd DO 不支持显式 BEGIN/COMMIT**（实测踩坑）——原子性由幂等整段重灌兜底（中断最坏=中间态，重跑自愈）。实测全流程：密码门/错码 toast/34 人预检/7.8s 运行/34-34 全真实核对；demo 账户已恢复官方 mogul 口径。测试 222 → 225；i18n 818 → 856×4（demoLab.* 38 键）。
 - v3.6（2026-09-17）：demo **mogul 拟真种子**（worker-only）——演示人物 13 → **31 个真实账户**（深圳科技圈/上海金融艺术圈/杭州生活圈 + 三城物业管家 + 5 位海外人脉 Kevin Zhang/Emily Chen/Daniel Wu/Sofia Liu/Marcus Wang，收款人 31/31 真实卡号）；流水 395 → **596 笔**（12 类加权商户池含六大爱好：运动健身/音乐乐器/数码科技/游戏装备/潮流收藏/生活美学；**三城房产**月供深圳湾 ¥28,453.27/静安 ¥19,236.84/文三 ¥13,572.51 + 三城水电燃气 + 管家物业费；**信用卡外币消费**（Amazon/骏河屋/Airbnb 等 memo 注明原币计价）+ 留学/差旅购汇；人脉转账 20+ 笔）；订阅 10 → **21**（海外 Spotify/PS Plus/XGP/Switch Online/Adobe CC 按 USD≈7.18 折算 + 国内全家桶；三条订阅暗模式角标）；账单 +3 房贷；任务 3 → 6；通知 14；**外币余额三币种**（USD 3,847.62/EUR 2,150.35/HKD 8,860.20，seedDemo op 支持 fx_balances 清库重灌）；竞赛锚点全保留。测试 217 → 222（seed-mogul：量级/锚点可复现/三城/六爱好海外/折算口径）。
