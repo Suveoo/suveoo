@@ -1,0 +1,29 @@
+{
+  "zh-CN": {
+    "tx.summaryTitle": "本月收支速览",
+    "tx.mainUp": "主要变化来自「{0}」：较上月多支出 ¥{1}",
+    "tx.mainDown": "主要变化来自「{0}」：较上月少支出 ¥{1}",
+    "tx.net": "结余",
+    "tx.thisMonth": "本月",
+    "tx.lastMonth": "上月",
+    "tx.catCompare": "支出分类环比（元）"
+  },
+  "zh-TW": {
+    "tx.summaryTitle": "本月收支速覽",
+    "tx.mainUp": "主要變化來自「{0}」：較上月多支出 ¥{1}",
+    "tx.mainDown": "主要變化來自「{0}」：較上月少支出 ¥{1}",
+    "tx.net": "結餘",
+    "tx.thisMonth": "本月",
+    "tx.lastMonth": "上月",
+    "tx.catCompare": "支出分類環比（元）"
+  },
+  "en-US": {
+    "tx.summaryTitle": "This month at a glance",
+    "tx.mainUp": "Biggest change: \"{0}\" — ¥{1} more than last month",
+    "tx.mainDown": "Biggest change: \"{0}\" — ¥{1} less than last month",
+    "tx.net": "Net",
+    "tx.thisMonth": "This month",
+    "tx.lastMonth": "Last month",
+    "tx.catCompare": "Spending by category (CNY)"
+  }
+}

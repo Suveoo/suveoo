@@ -128,3 +128,54 @@
 .fc-mini { position: relative; border-radius: 12px; padding: 10px 12px; overflow: hidden; }
 .fc-art-sm { position: absolute; right: -6px; bottom: -8px; width: 56px; height: 56px; z-index: 0; opacity: .9; pointer-events: none; }
 .fc-mini .num-xl { position: relative; z-index: 1; }
+
+/* ===== 主页 v2（第二十二轮 B）：渐变 hero + 语音按钮 + 收支一览卡 ===== */
+.hero-v2 { background: linear-gradient(135deg, #101851, #1E2A78 55%, #35479E); color: #fff; border-radius: var(--r-card-lg); position: relative; overflow: hidden; }
+.hero-v2::after { content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122, 143, 255, .35), transparent); pointer-events: none; }
+.hero-v2::before { content: ""; position: absolute; left: -40px; bottom: -110px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(closest-side, rgba(94, 219, 254, .18), transparent); pointer-events: none; }
+.hero-v2 .hero-input { position: relative; z-index: 1; }
+.hero-v2 .hero-chips { position: relative; z-index: 1; }
+.hero-v2 .chip { background: rgba(255,255,255,.13); color: #fff; border-color: rgba(255,255,255,.3); }
+.hero-v2 .chip:hover { background: rgba(255,255,255,.22); color: #fff; border-color: rgba(255,255,255,.5); }
+.hero-v2 .chip .chip-go { color: rgba(255,255,255,.75); }
+
+/* 语音按钮（hero 与 /ai composer 共用）：聆听态红色脉冲 = 功能性反馈 */
+.voice-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; border-radius: 50%; background: transparent; color: var(--color-ink-2); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.voice-btn:hover { background: var(--color-primary-tint); color: var(--color-navy); }
+.voice-btn.listening { background: var(--color-red-bg); color: var(--color-red); animation: voice-pulse 1.2s ease-in-out infinite; }
+.voice-btn.voice-off { opacity: .55; }
+@keyframes voice-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, .25); } 50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } }
+@media (prefers-reduced-motion: reduce) { .voice-btn.listening { animation: none; } }
+
+/* 本月收支一览卡 */
+.cf-row { gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+.cf-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 14px; background: var(--color-surface); }
+.cf-bar .in { background: linear-gradient(90deg, #1F7A4D, #2FA06A); }
+.cf-bar .out { background: linear-gradient(90deg, #35479E, #8B97D6); }
+.cf-row .dot, .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.dot-in { background: #1F7A4D; }
+.dot-out { background: #35479E; }
+
+/* 虚拟信用卡权益弹窗 */
+.pc-perks { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.pc-perk { display: flex; gap: 10px; align-items: flex-start; }
+.pp-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.pc-ico { position: absolute; right: 14px; top: 14px; z-index: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+
+/* ===== /ai 首屏洞察卡（第二十二轮 C）：低密度大卡，杜绝密密麻麻小字 ===== */
+.ai-insights { margin: 4px 0 8px; }
+.ai-ins-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ai-ins-head b { font-size: 15px; }
+.ai-ins-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ai-ins-card { position: relative; border-radius: 14px; padding: 14px 14px 12px; overflow: hidden; display: flex; gap: 10px; min-height: 118px; }
+.aic-ico { flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(255,255,255,.75); display: inline-flex; align-items: center; justify-content: center; }
+.aic-art { position: absolute; right: -10px; bottom: -12px; width: 86px; height: 86px; opacity: .85; pointer-events: none; }
+.aic-body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.aic-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; }
+.aic-title { font-size: 14.5px; line-height: 1.35; }
+.aic-desc { font-size: 12px; color: var(--color-ink-2); line-height: 1.5; margin: 0; }
+.aic-cta { margin-top: auto; align-self: flex-start; font-size: 12px; font-weight: 600; }
+@media (max-width: 767px) {
+  .ai-ins-grid { grid-template-columns: 1fr; gap: 8px; }
+  .ai-ins-card { min-height: 0; }
+}

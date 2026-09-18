@@ -112,8 +112,7 @@ S.router.register("home", async ({ user }) => {
     const cf = ins.cashflow;
     const el = document.getElementById("cashflow");
     if (!cf || (!cf.inThis && !cf.outThis)) return;
-    const M = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-    const mLabel = `${M[Number(cf.thisM.slice(5)) - 1]}${S.t("home.monthUnit")}`;
+    const mLabel = new Date().toLocaleDateString(S.i18n.lang || "zh-CN", { month: "long" });
     const pill = (p, inverse) => {
       if (p == null) return "";
       const up = p >= 0;

@@ -14,11 +14,13 @@ S.router.register("ai", async ({ user }) => {
               <img src="/assets/images/illustrations/ai-hero.svg${av ? "?v=" + av : ""}" alt="">
               <h2>${S.fmt.escape(S.t("ai.welcome"))}</h2>
             </div>
+            <div class="ai-insights" id="ai-insights"></div>
             <div class="chat-chips" id="chips"></div>
           </div>
           <div class="composer-hint">${S.fmt.escape(S.t("ai.hint"))}</div>
           <div class="chat-composer">
             <input class="input" id="chat-in" placeholder="${S.fmt.escape(S.t("ai.placeholder"))}">
+            <button class="voice-btn" id="chat-mic" type="button" title="">${S.ui.icon("mic", 18)}</button>
             <button class="btn btn-primary" id="chat-go">${S.ui.icon("send", 16)}</button>
           </div>
         </div>
@@ -54,6 +56,26 @@ S.router.register("ai", async ({ user }) => {
     document.getElementById("chips").innerHTML = d.ai_welcome.map((s) => `<button class="chip">${S.fmt.escape(s)}${S.ui.chipGo}</button>`).join("");
     S.ui.$$("#chips .chip").forEach((b) => { b.onclick = () => send(b.textContent); });
   });
+
+  /* 首屏主动洞察（C）：确定性规则引擎生成，零 LLM 调用（网络面板可验证——只有 GET /api/*）；
+     用户开始提问后随欢迎区一起让位。失败静默：洞察区空时不占位。 */
+  S.insights.collect().then((ins) => {
+    const box = document.getElementById("ai-insights");
+    if (!box || !ins.list.length) return;
+    const tint = { orange: "bg-tint-orange", gold: "bg-tint-gold", violet: "bg-tint-violet", teal: "bg-tint-teal", rose: "bg-tint-rose", sky: "bg-tint-sky" };
+    const tx = { orange: "tx-orange", gold: "tx-gold", violet: "tx-violet", teal: "tx-teal", rose: "tx-rose", sky: "tx-sky" };
+    box.innerHTML = `<div class="ai-ins-head"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" width="44" height="44" alt="" loading="lazy"><div><b>${S.fmt.escape(S.t("ai.insightTitle"))}</b><div class="muted" style="font-size:11px">${S.fmt.escape(S.t("ins.localNote"))}</div></div></div>
+      <div class="ai-ins-grid">${ins.list.slice(0, 3).map((it) => `
+        <div class="ai-ins-card ${tint[it.tone] ?? "bg-tint-sky"}">
+          ${it.art ? `<img class="aic-art" src="${it.art}?v=${S.ui.v()}" alt="" loading="lazy">` : `<span class="aic-ico ${tx[it.tone] ?? "tx-sky"}">${S.ui.icon(it.icon ?? "star", 20)}</span>`}
+          <div class="aic-body">
+            <span class="aic-tag ${tx[it.tone] ?? "tx-sky"}">${S.fmt.escape(S.t(it.tag))}</span>
+            <b class="aic-title">${S.fmt.escape(S.t(it.title))}</b>
+            <p class="aic-desc">${S.fmt.escape(it.body)}</p>
+            <a class="aic-cta" href="${it.cta && it.cta !== "modal" ? it.cta : "/home"}">${S.fmt.escape(S.t(it.ctaLabel ?? "ins.ctaGo"))} →</a>
+          </div>
+        </div>`).join("")}</div>`;
+  }).catch(() => {});
 
   /* 移动端/平板：Trust Console 以全屏抽屉呈现，对话区保持满幅；
      系统返回手势 = 关闭抽屉回到对话（pushState/popstate 集成），而不是退出 /ai */
@@ -112,7 +134,9 @@ S.router.register("ai", async ({ user }) => {
     busy = true;
     setBusyUI(true);
     bubble("user", text);
+    /* 用户开始提问：欢迎 chips 与首屏洞察区自然让位 */
     S.ui.$("#chips")?.remove();
+    S.ui.$("#ai-insights")?.remove();
     const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
     S.trust.evt("CHAT", null, text.slice(0, 60));
     S.ga4.event("ai_chat_start", { entry: "composer" });
@@ -214,6 +238,8 @@ S.router.register("ai", async ({ user }) => {
 
   const input = document.getElementById("chat-in");
   const goBtn = document.getElementById("chat-go");
+  /* 语音按钮（F）：识别结果填入输入框，用户核对后回车/点发送 */
+  S.voice.bind(document.getElementById("chat-mic"), input);
   /* 流式进行中：发送按钮切换为"停止"——中断挂起/冗长的请求（AbortController），已到内容保留 */
   const setBusyUI = (on) => {
     goBtn.innerHTML = on ? S.ui.icon("stop", 16) : S.ui.icon("send", 16);
