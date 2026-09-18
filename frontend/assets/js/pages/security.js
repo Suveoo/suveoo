@@ -17,7 +17,9 @@ S.router.register("security", async ({ user }) => {
         <a class="btn btn-sm btn-ghost" id="retest" href="/account/risk-assessment">${S.fmt.escape(S.t("sec.retest"))}</a></div>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("sec.audit"))}</h2></div>
-    <div class="card" id="audit">${S.ui.skeleton(4)}</div>`;
+    <div class="card" id="audit">${S.ui.skeleton(4)}</div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("circuit.title"))}</h2></div>
+    <div class="card" id="cb-card">${S.ui.skeleton(2)}</div>`;
   document.getElementById("chg").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.changePass"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.curPass"))}</span>${pwInput("cp-cur", "current-password")}</label>
@@ -97,4 +99,44 @@ S.router.register("security", async ({ user }) => {
       <div class="grow"><b>${S.fmt.escape(x.action)}</b>
         <div class="muted small mono">${S.fmt.datetime(x.ts)} · ${S.fmt.escape(x.channel ?? "")} ${x.trace_id ? "· " + S.fmt.escape(String(x.trace_id).slice(0, 14)) + "…" : ""}</div></div>
       <span class="badge badge-green">${S.ui.icon("check", 12)}</span></div>`).join("") || S.ui.empty(S.t("common.noData"));
+
+  /* 异常熔断卡：状态实时显示（正常绿 / 锁定红+剩余分钟+计数）+ 邮箱 OTP 提前解锁流 */
+  {
+    const card = document.getElementById("cb-card");
+    const load = async () => {
+      const r = await S.api.get("/api/security/circuit");
+      const d = r.data;
+      if (!d) { card.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
+      const zh = { otp: S.t("circuit.kOtp"), inj: S.t("circuit.kInj"), grant: S.t("circuit.kGrant") };
+      const counters = Object.entries(d.counters ?? {}).map(([k, v]) => `${zh[k] ?? k} ${v}/${d.thresholds?.[k] ?? "?"}`).join(" · ");
+      if (!d.locked) {
+        card.innerHTML = `
+          <div class="list-row"><span class="avatar">${S.ui.icon("shield", 14)}</span>
+            <div class="grow"><b>${S.fmt.escape(S.t("circuit.normal"))}</b><div class="muted small">${S.fmt.escape(S.t("circuit.normalNote"))}</div></div>
+            ${S.ui.badge(S.t("circuit.statusOk"), "badge-green")}</div>
+          <p class="muted small" style="margin:8px 0 0">${S.fmt.escape(S.t("circuit.counters"))}：${S.fmt.escape(counters || "—")}</p>`;
+        return;
+      }
+      card.innerHTML = `
+        <div class="banner" style="background:var(--color-red-bg);color:var(--color-red)">${S.ui.icon("lock", 14)}<div><b>${S.fmt.escape(S.t("circuit.locked", d.minutesLeft))}</b><div class="small" style="margin-top:4px">${S.fmt.escape(S.t("circuit.lockedNote"))}</div></div></div>
+        <p class="muted small" style="margin:8px 0">${S.fmt.escape(S.t("circuit.counters"))}：${S.fmt.escape(counters || "—")}</p>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <input class="input mono" id="cb-code" maxlength="6" inputmode="numeric" placeholder="${S.fmt.escape(S.t("consent.otp"))}" style="max-width:160px">
+          <button class="btn btn-light" id="cb-send">${S.fmt.escape(S.t("consent.getCode"))}</button>
+          <button class="btn btn-primary" id="cb-unlock">${S.ui.icon("unlock", 14)} ${S.fmt.escape(S.t("circuit.unlock"))}</button>
+        </div>`;
+      document.getElementById("cb-send").onclick = async () => {
+        const r2 = await S.api.post("/api/security/circuit", { action: "send" });
+        S.ui.toast(r2.ok ? S.t("circuit.codeSent") : r2msg(r2), !r2.ok);
+      };
+      document.getElementById("cb-unlock").onclick = async () => {
+        const code = document.getElementById("cb-code").value.trim();
+        if (!/^\d{6}$/.test(code)) { S.ui.toast(S.t("circuit.codeBad"), true); return; }
+        const r3 = await S.api.post("/api/security/circuit", { code });
+        if (r3.ok) { S.ui.toast(S.t("circuit.unlocked")); load(); }
+        else S.ui.toast(r2msg(r3), true);
+      };
+    };
+    load();
+  }
 });

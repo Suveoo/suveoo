@@ -545,7 +545,7 @@ export async function recordNonce(nonceStore, nonce) {
  * ② 安全前置（Auth）+ 邮件
  * ================================================================ */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMAIL_CODE_SCENES = new Set(["register", "login2fa", "recovery", "redstep"]);
+const EMAIL_CODE_SCENES = new Set(["register", "login2fa", "recovery", "redstep", "cbunlock"]);
 const SESSION_TTL = 3600, MFA_TOKEN_TTL = 300, EMAIL_CODE_TTL = 600, LOGIN_FAIL_LIMIT = 5;
 export const maskEmail = (email) => {
   const [name, domain] = email.split("@");
@@ -601,7 +601,7 @@ export async function sendMail(env, { to, subject, text, html }) {
   return null;
 }
 function emailCodeMail(code, scene) {
-  const sceneZh = { register: "注册", login2fa: "登录", recovery: "密码重置", redstep: "高危操作验证" }[scene];
+  const sceneZh = { register: "注册", login2fa: "登录", recovery: "密码重置", redstep: "高危操作验证", cbunlock: "安全熔断解锁" }[scene];
   const text = `您的 Suveoo ${sceneZh}验证码是 ${code}，10 分钟内有效。\n\n如非本人操作，请忽略本邮件。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">Suveoo ${sceneZh}验证码</h2><p style="font-size:28px;letter-spacing:8px;font-weight:700;margin:16px 0">${code}</p><p style="color:#666">10 分钟内有效。如非本人操作，请忽略本邮件。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】您的${sceneZh}验证码 ${code}`, text, html };
@@ -1148,9 +1148,81 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
   return null;
 }
 
+/* ================================================================
+ * 异常熔断（Circuit Breaker）——赛题 §三.2 "连续失败或可疑行为触发安全锁定"
+ * 只计攻击/可疑信号（OTP 连错、注入污染拦截、grant 篡改重放），业务性失败（余额不足、
+ * 收款人不存在、限额等正常用户会犯的错）不计入，避免演示误锁。
+ * 锁定期间：一切黄/红写操作拒绝（查询 GREEN 不受影响），到期自动恢复或邮箱 OTP 提前解锁。
+ * ================================================================ */
+const CB_THRESHOLDS = { otp: 5, inj: 2, grant: 3 }; /* OTP 连错 5 次 / 注入拦截 2 次 / grant 篡改 3 次触发 */
+const cbLockSeconds = (env) => Number(env.CIRCUIT_LOCK_SECONDS ?? 900);
+const cbKey = (userId) => `cb:${userId}`;
+async function cbLoad(env, userId) {
+  try { return JSON.parse((await env.SESSION_KV.get(cbKey(userId))) ?? "") ?? { otp: 0, inj: 0, grant: 0, locked_until: null, history: [] }; }
+  catch { return { otp: 0, inj: 0, grant: 0, locked_until: null, history: [] }; }
+}
+async function cbSave(env, userId, st) {
+  await env.SESSION_KV.put(cbKey(userId), JSON.stringify(st), { expirationTtl: Math.max(86400, cbLockSeconds(env) * 2) });
+}
+/** 锁定状态查询：minutesLeft>0 即处于熔断锁定。 */
+async function cbCheck(env, userId) {
+  const st = await cbLoad(env, userId);
+  if (!st.locked_until) return { locked: false, st };
+  const left = Date.parse(st.locked_until) - Date.now();
+  if (left <= 0) { st.locked_until = null; await cbSave(env, userId, st); return { locked: false, st }; }
+  return { locked: true, st, minutesLeft: Math.ceil(left / 60000), locked_until: st.locked_until };
+}
+/** BLOCKED reason → 可疑类别（null = 业务失败，不计）。 */
+const cbClassify = (reason) => {
+  const r = String(reason ?? "");
+  if (r.startsWith("OTP_")) return "otp";
+  if (r === "UNTRUSTED_PROVENANCE") return "inj";
+  if (/^(GRANT_|CONSENT_)/.test(r)) return "grant";
+  return null;
+};
+/**
+ * 记录一次可疑信号；达到阈值即触发熔断（锁定 + 站内/邮件通知 + 审计）。
+ * kind: "otp" | "inj" | "grant"；返回 {tripped, minutesLeft?} 供调用方附加到响应。
+ */
+async function cbRecord(env, ctxInfo, kind, reason) {
+  const { userId, email } = ctxInfo;
+  const st = await cbLoad(env, userId);
+  if (st.locked_until && Date.parse(st.locked_until) <= Date.now()) st.locked_until = null;
+  st[kind] = (st[kind] ?? 0) + 1;
+  st.history = [...(st.history ?? []), { ts: new Date().toISOString(), kind, reason }].slice(-8);
+  let tripped = false;
+  if (!st.locked_until && st[kind] >= CB_THRESHOLDS[kind]) {
+    tripped = true;
+    const until = new Date(Date.now() + cbLockSeconds(env) * 1000).toISOString();
+    st.locked_until = until;
+    const zh = { otp: "红级验证码连续错误", inj: "检测到提示注入/数据污染攻击", grant: "确认凭据篡改或重放" }[kind];
+    const minutes = Math.round(cbLockSeconds(env) / 60);
+    logEvent("warn", "circuit.tripped", { user_id: userId, kind, counter: st[kind], locked_until: until });
+    audit(env, { action: "circuit_tripped", user_id: userId, detail: { kind, reason, locked_until: until, counter: st[kind] } }).catch(() => {});
+    const UU = U(env, userId);
+    UU({ op: "notify", type: "SECURITY", title: "安全熔断已触发", body: `${zh}（第 ${st[kind]} 次），写操作已锁定 ${minutes} 分钟。可通过邮箱验证码提前解锁，查询类操作不受影响。` }).catch(() => {});
+    sendMail(env, { to: email, subject: "【Suveoo】安全熔断已触发", text: `${zh}，写操作已临时锁定 ${minutes} 分钟（至 ${until}）。如非本人操作请立即修改密码。这是模拟银行系统。`, html: `<p><b>安全熔断已触发</b></p><p>${zh}，写操作已临时锁定 ${minutes} 分钟。</p><p>如非本人操作请立即修改密码。这是模拟银行系统。</p>` }).catch(() => {});
+  }
+  await cbSave(env, userId, st);
+  return { tripped, minutesLeft: st.locked_until ? Math.max(1, Math.ceil((Date.parse(st.locked_until) - Date.now()) / 60000)) : null };
+}
+/** 熔断解锁（邮箱 OTP 校验通过或锁到期）：清零全部计数与锁。 */
+async function cbClear(env, userId) {
+  await cbSave(env, userId, { otp: 0, inj: 0, grant: 0, locked_until: null, history: [] });
+}
+
 /** 通用守卫入口：前置业务校验 → 编译 IR → （红级校验 OTP）→ verify → 执行。 */
 async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, otp, channel = "form", balanceOf }) {
   const { userId, email } = ctxInfo;
+  /* 熔断闸门：黄/红写操作在锁定期内直接拒绝（GREEN 查询不受影响，AI 通道的 mcpGreen 也不经过此处） */
+  if ((TOOL_REGISTRY[intent]?.tier ?? RISK.YELLOW) !== RISK.GREEN) {
+    const cb = await cbCheck(env, userId);
+    if (cb.locked) {
+      return { status: "BLOCKED", reason: "CIRCUIT_LOCKED", ir: null, tier: TOOL_REGISTRY[intent]?.tier ?? null,
+        message: `安全熔断锁定中（剩余约 ${cb.minutesLeft} 分钟）：连续失败或可疑行为已触发保护，写操作暂不可用；查询不受影响，可通过安全中心邮箱验证码提前解锁。`,
+        minutesLeft: cb.minutesLeft, httpStatus: 429 };
+    }
+  }
   const bizReject = await preValidateIntent(env, ctxInfo, intent, args ?? {});
   if (bizReject) return { status: "BIZ_REJECT", reason: bizReject.code, message: bizReject.message, httpStatus: bizReject.status, ir: null };
   const daily = await todayOutCents(env, userId);
@@ -1164,11 +1236,17 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
 
   if (grantHash) {
     const mismatch = await peekGrantMismatch(env.SESSION_KV, { userId, grantHash, ir });
-    if (mismatch) return { status: "BLOCKED", ir, tier, reason: mismatch, stages: [] };
+    if (mismatch) {
+      const cb = await cbRecord(env, ctxInfo, "grant", mismatch);
+      return { status: "BLOCKED", ir, tier, reason: mismatch, stages: [], ...(cb.tripped ? { circuit_tripped: true, minutesLeft: cb.minutesLeft } : {}) };
+    }
     if (tier === RISK.RED) {
       if (!otp) return { status: "OTP_REQUIRED", ir, tier };
       const chk = await checkEmailCode(env, "redstep", email, String(otp));
-      if (!chk.ok) return { status: "BLOCKED", ir, tier, reason: `OTP_${chk.reason}`, stages: [] };
+      if (!chk.ok) {
+        const cb = await cbRecord(env, ctxInfo, "otp", `OTP_${chk.reason}`);
+        return { status: "BLOCKED", ir, tier, reason: `OTP_${chk.reason}`, stages: [], ...(cb.tripped ? { circuit_tripped: true, minutesLeft: cb.minutesLeft } : {}) };
+      }
     }
   }
 
@@ -1189,9 +1267,18 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
       return { status: "BLOCKED", reason: ex.error ?? "EXEC_FAILED", ir, tier, stages: v.stages };
     }
     await nonceStore.record(ir.nonce);
+    /* 成功写操作清零 OTP 连错计数（正常用户偶发错码后成功即复位；注入/grant 计数 24h 内累计——攻击信号不因成功而洗白） */
+    const cbSt = await cbLoad(env, userId);
+    if (cbSt.otp > 0 && !cbSt.locked_until) { cbSt.otp = 0; await cbSave(env, userId, cbSt); }
     /* 全站写操作统一 Telegram 通知（转账/理财/冻结/缴费/换汇/订阅/任务等；REST 与 AI 通道在此收口） */
     tgFire(env, ctxInfo.waitUntil, tgActionLines(ir, ex));
     return { status: "EXECUTED", ir, tier, result: ex, stages: v.stages };
+  }
+  /* verify 拦截的可疑信号计入熔断（注入污染 / grant 篡改重放）；业务性拒绝（限额、不变量等）不计 */
+  const cbKind = cbClassify(v.blockReason);
+  if (cbKind) {
+    const cb = await cbRecord(env, ctxInfo, cbKind, v.blockReason);
+    return { ...v, ir, ...(cb.tripped ? { circuit_tripped: true, minutesLeft: cb.minutesLeft } : {}) };
   }
   return { ...v, ir };
 }
@@ -1578,6 +1665,32 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       const p = (await UU({ op: "getProfile" })).profile;
       return json({ twofa_enabled: p.twofa_enabled === 1, pr_level: p.pr_level, passkey: null, note: "红级验证当前支持邮箱验证码；Passkey（WebAuthn）规划中。" });
     }
+    /* 异常熔断：GET 状态（安全中心卡片）/ POST 解锁（邮箱 OTP 强验证后清锁） */
+    if (path === "/api/security/circuit" && method === "GET") {
+      const cb = await cbCheck(env, userId);
+      return json({
+        locked: cb.locked, minutesLeft: cb.minutesLeft ?? null, locked_until: cb.locked_until ?? null,
+        counters: { otp: cb.st.otp ?? 0, inj: cb.st.inj ?? 0, grant: cb.st.grant ?? 0 },
+        thresholds: CB_THRESHOLDS, history: cb.st.history ?? [],
+      });
+    }
+    if (path === "/api/security/circuit" && method === "POST") {
+      const b = await readJsonBody(request);
+      if (b?.action === "send") {
+        const r = await issueEmailCode(env, "cbunlock", email);
+        if (!r.ok) return apiError(r.code, r.message, r.status);
+        return json({ ok: true, sent: true });
+      }
+      const code = String(b?.code ?? "");
+      const chk = await checkEmailCode(env, "cbunlock", email, code);
+      if (!chk.ok) return apiError(`OTP_${chk.reason}`, "验证码错误", 401);
+      const before = await cbCheck(env, userId);
+      await cbClear(env, userId);
+      await audit(env, { action: "circuit_unlocked", user_id: userId, detail: { via: "email_otp", was_locked: before.locked } });
+      await UU({ op: "notify", type: "SECURITY", title: "安全熔断已解除", body: "您已通过邮箱验证码解除安全锁定，写操作恢复可用。" });
+      logEvent("info", "circuit.unlocked", { user_id: userId, via: "email_otp" });
+      return json({ ok: true, unlocked: true });
+    }
     if (path === "/api/security/password" && method === "PATCH") {
       const b = await readJsonBody(request);
       /* A1：改密必须验证当前密码 + 邮箱 OTP + 新密码——拿到验证码不再足以换掉核心凭证。
@@ -1672,6 +1785,10 @@ function guardResponse(g) {
     /* 前置业务校验拒绝（收款方不真实/不匹配等）：4xx + 结构化 code，供前端行内错误 */
     return json({ status: "BLOCKED", reason: g.reason, error: { code: g.reason, message: g.message }, trace_id: null }, g.httpStatus ?? 400);
   }
+  if (g.reason === "CIRCUIT_LOCKED") {
+    /* 安全熔断锁定：429 + 剩余时间与解锁指引（前端安全中心/行内提示消费） */
+    return json({ status: "BLOCKED", reason: "CIRCUIT_LOCKED", error: { code: "CIRCUIT_LOCKED", message: g.message }, minutesLeft: g.minutesLeft, trace_id: null }, g.httpStatus ?? 429);
+  }
   if (g.status === "INPUT_REQUIRED") {
     return json({
       status: "INPUT_REQUIRED", tier: g.tier, red: g.tier === RISK.RED,
@@ -1682,7 +1799,7 @@ function guardResponse(g) {
   if (g.status === "OTP_REQUIRED") {
     return json({ status: "OTP_REQUIRED", tier: RISK.RED, trace_id: g.ir?.trace_id, message: "红级操作需要邮箱验证码（scene=redstep）" }, 401);
   }
-  return json({ status: "BLOCKED", reason: g.blockReason ?? g.reason ?? "BLOCKED", stages: g.stages, trace_id: g.ir?.trace_id }, 403);
+  return json({ status: "BLOCKED", reason: g.blockReason ?? g.reason ?? "BLOCKED", stages: g.stages, trace_id: g.ir?.trace_id, ...(g.circuit_tripped ? { circuit_tripped: true, minutesLeft: g.minutesLeft } : {}) }, 403);
 }
 
 /* ---- pdf-lib 月度报告（专业版：矢量 logo 复刻 / 摘要封面 / 分类条形 / 斑马纹明细 / 页码页脚 / 长文本截断） ---- */
@@ -2237,6 +2354,12 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     }
   }
   const provenance = args.__provenance ?? null;
+  /* 熔断锁定：Trust Console 出红色 CIRCUIT 行（安全事件可视化——"连续失败触发安全锁定"评审直读） */
+  const cbGate = await cbCheck(env, ctxInfo.userId);
+  if (cbGate.locked && (TOOL_REGISTRY[name]?.tier ?? RISK.YELLOW) !== RISK.GREEN) {
+    push({ kind: "trust", type: "trust_event", event: { kind: "CIRCUIT", ok: false, reason: "CIRCUIT_LOCKED", detail: `写操作已锁定，剩余约 ${cbGate.minutesLeft} 分钟` } });
+    return { text: JSON.stringify({ status: "BLOCKED", reason: "CIRCUIT_LOCKED", message: `安全熔断锁定中（剩余约 ${cbGate.minutesLeft} 分钟）：连续失败或可疑行为已触发保护。请向用户说明可在安全中心通过邮箱验证码提前解锁；查询类操作不受影响。` }), isError: true };
+  }
   push({ kind: "trust", type: "trust_event", event: { kind: "PROPOSED", tool: name, args: JSON.stringify(args).slice(0, 300) } });
   if (!TOOL_REGISTRY[name]) return { text: JSON.stringify({ status: "BLOCKED", reason: "UNKNOWN_TOOL" }), isError: true };
 
@@ -2252,6 +2375,7 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     grantHash: args.grant_hash, otp: args.otp,
     balanceOf: balanceIntent ? { op: "cardAvailable", slug: args.from_card ?? null } : null,
   });
+  if (g.circuit_tripped) push({ kind: "trust", type: "trust_event", event: { kind: "CIRCUIT", ok: false, reason: "CIRCUIT_TRIPPED", detail: `安全熔断已触发（${g.reason}），写操作临时锁定` } });
   for (const s of g.stages ?? []) push({ kind: "trust", type: "trust_event", event: { kind: s.stage, ok: s.ok, reason: s.reason ?? null } });
 
   if (g.status === "EXECUTED") {

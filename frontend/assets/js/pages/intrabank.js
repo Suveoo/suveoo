@@ -58,10 +58,11 @@ S.router.register("intrabank", async () => {
       INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
       PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
       INSUFFICIENT_CREDIT: S.t("transfer.insufficientCredit"),
+      CIRCUIT_LOCKED: (r?.data?.minutesLeft ?? "?") + "",
     };
     const box = document.getElementById("t-err");
     box.style.display = "flex";
-    box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(map[reason] ?? r?.data?.error?.message ?? S.t("transfer.failed"))}</div>`;
+    box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(reason === "CIRCUIT_LOCKED" ? S.t("circuit.blockedMsg", r?.data?.minutesLeft ?? "—") : map[reason] ?? r?.data?.error?.message ?? S.t("transfer.failed"))}</div>`;
   };
   const hideErr = () => { const b = document.getElementById("t-err"); b.style.display = "none"; b.innerHTML = ""; };
 

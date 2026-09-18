@@ -42,6 +42,7 @@ S.trust = {
   onEvent(ev) {
     const map = { PROPOSED: null, COMPILED: null, POLICY: "POLICY", CONSENT: "CONSENT", PROVENANCE: "PROVENANCE", INVARIANTS: "INVARIANTS", REPLAY: "REPLAY", EXEC: null, COMPENSATE: null, RESULT: null, BLOCKED: null };
     if (ev.kind === "PROPOSED") { this.resetVerifiers(); this.trace(ev.tool ? `tool:${ev.tool}` : ""); this.evt("PROPOSED", null, ev.args ?? ""); }
+    else if (ev.kind === "CIRCUIT") this.evt("CIRCUIT", false, ev.detail ?? ev.reason ?? ""); /* 安全熔断：连续失败/可疑行为触发写操作锁定（赛题"异常熔断"可视化） */
     else if (ev.kind === "BLOCKED") this.evt("BLOCKED", false, ev.reason ?? "");
     else if (map[ev.kind] !== null && map[ev.kind] !== undefined) {
       this.v(ev.kind, ev.ok === "input_required" ? "run" : ev.ok);

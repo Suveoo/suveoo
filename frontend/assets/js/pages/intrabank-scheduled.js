@@ -60,10 +60,11 @@ S.router.register("intrabank-scheduled", async () => {
           INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
           PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
           INVALID_SCHEDULE_TIME: S.t("sch.pastTime"),
+          CIRCUIT_LOCKED: S.t("circuit.blockedMsg", 0),
         };
         const box = document.getElementById("s-err");
         box.style.display = "flex";
-        box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(map[reason] ?? r.data?.error?.message ?? "failed")}</div>`;
+        box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(reason === "CIRCUIT_LOCKED" ? S.t("circuit.blockedMsg", r.data?.minutesLeft ?? "—") : map[reason] ?? r.data?.error?.message ?? "failed")}</div>`;
         S.ui.toast(r.data?.reason ?? r.data?.error?.message ?? "failed", true);
       }
     };

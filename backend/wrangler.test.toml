@@ -35,6 +35,7 @@ new_sqlite_classes = ["LedgerDO", "SagaDO"]
 JWT_SECRET = "test-jwt-secret-not-for-prod"
 CANARY_TOKEN_SECRET = "test-canary-secret"
 CONSENT_GRANT_TTL_SECONDS = "120"
+CIRCUIT_LOCK_SECONDS = "3"
 INVARIANT_STRICT_MODE = "true"
 DEMO_MODE = "true"
 ADMIN_TOKEN = "test-admin-token-2026"
