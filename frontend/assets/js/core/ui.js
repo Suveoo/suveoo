@@ -51,6 +51,7 @@ S.ui = {
       shield: '<path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z"/><path d="m9 12 2 2 4-4"/>',
       bell: '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
       lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/><path d="M12 15v2"/>',
+      clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     }[glyph];
     if (!grad || !g) return `<svg class="ic" width="${size}" height="${size}" aria-hidden="true"><use href="/assets/icons/sprite.svg?v=${S.ui.v()}#i-${glyph}"/></svg>`;
     const id = "icg-" + (++S.ui._icSeq);

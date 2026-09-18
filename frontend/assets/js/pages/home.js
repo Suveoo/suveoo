@@ -28,21 +28,20 @@ S.router.register("home", async ({ user }) => {
   const go = () => { const v = document.getElementById("hero-q").value.trim(); if (v) S.router.ai(v); };
   document.getElementById("hero-input").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   S.voice.bind(document.getElementById("hero-mic"), document.getElementById("hero-q"));
-  /* services：多彩渐变宫格（第二十三轮 D：tint 圆底升级为 ic-* 彩色 squircle 图标，七族轮转同族不相邻） */
+  /* services：多彩渐变宫格（第二十三轮 D 升级 ic-*；第二十四轮补记：未开放的跨行/跨境退役，
+     补预约转账（赛题核心场景）与交易记录；七族轮转同族不相邻，按使用频率排序） */
   const svc = [
     ["/transfer/intrabank", "ic-pay-sky", S.t("pay.intrabank")],
-    ["disabled:crossBank", "ic-bank-teal", S.t("home.crossBank")],
-    ["disabled:crossBorder", "ic-globe-violet", S.t("home.crossBorder")],
+    ["/transfer/intrabank-scheduled", "ic-clock-teal", S.t("pay.scheduled")],
+    ["/account/transactions", "ic-chart-violet", S.t("pay.txHistory")],
     ["/pay/bills", "ic-doc-orange", S.t("home.billsShort")],
     ["/account/cards", "ic-card-navy", S.t("acct.grid.cards")],
     ["/wealth/funds", "ic-wealth-gold", S.t("wealth.funds").replace("Suveoo ", "")],
     ["/wealth/fx", "ic-exchange-rose", S.t("wealth.allFx")],
     ["/account/downloads", "ic-download-sky", S.t("acct.downloads")],
   ];
-  document.getElementById("services").innerHTML = svc.map(([href, ic, label]) => href.startsWith("disabled:")
-    ? `<div class="quick-item disabled" data-dis="${href.slice(9)}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}<br><span class="muted" style="font-size:10px">${S.fmt.escape(S.t("common.comingSoon"))}</span></span></div>`
-    : `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("");
-  S.ui.$$(".quick-item.disabled").forEach((el) => { el.onclick = () => S.ui.modal(`<h2>${S.fmt.escape(S.t("common.more"))}</h2><p class="muted">${S.fmt.escape(S.t("home.crossDisabled"))}</p>${S.sim.footnote()}`); });
+  document.getElementById("services").innerHTML = svc.map(([href, ic, label]) =>
+    `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("");
 
   /* 情境产品卡（未登录/无命中 → 通用卡；规则见 core/insights.js，零 LLM） */
   const promoEl = document.getElementById("promo");
@@ -122,11 +121,11 @@ S.router.register("home", async ({ user }) => {
         <a class="small" href="/account/transactions">${S.fmt.escape(S.t("common.more"))} →</a>
       </div>
       <div class="row cf-row">
-        <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.inLabel"))}</span><span class="n trend-up">¥${S.fmt.moneyPlain((cf.inThis / 100).toFixed(2))}</span></div>${pill(cf.inPct)}</div>
-        <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.outLabel"))}</span><span class="n">¥${S.fmt.moneyPlain((cf.outThis / 100).toFixed(2))}</span></div>${pill(cf.outPct, true)}</div>
+        <div class="cf-cell"><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.inLabel"))}</span><span class="n trend-up">¥${S.fmt.moneyPlain((cf.inThis / 100).toFixed(2))}</span></div>${pill(cf.inPct)}</div>
+        <div class="cf-cell"><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.outLabel"))}</span><span class="n">¥${S.fmt.moneyPlain((cf.outThis / 100).toFixed(2))}</span></div>${pill(cf.outPct, true)}</div>
       </div>
       <div class="cf-bar" title="${inFrac}% / ${100 - inFrac}%"><i class="in" style="width:${inFrac}%"></i><i class="out" style="width:${100 - inFrac}%"></i></div>
-      <div class="row between muted" style="font-size:11px;margin-top:6px">
+      <div class="row between muted" style="font-size:11px;margin-top:4px">
         <span><i class="dot dot-in"></i> ${S.fmt.escape(S.t("ch.inLabel"))} ${inFrac}%</span>
         <span><i class="dot dot-out"></i> ${S.fmt.escape(S.t("ch.outLabel"))} ${100 - inFrac}%</span>
       </div></div>`;

@@ -137,9 +137,13 @@
 @keyframes voice-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, .25); } 50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } }
 @media (prefers-reduced-motion: reduce) { .voice-btn.listening { animation: none; } }
 
-/* 本月收支一览卡 */
-.cf-row { gap: 28px; flex-wrap: wrap; margin-top: 10px; }
-.cf-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 14px; background: var(--color-surface); }
+/* 本月收支一览卡（第二十四轮补记：环比胶囊移至数值右方省一行；纵向留白整体收紧） */
+.cf-row { gap: 28px; flex-wrap: wrap; margin-top: 8px; }
+.cf-cell { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 4px 8px; }
+/* 30px 数字 + 胶囊在 390px 恰好压线溢出触发兜底换行（实测 ¥124,607.06 行 290.5≈cell 290）——此卡内局部降一档 */
+.cf-cell .num-xl .n { font-size: 26px; }
+.cf-cell .trend-pill { margin-bottom: 2px; white-space: nowrap; }
+.cf-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 10px; background: var(--color-surface); }
 .cf-bar .in { background: linear-gradient(90deg, #1F7A4D, #2FA06A); }
 .cf-bar .out { background: linear-gradient(90deg, #35479E, #8B97D6); }
 .cf-row .dot, .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
