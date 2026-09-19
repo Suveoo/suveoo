@@ -91,7 +91,7 @@ S.router.register("home", async ({ user }) => {
     /* 桌面端：今日收益纵排放大数字右侧（.assets-side），移动端 wrap 后靠左（模拟声明已按要求移出本卡） */
     document.getElementById("assets-main").innerHTML = `
       <div class="row between assets-head"><div>
-        <div class="acf-head"><img src="/assets/images/illustrations/assets-coins.svg?v=${S.ui.v()}" width="34" height="34" alt="" loading="lazy"><b class="h-txt">${S.fmt.escape(S.t("home.totalAssets"))}</b><button class="eye-toggle" id="eye">${S.ui.icon("eye", 16)}</button></div>
+        <div class="acf-head"><img src="/assets/images/illustrations/assets-coins.svg?v=${S.ui.v()}" width="34" height="34" alt="" loading="lazy"><b class="h-txt h-up">${S.fmt.escape(S.t("home.totalAssets"))}</b><button class="eye-toggle" id="eye">${S.ui.icon("eye", 16)}</button></div>
         <div><span class="total mmask" id="amt">${S.fmt.moneyPlain(o.total_assets)}</span><span class="cur">CNY</span></div>
       </div>
       <div class="assets-side">
