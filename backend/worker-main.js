@@ -2819,6 +2819,9 @@ export async function handleAiChat(request, env, ctx) {
     async start(controller) {
       const enc = new TextEncoder();
       const send = (obj) => controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      /* 本轮下发过的 GenUI 卡（落库到 assistant 侧，重放用）。必须与 flushAiring 同层声明——
+         放进 try 块会是块级作用域，外层 flushAiring 闭包引用不到（线上实证：出卡轮 ReferenceError） */
+      const turnCards = [];
       const flushAiring = async () => {
         for (const evt of await airingDrain(env, sid)) {
           if (evt.kind === "genui") { send({ type: "genui_event", card: evt.card }); turnCards.push(evt.card); }
@@ -2850,7 +2853,6 @@ export async function handleAiChat(request, env, ctx) {
         const msgs = [...buildHistoryContext(hist), { role: "user", content: text }];
         let assistantText = "";
         let hadError = false;
-        const turnCards = []; /* 本轮下发过的 GenUI 卡（落库到 assistant 侧，重放用） */
         let pendingGrantTools = new Set(); /* 已产出确认卡/OTP 门工具：防模型无视规则 4 重复发起同一笔 */
         for (let round = 0; round < 8; round++) {
           const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }));
