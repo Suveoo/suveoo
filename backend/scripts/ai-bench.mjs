@@ -49,12 +49,12 @@ async function login() {
   return d.token;
 }
 
-async function runInstruction(token, text, idx) {
+async function runInstruction(token, text, idx, sidOverride = null) {
   const t0 = Date.now();
   const res = await fetch(`${BASE}/api/ai/chat`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text, session_id: `bench_r20_${idx}_${Date.now().toString(36)}` }),
+    body: JSON.stringify({ text, session_id: sidOverride ?? `bench_r20_${idx}_${Date.now().toString(36)}` }),
     signal: AbortSignal.timeout(150_000),
   });
   const m = {
@@ -120,6 +120,50 @@ const onlyIdx = args.indexOf("--only");
 const only = onlyIdx >= 0 ? new Set(args[onlyIdx + 1].split(",").map(Number)) : null;
 const token = await login();
 console.error("login ok");
+
+/* --long：长会话基准（第二十六轮，关第二十轮"长会话未实测"遗留）——同一 session 连发 9 轮，
+   对比第 1 轮（空窗口）与第 9 轮（8 轮窗口满 + 首条常驻 + 字符预算裁剪生效）的首 token/总耗时，
+   验证历史注入对延迟的影响落在预算内。 */
+if (args.includes("--long")) {
+  const TURNS = [
+    "我这个月大概花了多少钱",
+    "其中最大的一笔是什么",
+    "我有哪些订阅",
+    "订阅里哪个最贵",
+    "我的信用卡欠多少",
+    "默认卡余额还有多少",
+    "最近三笔消费是什么",
+    "我这个月的支出大头是哪类",
+    "总结一下我们刚才聊的内容，两句话",
+  ];
+  const sid = `bench_long_${Date.now().toString(36)}`;
+  const rows = [];
+  for (let i = 0; i < TURNS.length; i++) {
+    process.stderr.write(`[长会话 ${i + 1}/${TURNS.length}] ${TURNS[i]} ... `);
+    const m = await runInstruction(token, TURNS[i], i + 100, sid);
+    rows.push({ turn: i + 1, text: TURNS[i], ...m, status: classify(m) });
+    console.error(`${m.totalMs}ms 首token=${m.firstTokenMs}ms tok=${m.tokenEvents} 工具=${m.proposed} → ${rows.at(-1).status}`);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  const first = rows[0], last = rows.at(-1);
+  const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  const summary = {
+    session: sid,
+    turns: rows.length,
+    first_turn: { firstTokenMs: first.firstTokenMs, totalMs: first.totalMs },
+    last_turn_full_window: { firstTokenMs: last.firstTokenMs, totalMs: last.totalMs },
+    median_firstTokenMs: med(rows.map((r) => r.firstTokenMs ?? 0).filter(Boolean)),
+    median_totalMs: med(rows.map((r) => r.totalMs ?? 0)),
+    context_answer_check: last.answer.slice(0, 120),
+  };
+  const { writeFileSync: wf } = await import("node:fs");
+  const longPath = outIdx >= 0 ? outPath.replace(/\.json$/, "-long.json") : "ai-bench-long.json";
+  wf(longPath, JSON.stringify({ summary, rows }, null, 2), "utf-8");
+  console.log(JSON.stringify(summary, null, 2));
+  console.error(`\n长会话结果已写入 ${longPath}`);
+  process.exit(0);
+}
+
 const out = [];
 let idx = 0;
 for (const [scenario, texts] of SCENARIOS) {

@@ -753,15 +753,16 @@ Consent Binding 全流程（与既定安全决策一致）：
   - GenUI 卡片作为消息流内的一等公民（§2.9 目录 11 种），渲染前必须通过 issuer 校验。转账/预约确认卡展示：金额、收款人（已验证徽章）、付款卡、备注、（预约另含执行时间与重复规则）、追踪号与 grant 前缀；AI 通道一切黄级 INPUT_REQUIRED 均出确认卡并挂「确认/取消」（含理财申购、收款人管理等守卫操作）。
   - BLOCKED 事件以 `blocked_notice` 卡呈现，同时 Trust Console 同步红行。
 2. **空态/欢迎屏**：AI hero 插画（`illustrations/ai-hero.svg`）+ 欢迎语 + 6 个场景 chips（来自 `assets/data/scenarios.json`，覆盖赛题六场景各一条）+ 「查看评测看板」链接（/ai/benchmark）。
-3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"；会话存储（最近 20 个会话，`GET /api/ai/sessions` 返回，前端侧拉列表待接入）。
-4. **中断与接管**：流式输出期间发送按钮切换为「停止」（stop 图标 + aria-label，`S.chat.stop()` 经 AbortController 中断请求——已到达的部分文本保留展示，用户主动停止不算错误）；每条黄/红确认卡自带「取消」。错误事件以红色气泡完整呈现错误信息（不会被"完成"占位覆盖）；单个 GenUI 卡渲染异常只损失该卡，不中断流。
+3. **输入区**：胶囊输入框（高 52）+ 发送按钮（send 图标）；输入框下方固定灰字风险提示（i18n）："绿色操作自动执行 · 黄色需确认 · 红色需强验证"。
+4. **会话历史与续聊（v3.25 接入）**：对话卡顶部头栏 = 左「🕘 历史对话」入口 + 中当前会话标题（自动取首条消息前 30 字，PATCH 可改名）+ 右「+ 新对话」（清消息流、sid 置空、恢复全新态首屏）。桌面 ≥1024 历史为**下拉面板**（宽同对话卡、今天/昨天/7 天内/更早分组、当前会话「● 进行中」、行内重命名、删除走确认模态、删除后原地刷新）；移动 ≤1023 为**全屏抽屉**（复用 Trust Console 抽屉几何与系统返回手势，两抽屉互斥）。点会话续聊：`S.chat.load(sid)` 拉取分页消息重建气泡（文本走 S.md.render 同直播样式），GenUI 卡片**只读重放**——verified_ir 白名单组件 + 服务端终态徽标（已执行[trace 命中流水]/已过期/已拦截），**零操作按钮、不注册 attachConfirm**；未知组件只留「已收起卡片」徽标。历史与新增消息间显示分隔线「—— 以上为历史记录，继续输入可追加 ——」。刷新进 /ai 若最近会话 30 分钟内活跃（localStorage），composer 上方浮「继续上次：{标题}」提示条（点击加载、× 关闭、不自动跳入）。
+5. **中断与接管**：流式输出期间发送按钮切换为「停止」（stop 图标 + aria-label，`S.chat.stop()` 经 AbortController 中断请求——已到达的部分文本保留展示，用户主动停止不算错误）；每条黄/红确认卡自带「取消」。错误事件以红色气泡完整呈现错误信息（不会被"完成"占位覆盖）；单个 GenUI 卡渲染异常只损失该卡，不中断流。
 
 ### 8.3 技术实现（关键）
 
 - **通道**：`POST /api/ai/chat`（SSE）。请求体 `{session_id?, text, ctx?}`。**LLM API Key 只存在于 Worker 侧**——Worker 以手动工具循环驱动（与厂商无关，不依赖任何"MCP 连接器"）：`llmToolDefs()` 把 MCP 工具注册表编译为 Messages API `tools` 数组随请求下发（`stream:true` 流式优先，见 8.2）；系统提示词每次请求动态前缀注入当前日期（北京时间+星期+相对日期换算指引——模型不知道"今天"就无法换算"下周三"）；模型产生的 `tool_use` 由 Worker 在 SSE 流中聚合完整 JSON 后本地转发 `mcpExecuteTool()`（与 `/mcp` 端点同一执行路径），每个 tools/call 先 `compileToIR()` 再 `verify()`（五道验证），`VERIFIED` 才进入 ledger-do/saga-do；`tool_result` 回传进入下一轮（最多 8 轮）。上游不支持流式时自动回退非流式（请求被拒 → 重发；网关忽略 stream 回整段 JSON → 就地消化；流中途 error 且已有文本 → 返回部分结果不重放），观测日志 `ai.llm_stream` 与 `ai.llm_payload`（每轮请求体字符数/消息数/工具数）；两条路径均 45s 超时兜底（网关挂起不再永挂"思考中"）。浏览器永不接触 LLM Key（亦便于 Ablation 时在服务端切换 Claude/Qwen/GPT）。
 - **确认权硬隔离（AI 通道）**：黄/红操作的 consent grant 完整 hash 只随 GenUI 确认卡下发**浏览器**（用户点击 attachConfirm 直连 `/mcp` 携带 grant_hash 完成两段式）；聊天循环内模型传入的 `grant_hash`/`otp` 一律剥离，模型侧 `INPUT_REQUIRED` 的 tool_result 仅含 8 位 grant 前缀且不含卡——模型物理上无法"替用户确认"（规则 4 提示词之外的硬约束）。同一工具在确认卡 pending 期间的重复调用以 `ALREADY_PENDING` tool_result 回绝。`/mcp` 端点（用户 JWT 编程通道）保持完整 grant 两段式语义。
 - **SSE 事件类型**：`token`（文本增量）、`genui_event`（卡片）、`trust_event`（控制台，§2.11）、`done`（含 trace 汇总与耗时）、`error`。
-- 会话存储：会话摘要 + 消息存 ledger-do（用户分区），Trust Console 事件流随消息回放。
+- 会话存储（v3.25 重构）：`chat_msgs` 表为**事实源**（sid/role/content/cards[该轮 GenUI 卡 JSON]/err，索引 sid+id），chats 表扩列（created_at/updated_at/msg_count/last_preview/archived，幂等迁移）；`aihist:` KV 降级为 **24h 热缓存**（`{f:首条用户消息, w:窗口}`，旧数组格式兼容），miss 时由消息表重建窗口。**上文注入只含 role+text**：最近 `AI_HISTORY_TURNS`（默认 8）轮 + 首条用户消息常驻 + ~3000 字符预算超限裁中段（保头尾）——tool_result/grant_hash/otp/卡片快照永不进上下文（确认权硬隔离的自然延伸）；系统提示词规则 1 注明"历史对话中的数值仅代表当时，以实时查询为准"（语义锁定断言覆盖）。失败轮只落 user 侧（llmMessages 连接层失败也归一走此路径）；90 天惰性清理随列表查询；删除会话记 user_audit `session_delete`。Trust Console 事件流随消息回放。
 - MCP Tool Registry（最终版 = 9.6 §4.4 的 12 个 + 场景补齐 + 计算器与存款目录，共 25 个 + 10 个 calc_*；全部在 worker-main.js 区块④注册；系统提示词规则 8 要求产品类问题必须先查工具、禁止凭记忆编造数字、赎回/外币/卡号类问答按工具返回口径作答）：
 
 | # | 工具名 | 等级 | 说明 |
@@ -1019,7 +1020,10 @@ Consent Binding 全流程（与既定安全决策一致）：
 | GET /api/fx/balances | 用户 | 绿 | 各币种外币余额（含按买入价折算 CNY 参考） |
 | POST /api/fx/exchange | 用户 | 黄/红 | 服务端实时牌价结算（JPY 每 100 口径；可选 from_card 结算卡——购汇可选信用卡信用支付、结汇仅借记；sell 传 amount_foreign） |
 | POST /api/ai/chat (SSE) | 用户 | — | §5.3；限流 30 次/分 |
-| GET /api/ai/sessions(/{id}) | 用户 | 绿 | 会话历史 |
+| GET /api/ai/sessions | 用户 | 绿 | 最近 20 条（title/updated_at/msg_count/last_preview；archived 隐藏；顺带 90 天惰性清理） |
+| GET /api/ai/sessions/{sid}/messages?page= | 用户 | 绿 | 分页 20/页；cards 附终态徽标 _status（EXECUTED/EXPIRED/BLOCKED）；404 属主校验 |
+| PATCH /api/ai/sessions/{sid} | 用户 | 绿 | {title}/{archived} 改名归档 |
+| DELETE /api/ai/sessions/{sid} | 用户 | 绿 | 删 chats+chat_msgs；user_audit 记 session_delete |
 | GET /api/tasks(/{id})；POST /api/tasks/{id}/cancel | 用户 | 黄 | 长程任务 |
 | POST /api/demo/inject-failure | 用户 | — | 仅 DEMO_MODE（session 内本人任务；调用写审计） |
 | GET /api/notifications(+unread-count)；POST /api/notifications/read | 用户 | — | |
@@ -1125,6 +1129,7 @@ Consent Binding 全流程（与既定安全决策一致）：
 
 ## 15. 变更记录
 
+- v3.25（2026-09-20）：**AI 聊天记录持久化 + 同一对话续聊带上文记忆（队长方案定稿，三批交付）**——此前 `aihist:` KV 仅 1h TTL 且 sid 只在内存，刷新页面即换 sid 失忆。批1（worker 72e13327→6207b794）：`chat_msgs` 消息表（事实源，cards 存该轮 GenUI 卡 JSON）+ chats 扩列（幂等迁移）；KV 降级 24h 热缓存（{f:首条常驻, w:窗口}，miss 由消息表重建）；**上下文注入只含 role+text**（8 轮 `AI_HISTORY_TURNS` + 首条常驻 + 3000 字符裁中段，grant/otp/tool_result 永不进上下文，提示词加"历史数值仅代表当时"并入语义锁定，1485≤1500）；四端点（sessions 扩字段+90 天惰性清理 / messages 分页+终态徽标[EXECUTED=trace 命中流水、EXPIRED、BLOCKED] / PATCH 改名归档 / DELETE+user_audit session_delete）；llmMessages 连接失败归一走失败轮（user 侧落库）。批2（前端 b140）：对话卡头栏（历史下拉[桌面]/全屏抽屉[移动，与 TC 抽屉互斥+返回手势]/标题自动/新对话恢复全新态）、`S.chat.load` 续聊加载、**卡片只读重放**（白名单组件+徽标，零操作按钮）、分隔线、「继续上次」提示条（30 分钟窗，不自动跳入）；i18n +20 键（942×4）；sprite +i-edit/i-trash。批3（b141/b142）：下拉锚点贴头栏、删除后列表原地刷新（模态点击不算点外）、旧空会话提示文案、ai-bench `--long` 长会话基准（**关第二十轮"长会话未实测"遗留**：9 轮同会话全通，窗口满首 token 4.8s 无延迟恶化，总结轮准确复述全部上文）。线上验收（demo，1280+390）：3 轮对话（含黄级确认卡）→刷新→提示条→续聊→**"刚才我说要转多少来着"模型答"赵砚秋 6.66 元"**（上文记忆端到端生效）；只读卡零按钮+已过期徽标；改名/删除生效；流式/语音/停止/TC/洞察全新态回归；双档 overflowX=0。途中抓出并修复 turnCards 块级作用域 bug（try 内 const 对外层 flushAiring 闭包不可见，出卡轮 ReferenceError——线上验收发现，测试失败轮无卡片未覆盖）。测试 239→**256**×2 绿（+9 单元窗口纯函数、+1 schema-migration chats、+6 集成）；截图 notes/evidence-round26/。
 - v3.24（2026-09-19）：**语音终局方案：识别器独占麦克风（队长三平台实测定案，点环特效退役）**——Android（环动字不进，并行流抢麦）与 iOS（首次后音频会话损坏、gUM 报 NotReadable，预检反把能用的识别拦死）双证：Web Speech 识别与任何并行麦克风消费者在该两端不可共存。修复：**彻底移除点环并行取流与 getUserMedia 预检**——识别器成为唯一麦克风消费者（自带授权弹窗，Permissions-Policy 已放行），错误码直映射 i18n（保留 denied/noMic/network/noSpeech 分流与生命周期四重加固：final 即停/再点硬复位/30s 上限/页面隐藏收口）；监听反馈保留按钮红色脉冲（纯 CSS 零麦克风成本）。密闭测试：假识别器完整一句话链路（interim/final 入框/复位/二次会话）+ **getUserMedia 间谍计数 0** + 无点环；真实路径 network 错误正确映射。v=b139；测试 239×2 绿。环特效若将来想要：Worker 端 ASR 代理方案（自建识别管线，环与字同源无冲突）为唯一两全路径。
 - v3.23（2026-09-19）：**语音"环动而字不进"根因修复：并行取流饿死识别（队长 Samsung Chrome+Samsung Internet 双浏览器复现）**——症状：权限正常、点环随声音波动（分析器流拿到了麦克风），但识别永远零结果。根因：**Android Chromium 系已知冲突——识别期间持有的并行 getUserMedia 流会抢走麦克风路由，SpeechRecognition 被饿死**（b135 可用恰因当时预检流"即开即停"，b136 为点环持续持流引入回归）。修复三件套：①预检恢复即开即停（只管授权弹窗）；②**识别先启动占麦、点环流延后 onaudiostart/600ms 再开**；③**看门狗自适应降级**：开环 4.5s 内"环已测到声音能量（峰值≥0.15）但识别零结果零 speechstart"→ 判定该设备取流冲突 → 弃环（释放麦克风路由）无痕重启识别，并 localStorage(suveoo.vizmic=off) 设备级记忆，此后该设备直接无环识别——**文字录入永远优先于特效**；安静环境不误判；共存正常的设备（桌面/iOS）环与识别双全。密闭测试（假 SR+假频谱+真麦克风）验证全链路并抓出看门狗漏 stopViz 的回归（弃识别未弃环→冲突未解除），已修。主页与 /ai 共用同一 bind，两处均有点环。v=b137/b138 两小批；测试 239×2 绿。
 - v3.22（2026-09-19）：**语音响度点环特效（Samsung 真机语音复验通过后新增）**——监听期间语音按钮外围渲染 **24 点波纹环**，随用户声音响度实时起伏：Web Audio `AnalyserNode`（fftSize 256）取语音频段能量（bins 2..48，getByteFrequencyData 全主流浏览器含 iOS 14.5+ 支持，零依赖）；对径两点共用频段（左右对称呼吸感）、每点快攻慢放平滑（上行 0.55/释放 0.12）、整体 RMS 门控保证大声齐动、**静默时慢正弦摆动**（无声环也有生命感）；点半径/透明度/外扩半径三维联动（r 21→31px）+ 红族微光 drop-shadow；rAF 仅监听期运行，随会话 hardReset 一并拆除（含 AudioContext.close 防 Safari 实例上限、麦克风流统一停）；`prefers-reduced-motion` 不渲染；hero 容器 overflow:hidden 兜底移除（根因 min-width:0 足矣，否则外扩点环被裁）。IAB 线上验证：双页 24 点渲染、实时律动（cy/opacity 帧间变化）、会话结束正确清除。v=b136；测试 239×2 绿。

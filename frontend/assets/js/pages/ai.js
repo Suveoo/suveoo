@@ -309,10 +309,9 @@ S.router.register("ai", async ({ user }) => {
       if (!r.ok) { S.ui.toast(S.t("common.loadFailed"), true); return; }
       try { if (localStorage.getItem("suveoo.aiLastSid") === s.id) localStorage.removeItem("suveoo.aiLastSid"); } catch { /* ignore */ }
       if (s.id === S.chat.sid) resetToFresh();
-      document.getElementById("hist-drop")?.remove();
-      refreshHistory(histDrawer.querySelector("#hd-list"));
-      const drop2 = document.getElementById("hist-drop");
-      if (drop2) refreshHistory(drop2);
+      /* 原地刷新所在容器（桌面下拉保持展开不闪断；移动抽屉同理） */
+      const drop = document.getElementById("hist-drop");
+      refreshHistory(drop ?? histDrawer.querySelector("#hd-list"));
     };
   }
   /* 历史卡片只读重放：只渲染已知组件的快照 + 服务端终态徽标（已执行/已过期/已拦截）；
@@ -351,6 +350,8 @@ S.router.register("ai", async ({ user }) => {
       if (m.content) histBubble("ai", String(m.content));
       for (const card of m.cards ?? []) replayCard(card);
     }
+    /* 旧版（b139 前）会话只有摘要无消息落库：空流给一句提示而非空白对话区 */
+    if (!msgs.length) thread.appendChild(S.ui.el(`<div class="hist-divider">${S.fmt.escape(S.t("ai.histEmpty"))}</div>`));
     if (msgs.length) thread.appendChild(S.ui.el(`<div class="hist-divider">${S.fmt.escape(S.t("ai.histDivider"))}</div>`));
     updateLastCache();
     scroll();
@@ -380,6 +381,7 @@ S.router.register("ai", async ({ user }) => {
       refreshHistory(drop);
       const off = (ev) => {
         if (!drop.isConnected) { document.removeEventListener("click", off); return; }
+        if (ev.target.closest(".modal-mask")) return; /* 模态交互（如删除确认）不算点外 */
         if (!drop.contains(ev.target) && !histBtn.contains(ev.target)) { drop.remove(); document.removeEventListener("click", off); }
       };
       setTimeout(() => document.addEventListener("click", off), 0);

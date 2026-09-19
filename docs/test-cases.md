@@ -37,10 +37,15 @@ prompt-injection / replay-attack / authorization-bypass / consent-mutation 四�
 ## 运行结果
 
 ```
-Test Files  27 passed (27)
-     Tests  207 passed (207)
-  Duration   ~24s
+Test Files  36 passed (36)
+     Tests  256 passed (256)
+  Duration   ~28s
 ```
+
+2026-09-20（第二十六轮）新增会话历史测试：
+- tests/unit/chat-history.test.js（9）——窗口纯函数：parseHistCache 新旧格式兼容、buildHistoryContext 首条常驻/字符预算裁中段保头尾/条目只含 role+text（混入 grant_hash/tool_use/cards 白名单化丢弃）、advanceHistory 失败轮 user-only 与滚动截窗、提示词历史数值过期语义在锁定区且 ≤1500
+- tests/integration/chat-history.test.js（6）——sessions CRUD 与属主隔离（PATCH 改名归档/DELETE 后 404/user_audit session_delete）、失败轮只落 user 侧且消息行零 grant/tool_result 字段、KV miss → chat_msgs 重建窗口（首条常驻+role+text）、历史卡片落库形态与终态徽标（EXECUTED/EXPIRED/BLOCKED）、过期 grant 重放"确认执行"被 CONSENT 校验拦截、90 天惰性清理
+- schema-migration.test.js 扩展 chats 五列迁移覆盖；reminder-task.test.js 语义锁定 +1（历史数值过期）；测试环境配置假 LLM 端点（拒连地址）驱动失败轮路径
 
 2026-09-17（第十一轮）新增集成测试文件：
 - tests/integration/demo-admin.test.js（6）——演示端点管理员令牌 fail-closed/三连鉴权/审计落盘/inspect 巡检
