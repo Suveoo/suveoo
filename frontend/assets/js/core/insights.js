@@ -78,13 +78,13 @@ S.insights = (() => {
     });
     /* ③ 月薪定投：检测到稳定工资入账 */
     if (salary) out.push({
-      id: "dca", tone: "teal", art: null, icon: "trend",
+      id: "dca", tone: "teal", art: "/assets/images/illustrations/dca-auto.svg", icon: "trend",
       tag: "ins.tagDca", title: "ins.dcaTitle", body: S.t("ins.dcaBody", salary.name, S.fmt.moneyPlain((salary.total / Math.max(1, salary.count)).toFixed(2))),
       cta: "/wealth/funds", priority: 80,
     });
     /* ④ 信用卡还款：有欠款 */
     if (credit && num(credit.balance) > 0) out.push({
-      id: "repay", tone: "rose", art: null, icon: "card",
+      id: "repay", tone: "rose", art: "/assets/images/illustrations/card-repay.svg", icon: "card",
       tag: "ins.tagTodo", title: "ins.repayTitle", body: S.t("ins.repayBody", credit.balance, credit.available),
       cta: "/pay/bills", priority: 70,
     });
@@ -97,7 +97,7 @@ S.insights = (() => {
     });
     /* ⑥ 账单待办：5 天内到期 */
     if (dueSoon.length) out.push({
-      id: "bills", tone: "sky", art: null, icon: "doc",
+      id: "bills", tone: "sky", art: "/assets/images/illustrations/bill-due.svg", icon: "doc",
       tag: "ins.tagTodo", title: "ins.billsTitle", body: S.t("ins.billsBody", dueSoon.length, S.fmt.moneyPlain(yuan(dueSum))),
       cta: "/pay/bills", priority: 50,
     });

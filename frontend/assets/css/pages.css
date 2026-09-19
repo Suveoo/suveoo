@@ -208,6 +208,10 @@
 .ai-ins-card { position: relative; border-radius: 14px; padding: 14px 14px 12px; overflow: hidden; display: flex; gap: 10px; min-height: 118px; }
 .aic-ico { flex: none; display: inline-flex; align-items: center; justify-content: center; }
 .aic-art { position: absolute; right: -10px; bottom: -12px; width: 86px; height: 86px; opacity: .85; pointer-events: none; }
+/* 挂图案的卡：仅移动端（宽卡长文案）给正文让出右下图案区；桌面窄卡行短无需让位 */
+@media (max-width: 767px) {
+  .ai-ins-card.has-art .aic-desc { max-width: calc(100% - 74px); }
+}
 .aic-body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .aic-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; }
 .aic-title { font-size: 14.5px; line-height: 1.35; }
