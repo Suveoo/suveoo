@@ -5,9 +5,15 @@ S.router.register("bills", async () => {
     <div class="card" id="insight">${S.ui.skeleton(1)}</div>
     <div class="card" style="margin-top:16px" id="bills">${S.ui.skeleton(4)}</div>`;
   const ins = await S.api.get("/api/dashboard/insight");
+  /* 行即入口（第二十五轮续 6，与主页 AI 洞察同款）：去行首符号（首字与标题对齐），行尾回车图标，整行可点 → 第一人称发 Suveoo AI */
   document.getElementById("insight").innerHTML = ins.ok
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("bills.insight"))}</b>
-       ${(ins.data.insights ?? []).map((t) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(t)}</p>`).join("")}</div></div>` : "";
+    ? `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("bills.insight"))}</b>
+       ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:4px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}</div></div>` : "";
+  S.ui.$$("#insight .insight-li").forEach((p) => {
+    const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));
+    p.onclick = ask;
+    p.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
+  });
   const r = await S.api.get("/api/bills");
   const el = document.getElementById("bills");
   if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
