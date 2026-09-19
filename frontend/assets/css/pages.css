@@ -116,8 +116,12 @@
   #grid.grid-2 { grid-template-columns: 1fr; }
 }
 
-/* ===== 理财卡大数字重排（第二十二轮 E）：浅底渐变卡头 + 插画角标 + 大数字主视觉 ===== */
+/* ===== 理财卡大数字重排（第二十二轮 E）：浅底渐变卡头 + 插画角标 + 大数字主视觉 =====
+   第二十五轮续：资产类别徽章上移至基金名尾字右侧（.fc-name 内联成组，超宽整体折行，R1 保持右上） */
 .fund-card2 { display: flex; flex-direction: column; }
+.fund-card2 .fc-top { align-items: flex-start; }
+.fc-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; flex: 1; min-width: 0; padding-right: 8px; }
+.fc-cat { flex: none; }
 .fc-hero { position: relative; border-radius: 14px; padding: 14px 16px; overflow: hidden; }
 .fc-hero .num-xl { position: relative; z-index: 1; }
 .fc-hero .n { font-size: 34px; }
@@ -142,17 +146,17 @@
 .assets-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; padding-bottom: 3px; }
 @media (max-width: 767px) { .assets-side { align-items: flex-start; text-align: left; padding-bottom: 0; } }
 /* 卡头（logo + 粗体标题）：标题与插画的光学对齐按插画重心分别补偿——
-   钱包（重心居中偏上）文字 +1px 下移；金币堆（顶轻底重）文字 -1.5px 上移（队长实拍校正） */
+   钱包（重心居中偏上）文字 +0px 下移；金币堆（顶轻底重）文字 -0.5px 上移 */
 .acf-head { display: flex; gap: 10px; align-items: center; }
 .acf-head img { width: 34px; height: 34px; flex: none; }
-.acf-head .h-txt { display: inline-block; transform: translateY(1px); }
-.acf-head .h-txt.h-up { transform: translateY(-1.5px); }
+.acf-head .h-txt { display: inline-block; transform: translateY(0px); }
+.acf-head .h-txt.h-up { transform: translateY(-0.5px); }
 .acf-head .eye-toggle { margin-left: 2px; vertical-align: middle; }
-.cf-sep { border: none; border-top: 1px solid var(--color-line); margin: 6px 0 0; }
+.cf-sep { border: none; border-top: 1px solid var(--color-line); margin: 2px 0 5px; }
 @media (max-width: 767px) {
   /* 手机端：今日收益行与分隔线一起上提——折行间距归零 + 分隔线更贴 */
   .card .row.between.assets-head { row-gap: 0; }
-  .cf-sep { margin-top: 5px; }
+  .cf-sep { margin-top: 12px; margin-bottom: 8px; }
 }
 
 /* ===== 主页/账单页洞察：行即入口（第二十五轮 2/6）——行首无符号（首字与标题对齐），行尾回车图标示意"带去 AI"，整行可点 ===== */

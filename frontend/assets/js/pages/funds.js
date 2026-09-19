@@ -28,7 +28,7 @@ S.router.register("funds", async () => {
     const up = r12 >= 0;
     return `
     <div class="card fund-card2">
-      <div class="row between"><b>${S.fmt.escape(f.name)}</b>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
+      <div class="row between fc-top"><span class="fc-name"><b>${S.fmt.escape(f.name)}</b>${f.asset_class ? S.ui.badge(f.asset_class, "badge-gray fc-cat") : ""}</span>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
       <div class="muted small mono" style="margin:4px 0 10px">${S.fmt.escape(f.code)} · NAV ${f.nav}</div>
       <div class="fc-hero bg-tint-gold">
         <img class="fc-art" src="/assets/images/illustrations/cat-fund.svg?v=${S.ui.v()}" alt="" loading="lazy">
@@ -40,7 +40,6 @@ S.router.register("funds", async () => {
           <span>${S.fmt.escape(S.t("funds.minInvest"))} <b class="mono">${S.fmt.escape(f.min_invest)}</b></span>
         </div>
       </div>
-      ${f.asset_class ? `<div class="muted small" style="margin-top:8px">${S.ui.badge(f.asset_class, "badge-gray")}</div>` : ""}
       <div class="row" style="margin-top:12px"><a class="btn btn-sm btn-accent-gold" href="/wealth/funds/${f.slug}">${S.fmt.escape(S.t("funds.detail"))}</a></div>
     </div>`;
   };
