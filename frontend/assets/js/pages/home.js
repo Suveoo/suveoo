@@ -11,15 +11,10 @@ S.router.register("home", async ({ user }) => {
       <button class="voice-btn" id="hero-mic" type="button">${S.ui.icon("mic", 16)}</button>
     </div>
     <div id="promo" style="margin-top:16px"></div>
-    <div id="cashflow" style="margin-top:16px"></div>
-    <div class="card assets-block" style="margin-top:16px" id="assets"></div>
+    <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"></div><div id="cashflow"></div></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("home.services"))}</h2></div>
     <div class="quick-grid" id="services"></div>
     <div class="card" id="insight" style="margin-top:16px"></div>
-    <div class="card card-surface banner" style="margin-top:16px">${S.ui.icon("shield", 16)}<div><b>${S.fmt.escape(S.t("home.securityTitle"))}</b>
-      <ul class="small muted home-anti" style="margin:6px 0 10px;padding-left:0;list-style:none">
-        <li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af1"))}</span></li><li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af2"))}</span></li><li style="display:flex;align-items:flex-start;gap:6px">${S.ui.icon("arrow-right", 12)} <span>${S.fmt.escape(S.t("help.af3"))}</span></li>
-      </ul><a class="small" href="/help#antifraud">${S.fmt.escape(S.t("common.more"))} →</a></div></div>
     <div class="brand-banner" style="margin-top:24px">
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
@@ -75,7 +70,7 @@ S.router.register("home", async ({ user }) => {
 
   /* assets / cashflow / insight */
   if (!user) {
-    document.getElementById("assets").innerHTML = `<div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))}</div>
+    document.getElementById("assets-main").innerHTML = `<div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))}</div>
       <div class="total">—</div></div><a class="btn btn-primary" href="/account/login">${S.fmt.escape(S.t("home.loginBtn"))}</a></div>
       <p class="footnote-sim">${S.fmt.escape(S.t("home.loginCta"))}</p>`;
     document.getElementById("insight").style.display = "none";
@@ -85,12 +80,16 @@ S.router.register("home", async ({ user }) => {
   const ov = await S.api.get("/api/overview");
   if (ov.ok) {
     const o = ov.data;
-    document.getElementById("assets").innerHTML = `
-      <div class="row between"><div>
+    /* 桌面端：今日收益与模拟声明纵排放大数字右侧（.assets-side），移动端 wrap 后靠左 */
+    document.getElementById("assets-main").innerHTML = `
+      <div class="row between assets-head"><div>
         <div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))} <button class="eye-toggle" id="eye">${S.ui.icon("eye", 16)}</button></div>
         <div><span class="total" id="amt">${S.fmt.moneyPlain(o.total_assets)}</span><span class="cur">CNY</span></div>
+      </div>
+      <div class="assets-side">
         <div class="muted small">${S.fmt.escape(S.t("home.todayPnl"))} <span class="mono" id="pnl">${o.today_pnl.amount} (${o.today_pnl.percent})</span></div>
-      </div></div>${S.sim.footnote()}`;
+        ${S.sim.footnote()}
+      </div></div>`;
     let hidden = false;
     document.getElementById("eye").onclick = () => {
       hidden = !hidden;
@@ -115,7 +114,8 @@ S.router.register("home", async ({ user }) => {
     };
     const total = cf.inThis + cf.outThis;
     const inFrac = total ? Math.round((cf.inThis / total) * 100) : 50;
-    el.innerHTML = `<div class="card">
+    /* 与资产总估值同卡（第二十五轮 1）：灰色横向分隔线 + 无卡壳内容；cashflow 为空时不渲染 → 无分隔线 */
+    el.innerHTML = `<hr class="cf-sep">
       <div class="row between" style="align-items:center">
         <div class="row" style="gap:10px;align-items:center"><img src="/assets/images/illustrations/wallet-cashflow.svg?v=${S.ui.v()}" width="34" height="34" alt="" loading="lazy"><b>${S.fmt.escape(S.t("home.monthCashflow"))} · ${mLabel}</b></div>
         <a class="small" href="/account/transactions">${S.fmt.escape(S.t("common.more"))} →</a>
@@ -128,14 +128,20 @@ S.router.register("home", async ({ user }) => {
       <div class="row between muted" style="font-size:11px;margin-top:4px">
         <span><i class="dot dot-in"></i> ${S.fmt.escape(S.t("ch.inLabel"))} ${inFrac}%</span>
         <span><i class="dot dot-out"></i> ${S.fmt.escape(S.t("ch.outLabel"))} ${100 - inFrac}%</span>
-      </div></div>`;
+      </div>`;
   }).catch(() => {});
   const ins = await S.api.get("/api/dashboard/insight");
   if (ins.ok) {
+    /* 行即入口（第二十五轮 2）：去底部按钮与行首箭头，行尾回车式图标示意"带去 AI"；
+       整行可点击 → 以第一人称指令原文发给 Suveoo AI（S.router.ai → /ai?q=…） */
     document.getElementById("insight").innerHTML = `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
-      ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}</p>`).join("")}
-      <div style="margin-top:10px"><button class="ai-chip" id="ask-ai">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div></div>`;
-    document.getElementById("ask-ai").onclick = () => S.router.ai(S.t("prompt.billInsight"));
+      ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
+      </div></div>`;
+    S.ui.$$("#insight .insight-li").forEach((p) => {
+      const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));
+      p.onclick = ask;
+      p.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
+    });
   }
 });

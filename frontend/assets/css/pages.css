@@ -137,6 +137,19 @@
 @keyframes voice-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, .25); } 50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } }
 @media (prefers-reduced-motion: reduce) { .voice-btn.listening { animation: none; } }
 
+/* ===== 资产总估值 + 本月收支合并卡（第二十五轮 1）：灰色横向分隔线；桌面端次信息放大数字右侧 ===== */
+.assets-head { align-items: flex-end; }
+.assets-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; padding-bottom: 3px; }
+.assets-side .footnote-sim { margin: 0; }
+@media (max-width: 767px) { .assets-side { align-items: flex-start; text-align: left; padding-bottom: 0; } }
+.cf-sep { border: none; border-top: 1px solid var(--color-line); margin: 16px 0 0; }
+
+/* ===== 主页 AI 洞察：行即入口（第二十五轮 2）——行首无箭头（首字与标题对齐），行尾回车图标示意"带去 AI"，整行可点 ===== */
+#insight .insight-li { display: block; cursor: pointer; transition: color .12s ease; }
+#insight .insight-li:hover { color: var(--color-navy); }
+#insight .insight-li .ic { width: 14px; height: 14px; margin-left: 5px; vertical-align: -2px; color: var(--color-ink-2); transition: color .12s ease; }
+#insight .insight-li:hover .ic { color: var(--color-navy); }
+
 /* 本月收支一览卡（第二十四轮补记：环比胶囊移至数值右方省一行；纵向留白整体收紧） */
 .cf-row { gap: 28px; flex-wrap: wrap; margin-top: 8px; }
 .cf-cell { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 4px 8px; }
