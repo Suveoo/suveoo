@@ -3,21 +3,17 @@
  * feature-detect：不支持（如部分 Linux/Firefox）按钮降级为 i18n toast 提示；不引入第三方库。
  * S.voice.bind(btn, input)：识别结果填入输入框（interim 实时上屏），不自动发送。
  *
- * 第二十五轮续 7 重构（队长真机反馈三项修复）：
- * 1) 权限预检：点击先 getUserMedia({audio})——①强制浏览器弹出麦克风授权（实测部分环境
- *    SpeechRecognition 静默失败、从不弹窗：Windows/Android 权限已被拒时 start() 1ms 内即
- *    not-allowed，无任何提示）；②失败拿到精确原因（NotAllowed/NotFound/NotReadable…）。
- * 2) 错误分流：not-allowed/audio-capture/network/no-speech → 各自 i18n 文案（原实现全部
- *    兜底成一句"语音识别出错"，真机排障无从下手）；未映射码附原始 code 便于回报。
- * 3) 会话生命周期加固（修 Safari"只识别第一次、麦克风一直亮"）：
- *    - 旧实现 rec.stop() 后完全依赖 onend 复位——iOS Safari 存在 onend 不触发缺陷，
- *      rec 永不置空，后续点击全被"if(rec) 停止"分支吞掉 → 表现即只识别第一次；
- *    - 现改为：final 结果立即 stop() 收口；会话中再点=硬复位（同步清 UI/引用后 abort，
- *      不依赖任何回调）；30s 绝对上限自动收口；页面隐藏即 abort；单例会话。
+ * 第二十五轮补记 7：权限预检 getUserMedia + 错误分流 + 会话生命周期加固（Safari onend 僵尸硬复位）。
+ * 第二十五轮补记 9：**响度驱动点环特效**——监听期间在按钮外围渲染 24 点波纹环，
+ *   Web Audio AnalyserNode 实时取语音频段能量（getByteFrequencyData，iOS14.5+/全主流支持）：
+ *   对径两点共用频段（对称呼吸感）；每点快攻慢放平滑（0.55 上行 / 0.12 释放）；
+ *   整体 RMS 门控保证大声齐动；静默时慢正弦摆动（无声环也活着）；
+ *   rAF 仅监听期运行；prefers-reduced-motion 不渲染；会话结束随 hardReset 一并拆除。
  */
 S.voice = (() => {
   const Ctor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null, activeBtn = null, timer = null;
+  let viz = null; /* { svg, ctx, stream, raf } */
   /* 识别器错误码 → i18n 键（voice.err 为兜底，未映射码在文案后附原始 code） */
   const MSG = {
     "not-allowed": "voice.denied", "service-not-allowed": "voice.denied",
@@ -28,24 +24,86 @@ S.voice = (() => {
     btn.setAttribute("aria-label", S.t(on ? "voice.stopAria" : "voice.aria"));
     btn.title = S.t(on ? "voice.stopAria" : "voice.aria");
   };
+  /* ---- 响度点环 ---- */
+  const VIZ_DOTS = 24, VIZ_BANDS = 12;
+  function startViz(stream, btn) {
+    stopViz();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let ctx, analyser;
+    try {
+      ctx = new AC();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.55;
+      ctx.createMediaStreamSource(stream).connect(analyser); /* 只分析不回放 */
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    } catch { try { ctx.close(); } catch { } return; }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 72 72");
+    svg.classList.add("voice-viz");
+    const dots = [];
+    for (let i = 0; i < VIZ_DOTS; i++) {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", "36"); c.setAttribute("cy", "36");
+      svg.appendChild(c);
+      dots.push(c);
+    }
+    btn.appendChild(svg);
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    const smooth = new Array(VIZ_DOTS).fill(0);
+    const loop = () => {
+      analyser.getByteFrequencyData(bins);
+      let rms = 0;
+      for (let k = 2; k < 48; k++) rms += bins[k]; /* bins 2..48 ≈ 语音能量区 */
+      rms /= 46 * 255;
+      const now = performance.now();
+      for (let i = 0; i < VIZ_DOTS; i++) {
+        const band = i % VIZ_BANDS; /* 对径同频段 → 左右对称呼吸 */
+        const lo = 2 + band * 4;
+        let v = 0;
+        for (let k = lo; k < lo + 4; k++) v += bins[k];
+        const target = Math.max(v / (4 * 255), rms * 0.8);
+        smooth[i] += (target - smooth[i]) * (target > smooth[i] ? 0.55 : 0.12); /* 快攻慢放 */
+        const idle = 0.1 + 0.06 * Math.sin(now / 900 + i * 0.6); /* 静默慢摆，无声也活着 */
+        const amp = Math.max(smooth[i], idle);
+        const a = (i / VIZ_DOTS) * Math.PI * 2 - Math.PI / 2;
+        const r = 21 + amp * 10;
+        dots[i].setAttribute("cx", (36 + r * Math.cos(a)).toFixed(2));
+        dots[i].setAttribute("cy", (36 + r * Math.sin(a)).toFixed(2));
+        dots[i].setAttribute("r", (1.3 + amp * 1.6).toFixed(2));
+        dots[i].setAttribute("opacity", (0.35 + amp * 0.65).toFixed(2));
+      }
+      if (viz) viz.raf = requestAnimationFrame(loop);
+    };
+    viz = { svg, ctx, stream, raf: requestAnimationFrame(loop) };
+  }
+  function stopViz() {
+    if (!viz) return;
+    cancelAnimationFrame(viz.raf);
+    viz.svg.remove();
+    try { viz.stream.getTracks().forEach((t) => t.stop()); } catch { }
+    try { viz.ctx.close(); } catch { } /* Safari 音频上下文有实例上限，随用随关 */
+    viz = null;
+  }
   /* 硬复位：同步清空一切后再 abort 旧实例（并摘除其回调）——绝不依赖 onend 触发 */
   const hardReset = () => {
     const r = rec;
     rec = null;
     if (timer) { clearTimeout(timer); timer = null; }
+    stopViz();
     if (activeBtn) { setState(activeBtn, false); activeBtn = null; }
     if (r) { r.onresult = r.onerror = r.onend = null; try { r.abort(); } catch { /* 已结束 */ } }
   };
-  /* 麦克风预检：返回 null=通过；否则返回应提示的 i18n 键 */
+  /* 麦克风预检：返回 { stream } 或 { err: i18n键 }——成功时流交给点环持有（监听期常开，结束统一停） */
   async function ensureMic() {
     try {
-      const st = await navigator.mediaDevices.getUserMedia({ audio: true });
-      st.getTracks().forEach((t) => t.stop());
-      return null;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      return { stream };
     } catch (e) {
-      if (["NotAllowedError", "SecurityError", "PermissionDeniedError"].includes(e.name)) return "voice.denied";
-      if (["NotFoundError", "NotReadableError", "OverconstrainedError", "AbortError"].includes(e.name)) return "voice.noMic";
-      return null; /* 未知 getUserMedia 错误不拦截，交给识别器本体报 */
+      if (["NotAllowedError", "SecurityError", "PermissionDeniedError"].includes(e.name)) return { err: "voice.denied" };
+      if (["NotFoundError", "NotReadableError", "OverconstrainedError", "AbortError"].includes(e.name)) return { err: "voice.noMic" };
+      return { err: null }; /* 未知 getUserMedia 错误交给识别器本体报 */
     }
   }
   function bind(btn, input, { onFinal = null } = {}) {
@@ -61,8 +119,9 @@ S.voice = (() => {
     btn.title = S.t("voice.aria");
     btn.onclick = async () => {
       if (rec) { hardReset(); return; } /* 会话中点击=停止（同步复位，修僵尸会话） */
-      const micErr = await ensureMic();
-      if (micErr) { S.ui.toast(S.t(micErr), true); return; }
+      const mic = await ensureMic();
+      if (mic.err) { S.ui.toast(S.t(mic.err), true); return; }
+      if (!mic.err) startViz(mic.stream, btn);
       let gotFinal = false;
       try {
         rec = new (Ctor())();
