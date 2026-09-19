@@ -27,19 +27,24 @@ S.router.register("ai", async ({ user }) => {
       <aside class="trust-console" id="tc"></aside>
     </div>`;
   S.trust.mount(document.getElementById("tc"));
-  /* 控制台收起开关（桌面端给对话让出全宽；偏好记忆）+ 自动打开工具链接开关（同区） */
+  /* 控制台收起开关（桌面端给对话让出全宽；偏好记忆）+ 自动打开工具链接开关（同区）
+     第二十五轮续：收起后控制台整体消失、开关随之不可达——补右侧贴边恢复钮（fixed 不占对话区布局） */
   if (window.matchMedia("(min-width: 1024px)").matches) {
     const layout = document.querySelector(".ai-layout");
     const head = document.querySelector("#tc .tc-head");
     if (layout && head) {
       const btn = S.ui.el('<button class="tc-toggle" id="tc-toggle"></button>');
       head.appendChild(btn);
+      const restore = S.ui.el(`<button class="tc-restore" id="tc-restore" aria-label="${S.fmt.escape(S.t("ai.consoleTab"))}">${S.ui.icon("chevron", 15)}</button>`);
+      document.body.appendChild(restore);
       const apply = () => {
         const hidden = localStorage.getItem("suveoo.tc") === "hidden";
         layout.classList.toggle("console-hidden", hidden);
         btn.textContent = hidden ? "显示控制台" : "收起控制台";
+        restore.classList.toggle("show", hidden);
       };
       btn.onclick = () => { localStorage.setItem("suveoo.tc", layout.classList.contains("console-hidden") ? "open" : "hidden"); apply(); };
+      restore.onclick = () => { localStorage.setItem("suveoo.tc", "open"); apply(); };
       apply();
       /* 自动打开工具链接：默认开；回答末尾"有且仅有一个"工具 URL 时新标签直达（一次为限） */
       const ao = S.ui.el('<button class="tc-toggle" id="ao-toggle"></button>');
