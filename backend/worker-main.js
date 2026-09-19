@@ -218,7 +218,10 @@ export function publicCard(c) {
 const SECURITY_HEADERS = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
-  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+  /* microphone=(self)：语音输入核心功能（第二十五轮补记 8 修复）——此前 microphone=() 导致浏览器
+     跳过授权弹窗、getUserMedia/SpeechRecognition 瞬间 NotAllowedError（真机对照实验：google.com 弹窗、
+     suveoo.com 秒拒）。self 仍受浏览器原生授权弹窗约束（用户可拒绝），非弱化；camera/geolocation 维持禁用 */
+  "permissions-policy": "camera=(), microphone=(self), geolocation=()",
 };
 function withSecurityHeaders(res) {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
