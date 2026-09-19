@@ -1,7 +1,6 @@
 /* pages.css — 页面级布局 */
 /* home hero 输入条（第二十三轮 A 极简化：全宽胶囊、无外容器；C 修复：input 可收缩 + 容器防溢出） */
-.hero-input { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 8px 8px 8px 16px; cursor: text; }
-/* 注：overflow:hidden 兜底已移除（C 修复根因 min-width:0 足矣）——否则监听态响度点环（外扩出容器）被裁 */
+.hero-input { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 8px 8px 8px 16px; cursor: text; overflow: hidden; }
 .hero-input:focus-within, .hero-input:hover { border-color: var(--color-navy); }
 .hero-input img, .hero-input svg { width: 20px; height: 20px; flex: none; }
 .hero-input input { border: none; outline: none; flex: 1; min-width: 0; font-size: var(--fs-16); font-family: inherit; background: transparent; }
@@ -144,11 +143,6 @@
 .voice-btn:hover { background: var(--color-primary-tint); color: var(--color-navy); }
 .voice-btn.listening { background: var(--color-red-bg); color: var(--color-red); animation: voice-pulse 1.2s ease-in-out infinite; }
 .voice-btn.voice-off { opacity: .55; }
-/* 响度点环（第二十五轮补记 9）：监听态按钮中心叠加 72px SVG 视窗，24 点随声音能量外扩变亮；
-   点色跟聆听态红族，溢出容器绘制（pointer-events 穿透） */
-.voice-btn { position: relative; }
-.voice-viz { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
-.voice-viz circle { fill: var(--color-red); filter: drop-shadow(0 0 3px rgba(192, 57, 43, .35)); }
 @keyframes voice-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, .25); } 50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, 0); } }
 @media (prefers-reduced-motion: reduce) { .voice-btn.listening { animation: none; } }
 
