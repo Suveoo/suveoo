@@ -45,3 +45,8 @@ SENDER_NOREPLY = "noreply@suveoo.com"
 SENDER_SECURITY = "security@suveoo.com"
 SUPPORT_INBOX = "support@suveoo.com"
 LLM_PROVIDER = "anthropic"
+# 第二十六轮：会话历史测试——假 LLM 端点（127.0.0.1:1 即刻拒连）驱动失败轮路径（user 侧落库）；
+# 上下文窗口轮数与生产一致
+AI_HISTORY_TURNS = "8"
+LLM_BASE_URL = "http://127.0.0.1:1"
+LLM_API_KEY = "sk-test-integration"

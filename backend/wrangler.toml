@@ -53,6 +53,8 @@ SUPPORT_INBOX = "support@suveoo.com"
 LLM_PROVIDER = "qwen"
 LLM_BASE_URL = "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic"
 LLM_MODEL = "qwen3.6-flash"
+# AI 会话上下文窗口：注入最近 N 轮（2N 条消息；首条用户消息常驻 + 字符预算 ~3000 裁中段）
+AI_HISTORY_TURNS = "8"
 # 切回 Anthropic 直连示例：
 #   LLM_PROVIDER = "anthropic"
 #   LLM_BASE_URL = "https://api.anthropic.com"
