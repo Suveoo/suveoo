@@ -74,8 +74,8 @@ S.router.register("ai", async ({ user }) => {
     const tx = { orange: "tx-orange", gold: "tx-gold", violet: "tx-violet", teal: "tx-teal", rose: "tx-rose", sky: "tx-sky" };
     box.classList.add("ready");
     box.innerHTML = `<div class="ai-ins-head"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" width="44" height="44" alt="" loading="lazy"><b>${S.fmt.escape(S.t("ai.insightTitle"))}</b></div>
-      <div class="ai-ins-grid">${ins.list.slice(0, 3).map((it) => `
-        <div class="ai-ins-card ${tint[it.tone] ?? "bg-tint-sky"}${it.art ? " has-art" : ""}">
+      <div class="ai-ins-grid">${ins.list.slice(0, 3).map((it, i) => `
+        <div class="ai-ins-card ${tint[it.tone] ?? "bg-tint-sky"}${it.art ? " has-art" : ""}" style="animation-delay:${i * 110}ms">
           ${it.art ? `<img class="aic-art" src="${it.art}?v=${S.ui.v()}" alt="" loading="lazy">` : `<span class="aic-ico">${S.ui.icon("ic-" + (it.icon ?? "star") + "-" + (it.tone ?? "sky"), 24)}</span>`}
           <div class="aic-body">
             <span class="aic-tag ${tx[it.tone] ?? "tx-sky"}">${S.fmt.escape(S.t(it.tag))}</span>

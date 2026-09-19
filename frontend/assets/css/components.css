@@ -165,6 +165,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 /* 营销产品卡：渐变通栏 + 白字 + 3D 插画位 + CTA（首页情境推荐/AI 洞察共用骨架） */
 .promo-card { position: relative; border-radius: var(--r-card-lg); overflow: hidden; color: #fff; box-shadow: var(--shadow-lg); display: flex; align-items: stretch; min-height: 128px; }
 .promo-card .pc-body { position: relative; z-index: 1; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+/* 新客专享式角标（微众 3956）：橙渐变贴右上角，压卡片圆角 */
+.promo-card .pc-ribbon { position: absolute; top: 0; right: 0; z-index: 2; background: linear-gradient(135deg, #FFB020, #F97316); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 5px 14px; border-radius: 0 var(--r-card-lg) 0 14px; box-shadow: -2px 2px 8px rgba(249, 115, 22, .3); }
 .promo-card .pc-tag { display: inline-flex; align-self: flex-start; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; background: rgba(255,255,255,.22); border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 2px 10px; }
 .promo-card .pc-title { font-size: 17px; font-weight: 700; line-height: 1.35; }
 .promo-card .pc-desc { font-size: 12.5px; color: rgba(255,255,255,.88); line-height: 1.55; }

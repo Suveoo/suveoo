@@ -116,6 +116,11 @@
   #grid.grid-2 { grid-template-columns: 1fr; }
 }
 
+/* /wealth/funds 风险筛选 tab：微众药丸样式（3962 筛选器——灰底胶囊，选中浅蓝底+深蓝字，无下划线） */
+#f-tabs { border-bottom: none; gap: 8px; flex-wrap: wrap; }
+#f-tabs .tab { border-bottom: none; background: var(--color-surface); border-radius: 999px; padding: 7px 16px; color: var(--color-ink-2); }
+#f-tabs .tab.active { background: var(--color-primary-tint); color: var(--color-navy); border-bottom: none; font-weight: 600; }
+
 /* ===== 理财卡大数字重排（第二十二轮 E）：浅底渐变卡头 + 插画角标 + 大数字主视觉 =====
    第二十五轮续：资产类别徽章上移至基金名尾字右侧（.fc-name 内联成组，超宽整体折行，R1 保持右上） */
 .fund-card2 { display: flex; flex-direction: column; }
@@ -194,7 +199,9 @@
 .ai-ins-head b { font-size: 15px; }
 /* 光学对齐：徽标视觉重心（非边界盒）与单行标题居中——不规则形 -1.5px 补偿 */
 .ai-ins-head img { transform: translateY(-1.5px); }
-.ai-insights.ready > * { animation: rise-in .28s cubic-bezier(.25, .6, .3, 1) both; }
+.ai-insights.ready > .ai-ins-head { animation: rise-in .28s cubic-bezier(.25, .6, .3, 1) both; }
+/* 卡片逐张错峰渐入（流式观感；延迟由 JS 内联注入，首张 0ms、 subsequent +110ms） */
+.ai-insights.ready .ai-ins-card { animation: rise-in .34s cubic-bezier(.25, .6, .3, 1) both; }
 .ai-ins-loading { display: flex; align-items: center; gap: 10px; padding: 12px 2px; color: var(--color-ink-2); font-size: 13px; }
 .ail-badge { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary-tint); display: inline-flex; align-items: center; justify-content: center; animation: ail-pulse 1.6s ease-in-out infinite; }
 .ail-badge img { width: 22px; height: 22px; }
@@ -203,7 +210,7 @@
 .ai-ins-loading .dots i:nth-child(2) { animation-delay: .15s; }
 .ai-ins-loading .dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes ail-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(30, 42, 120, .12); } 50% { box-shadow: 0 0 0 6px rgba(30, 42, 120, 0); } }
-@media (prefers-reduced-motion: reduce) { .ail-badge, .ai-ins-loading .dots i { animation: none; } .ai-insights.ready > * { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ail-badge, .ai-ins-loading .dots i { animation: none; } .ai-insights.ready > .ai-ins-head, .ai-insights.ready .ai-ins-card { animation: none; } }
 .ai-ins-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .ai-ins-card { position: relative; border-radius: 14px; padding: 14px 14px 12px; overflow: hidden; display: flex; gap: 10px; min-height: 118px; }
 .aic-ico { flex: none; display: inline-flex; align-items: center; justify-content: center; }

@@ -47,6 +47,7 @@ S.router.register("home", async ({ user }) => {
   const renderPromo = (it) => {
     const grad = { orange: "bg-grad-orange", gold: "bg-grad-gold", violet: "bg-grad-violet", teal: "bg-grad-teal", rose: "bg-grad-rose", sky: "bg-grad-sky" }[it.tone] ?? "bg-grad-navy";
     promoEl.innerHTML = `<div class="promo-card ${grad}" id="pc-${it.id}">
+      ${it.id === "credit" ? `<span class="pc-ribbon">${S.fmt.escape(S.t("ins.ribbonNew"))}</span>` : ""}
       <div class="pc-body">
         <span class="pc-tag">${S.fmt.escape(S.t(it.tag))}</span>
         <div class="pc-title">${S.fmt.escape(S.t(it.title))}</div>
