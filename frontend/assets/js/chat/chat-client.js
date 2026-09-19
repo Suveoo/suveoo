@@ -4,6 +4,25 @@ S.chat = {
   sending: false,
   _ctrl: null, /* 当前请求的 AbortController（停止按钮入口） */
   stop() { if (this._ctrl) this._ctrl.abort(); },
+  /** 续聊加载：拉取某会话全部历史消息（分页 20/页，自动翻页到底）；失败返回 null。
+   *  返回条目 {role, content, cards, err, created_at}——cards 由服务端附终态徽标 _status，只读重放用。 */
+  async load(sid) {
+    const out = [];
+    let page = 1, totalPages = 1;
+    try {
+      do {
+        const r = await fetch(`/api/ai/sessions/${encodeURIComponent(sid)}/messages?page=${page}`, {
+          headers: S.api.token ? { authorization: `Bearer ${S.api.token}` } : {},
+        });
+        if (!r.ok) return null;
+        const d = await r.json();
+        totalPages = d.total_pages ?? 1;
+        out.push(...(d.messages ?? []));
+        page++;
+      } while (page <= totalPages);
+      return out;
+    } catch { return null; }
+  },
   async send(text, { onToken, onGenui, onTrust, onDone, onError } = {}) {
     if (this.sending || !text.trim()) return;
     this.sending = true;

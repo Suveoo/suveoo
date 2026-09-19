@@ -1,21 +1,29 @@
-/* ai.js — P03 Suveoo AI 对话 + Trust Console（全站核心页） */
+/* ai.js — P03 Suveoo AI 对话 + Trust Console（全站核心页）
+   第二十六轮：对话卡头栏（历史对话下拉/抽屉 + 当前会话标题 + 新对话）、续聊加载与只读重放、
+   "继续上次"提示条。历史卡片是展览品不是操作入口：重放只渲染快照 + 终态徽标，绝不挂确认按钮。 */
 S.router.register("ai", async ({ user }) => {
   const c = document.getElementById("content");
   const q = new URLSearchParams(location.search).get("q");
   /* 插画资源跟随 HTML 资产版本（?v=bNN）——R2 内容更新后 bump 版本即对所有用户强制换图（浏览器/SW 缓存按 URL 命中） */
   const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
+  /* 全新会话首屏（欢迎区 + 洞察加载态）：加载历史/续聊时不渲染；"+ 新对话"恢复 */
+  const WELCOME_HTML = `
+              <div class="ai-welcome">
+                <img src="/assets/images/illustrations/ai-hero.svg${av ? "?v=" + av : ""}" alt="">
+                <h2>${S.fmt.escape(S.t("ai.welcome"))}</h2>
+              </div>`;
+  const INSIGHTS_HTML = `<div class="ai-insights" id="ai-insights"><div class="ai-ins-loading"><span class="ail-badge"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt=""></span><span>${S.fmt.escape(S.t("ai.insLoading"))}</span><span class="dots"><i></i><i></i><i></i></span></div></div>`;
   c.innerHTML = `
     <div class="ai-layout">
       <section class="chat-area card" style="padding:0">
         <div class="mobile-tabs"><button class="active" data-pane="chat">${S.fmt.escape(S.t("ai.chatTab"))}</button><button data-pane="console">${S.fmt.escape(S.t("ai.consoleTab"))}</button></div>
+          <div class="chat-head">
+            <button class="ch-btn" id="hist-btn" type="button">${S.ui.icon("clock", 13)}<span class="hh-full">${S.fmt.escape(S.t("ai.history"))}</span><span class="hh-short">${S.fmt.escape(S.t("ai.historyShort"))}</span>${S.ui.icon("chevron", 11)}</button>
+            <div class="ch-title" id="ch-title">${S.fmt.escape(S.t("ai.newChat"))}</div>
+            <button class="ch-btn" id="new-chat" type="button">${S.ui.icon("plus", 13)}<span class="hh-full">${S.fmt.escape(S.t("ai.newChat"))}</span></button>
+          </div>
           <div id="pane-chat" style="display:flex;flex-direction:column;flex:1;min-height:0">
-            <div class="chat-thread" id="thread">
-              <div class="ai-welcome">
-                <img src="/assets/images/illustrations/ai-hero.svg${av ? "?v=" + av : ""}" alt="">
-                <h2>${S.fmt.escape(S.t("ai.welcome"))}</h2>
-              </div>
-              <div class="ai-insights" id="ai-insights"><div class="ai-ins-loading"><span class="ail-badge"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt=""></span><span>${S.fmt.escape(S.t("ai.insLoading"))}</span><span class="dots"><i></i><i></i><i></i></span></div></div>
-            </div>
+            <div class="chat-thread" id="thread">${WELCOME_HTML}${INSIGHTS_HTML}</div>
           <div class="composer-hint">${S.fmt.escape(S.t("ai.hint"))}</div>
           <div class="chat-composer">
             <input class="input" id="chat-in" placeholder="${S.fmt.escape(S.t("ai.placeholder"))}">
@@ -57,23 +65,26 @@ S.router.register("ai", async ({ user }) => {
 
   /* 首屏主动洞察（C）：确定性规则引擎生成，零 LLM 调用（网络面板可验证——只有 GET /api/*）。
      第二十三轮 B：渲染即出加载态（无空档）；collect() 返回后淡入替换；空结果/reject/超 8s
-     均静默移除不留死动画；用户开始提问后随欢迎区一起让位。 */
-  let insSettled = false;
-  const insTimer = setTimeout(() => {
-    if (insSettled) return;
-    insSettled = true;
-    document.getElementById("ai-insights")?.remove();
-  }, 8000);
-  S.insights.collect().then((ins) => {
-    if (insSettled) return;
-    insSettled = true;
-    clearTimeout(insTimer);
-    const box = document.getElementById("ai-insights");
-    if (!box || !ins.list.length) { box?.remove(); return; }
-    const tint = { orange: "bg-tint-orange", gold: "bg-tint-gold", violet: "bg-tint-violet", teal: "bg-tint-teal", rose: "bg-tint-rose", sky: "bg-tint-sky" };
-    const tx = { orange: "tx-orange", gold: "tx-gold", violet: "tx-violet", teal: "tx-teal", rose: "tx-rose", sky: "tx-sky" };
-    box.classList.add("ready");
-    box.innerHTML = `<div class="ai-ins-head"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" width="44" height="44" alt="" loading="lazy"><b>${S.fmt.escape(S.t("ai.insightTitle"))}</b></div>
+     均静默移除不留死动画；用户开始提问后随欢迎区一起让位。
+     第二十六轮：封装为可重建单元（历史加载让位 / 新对话回归复用），epoch 令牌防陈旧回调。 */
+  let insEpoch = 0;
+  function startInsights() {
+    const tok = ++insEpoch;
+    const timer = setTimeout(() => {
+      if (tok !== insEpoch) return;
+      insEpoch++;
+      document.getElementById("ai-insights")?.remove();
+    }, 8000);
+    S.insights.collect().then((ins) => {
+      if (tok !== insEpoch) return;
+      insEpoch++;
+      clearTimeout(timer);
+      const box = document.getElementById("ai-insights");
+      if (!box || !ins.list.length) { box?.remove(); return; }
+      const tint = { orange: "bg-tint-orange", gold: "bg-tint-gold", violet: "bg-tint-violet", teal: "bg-tint-teal", rose: "bg-tint-rose", sky: "bg-tint-sky" };
+      const tx = { orange: "tx-orange", gold: "tx-gold", violet: "tx-violet", teal: "tx-teal", rose: "tx-rose", sky: "tx-sky" };
+      box.classList.add("ready");
+      box.innerHTML = `<div class="ai-ins-head"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" width="44" height="44" alt="" loading="lazy"><b>${S.fmt.escape(S.t("ai.insightTitle"))}</b></div>
       <div class="ai-ins-grid">${ins.list.slice(0, 3).map((it, i) => `
         <div class="ai-ins-card ${tint[it.tone] ?? "bg-tint-sky"}${it.art ? " has-art" : ""}" style="animation-delay:${i * 110}ms">
           ${it.art ? `<img class="aic-art" src="${it.art}?v=${S.ui.v()}" alt="" loading="lazy">` : `<span class="aic-ico">${S.ui.icon("ic-" + (it.icon ?? "star") + "-" + (it.tone ?? "sky"), 24)}</span>`}
@@ -84,42 +95,70 @@ S.router.register("ai", async ({ user }) => {
             <a class="aic-cta" href="${it.cta && it.cta !== "modal" ? it.cta : "/home"}">${S.fmt.escape(S.t(it.ctaLabel ?? "ins.ctaGo"))} →</a>
           </div>
         </div>`).join("")}</div>`;
-  }).catch(() => {
-    if (insSettled) return;
-    insSettled = true;
-    clearTimeout(insTimer);
-    document.getElementById("ai-insights")?.remove();
-  });
-
-  /* 移动端/平板：Trust Console 以全屏抽屉呈现，对话区保持满幅；
-     系统返回手势 = 关闭抽屉回到对话（pushState/popstate 集成），而不是退出 /ai */
-  {
-    const tc = document.getElementById("tc");
-    const head = tc.querySelector(".tc-head");
-    const chatTab = document.querySelector('.mobile-tabs [data-pane="chat"]');
-    const consoleTab = document.querySelector('.mobile-tabs [data-pane="console"]');
-    let pushed = false;
-    const setOpen = (on, fromPop = false) => {
-      tc.classList.toggle("open", on);
-      document.body.classList.toggle("tc-open", on);
-      consoleTab?.classList.toggle("active", on);
-      chatTab?.classList.toggle("active", !on);
-      if (on && !pushed) { history.pushState({ tcDrawer: true }, ""); pushed = true; }
-      if (!on && pushed) { pushed = false; if (!fromPop) history.back(); }
-    };
-    window.addEventListener("popstate", () => {
-      if (pushed) { pushed = false; setOpen(false, true); }
+    }).catch(() => {
+      if (tok !== insEpoch) return;
+      insEpoch++;
+      clearTimeout(timer);
+      document.getElementById("ai-insights")?.remove();
     });
+  }
+  function clearFirstScreen() {
+    insEpoch++; /* 在途 collect() 回调一律作废 */
+    thread.querySelector(".ai-welcome")?.remove();
+    document.getElementById("ai-insights")?.remove();
+  }
+  function mountFirstScreen() {
+    thread.insertAdjacentHTML("afterbegin", WELCOME_HTML + INSIGHTS_HTML);
+    startInsights();
+  }
+  startInsights();
+
+  /* 抽屉统一管理（≤1023）：Trust Console 与历史会话两个全屏抽屉互斥——切换时 replaceState 原位换层
+     （不多压一层历史记录）；系统返回手势 = 关抽屉回对话（popstate 单点收口），不退出 /ai。 */
+  const thread = document.getElementById("thread");
+  const tc = document.getElementById("tc");
+  const chatTab = document.querySelector('.mobile-tabs [data-pane="chat"]');
+  const consoleTab = document.querySelector('.mobile-tabs [data-pane="console"]');
+  const histDrawer = S.ui.el(`<div class="hist-drawer" id="hist-drawer">
+    <div class="hd-head"><button class="tc-close" id="hd-back">${S.ui.icon("x", 14)} ${S.fmt.escape(S.t("ai.backToChat"))}</button><b class="hd-title">${S.fmt.escape(S.t("ai.sessions"))}</b></div>
+    <div class="hd-list" id="hd-list"></div>
+  </div>`);
+  document.body.appendChild(histDrawer);
+  let drawer = null; /* null | "tc" | "hist" */
+  const applyDrawer = () => {
+    tc.classList.toggle("open", drawer === "tc");
+    histDrawer.classList.toggle("open", drawer === "hist");
+    document.body.classList.toggle("tc-open", drawer != null);
+    consoleTab?.classList.toggle("active", drawer === "tc");
+    chatTab?.classList.toggle("active", drawer == null);
+  };
+  const closeDrawer = (fromPop = false) => {
+    if (!drawer) return;
+    drawer = null;
+    applyDrawer();
+    if (!fromPop) history.back();
+  };
+  const openDrawer = (which) => {
+    if (drawer === which) { closeDrawer(); return; }
+    if (drawer) history.replaceState({ drawer: which }, "");
+    else history.pushState({ drawer: which }, "");
+    drawer = which;
+    applyDrawer();
+    if (which === "hist") refreshHistory(histDrawer.querySelector("#hd-list"));
+  };
+  window.addEventListener("popstate", () => closeDrawer(true));
+  {
+    const head = tc.querySelector(".tc-head");
     if (head) {
       const close = S.ui.el(`<button class="tc-close">${S.ui.icon("x", 14)} ${S.fmt.escape(S.t("ai.backToChat"))}</button>`);
       head.prepend(close);
-      close.onclick = () => setOpen(false);
+      close.onclick = () => closeDrawer();
     }
-    consoleTab && (consoleTab.onclick = () => setOpen(true));
-    chatTab && (chatTab.onclick = () => setOpen(false));
   }
+  consoleTab && (consoleTab.onclick = () => openDrawer("tc"));
+  chatTab && (chatTab.onclick = () => closeDrawer());
+  histDrawer.querySelector("#hd-back").onclick = () => closeDrawer();
 
-  const thread = document.getElementById("thread");
   /* 移动端（≤1023）为自然页面滚动：锚定最后一条消息而非文档底（文档底会把 footer 三栏拉进视口）；
      预留 = 底导航实际高度（offsetHeight 已含手势条 safe-area padding）+ 12px 余量；只向下不回滚 */
   const scroll = () => {
@@ -141,15 +180,249 @@ S.router.register("ai", async ({ user }) => {
     scroll();
     return m;
   };
+  /* 历史气泡：与直播态同款样式（用户右对齐纯文本 / AI 左对齐 Markdown 渲染） */
+  const histBubble = (role, content) => {
+    const m = S.ui.el(`<div class="msg ${role}"></div>`);
+    if (role === "ai") { m.classList.add("md"); m.innerHTML = S.md.render(content); }
+    else m.textContent = content;
+    thread.appendChild(m);
+    return m;
+  };
+
+  /* ---- 历史会话列表（桌面下拉 / 移动抽屉共用渲染） ---- */
+  const setHeaderTitle = (t) => { const el = document.getElementById("ch-title"); if (el) el.textContent = t; };
+  const headerTitle = () => document.getElementById("ch-title")?.textContent ?? "";
+  const updateLastCache = () => {
+    try {
+      if (!S.chat.sid) return;
+      localStorage.setItem("suveoo.aiLastSid", S.chat.sid);
+      localStorage.setItem("suveoo.aiLastTs", String(Date.now()));
+      localStorage.setItem("suveoo.aiLastTitle", headerTitle());
+    } catch { /* 隐私模式静默 */ }
+  };
+  const groupKey = (iso) => {
+    const t = Date.parse(iso ?? "");
+    if (!Number.isFinite(t)) return "older";
+    const now = new Date();
+    const day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (t >= day0) return "today";
+    if (t >= day0 - 86400000) return "yesterday";
+    if (t >= day0 - 7 * 86400000) return "week";
+    return "older";
+  };
+  const GROUP_ORDER = [["today", "ai.groupToday"], ["yesterday", "ai.groupYesterday"], ["week", "ai.groupWeek"], ["older", "ai.groupOlder"]];
+  function renderSessionList(box, sessions) {
+    if (!sessions.length) { box.innerHTML = `<div class="hs-empty muted small">${S.fmt.escape(S.t("ai.histEmpty"))}</div>`; return; }
+    const byGroup = {};
+    for (const s of sessions) (byGroup[groupKey(s.updated_at ?? s.ts)] ??= []).push(s);
+    const frag = document.createDocumentFragment();
+    for (const [g, key] of GROUP_ORDER) {
+      const list = byGroup[g];
+      if (!list?.length) continue;
+      const gh = S.ui.el(`<div class="hs-group muted small">${S.fmt.escape(S.t(key))}</div>`);
+      frag.appendChild(gh);
+      for (const s of list) {
+        const cur = s.id === S.chat.sid;
+        const item = S.ui.el(`<div class="hs-item${cur ? " cur" : ""}" data-sid="${S.fmt.escape(s.id)}">
+          <div class="hs-main">
+            <div class="hs-l1"><span class="hs-title">${S.fmt.escape(s.title || S.t("ai.newChat"))}</span>${cur ? `<span class="hs-cur">${S.fmt.escape(S.t("ai.ongoing"))}</span>` : ""}</div>
+            <div class="hs-meta muted small">${S.fmt.escape(S.fmt.relTime(s.updated_at ?? s.ts))} · ${S.fmt.escape(S.t("ai.msgCount", s.msg_count ?? 0))}</div>
+            ${s.last_preview ? `<div class="hs-prev muted small">${S.fmt.escape(String(s.last_preview))}</div>` : ""}
+          </div>
+          <div class="hs-acts">
+            <button class="hs-act" type="button" aria-label="${S.fmt.escape(S.t("ai.rename"))}" title="${S.fmt.escape(S.t("ai.rename"))}">${S.ui.icon("edit", 13)}</button>
+            <button class="hs-act hs-del" type="button" aria-label="${S.fmt.escape(S.t("ai.deleteTxt"))}" title="${S.fmt.escape(S.t("ai.deleteTxt"))}">${S.ui.icon("trash", 13)}</button>
+          </div>
+        </div>`);
+        item.onclick = (e) => {
+          if (e.target.closest(".hs-act") || e.target.closest(".hs-rename")) return;
+          closeDrawer();
+          document.getElementById("hist-drop")?.remove();
+          loadSession(s.id, s.title);
+        };
+        item.querySelector(".hs-act:not(.hs-del)").onclick = (e) => { e.stopPropagation(); startRename(item, s); };
+        item.querySelector(".hs-del").onclick = (e) => { e.stopPropagation(); confirmDelete(s); };
+        frag.appendChild(item);
+      }
+    }
+    box.innerHTML = "";
+    box.appendChild(frag);
+  }
+  async function refreshHistory(box) {
+    if (!box) return;
+    box.innerHTML = `<div class="hs-loading">${S.ui.skeleton(3)}</div>`;
+    const r = await S.api.get("/api/ai/sessions");
+    if (!r.ok) { box.innerHTML = `<div class="hs-empty muted small">${S.fmt.escape(S.t("common.loadFailed"))}</div>`; return; }
+    renderSessionList(box, r.data.chats ?? []);
+  }
+  function startRename(item, s) {
+    const titleEl = item.querySelector(".hs-title");
+    if (!titleEl || item.querySelector(".hs-rename")) return;
+    const input = S.ui.el('<input class="input hs-rename" maxlength="60">');
+    input.value = s.title ?? "";
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+    let settled = false;
+    const restore = () => input.replaceWith(titleEl);
+    const commit = async () => {
+      if (settled) return;
+      settled = true;
+      const v = input.value.trim();
+      if (!v || v === (s.title ?? "")) { restore(); return; }
+      const r = await fetch(`/api/ai/sessions/${encodeURIComponent(s.id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", ...(S.api.token ? { authorization: `Bearer ${S.api.token}` } : {}) },
+        body: JSON.stringify({ title: v }),
+      });
+      if (r.ok) {
+        s.title = v;
+        titleEl.textContent = v;
+        if (s.id === S.chat.sid) setHeaderTitle(v);
+        updateLastCache();
+      } else {
+        S.ui.toast(S.t("common.loadFailed"), true);
+      }
+      restore();
+    };
+    input.onblur = commit;
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      else if (e.key === "Escape") { settled = true; restore(); }
+    };
+    input.onclick = (e) => e.stopPropagation();
+  }
+  function confirmDelete(s) {
+    const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("ai.delConfirmTitle"))}</h2>
+      <p class="muted small">${S.fmt.escape(S.t("ai.delConfirmBody"))}</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="hsd-cancel">${S.fmt.escape(S.t("common.cancel"))}</button>
+        <button class="btn btn-primary" id="hsd-ok">${S.fmt.escape(S.t("ai.deleteTxt"))}</button>
+      </div>`);
+    m.el.querySelector("#hsd-cancel").onclick = m.close;
+    m.el.querySelector("#hsd-ok").onclick = async () => {
+      m.close();
+      const r = await fetch(`/api/ai/sessions/${encodeURIComponent(s.id)}`, {
+        method: "DELETE",
+        headers: S.api.token ? { authorization: `Bearer ${S.api.token}` } : {},
+      });
+      if (!r.ok) { S.ui.toast(S.t("common.loadFailed"), true); return; }
+      try { if (localStorage.getItem("suveoo.aiLastSid") === s.id) localStorage.removeItem("suveoo.aiLastSid"); } catch { /* ignore */ }
+      if (s.id === S.chat.sid) resetToFresh();
+      document.getElementById("hist-drop")?.remove();
+      refreshHistory(histDrawer.querySelector("#hd-list"));
+      const drop2 = document.getElementById("hist-drop");
+      if (drop2) refreshHistory(drop2);
+    };
+  }
+  /* 历史卡片只读重放：只渲染已知组件的快照 + 服务端终态徽标（已执行/已过期/已拦截）；
+     未知组件宁可不渲染（留"已收起卡片"徽标）；绝不注册 attachConfirm、不带任何可点击操作 */
+  const REPLAYABLE = ["transfer_confirmation", "split_bill_detail", "wealth_compare", "sankey_chart", "subscription_list", "scheduled_task", "card_setting_confirm", "fx_quote", "insight_card", "blocked_notice", "report_download"];
+  const STATUS_META = { EXECUTED: ["ai.cardExecuted", "badge-green"], EXPIRED: ["ai.cardExpired", "badge-gray"], BLOCKED: ["ai.cardBlocked", "badge-red"] };
+  function replayCard(card) {
+    if (!card || typeof card !== "object" || card.issuer !== "verified_ir" || !REPLAYABLE.includes(card.component)) {
+      thread.appendChild(S.ui.el(`<div class="hist-card-note muted small">${S.fmt.escape(S.t("ai.cardCollapsed"))}</div>`));
+      return;
+    }
+    const node = S.genui.render(card);
+    if (!node) return;
+    node.style.maxWidth = "82%";
+    node.style.alignSelf = "flex-start";
+    if (card._status && STATUS_META[card._status]) {
+      const [key, cls] = STATUS_META[card._status];
+      node.querySelector(".gc-head")?.appendChild(S.ui.el(`<span class="badge ${cls} hs-badge">${S.fmt.escape(S.t(key))}</span>`));
+    }
+    thread.appendChild(node);
+  }
+  /* 续聊加载：历史/续聊会话不渲染欢迎区与首屏洞察（全新会话专属）；卡片只读重放后插分隔线 */
+  async function loadSession(sid, title) {
+    if (busy) return;
+    const msgs = await S.chat.load(sid);
+    if (msgs == null) { S.ui.toast(S.t("common.loadFailed"), true); return; }
+    clearFirstScreen();
+    S.ui.clear(thread);
+    document.getElementById("cont-bar")?.remove();
+    S.chat.sid = sid;
+    const firstUser = msgs.find((m) => m.role === "user");
+    setHeaderTitle(title || (firstUser ? String(firstUser.content ?? "").slice(0, 30) : "") || S.t("ai.sessions"));
+    for (const m of msgs) {
+      if (m.role === "user") { histBubble("user", String(m.content ?? "")); continue; }
+      if (m.role !== "assistant") continue;
+      if (m.content) histBubble("ai", String(m.content));
+      for (const card of m.cards ?? []) replayCard(card);
+    }
+    if (msgs.length) thread.appendChild(S.ui.el(`<div class="hist-divider">${S.fmt.escape(S.t("ai.histDivider"))}</div>`));
+    updateLastCache();
+    scroll();
+    if (window.matchMedia("(min-width: 1024px)").matches) window.setTimeout(() => { thread.scrollTop = thread.scrollHeight; }, 0);
+  }
+  /* "+ 新对话"：清消息流、sid 置空、恢复全新态（loading + 洞察卡回归） */
+  function resetToFresh() {
+    if (!S.chat.sid && thread.querySelector(".ai-welcome")) return; /* 已是全新态 */
+    S.chat.sid = null;
+    clearFirstScreen();
+    S.ui.clear(thread);
+    mountFirstScreen();
+    setHeaderTitle(S.t("ai.newChat"));
+    window.scrollTo(0, 0);
+    thread.scrollTop = 0;
+  }
+
+  /* 历史入口：桌面（≥1024）下拉面板（点外关闭）；移动/平板（≤1023）全屏抽屉（与 TC 抽屉互斥） */
+  const histBtn = document.getElementById("hist-btn");
+  histBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      const ex = document.getElementById("hist-drop");
+      if (ex) { ex.remove(); return; }
+      const drop = S.ui.el('<div class="hist-drop" id="hist-drop"></div>');
+      document.querySelector(".chat-area").appendChild(drop);
+      refreshHistory(drop);
+      const off = (ev) => {
+        if (!drop.isConnected) { document.removeEventListener("click", off); return; }
+        if (!drop.contains(ev.target) && !histBtn.contains(ev.target)) { drop.remove(); document.removeEventListener("click", off); }
+      };
+      setTimeout(() => document.addEventListener("click", off), 0);
+    } else {
+      openDrawer("hist");
+    }
+  });
+  document.getElementById("new-chat").onclick = () => {
+    if (busy) return;
+    document.getElementById("hist-drop")?.remove();
+    closeDrawer();
+    resetToFresh();
+  };
+
+  /* "继续上次对话"提示条：最近会话 30 分钟内活跃则浮一条（不自动跳入，不打断新意图） */
+  (function maybeContBar() {
+    try {
+      const sid = localStorage.getItem("suveoo.aiLastSid");
+      const ts = Number(localStorage.getItem("suveoo.aiLastTs") ?? 0);
+      const title = localStorage.getItem("suveoo.aiLastTitle") ?? "";
+      if (!sid || !title || Date.now() - ts > 30 * 60e3) return;
+      const hint = document.querySelector(".composer-hint");
+      if (!hint) return;
+      const bar = S.ui.el(`<div class="cont-bar" id="cont-bar">
+        <button class="cb-go" type="button">${S.ui.icon("clock", 13)} ${S.fmt.escape(S.t("ai.continueLast", title))}</button>
+        <button class="cb-x" type="button" aria-label="${S.fmt.escape(S.t("common.cancel"))}">${S.ui.icon("x", 12)}</button>
+      </div>`);
+      hint.insertAdjacentElement("beforebegin", bar);
+      bar.querySelector(".cb-go").onclick = () => { bar.remove(); loadSession(sid, title); };
+      bar.querySelector(".cb-x").onclick = () => bar.remove();
+    } catch { /* 隐私模式静默 */ }
+  })();
 
   let busy = false;
   async function send(text) {
     if (busy || !text.trim()) return;
     busy = true;
     setBusyUI(true);
+    const wasNew = !S.chat.sid; /* 新会话首轮：头栏标题取首条消息（与服务器口径一致） */
     bubble("user", text);
-    /* 用户开始提问：首屏洞察区自然让位 */
+    /* 用户开始提问：首屏洞察区/继续上次提示条自然让位 */
     S.ui.$("#ai-insights")?.remove();
+    document.getElementById("cont-bar")?.remove();
     const aiMsg = bubble("ai", ""); aiMsg.classList.add("thinking"); aiMsg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
     S.trust.evt("CHAT", null, text.slice(0, 60));
     S.ga4.event("ai_chat_start", { entry: "composer" });
@@ -190,6 +463,8 @@ S.router.register("ai", async ({ user }) => {
         const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
         if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
       }
+      if (wasNew) setHeaderTitle(text.slice(0, 30));
+      updateLastCache();
       busy = false;
       setBusyUI(false);
     };
