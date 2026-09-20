@@ -5,7 +5,7 @@ S.trust = {
     this.el = rootEl;
     rootEl.innerHTML = `
       <div class="tc-head"><span class="dot-live"></span><b>Trust Console</b>
-        <span class="muted small mono" id="tc-trace" style="margin-left:auto"></span></div>
+        <span class="muted small mono" id="tc-trace"></span></div>
       <div class="tc-verifiers" id="tc-v"></div>
       <div class="tc-events" id="tc-ev"></div>
       <details class="tc-ir" id="tc-ir" style="padding:8px 16px"><summary>BankAction IR</summary><pre></pre></details>

@@ -70,12 +70,17 @@ S.ui = {
     wrap.appendChild(t);
     setTimeout(() => t.remove(), 3200);
   },
+  _modalCount: 0,
+  /* 弹窗锁背景滚动（嵌套计数：modal/OTP 等多个弹层共存时最后一个关掉才解锁） */
+  _lockScroll() { S.ui._modalCount++; document.body.classList.add("modal-open"); },
+  _unlockScroll() { S.ui._modalCount = Math.max(0, S.ui._modalCount - 1); if (!S.ui._modalCount) document.body.classList.remove("modal-open"); },
   modal(content, { onClose = null, large = false } = {}) {
     const mask = S.ui.el(`<div class="modal-mask"><div class="modal${large ? " modal-lg" : ""}" role="dialog"></div></div>`);
     const box = mask.querySelector(".modal");
     if (typeof content === "string") box.innerHTML = content; else box.appendChild(content);
     document.body.appendChild(mask);
-    const close = () => { mask.remove(); onClose && onClose(); };
+    S.ui._lockScroll();
+    const close = () => { mask.remove(); S.ui._unlockScroll(); onClose && onClose(); };
     mask.addEventListener("click", (e) => { if (e.target === mask) close(); });
     return { el: box, close };
   },

@@ -3,7 +3,11 @@
 @media (max-width: 1023px) { .ai-layout { grid-template-columns: 1fr; } }
 .trust-console { border: 1px solid var(--color-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); position: sticky; top: 80px; max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
 @media (max-width: 1023px) { .trust-console { position: static; max-height: 70vh; } }
-.tc-head { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--color-line); display: flex; align-items: center; gap: 8px; }
+/* 头部两行排版：首行 = 状态点 + 标题 + 开关按钮组（标题弹性推右）；
+   第二行 = 当前工具/追踪号整行 ellipsis（长内容如 tool:scheduled_task_create 不再挤压按钮溢出） */
+.tc-head { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--color-line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tc-head > b { margin-right: auto; min-width: 0; }
+.tc-head #tc-trace { flex: 1 1 100%; order: 10; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-head .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--color-green); animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
 .tc-verifiers { display: flex; gap: 6px; padding: 10px var(--sp-4); border-bottom: 1px solid var(--color-line); flex-wrap: wrap; }

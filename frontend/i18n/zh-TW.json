@@ -733,7 +733,7 @@
   "subs.usageRow": "{0} 使用率 {1}%，月費 ¥{2}",
   "tasks.cancel": "取消任務",
   "tasks.compensated": "已補償",
-  "tasks.injectNote": "示範：注入商戶履約故障，觀察 T1 鎖定、T2 履約失敗、C1 資金解鎖 的補償鏈路。",
+  "tasks.injectNote": "下次執行將注入商戶履約故障（演示 T2 失敗 → Saga C1 補償鏈）",
   "tasks.injected": "已注入：下次履約將失敗並觸發補償",
   "tasks.next": "下次執行",
   "tasks.none": "暫無任務",
@@ -945,5 +945,11 @@
   "genui.confirmSubCancel": "確認取消訂閱",
   "genui.subFee": "訂閱費用",
   "genui.subNext": "下次扣費",
-  "genui.subCancelNote": "取消後不再扣費；本期已付權益保留至到期。"
+  "genui.subCancelNote": "取消後不再扣費；本期已付權益保留至到期。",
+  "tasks.injectedBadge": "已注入故障",
+  "payees.group.colleague": "同事",
+  "payees.group.life": "生活繳費",
+  "payees.group.other": "其他",
+  "payees.groupCustom": "自訂…",
+  "payees.groupCustomPh": "輸入分組名（≤12 字元）"
 }

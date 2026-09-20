@@ -26,12 +26,31 @@ S.ctl = {
       render();
       if (!silent) { root.dispatchEvent(new Event("input", { bubbles: true })); onChange?.(current.v); }
     };
-    const close = () => { root.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); list.hidden = true; };
+    /* 下拉面板挂 body（fixed 定位）：突破任何祖先的 overflow/滚动容器（模态、卡片内不再裁剪/内滚）；
+       open 时锚定按钮位置，下方空间不足上翻；页面滚动/缩放即收起（业界惯例——避免锚点漂移）；
+       close 时面板归位回 root 内（宿主容器销毁时随root 一并移除，无孤儿 DOM） */
+    let onScroll = null;
+    const close = () => {
+      if (onScroll) { window.removeEventListener("scroll", onScroll, { capture: true }); window.removeEventListener("resize", onScroll); onScroll = null; }
+      root.classList.remove("open");
+      btn.setAttribute("aria-expanded", "false");
+      list.hidden = true;
+      root.append(list);
+    };
     const open = () => {
       S.ctl._closeAll();
       root.classList.add("open");
       btn.setAttribute("aria-expanded", "true");
+      document.body.appendChild(list);
       list.hidden = false;
+      const r = btn.getBoundingClientRect();
+      list.style.left = r.left + "px";
+      list.style.minWidth = Math.max(r.width, 160) + "px";
+      const below = window.innerHeight - r.bottom, listH = list.offsetHeight;
+      list.style.top = (below < listH + 12 && r.top > listH + 12 ? r.top - listH - 4 : r.bottom + 4) + "px";
+      onScroll = () => close();
+      window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+      window.addEventListener("resize", onScroll);
       const sel = list.querySelector('[aria-selected="true"]');
       if (sel) sel.scrollIntoView({ block: "nearest" });
     };
@@ -60,7 +79,7 @@ S.ctl = {
         close();
       }
     });
-    document.addEventListener("click", (e) => { if (!root.contains(e.target)) close(); }, { capture: true });
+    document.addEventListener("click", (e) => { if (!root.contains(e.target) && !list.contains(e.target)) close(); }, { capture: true });
     Object.defineProperty(root, "value", {
       get: () => current.v,
       set: (v) => commit(v, true),
@@ -90,9 +109,10 @@ S.ctl = {
           </div>
         </div></div>`);
       document.body.appendChild(box);
+      S.ui._lockScroll();
       const input = box.querySelector("#ctl-otp");
       const sendBtn = box.querySelector("#ctl-send");
-      const close = (v) => { clearInterval(timer); box.remove(); resolve(v); };
+      const close = (v) => { clearInterval(timer); box.remove(); S.ui._unlockScroll(); resolve(v); };
       input.focus();
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") box.querySelector("#ctl-ok").click(); });
       box.querySelector("#ctl-no").onclick = () => close(null);

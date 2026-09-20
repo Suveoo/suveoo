@@ -733,7 +733,7 @@
   "subs.usageRow": "{0}: {1}% usage, ¥{2}/month",
   "tasks.cancel": "Cancel Task",
   "tasks.compensated": "Compensated",
-  "tasks.injectNote": "Demo: inject a merchant fulfilment failure and watch the T1 lock, T2 fail, C1 unlock compensation chain.",
+  "tasks.injectNote": "Merchant fulfilment failure will be injected on next run (demo: T2 fails → Saga C1 compensation)",
   "tasks.injected": "Injected: next fulfilment will fail and trigger compensation",
   "tasks.next": "Next Run",
   "tasks.none": "No tasks",
@@ -945,5 +945,11 @@
   "genui.confirmSubCancel": "Confirm unsubscribe",
   "genui.subFee": "Subscription fee",
   "genui.subNext": "Next charge",
-  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends."
+  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends.",
+  "tasks.injectedBadge": "Failure injected",
+  "payees.group.colleague": "Colleague",
+  "payees.group.life": "Bills & utilities",
+  "payees.group.other": "Other",
+  "payees.groupCustom": "Custom…",
+  "payees.groupCustomPh": "Custom group name (max 12 chars)"
 }

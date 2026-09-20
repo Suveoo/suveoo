@@ -733,7 +733,7 @@
   "subs.usageRow": "{0} 使用率 {1}%，月费 ¥{2}",
   "tasks.cancel": "取消任务",
   "tasks.compensated": "已补偿",
-  "tasks.injectNote": "演示：注入商户履约故障，观察 T1 锁定、T2 履约失败、C1 资金解锁 的补偿链路。",
+  "tasks.injectNote": "Merchant fulfilment failure will be injected on next run (demo: T2 fails → Saga C1 compensation)",
   "tasks.injected": "已注入：下次履约将失败并触发补偿",
   "tasks.next": "下次执行",
   "tasks.none": "暂无任务",
@@ -945,5 +945,11 @@
   "genui.confirmSubCancel": "Confirm unsubscribe",
   "genui.subFee": "Subscription fee",
   "genui.subNext": "Next charge",
-  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends."
+  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends.",
+  "tasks.injectedBadge": "Failure injected",
+  "payees.group.colleague": "Colleague",
+  "payees.group.life": "Bills & utilities",
+  "payees.group.other": "Other",
+  "payees.groupCustom": "Custom…",
+  "payees.groupCustomPh": "Custom group name (max 12 chars)"
 }
