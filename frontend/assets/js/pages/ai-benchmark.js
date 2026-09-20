@@ -2,13 +2,14 @@
 S.router.register("ai-benchmark", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("bench.title"))}</h1>
-    <div class="banner">${S.ui.icon("chart", 16)}<div>${S.fmt.escape(S.t("bench.note"))}</div></div>
-    <div class="section-title"><h2>${S.fmt.escape(S.t("bench.metrics"))}</h2><span class="muted small" id="gen-at"></span></div>
+    <div class="banner" style="margin-top:14px">${S.ui.icon("chart", 16)}<div>${S.fmt.escape(S.t("bench.note"))}</div></div>
+    <div class="section-title" style="flex-wrap:wrap;row-gap:4px"><h2>${S.fmt.escape(S.t("bench.metrics"))}</h2><span class="muted small" id="gen-at" style="flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis"></span></div>
     <div class="card">${S.ui.skeleton(4)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("bench.ablation"))}</h2></div>
     <div class="card">${S.ui.skeleton(2)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("bench.dataset"))}</h2></div>
     <div class="card" id="ds"></div>
+    <p class="muted small" id="ds-note" style="display:none;margin:-6px 0 10px"></p>
     <div class="section-title"><h2>${S.fmt.escape(S.t("bench.method"))}</h2></div>
     <div class="card" id="method"></div>`;
   const d = await S.api.json("/assets/data/benchmark.json");
@@ -32,8 +33,11 @@ S.router.register("ai-benchmark", async () => {
       <div class="center"><div class="mono" style="font-size:28px;font-weight:700">${d.dataset.human_curated}</div><div class="muted small">${S.fmt.escape(S.t("bench.human"))}</div></div>
       <div class="center"><div class="mono" style="font-size:28px;font-weight:700">${d.dataset.attack_cases}</div><div class="muted small">${S.fmt.escape(S.t("bench.attack"))}</div></div>
       <div class="center"><div class="mono" style="font-size:28px;font-weight:700">${d.metrics.length}</div><div class="muted small">${S.fmt.escape(S.t("bench.metricsN"))}</div></div>
-    </div>
-    <p class="muted small" style="margin:12px 0 0">${S.fmt.escape(S.t("bench.dsNote", d.dataset.cases - d.dataset.human_curated - d.dataset.attack_cases))}</p>`;
+    </div>`;
+  /* "程序化生成"说明移出数据卡（卡内只留四个大数字）——置卡下方独立一行 */
+  const dsNote = document.getElementById("ds-note");
+  dsNote.textContent = S.t("bench.dsNote", d.dataset.cases - d.dataset.human_curated - d.dataset.attack_cases);
+  dsNote.style.display = "";
   /* 评测方法：条目卡阵列（手机单列 / 平板起两列）——此前 kv 键值横排长文本在窄屏拥挤换行 */
   document.getElementById("method").innerHTML = `
     <div class="bench-method">

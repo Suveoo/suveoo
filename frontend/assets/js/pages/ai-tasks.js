@@ -22,7 +22,7 @@ S.router.register("ai-tasks", async () => {
         ${t.fail_next ? S.ui.badge(S.t("tasks.injectedBadge"), "badge-red") : S.ui.badge(S.t("tasks.status." + t.status) ?? t.status, t.status === "DONE" ? "badge-green" : t.status === "PENDING" ? "badge-yellow" : t.status === "COMPENSATED" ? "badge-navy" : "badge-gray")}
       </div>
       <div style="margin:12px 0">${stepsFor(t).map((s) => `<div class="task-step"><span class="st">·</span>${s}</div>`).join("")}</div>
-      ${t.fail_next ? `<div class="banner" style="display:flex;background:var(--color-red-bg);color:var(--color-red);padding:8px 12px">${S.ui.icon("shield", 14)}<div class="small">${S.fmt.escape(S.t("tasks.injectNote"))}</div></div>` : ""}
+      ${t.fail_next ? `<div class="banner" style="display:flex;background:var(--color-red-bg);color:var(--color-red);padding:8px 12px;margin-top:16px">${S.ui.icon("shield", 14)}<div class="small">${S.fmt.escape(S.t("tasks.injectNote"))}</div></div>` : ""}
       ${t.payload?.amount ? `<div class="muted small">${S.fmt.escape(S.t("genui.budget"))}：¥${S.fmt.escape(String(t.payload.amount))}</div>` : ""}
       <div class="row" style="margin-top:12px">
         ${t.status === "PENDING" ? `<button class="btn btn-sm btn-ghost cancel" data-id="${t.id}">${S.fmt.escape(S.t("tasks.cancel"))}</button>` : ""}
