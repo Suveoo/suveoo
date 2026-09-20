@@ -941,5 +941,9 @@
   "wealth.title": "Wealth",
   "wealth.toolHub": "Financial Calculators",
   "wealth.viewHoldings": "View Holdings",
-  "ai.deepThinking": "Analyzing your request…"
+  "ai.deepThinking": "Analyzing your request…",
+  "genui.confirmSubCancel": "Confirm unsubscribe",
+  "genui.subFee": "Subscription fee",
+  "genui.subNext": "Next charge",
+  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends."
 }

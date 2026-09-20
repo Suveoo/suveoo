@@ -32,7 +32,9 @@ S.router.register("card-history", async () => {
 
   const PAGE = 10;           /* 已加载数据内的本地展示分页 */
   let page = 0;
-  const monthKey = (ts) => (ts ?? "").slice(0, 7);
+  /* 日期/月份键用浏览器本地时区（中国用户=北京时间）：ISO slice 是 UTC 日期，凌晨交易会被归入前一天（跨天 bug） */
+  const localDate = (ts) => { try { return new Date(ts ?? 0).toLocaleDateString("sv-SE"); } catch { return "—"; } };
+  const monthKey = (ts) => localDate(ts).slice(0, 7);
   const render = () => {
     const list = all.filter((t) => cat === "ALL" || t.category === cat);
     const shown = list.slice(0, (page + 1) * PAGE);
@@ -40,7 +42,7 @@ S.router.register("card-history", async () => {
     const mIn = months.map((m) => all.filter((t) => monthKey(t.ts) === m && t.direction === "IN").reduce((a, t) => a + Number(t.amount_cents) / 100, 0));
     const mOut = months.map((m) => all.filter((t) => monthKey(t.ts) === m && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents) / 100, 0));
     const byDay = {};
-    for (const t of shown) (byDay[t.ts?.slice(0, 10) ?? "—"] ??= []).push(t);
+    for (const t of shown) (byDay[localDate(t.ts)] ??= []).push(t);
     el.innerHTML = `
       ${months.length ? `<div class="section-title" style="margin-top:0"><h3>${S.fmt.escape(S.t("dash.inout"))}</h3></div>
         ${S.charts.bar([{ name: S.t("ch.inLabel"), values: mIn.map((v) => +v.toFixed(2)) }, { name: S.t("ch.outLabel"), values: mOut.map((v) => +v.toFixed(2)) }], { labels: months })}` : ""}

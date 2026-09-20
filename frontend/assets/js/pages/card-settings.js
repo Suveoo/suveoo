@@ -86,14 +86,12 @@ S.router.register("card-settings", async () => {
   };
   document.getElementById("cs-fz").onclick = async () => {
     const intent = cd.status === "FROZEN" ? "unfreeze" : "freeze";
-    const otp = await S.ctl.otp({
-      email: (await S.auth.session())?.email,
-      send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
-    });
-    if (!otp) return;
-    const r2 = await S.api.post(`/api/cards/${slug}/${intent}`, { otp });
+    /* 两段式走 mutate（首答 INPUT_REQUIRED → 确认卡[RED 含 OTP 输入] → 携 grant_hash+otp 二段）——
+       此前裸 post {otp} 拿到 INPUT_REQUIRED 被当失败提示 "failed"（组员报告的冻结/解冻失效根因） */
+    const r2 = await S.api.mutate(`/api/cards/${slug}/${intent}`, {}, { action: `card_${intent === "freeze" ? "freeze" : "unfreeze"}`, subject: cd.number });
+    if (r2.cancelled) return;
     if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-    else S.ui.toast(r2.data?.reason ?? "failed", true);
+    else S.ui.toast(r2.data?.reason ?? r2.data?.error?.message ?? "failed", true);
   };
   /* 立即还款：走 credit-repay 账单缴费（黄级确认卡），金额=当前欠款全额（服务端动态取） */
   const repayBtn = document.getElementById("cs-repay");

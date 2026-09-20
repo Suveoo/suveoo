@@ -478,6 +478,10 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   .chat-head .hh-short { display: inline; }
 }
 
+/* 亚像素溢出兜底（组员报告 /pay/subscriptions 390 需左右滚动）：行内 switch/进度条的小数宽度
+   会让 scrollWidth 超 1px 触发橡皮筋——clip 吞掉且不创建滚动容器（不影响 sticky；旧 webview 不识别则回退 visible 无害） */
+.page { overflow-x: clip; }
+
 /* 手机头栏融入页面（ChatGPT 式无边框）；发丝线只在保留卡壳的桌面出现。注意不能嵌进上方 ≤1023 块——CSS 媒体查询不可嵌套（旧 webview 直接丢弃整条） */
 @media (max-width: 767px) { .chat-head { border-bottom: none; } }
 

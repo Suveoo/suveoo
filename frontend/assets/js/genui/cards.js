@@ -16,6 +16,7 @@ S.genuiCards = {
     card_limit_adjust:   { title: "genui.confirmLimit",    icon: "gear",     field: "genui.card",     fee: false },
     card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
     card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
+    subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: null,             fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
@@ -29,10 +30,11 @@ S.genuiCards = {
     if (!subject) {
       if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
       else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze") subject = p.card_id ?? null;
+      else if (c.action === "subscription_cancel") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
       else if (c.action === "fx_exchange") subject = null;
       else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
     }
-    const rawAmt = p.amount_cny ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
+    const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
     /* "ALL" 全额赎回占位无数值可显示，以文案替代，避免渲染 ¥ NaN */
     const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : S.t("genui.redeemAll");
     /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
@@ -44,6 +46,10 @@ S.genuiCards = {
         ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
         ...(p.memo != null && String(p.memo) !== "" ? [[S.t("genui.memo"), p.memo]] : []),
+        ...(c.action === "subscription_cancel" ? [
+          ...(p.subscription_amount != null ? [[S.t("genui.subFee"), `¥${S.fmt.moneyPlain(p.subscription_amount)} / ${S.fmt.escape(p.subscription_cycle ?? "月")}`]] : []),
+          ...(p.subscription_next != null ? [[S.t("genui.subNext"), S.fmt.escape(p.subscription_next)]] : []),
+        ] : []),
         ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
         ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
@@ -51,6 +57,7 @@ S.genuiCards = {
         ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
+      ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
       <div class="gc-grant">grant ${String(c.grant_hash ?? "").slice(0, 12)}…</div>
     </div>`;
   },

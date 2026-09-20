@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SELF, env } from "cloudflare:test";
-import { toCents } from "../../worker-main.js";
+import { toCents, genDemoSeedRich, seededRng } from "../../worker-main.js";
 
 /** 任务 B：交易挂卡 + 信用卡账本（信用支付 / 还款闭环）+ 单卡明细真过滤真分页。 */
 const BASE = "https://suveoo.com";
@@ -264,13 +264,17 @@ describe("B5 单卡明细真过滤 + 分页", () => {
 });
 
 describe("B4 种子：信用卡初始欠款与全量挂卡", () => {
-  it("demo 重灌：信用欠款 ¥8,632.47；流水全部挂卡（本月抽查无 NULL card）", async () => {
+  it("demo 重灌：信用欠款=信用卡消费合计（动态，账本可复算）；流水全部挂卡（本月抽查无 NULL card）", async () => {
     const seed = await j(await SELF.fetch(BASE + "/api/demo/seed", { method: "POST", headers: { "x-admin-token": env.ADMIN_TOKEN } }));
     expect(seed.ok).toBe(true);
     const cards = await cardsOf(seed.user_id);
     const cred = cards.find((c) => c.kind === "credit");
-    expect(cred.balance_cents).toBe("863247");                       // ¥8,632.47
-    expect(BigInt(cred.limit_cents) - BigInt(cred.balance_cents)).toBe(32000000n - 863247n); // 可用额度 < 320,000
+    /* 第三十轮：欠款不再固定 863247，与种子信用卡消费动态合计一致——用同种子直接计算期望值 */
+    const expectDebt = genDemoSeedRich(seededRng(20260916)).txs
+      .filter((t) => t.card === "credit-card-1" && t.direction === "OUT")
+      .reduce((a, t) => a + Number(t.amount_cents), 0);
+    expect(cred.balance_cents).toBe(String(expectDebt));
+    expect(BigInt(cred.limit_cents) - BigInt(cred.balance_cents)).toBe(32000000n - BigInt(expectDebt)); // 可用额度 < 320,000
     /* 本月流水全部挂卡（reportData 直查 tx 表） */
     const month = new Date().toISOString().slice(0, 7);
     const rep = await doOp(`u:${seed.user_id}`, { op: "reportData", month });

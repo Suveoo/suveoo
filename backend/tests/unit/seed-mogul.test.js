@@ -13,7 +13,11 @@ describe("demo mogul 种子剖面", () => {
     expect(seed.bills).toHaveLength(11);
     expect(seed.tasks).toHaveLength(6);
     expect(seed.fx_balances.map((f) => f.currency).sort()).toEqual(["EUR", "HKD", "USD"]);
-    expect(seed.credit_debt_cents).toBe("863247");
+    /* 第三十轮：欠款=信用卡消费动态合计（账本可精确复算）；月度任务 day_of_month 锚定标题日期；收款人全带手机号 */
+    const creditSum = seed.txs.filter((t) => t.card === "credit-card-1" && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents), 0);
+    expect(seed.credit_debt_cents).toBe(String(creditSum));
+    expect(seed.tasks.filter((t) => t.title.includes("每月")).every((t) => Number.isInteger(t.day_of_month))).toBe(true);
+    expect(seed.payees.every((p) => /^13\d{9}$/.test(p.phone ?? ""))).toBe(true);
   });
 
   it("竞赛锚点全保留（火锅 860 / 注入 memo / 生日订花 / 女儿 200 / 物业 412.70 / 工资 / 报销）", () => {

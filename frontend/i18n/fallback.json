@@ -941,5 +941,9 @@
   "wealth.title": "财富",
   "wealth.toolHub": "金融计算工具",
   "wealth.viewHoldings": "查看持仓",
-  "ai.deepThinking": "Analyzing your request…"
+  "ai.deepThinking": "Analyzing your request…",
+  "genui.confirmSubCancel": "Confirm unsubscribe",
+  "genui.subFee": "Subscription fee",
+  "genui.subNext": "Next charge",
+  "genui.subCancelNote": "No further charges after cancellation; paid benefits remain until the period ends."
 }

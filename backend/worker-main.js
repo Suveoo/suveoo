@@ -2260,12 +2260,12 @@ export const MCP_TOOLS = [
   { name: "account_query", desc: "查询用户总余额与卡片概览", args: {} },
   { name: "transaction_history", desc: "查询交易流水", args: { days: { type: "number" }, category: { type: "string" } } },
   { name: "bill_analysis", desc: "账单分类统计与异常识别；支出归因按流水的 card 字段区分付款卡（by_card，含信用卡消费）", args: { period: { type: "string" } } },
-  { name: "wealth_product_query", desc: "查询理财产品目录（可传 risk_level/min_duration 过滤）", args: { risk_level: { type: "number" }, min_duration: { type: "number" } } },
+  { name: "wealth_product_query", desc: "查询理财产品目录（可传 risk_level/min_duration 过滤；返回含您的当前风险承受等级 user_pr_level）。适当性硬规则：推荐、对比与申购建议仅限风险等级不高于 user_pr_level 的产品；更高等级产品只能客观陈列并明确提示超出用户风险承受等级，不得推荐", args: { risk_level: { type: "number" }, min_duration: { type: "number" } } },
   { name: "wealth_holdings_query", desc: "查询用户当前理财持仓（名称、风险等级、净值、成本、市值、redeem_value 预计赎回回款、unrealized_pnl 浮动盈亏）。赎回按市值结算", args: {} },
   { name: "card_status_query", desc: "查卡状态/限额/欠款。借记卡 balance=可用余额；信用卡 balance=欠款、available=总额度−欠款；recent_txs 为各卡最近消费（按流水 card 字段挂卡）。完整卡号不经 AI 通道返回——引用返回的 full_number_hint 设置页链接引导用户自查，不得编造卡号。", args: { card_id: { type: "string" } } },
   { name: "subscription_scan", desc: "扫描订阅扣费与使用评分", args: { lookback_days: { type: "number" } } },
   { name: "split_bill_calculate", desc: "AA 分账精确计算", args: { total: { type: "string" }, participants: { type: "array" }, adjustments: { type: "object" } } },
-  { name: "contacts_search", desc: "按姓名搜索常用收款人（仅返回已通过真实性校验的收款人，卡号均为真实 Suveoo 账户，可直接用于转账）", args: { name: { type: "string" } } },
+  { name: "contacts_search", desc: "按姓名或手机号搜索常用收款人（仅返回已通过真实性校验的收款人，卡号均为真实 Suveoo 账户，可直接用于转账；手机号支持全号或尾号）。返回的完整卡号仅用于转账工具参数回传——回复正文中出现卡号一律只写尾号 4 位（如 ****3026）", args: { name: { type: "string" } } },
   { name: "fx_quote_query", desc: "查询外汇实时牌价（买/卖/中间价，数据源为真实市场汇率日更+15 分钟缓存）。currency 可选过滤币种", args: { currency: { type: "string" } } },
   { name: "fx_balance_query", desc: "查询用户各币种外币余额（含按实时买入价折算的人民币参考值 cny_estimate）。用户问“我有多少外币/美元余额/能换回多少人民币”时先查此工具", args: {} },
   { name: "deposit_product_query", desc: "查询六档存款方案（活期/通知/3月/6月/1年/3年）：利率、起存、计息方式、提前支取规则。用户问“存款利率多少/哪种存款划算”时先查此工具，再用 calc_deposit_compare 测算", args: {} },
@@ -2496,6 +2496,14 @@ async function genuiCardFor(env, ctxInfo, g) {
       p.from_card_display = fc ? `${fc.class_label}（尾号 ${String(fc.number ?? "").slice(-4)}）${fc.kind === "credit" ? " · 信用支付" : ""}` : p.from_card ?? null;
     } catch { /* 卡列表查询失败不阻塞出卡 */ }
   }
+  /* 订阅取消卡展开（组员报告：generic 卡误显"全部持仓"且无订阅信息）——附商户/月费/周期/下次扣费供确认 */
+  if (g.ir.intent === "subscription_cancel" && p.subscription_id != null) {
+    try {
+      const subs = (await U(env, ctxInfo.userId)({ op: "subs" })).subscriptions ?? [];
+      const s = subs.find((x) => String(x.id) === String(p.subscription_id));
+      if (s) { p.subscription_merchant = s.merchant; p.subscription_amount = s.amount; p.subscription_cycle = s.cycle; p.subscription_next = s.next_charge_date ?? null; }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
   /* INPUT_REQUIRED 一律走 transfer_confirmation 确认卡（前端 attachConfirm 仅为此组件挂确认条）：
      未列举 intent 落 confirmMeta.generic；此前兜底 card_setting_confirm（卡片设置专用、无确认操作）
      曾让 AI 通道预约转账/收款人管理等出现"点不动"的错卡 */
@@ -2523,7 +2531,8 @@ async function mcpGreen(env, ctxInfo, name, args) {
           proj_10y_p50: f.projection?.p50?.[10] ?? null, inception: f.inception ?? null,
         });
       }
-      return { products: out, note: "共 16 只基金（R1-R5）；returns 单位 %；proj_10y_p50 为 1 元投资 10 年中位终值（蒙特卡洛）。" };
+      const prof = await UU({ op: "getProfile" });
+      return { products: out, user_pr_level: prof?.profile?.pr_level ?? null, note: "共 16 只基金（R1-R5）；returns 单位 %；proj_10y_p50 为 1 元投资 10 年中位终值（蒙特卡洛）。推荐与建议仅限风险等级 ≤ user_pr_level 的产品（适当性）。" };
     }
     case "deposit_product_query": {
       const out = [];
@@ -2570,7 +2579,9 @@ async function mcpGreen(env, ctxInfo, name, args) {
     case "contacts_search": {
       const r = await UU({ op: "payees" });
       const kw = (args.name ?? "").trim();
-      return { payees: (r.payees ?? []).filter((p) => !kw || p.name.includes(kw)) };
+      /* 手机号匹配（官方"按手机号转账"）：关键词含 ≥4 位数字即按号匹配（全号或尾号命中均可） */
+      const digits = kw.replace(/\D/g, "");
+      return { payees: (r.payees ?? []).filter((p) => !kw || p.name.includes(kw) || (digits.length >= 4 && String(p.phone ?? "").replace(/\D/g, "").includes(digits))) };
     }
     case "fx_quote_query": {
       const fx = await hFxLive(env);
@@ -2756,6 +2767,12 @@ export async function llmMessages(env, messages, tools, onText, onThinking) {
         if (e?.partial?.length) { /* 已下发的 token 不撤回：把聚合到的部分作为本轮结果 */
           logEvent("warn", "ai.llm_stream", { ok: "partial", message: e?.message });
           return { out: { content: e.partial, stop_reason: "stream_error" }, streamed: true };
+        }
+        /* 上游超时直接判失败轮（user 侧落库可重试）——此前会 fallthrough 到非流式重发再等一个超时窗，
+           多轮工具循环下最坏 150s/轮、整链可达数分钟"转圈"，是 GLM 思考型慢轮的体验放大器 */
+        if (e?.name === "TimeoutError" || e?.name === "AbortError" || /timeout/i.test(String(e?.message))) {
+          logEvent("warn", "ai.llm_stream", { ok: "timeout" });
+          return { err: `LLM upstream timeout（${TIMEOUT_MS / 1000}s）——模型响应缓慢，请稍后重试` };
         }
         logEvent("warn", "ai.llm_stream", { ok: "fallback", message: e?.message });
       }
@@ -3069,10 +3086,19 @@ function genUserSeedData(rng) {
     { type: "WEALTH", title: "持仓月报已生成", body: "本月持仓月报已生成，可前往月度报告页面下载查看。" },
   ];
   const tasks = [
-    { type: "scheduled_transfer", title: "每月 1 日 · 房租转账（沈建平）", payload: { amount: "3650.00", recipient_name: "沈建平", memo: "房租（滨江星澜府）", repeat: "monthly" }, offset_days: 14 },
-    { type: "scheduled_transfer", title: "每月 12 日 · 给林芷晴转生活费", payload: { amount: "2000.00", recipient_name: "林芷晴", memo: "大学生活费", repeat: "monthly" }, offset_days: 26 },
+    /* day_of_month：执行日锚定标题日期（北京时间 09:00 执行）——offset_days 与标题无关曾致"每月 1 日"实际 2 日执行 */
+    { type: "scheduled_transfer", title: "每月 1 日 · 房租转账（沈建平）", payload: { amount: "3650.00", recipient_name: "沈建平", memo: "房租（滨江星澜府）", repeat: "monthly" }, day_of_month: 1 },
+    { type: "scheduled_transfer", title: "每月 12 日 · 给林芷晴转生活费", payload: { amount: "2000.00", recipient_name: "林芷晴", memo: "大学生活费", repeat: "monthly" }, day_of_month: 12 },
   ];
-  /* 信用卡初始欠款 ¥5,183.29（非整）：可用额度真实小于总额度 */
+  /* 信用卡消费明细 3 笔精确合计欠款 ¥5,183.29（1980.00+2180.50+1022.79）——此前欠款只 UPDATE 余额、明细 0 笔无法复算 */
+  txs.push(
+    { ts: iso(now - 6 * DAY, 13, 24), amount_cents: "198000", direction: "OUT", counterparty: "Apple App Store", category: "订阅", memo: "年度订阅分摊", status: "SUCCESS", channel: "card", trace_id: null, card: "credit-card-1" },
+    { ts: iso(now - 4 * DAY, 10, 41), amount_cents: "218050", direction: "OUT", counterparty: "山姆会员商店", category: "购物", memo: "家庭囤货", status: "SUCCESS", channel: "card", trace_id: null, card: "credit-card-1" },
+    { ts: iso(now - 2 * DAY, 19, 8), amount_cents: "102279", direction: "OUT", counterparty: "携程旅行", category: "生活服务", memo: "周末酒店", status: "SUCCESS", channel: "card", trace_id: null, card: "credit-card-1" },
+  );
+  /* 收款人手机号（官方"按手机号转账"场景）：固定 rng 生成 13x 号段，可复现 */
+  for (const p of payees) if (!p.phone) p.phone = "13" + String(Math.floor(rng() * 1e9)).padStart(9, "0");
+  /* 信用卡初始欠款 ¥5,183.29（非整）：可用额度真实小于总额度；金额=上方明细合计，账本可复算 */
   return { txs, payees, bills, subs, holdings, notifs, tasks, credit_debt_cents: "518329" };
 }
 /* demo@suveoo.com 增强种子：保留全部竞赛演示锚点（火锅 ¥860 AA / 注入 memo / 生日订花 / README 口径账单订阅持仓），
@@ -3298,11 +3324,11 @@ export function genDemoSeedRich(rng) {
   const tasks = [
     /* 竞赛锚点任务（saga-compensation.test.js 依赖 birthday_flowers 与 held ¥600） */
     { type: "birthday_flowers", title: "爱人生日 · 鲜花预订（Saga 演示）", payload: { item: "鲜花礼盒", amount: "600.00", reason: "birthday_reservation" }, offset_days: 2 },
-    { type: "scheduled_transfer", title: "每月 1 日给女儿转生活费", payload: { amount: "2000.00", recipient_name: "女儿", memo: "本月生活费", repeat: "monthly" }, offset_days: 19 },
-    { type: "scheduled_transfer", title: "每月 25 日 · 物业费转账", payload: { amount: "412.70", recipient_name: "西湖文三公寓物业", memo: "物业费", repeat: "monthly" }, offset_days: 8 },
+    { type: "scheduled_transfer", title: "每月 1 日给女儿转生活费", payload: { amount: "2000.00", recipient_name: "女儿", memo: "本月生活费", repeat: "monthly" }, day_of_month: 1 },
+    { type: "scheduled_transfer", title: "每月 25 日 · 物业费转账", payload: { amount: "412.70", recipient_name: "西湖文三公寓物业", memo: "物业费", repeat: "monthly" }, day_of_month: 25 },
     /* 第十六轮：三城生活/海外往来的长程任务 */
     { type: "scheduled_transfer", title: "每季度 · 深圳湾壹号物业费", payload: { amount: "1286.50", recipient_name: "周管家", memo: "深圳湾壹号物业费（季度）", repeat: "monthly" }, offset_days: 12 },
-    { type: "scheduled_transfer", title: "每月 6 日 · 私教课时费", payload: { amount: "1680.00", recipient_name: "汤嘉树", memo: "力量训练 8 课时包", repeat: "monthly" }, offset_days: 6 },
+    { type: "scheduled_transfer", title: "每月 6 日 · 私教课时费", payload: { amount: "1680.00", recipient_name: "汤嘉树", memo: "力量训练 8 课时包", repeat: "monthly" }, day_of_month: 6 },
     { type: "scheduled_transfer", title: "每季度 · Emily Chen 差旅垫付结算", payload: { amount: "2360.00", recipient_name: "Emily Chen", memo: "新加坡会议差旅结算", repeat: "monthly" }, offset_days: 26 },
   ];
   /* 外币余额（分口径整数串；海内外消费底仓） */
@@ -3311,8 +3337,11 @@ export function genDemoSeedRich(rng) {
     { currency: "EUR", amount: "215035" },
     { currency: "HKD", amount: "886020" },
   ];
-  /* 信用卡初始欠款 ¥8,632.47（非整）：P24 剩余可用额度真实小于 ¥320,000 */
-  return { txs, payees, bills, subs, holdings, notifs, tasks, fx_balances, credit_debt_cents: "863247" };
+  /* 收款人手机号（官方"按手机号转账"场景）：固定 rng 生成 13x 号段，可复现 */
+  for (const p of payees) if (!p.phone) p.phone = "13" + String(Math.floor(rng() * 1e9)).padStart(9, "0");
+  /* 信用卡欠款=本种子全部信用卡消费合计（动态计算——外币消费金额随机，动态合计保证账本可精确复算欠款） */
+  const richCreditDebt = txs.filter((t) => t.card === "credit-card-1" && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents), 0);
+  return { txs, payees, bills, subs, holdings, notifs, tasks, fx_balances, credit_debt_cents: String(richCreditDebt) };
 }
 /* ===== 演示人物落户：种子里的收款人全部变成真实 Suveoo 账户（DEMO_MODE 管理员操作，跳过邮箱验证码） ===== */
 const DEMO_PERSONAS = [
@@ -3392,6 +3421,9 @@ const SELF_SEED_DESIGNATED = { "unperishability@gmail.com": "团队", "10donotha
 
 /** 动态收款人数据源：全部 suveoo 域名拟真账户（含 demo.suveoo.com 人物）+ 指定团队账户；
  *  每人取真实姓名（profile）与借记卡号（getCards）；排除本人；拟真度排序（假的在尾）。 */
+/** 确定性手机号派生（13x 号段 11 位，同一邮箱恒定）：收款人手机号数据支撑——官方"按手机号转账"场景 */
+const phoneOf = (seedStr) => { let h = 0; for (const ch of String(seedStr)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return "13" + String(h % 1000000000).padStart(9, "0"); };
+
 async function buildSelfSeedPayees(env, selfEmail) {
   const users = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "listUsers" })).users ?? [];
   const byEmail = new Map(users.map((u) => [u.email, u]));
@@ -3413,7 +3445,7 @@ async function buildSelfSeedPayees(env, selfEmail) {
       if (!debit) continue;
       const name = prof.profile?.name ?? email.split("@")[0];
       const group = SELF_SEED_DESIGNATED[email] ?? (/^[A-Za-z]/.test(name) ? "海外" : name.includes("管家") ? "生活缴费" : "朋友");
-      out.push({ name, account: debit.number, group_label: group, email, low: LOW_REALISM_NAMES.has(name) });
+      out.push({ name, account: debit.number, group_label: group, email, phone: phoneOf(email), low: LOW_REALISM_NAMES.has(name) });
     } catch { /* 单人查询失败跳过，不阻塞数据源 */ }
   }
   out.sort((a, b) => Number(a.low) - Number(b.low));
@@ -3468,7 +3500,7 @@ async function seedDemo(env, targetEmail, opts = {}) {
   if (opts.payeesOverride?.length) {
     const map = opts.payeeNameMap ?? {};
     for (const t of txs) if (map[t.counterparty]) t.counterparty = map[t.counterparty];
-    payees = opts.payeesOverride.map((p) => ({ name: p.name, account: p.account, group_label: p.group_label, email: null }));
+    payees = opts.payeesOverride.map((p) => ({ name: p.name, account: p.account, group_label: p.group_label, email: null, phone: p.phone ?? null }));
   } else {
     /* 演示人物落户：种子 payees 的 account 全部指向真实 Suveoo 卡号（同名人物跨账户指向同一人） */
     const personas = await ensureDemoPersonas(env);
@@ -3662,7 +3694,7 @@ const DDL = [
   `CREATE TABLE IF NOT EXISTS tx(
      id TEXT PRIMARY KEY, ts TEXT, amount_cents TEXT, direction TEXT,
      counterparty TEXT, memo TEXT, status TEXT, channel TEXT, trace_id TEXT, category TEXT DEFAULT '其他')`,
-  "CREATE TABLE IF NOT EXISTS payees(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, account TEXT, group_label TEXT, email TEXT, created_at TEXT)",
+  "CREATE TABLE IF NOT EXISTS payees(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, account TEXT, group_label TEXT, email TEXT, phone TEXT, created_at TEXT)",
   "CREATE TABLE IF NOT EXISTS bills(id TEXT PRIMARY KEY, name TEXT, category TEXT, amount_cents TEXT, due_day INTEGER, autopay INTEGER DEFAULT 0, last_paid_at TEXT)",
   "CREATE TABLE IF NOT EXISTS subscriptions(id TEXT PRIMARY KEY, merchant TEXT, plan TEXT, amount_cents TEXT, cycle TEXT, next_charge_date TEXT, usage_score INTEGER, dark_pattern_note TEXT, reminders INTEGER DEFAULT 1, status TEXT DEFAULT 'ACTIVE')",
   "CREATE TABLE IF NOT EXISTS holdings(fund TEXT PRIMARY KEY, amount_cents TEXT, cost_nav TEXT)",
@@ -3679,10 +3711,12 @@ const DDL = [
 
 /* ---- 幂等列迁移（PRAGMA table_info 检测 → ALTER 补列；DDL 保持老表结构，新旧实例走同一条迁移路径） ---- */
 /** 输入各表现有列名（来自 PRAGMA table_info 的 name 列），返回待执行的 ALTER 语句。纯函数，供单测。 */
-export function columnMigrations({ profile = [], tx = [], chats = [] } = {}) {
+export function columnMigrations({ profile = [], tx = [], chats = [], payees = [] } = {}) {
   const out = [];
   if (!profile.includes("session_epoch")) out.push("ALTER TABLE profile ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0");
   if (!tx.includes("card")) out.push("ALTER TABLE tx ADD COLUMN card TEXT");
+  /* 第三十轮：payees 加手机号——官方六场景"按手机号转账"的数据支撑 */
+  if (!payees.includes("phone")) out.push("ALTER TABLE payees ADD COLUMN phone TEXT");
   /* 第二十六轮：chats 扩列（会话持久化）——活跃时间/消息数/末句预览/归档 */
   if (!chats.includes("created_at")) out.push("ALTER TABLE chats ADD COLUMN created_at TEXT");
   if (!chats.includes("updated_at")) out.push("ALTER TABLE chats ADD COLUMN updated_at TEXT");
@@ -3698,7 +3732,7 @@ export class LedgerDO {
     if (this.ready) return;
     for (const q of DDL) this.state.storage.sql.exec(q);
     const cols = (t) => this.#rows(this.state.storage.sql.exec(`PRAGMA table_info(${t})`)).map((r) => String(r.name));
-    for (const q of columnMigrations({ profile: cols("profile"), tx: cols("tx"), chats: cols("chats") })) this.state.storage.sql.exec(q);
+    for (const q of columnMigrations({ profile: cols("profile"), tx: cols("tx"), chats: cols("chats"), payees: cols("payees") })) this.state.storage.sql.exec(q);
     this.ready = true;
   }
   #rows(c) { return c.toArray(); }
@@ -4294,7 +4328,7 @@ export class LedgerDO {
           const defCard = (this.#rows(sql.exec("SELECT slug FROM cards WHERE is_default = 1 AND kind='debit'"))[0] ?? {}).slug ?? "debit-card-1";
           for (const t of input.txs) sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             `TX${randomHex(6).toUpperCase()}`, t.ts, t.amount_cents, t.direction, t.counterparty, t.memo ?? null, t.status ?? "SUCCESS", t.channel ?? "card", null, t.category ?? "其他", t.card ?? defCard);
-          for (const p of input.payees) sql.exec("INSERT INTO payees(name, account, group_label, email, created_at) VALUES(?,?,?,?,?)", p.name, p.account, p.group_label, p.email, NOW);
+          for (const p of input.payees) sql.exec("INSERT INTO payees(name, account, group_label, email, phone, created_at) VALUES(?,?,?,?,?,?)", p.name, p.account, p.group_label, p.email, p.phone ?? null, NOW);
           for (const b of input.bills) sql.exec("INSERT INTO bills(id, name, category, amount_cents, due_day, autopay) VALUES(?,?,?,?,?,?)", b.id, b.name, b.category, b.amount_cents, b.due_day, b.autopay);
           for (const s of input.subs) sql.exec("INSERT INTO subscriptions(id, merchant, plan, amount_cents, cycle, usage_score, dark_pattern_note, reminders, status) VALUES(?,?,?,?,?,?,?,?, 'ACTIVE')",
             s.id, s.merchant, s.plan, s.amount_cents, s.cycle, s.usage_score, s.dark_pattern_note, s.reminders);
@@ -4305,7 +4339,11 @@ export class LedgerDO {
           if (input.credit_debt_cents != null) sql.exec("UPDATE cards SET balance_cents = ? WHERE kind = 'credit'", String(input.credit_debt_cents));
           const taskIds = [];
           for (const t of input.tasks) {
-            const execute_at = new Date(Date.now() + t.offset_days * 86400000).toISOString();
+            /* day_of_month 优先：锚定"下一个该日期的北京时间 09:00"（UTC 01:00）——执行日与任务标题严格一致；
+               无该字段（一次性任务如生日订花）退回 offset_days 相对偏移 */
+            const execute_at = Number.isInteger(t.day_of_month) && t.day_of_month >= 1 && t.day_of_month <= 31
+              ? (() => { const bj = new Date(Date.now() + 8 * 3600_000); let d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), t.day_of_month, 1, 0, 0)); if (d.getTime() <= Date.now()) d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth() + 1, t.day_of_month, 1, 0, 0)); return d.toISOString(); })()
+              : new Date(Date.now() + (t.offset_days ?? 0) * 86400000).toISOString();
             sql.exec("INSERT INTO tasks(type, title, payload, status, next_run_at, repeat, created_at) VALUES(?,?,?, 'PENDING', ?, ?, ?)",
               t.type, t.title, JSON.stringify(t.payload), execute_at, t.type === "scheduled_transfer" ? "monthly" : "once", NOW);
             const id = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;

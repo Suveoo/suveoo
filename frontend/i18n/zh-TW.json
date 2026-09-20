@@ -941,5 +941,9 @@
   "wealth.title": "財富",
   "wealth.toolHub": "金融計算工具",
   "wealth.viewHoldings": "查看持倉",
-  "ai.deepThinking": "正在深度分析您的指令…"
+  "ai.deepThinking": "正在深度分析您的指令…",
+  "genui.confirmSubCancel": "確認取消訂閱",
+  "genui.subFee": "訂閱費用",
+  "genui.subNext": "下次扣費",
+  "genui.subCancelNote": "取消後不再扣費；本期已付權益保留至到期。"
 }
