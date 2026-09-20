@@ -206,3 +206,45 @@ describe("预约转账（长程任务）", () => {
     expect(notif.body).toContain("Netflix");
   }, 30000);
 });
+
+
+/* 第三十一轮：AI 通道任务取消（task_list 查询 + task_cancel 黄级——此前 AI 无法取消预约转账） */
+describe("AI 任务取消（task_list / task_cancel）", () => {
+  it("task_list 查询 → task_cancel 出卡（含任务标题展开）→ grant 确认 → CANCELLED；重复取消首调即拒", async () => {
+    const out = await registerUser("st8@test.dev", "定cancel");
+    const to = await registerUser("st8to@test.dev", "收款cancel");
+    const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const mkBody = (id, params) => JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params });
+    const call = async (id, params) => j(await SELF.fetch(`${BASE}/mcp?sid=st8`, { method: "POST", headers: H, body: mkBody(id, params) }));
+    /* 建立预约任务（MCP 两段式） */
+    const c1 = await call(1, { name: "scheduled_task_create", arguments: {
+      task_type: "scheduled_transfer", title: "预约转账 · cancel 测",
+      execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once",
+      transfer: { recipient_name: "收款cancel", recipient_account: toDebit.number, amount: "12.00" },
+    } });
+    const inner1 = JSON.parse(c1.result.content[0].text);
+    expect(inner1.status).toBe("INPUT_REQUIRED");
+    const c2 = await call(2, { name: inner1.card.action, arguments: { ...inner1.card.params, grant_hash: inner1.card.grant_hash } });
+    expect(JSON.parse(c2.result.content[0].text).status).toBe("EXECUTED");
+    /* task_list（GREEN 查询）拿到 task_id */
+    const l = await call(3, { name: "task_list", arguments: {} });
+    const tasks = JSON.parse(l.result.content[0].text).tasks;
+    expect(tasks.length).toBeGreaterThan(0);
+    const tid = tasks.find((t) => t.type === "scheduled_transfer").id;
+    /* task_cancel 黄级出卡（确认卡展开任务标题）→ grant 确认 → CANCELLED */
+    const c3 = await call(4, { name: "task_cancel", arguments: { task_id: tid } });
+    const inner3 = JSON.parse(c3.result.content[0].text);
+    expect(inner3.status).toBe("INPUT_REQUIRED");
+    expect(inner3.card.params.task_title).toBe("预约转账 · cancel 测");
+    const c4 = await call(5, { name: "task_cancel", arguments: { task_id: tid, grant_hash: inner3.card.grant_hash } });
+    expect(JSON.parse(c4.result.content[0].text).status).toBe("EXECUTED");
+    const after = await j(await SELF.fetch(BASE + "/api/tasks", { headers: H }));
+    expect(after.tasks.find((t) => t.id === tid).status).toBe("CANCELLED");
+    /* 重复取消：状态前置校验首调即拒（不再出卡） */
+    const c5 = await call(6, { name: "task_cancel", arguments: { task_id: tid } });
+    const inner5 = JSON.parse(c5.result.content[0].text);
+    expect(inner5.status).not.toBe("INPUT_REQUIRED");
+    expect(JSON.stringify(inner5)).toContain("TASK_NOT_PENDING");
+  }, 30000);
+});

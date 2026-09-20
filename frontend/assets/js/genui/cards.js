@@ -17,6 +17,7 @@ S.genuiCards = {
     card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
     card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
     subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: null,             fee: false },
+    task_cancel:         { title: "genui.confirmTaskCancel", icon: "clock",  field: null,             fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
@@ -31,6 +32,7 @@ S.genuiCards = {
       if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
       else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze") subject = p.card_id ?? null;
       else if (c.action === "subscription_cancel") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
+      else if (c.action === "task_cancel") subject = p.task_title ?? ("#" + (p.task_id ?? "—"));
       else if (c.action === "fx_exchange") subject = null;
       else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
     }
@@ -50,6 +52,7 @@ S.genuiCards = {
           ...(p.subscription_amount != null ? [[S.t("genui.subFee"), `¥${S.fmt.moneyPlain(p.subscription_amount)} / ${S.fmt.escape(p.subscription_cycle ?? "月")}`]] : []),
           ...(p.subscription_next != null ? [[S.t("genui.subNext"), S.fmt.escape(p.subscription_next)]] : []),
         ] : []),
+        ...(c.action === "task_cancel" && p.task_next != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.task_next)]] : []),
         ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
         ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
@@ -58,6 +61,7 @@ S.genuiCards = {
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
       ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
+      ${c.action === "task_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.taskCancelNote"))}</p>` : ""}
       <div class="gc-grant">grant ${String(c.grant_hash ?? "").slice(0, 12)}…</div>
     </div>`;
   },

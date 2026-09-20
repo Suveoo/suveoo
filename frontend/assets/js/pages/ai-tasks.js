@@ -1,7 +1,7 @@
 /* ai-tasks.js — P13 长程任务中心（Saga 时间线 + 故障注入） */
 S.router.register("ai-tasks", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("tasks.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("tasks.title"))}</h1>
     <div class="banner" style="background:#FFFBEF;border:1px dashed var(--color-yellow)">${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("tasks.injectNote"))}</div></div>
     <div class="stack" id="tasks">${S.ui.skeleton(2)}</div>`;
   const r = await S.api.get("/api/tasks");

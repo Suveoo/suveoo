@@ -951,5 +951,7 @@
   "payees.group.life": "生活繳費",
   "payees.group.other": "其他",
   "payees.groupCustom": "自訂…",
-  "payees.groupCustomPh": "輸入分組名（≤12 字元）"
+  "payees.groupCustomPh": "輸入分組名（≤12 字元）",
+  "genui.confirmTaskCancel": "確認取消任務",
+  "genui.taskCancelNote": "取消即生效且不可恢復；生日訂花等已鎖定資金的任務取消後將解鎖退回。"
 }

@@ -67,10 +67,10 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
   it("提示词瘦身达标（≤1600 字符；第二十七轮自 1500 上调：新增领域边界/危机应对/专业语气是银行 AI 必需项，非瘦身回退，并同步精简既有措辞 -51 字符）", () => {
     expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
   });
-  it("工具 desc 总量瘦身达标（≤5200 字符，基线 5949）且数量不变（37）", () => {
-    expect(MCP_TOOLS).toHaveLength(37);
+  it("工具 desc 总量预算（≤5600 字符；第三十一轮 +task_list/task_cancel 两工具，37→39、上限 5200→5600）", () => {
+    expect(MCP_TOOLS).toHaveLength(39);
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
-    expect(total).toBeLessThanOrEqual(5200);
+    expect(total).toBeLessThanOrEqual(5600);
   });
   it("scheduled_task_create desc 注明 reminder 任务形态", () => {
     expect(MCP_TOOLS.find((t) => t.name === "scheduled_task_create").desc).toContain("reminder");

@@ -71,7 +71,12 @@ async function uploadOne({ rel, full }, attempt = 0) {
 }
 
 async function main() {
-  const files = (await walk(FRONTEND_DIR)).filter((f) => !FILTER || f.rel.includes(FILTER));
+  const all = (await walk(FRONTEND_DIR)).filter((f) => !FILTER || f.rel.includes(FILTER));
+  /* 发布顺序纪律（b151 实证教训）：资产（JS/CSS/图片）先全部就位，HTML 最后切换——
+     若 HTML 先到，页面以新 ?v= 引用拉到尚未更新的旧资产，SW/CDN 会把"新参数→旧内容"缓存住 1h */
+  const phases = [[], []];
+  for (const f of all) phases[f.rel.endsWith(".html") ? 1 : 0].push(f);
+  const files = [...phases[0], ...phases[1]];
   const total = files.length;
   const totalBytes = (await Promise.all(files.map((f) => stat(f.full).then((s) => s.size)))).reduce((a, b) => a + b, 0);
   console.log(`上传 ${total} 个文件（${(totalBytes / 1024 / 1024).toFixed(1)} MB）至 ${BUCKET}/${FILTER ? `（过滤：${FILTER}）` : ""}`);

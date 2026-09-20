@@ -22,6 +22,8 @@ S.router.register("ai", async ({ user }) => {
             <div class="ch-title" id="ch-title">${S.fmt.escape(S.t("ai.newChat"))}</div>
             <button class="ch-btn" id="new-chat" type="button">${S.ui.icon("plus", 13)}<span class="hh-full">${S.fmt.escape(S.t("ai.newChat"))}</span></button>
           </div>
+          <!-- 手机/平板无 Side Drawer，长程任务与评测看板入口随父页走（桌面隐藏——侧栏已有） -->
+          <div class="ai-sub-links"><a href="/ai/tasks">${S.ui.icon("clock", 13)} ${S.fmt.escape(S.t("tasks.title"))}</a><a href="/ai/benchmark">${S.ui.icon("chart", 13)} ${S.fmt.escape(S.t("bench.title"))}</a></div>
           <div id="pane-chat" style="display:flex;flex-direction:column;flex:1;min-height:0">
             <div class="chat-thread" id="thread">${WELCOME_HTML}${INSIGHTS_HTML}</div>
           <div class="composer-hint">${S.fmt.escape(S.t("ai.hint"))}</div>

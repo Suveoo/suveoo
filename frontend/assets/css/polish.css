@@ -478,6 +478,22 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   .chat-head .hh-short { display: inline; }
 }
 
+/* SuveooBench：当前生产模型徽标 + 评测方法条目卡阵列（手机单列 / ≥768 两列） */
+.prod-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; background: var(--color-green-bg); color: var(--color-green); font-size: var(--fs-12); font-weight: 600; margin-right: 10px; white-space: nowrap; }
+.bench-method { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 768px) { .bench-method { grid-template-columns: 1fr 1fr; } }
+.bm-item { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--color-line); border-radius: var(--r-btn); background: var(--color-surface); }
+.bm-item b { font-size: var(--fs-14); }
+.bm-ico { flex: none; width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary-tint); color: var(--color-navy); }
+
+/* AI 子页入口行：手机/平板（无 Side Drawer）在对话卡头栏下提供长程任务/评测看板直达；桌面隐藏（侧栏已有） */
+.ai-sub-links { display: none; }
+@media (max-width: 1023px) {
+  .ai-sub-links { display: flex; gap: 8px; padding: 8px 16px 2px; }
+  .ai-sub-links a { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: var(--r-pill); background: var(--color-primary-tint); color: var(--color-navy); font-size: var(--fs-12); font-weight: 600; text-decoration: none; }
+  .ai-sub-links a:active { filter: brightness(.96); }
+}
+
 /* 亚像素溢出兜底（组员报告 /pay/subscriptions 390 需左右滚动）：行内 switch/进度条的小数宽度
    会让 scrollWidth 超 1px 触发橡皮筋——clip 吞掉且不创建滚动容器（不影响 sticky；旧 webview 不识别则回退 visible 无害） */
 .page { overflow-x: clip; }

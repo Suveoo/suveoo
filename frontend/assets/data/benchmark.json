@@ -80,5 +80,10 @@
    "ours": 0.003
   }
  ],
- "note": "这是模拟银行系统；评测数字来自本仓库自动化用例（单测 + 集成 + 对抗），Ablation 的 Baseline 为关闭 Verification Runtime 的对照模式。"
+ "note": "评测数字来自本仓库自动化用例（单测 + 集成 + 对抗），Ablation 的 Baseline 为关闭 Verification Runtime 的对照模式。",
+ "production": {
+  "model": "GLM-5.3-Flash",
+  "since": "2026-09-20",
+  "note": "当前生产模型 GLM-5.3-Flash（智谱开放平台）守卫开启下 256 项自动化用例全绿（授权绕过率 / 注入成功率 = 0）；裸模型对照（Baseline）沿用接入评估期三组，GLM 专项 Ablation 待跑。"
+ }
 }

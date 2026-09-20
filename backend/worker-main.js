@@ -302,6 +302,8 @@ export const TOOL_REGISTRY = {
   wealth_product_redeem:  { tier: RISK.RED, amountArg: "amount" },
   card_freeze:            { tier: RISK.RED },
   card_unfreeze:          { tier: RISK.RED },
+  task_cancel:            { tier: RISK.YELLOW },
+  task_list:              { tier: RISK.GREEN },
   ecommerce_order_mock:   { tier: RISK.RED, amountArg: "amount" },
 };
 /* 提醒类长程任务不涉及资金（到期仅站内通知），金额可缺省；预约转账/订花等其余 amountArg 工具仍须正金额。
@@ -374,6 +376,7 @@ export const TOOL_SCHEMA = {
   wealth_product_redeem:  { authFields: ["product_id", "amount"], preconditions: ["holding.value >= amount"], compensation: [] },
   card_freeze:            { authFields: ["card_id"], preconditions: [], compensation: ["card_unfreeze"] },
   card_unfreeze:          { authFields: ["card_id"], preconditions: ["card.status == FROZEN"], compensation: [] },
+  task_cancel:            { authFields: ["task_id"], preconditions: ["task.status == PENDING"], compensation: [] },
   ecommerce_order_mock:   { authFields: ["item", "amount"], preconditions: ["locked_funds >= amount"], compensation: ["cancel_order"] },
 };
 export function compileToIR(toolName, args = {}, ctx = {}) {
@@ -1142,6 +1145,12 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     if (!t.ok) return reject(t.code);
     return null;
   }
+  if (intent === "task_cancel" && args.task_id != null) {
+    /* 仅 PENDING 可取消：状态前置校验放在出卡前（已完成/已取消的任务直接如实拒绝，不出确认卡浪费一轮） */
+    const cur = (await U(env, ctxInfo.userId)({ op: "tasks" })).tasks?.find((x) => String(x.id) === String(args.task_id));
+    if (!cur) return reject("TASK_NOT_FOUND");
+    if (cur.status !== "PENDING") return { ...reject("TASK_NOT_PENDING"), message: `任务当前状态为 ${cur.status}，仅待执行（PENDING）的任务可取消。` };
+  }
   if (intent === "payee_manage" && args.action === "add") {
     const account = args.payee?.account, name = args.payee?.name;
     if (account == null) return reject("INVALID_CARD_FORMAT");
@@ -1343,6 +1352,22 @@ async function executeIntent(env, ir) {
       const r = await U(env, uid)({ op: "subCancel", id: p.subscription_id });
       await U(env, uid)({ op: "audit", action: "subscription_cancel", detail: { id: p.subscription_id }, channel: ir.channel, trace_id: ir.trace_id });
       await U(env, uid)({ op: "notify", type: "SYSTEM", title: "订阅已取消", body: `订阅 ${p.subscription_id} 已取消，下次扣费前不再扣款。` });
+      return r;
+    }
+    case "task_cancel": {
+      /* 仅 PENDING 可取消（已完成/已取消的任务如实拒绝，防重复取消与误导性"成功"） */
+      const cur = (await U(env, uid)({ op: "tasks" })).tasks?.find((x) => String(x.id) === String(p.task_id));
+      if (!cur) return { ok: false, error: "TASK_NOT_FOUND" };
+      if (cur.status !== "PENDING") return { ok: false, error: "TASK_NOT_PENDING", status: cur.status };
+      const r = await U(env, uid)({ op: "taskCancel", id: Number(p.task_id) });
+      if (r.ok) {
+        try {
+          const stub = env.SAGA.get(env.SAGA.idFromName(`task:${uid}:${p.task_id}`));
+          await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "cancel" }) });
+        } catch { /* saga 侧取消失败不回滚账本（alarm 触发时任务已 CANCELLED 自然跳过） */ }
+        await U(env, uid)({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? "任务取消并已执行补偿（资金解锁）。" : "任务已取消。" });
+      }
+      await U(env, uid)({ op: "audit", action: "task_cancel", detail: { task_id: p.task_id, compensated: !!r.compensated }, channel: ir.channel, trace_id: ir.trace_id });
       return r;
     }
     case "autopay_manage": {
@@ -2292,6 +2317,8 @@ export const MCP_TOOLS = [
   { name: "wealth_product_purchase", desc: "申购理财（红级）", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "wealth_product_redeem", desc: "赎回理财（红级）。赎回按当前净值对成本净值比例结算（浮盈浮亏实时兑现，整数运算），回款入默认借记卡；预计回款额可先查 wealth_holdings_query 的 redeem_value", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
+  { name: "task_list", desc: "查询用户的长程任务列表（预约转账/提醒/订花）：返回 id、标题、类型、状态、下次执行时间。用户要查看或取消任务时先查此工具拿到 task_id", args: {} },
+  { name: "task_cancel", desc: "取消长程任务（预约转账/提醒/订花）。task_id 用 task_list 查询；仅 PENDING 可取消，取消即生效；生日订花类取消会同步解锁已锁资金（补偿）。黄级：确认卡等待用户点击", args: { task_id: { type: "number" } } },
   { name: "card_unfreeze", desc: "解冻卡片（红级）", args: { card_id: { type: "string" } } },
   { name: "ecommerce_order_mock", desc: "演示商户下单（红级，仅 DEMO_MODE 场景 6）", args: { item: { type: "string" }, amount: { type: "string" }, task_id: { type: "number" } } },
 ];
@@ -2504,6 +2531,13 @@ async function genuiCardFor(env, ctxInfo, g) {
       if (s) { p.subscription_merchant = s.merchant; p.subscription_amount = s.amount; p.subscription_cycle = s.cycle; p.subscription_next = s.next_charge_date ?? null; }
     } catch { /* 查询失败不阻塞出卡 */ }
   }
+  /* 任务取消卡展开：附任务标题与下次执行时间（确认卡能对上"取消的是哪个任务"） */
+  if (g.ir.intent === "task_cancel" && p.task_id != null) {
+    try {
+      const t = (await U(env, ctxInfo.userId)({ op: "tasks" })).tasks?.find((x) => String(x.id) === String(p.task_id));
+      if (t) { p.task_title = t.title; p.task_next = t.next_run_at ?? null; }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
   /* INPUT_REQUIRED 一律走 transfer_confirmation 确认卡（前端 attachConfirm 仅为此组件挂确认条）：
      未列举 intent 落 confirmMeta.generic；此前兜底 card_setting_confirm（卡片设置专用、无确认操作）
      曾让 AI 通道预约转账/收款人管理等出现"点不动"的错卡 */
@@ -2576,6 +2610,10 @@ async function mcpGreen(env, ctxInfo, name, args) {
       return { cards: out, note: "借记卡 balance=可用余额；信用卡 balance=当前欠款、available=总额度−欠款；recent_txs 为该卡最近消费（按流水 card 字段）" };
     }
     case "subscription_scan": return await UU({ op: "subs" });
+    case "task_list": {
+      const r = await UU({ op: "tasks" });
+      return { tasks: (r.tasks ?? []).map((t) => ({ id: t.id, title: t.title, type: t.type, status: t.status, next_run_at: t.next_run_at, repeat: t.repeat })) };
+    }
     case "contacts_search": {
       const r = await UU({ op: "payees" });
       const kw = (args.name ?? "").trim();

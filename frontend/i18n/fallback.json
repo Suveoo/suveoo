@@ -951,5 +951,7 @@
   "payees.group.life": "Bills & utilities",
   "payees.group.other": "Other",
   "payees.groupCustom": "Custom…",
-  "payees.groupCustomPh": "Custom group name (max 12 chars)"
+  "payees.groupCustomPh": "Custom group name (max 12 chars)",
+  "genui.confirmTaskCancel": "Confirm task cancellation",
+  "genui.taskCancelNote": "Cancellation is immediate and irreversible; locked funds (e.g. birthday-flower reservations) are unlocked and returned."
 }
