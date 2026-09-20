@@ -69,12 +69,12 @@ S.router.register("card-settings", async () => {
     else S.ui.toast(S.t("common.opFailed"), true);
   };
   document.getElementById("cs-alias-go").onclick = async () => {
-    const r2 = await S.api.mutate(`/api/cards/${slug}`, { alias: document.getElementById("cs-alias").value.trim() || undefined });
+    const r2 = await S.api.mutate(`/api/cards/${slug}`, { alias: document.getElementById("cs-alias").value.trim() || undefined }, { method: "PATCH" });
     if (!r2.cancelled) S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("common.opOk") : r2.data?.reason ?? "failed", r2.data?.status !== "EXECUTED");
   };
   const def = document.getElementById("cs-default");
   if (def) def.onclick = async () => {
-    const r2 = await S.api.mutate(`/api/cards/${slug}`, { is_default: 1 });
+    const r2 = await S.api.mutate(`/api/cards/${slug}`, { is_default: 1 }, { method: "PATCH" });
     if (!r2.cancelled && r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 700); }
   };
   const geo = document.getElementById("cs-geo");

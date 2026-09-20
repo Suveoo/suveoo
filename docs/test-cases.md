@@ -37,10 +37,14 @@ prompt-injection / replay-attack / authorization-bypass / consent-mutation 四�
 ## 运行结果
 
 ```
-Test Files  36 passed (36)
-     Tests  256 passed (256)
-  Duration   ~28s
+Test Files  37 passed (37)
+     Tests  267 passed (267)
+  Duration   ~40s
 ```
+
+2026-09-21（第三十三轮，v3.35）新增测试：
+- tests/unit/fund-data.test.js 扩展（+4 净增）——`fxSparkByDay` 按自然日去重（同日多次采样序列不变/跨日追加滑窗 7 点/当日末点更新/JPY 口径与多币种独立累计）；`fxQuotesFromRates` 无历史断言改"单点真实值"（原 7 点平铺锁定的是伪造填充，按第四期任务 A 口径改写）
+- tests/integration/payee-phone.test.js（2）——带手机号添加（REST 两段式）→ /api/payees 返回 phone → contacts_search 全号/尾号命中 → payee 转账 EXECUTED → DELETE 清理；非法手机号 INVALID_PHONE（含 0 开头/短号）与可选性（不填不受影响）
 
 2026-09-20（第二十六轮）新增会话历史测试：
 - tests/unit/chat-history.test.js（9）——窗口纯函数：parseHistCache 新旧格式兼容、buildHistoryContext 首条常驻/字符预算裁中段保头尾/条目只含 role+text（混入 grant_hash/tool_use/cards 白名单化丢弃）、advanceHistory 失败轮 user-only 与滚动截窗、提示词历史数值过期语义在锁定区且 ≤1600（第二十七轮自 1500 上调：领域边界/危机应对为必需项）

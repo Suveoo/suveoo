@@ -157,7 +157,7 @@
 .acf-head .h-txt { display: inline-block; transform: translateY(0px); }
 .acf-head .h-txt.h-up { transform: translateY(-0.5px); }
 .acf-head .eye-toggle { margin-left: 2px; vertical-align: middle; }
-.cf-sep { border: none; border-top: 1px solid var(--color-line); margin: 2px 0 5px; }
+.cf-sep { border: none; border-top: 1px solid var(--color-line); margin: 7px 0 11px; }
 @media (max-width: 767px) {
   /* 手机端：今日收益行与分隔线一起上提——折行间距归零 + 分隔线更贴 */
   .card .row.between.assets-head { row-gap: 0; }

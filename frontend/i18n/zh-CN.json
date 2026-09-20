@@ -953,5 +953,9 @@
   "payees.groupCustom": "自定义…",
   "payees.groupCustomPh": "输入分组名（≤12 字符）",
   "genui.confirmTaskCancel": "确认取消任务",
-  "genui.taskCancelNote": "取消即生效且不可恢复；生日订花等已锁定资金的任务取消后将解锁退回。"
+  "genui.taskCancelNote": "取消即生效且不可恢复；生日订花等已锁定资金的任务取消后将解锁退回。",
+  "fx.sparkAccumulating": "7D 走势逐日积累中（数据源每日更新一次，序列为每日一个真实值）",
+  "payees.phone": "手机号（可选）",
+  "payees.badPhone": "手机号格式不正确（11 位，1 开头）",
+  "bench.prodBench": "生产模型实测（{0} 条指令）：首 token 中位 {1}s · P95 {2}s · 成功 {3}/{0}"
 }

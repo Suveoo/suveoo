@@ -23,7 +23,9 @@ S.router.register("ai-benchmark", async () => {
     ${d.metrics.map((m) => `<tr><td>${S.fmt.escape(m.name)}</td>
       <td class="mono">${(m.baseline * 100).toFixed(1)}%</td>
       <td class="mono" style="color:${m.ours <= m.baseline ? "var(--color-green)" : "var(--color-red)"};font-weight:600">${(m.ours * 100).toFixed(1)}%</td></tr>`).join("")}
-    </tbody></table></div>`;
+    </tbody></table></div>`
+    /* 生产模型 GLM 实测基线（production.bench，2026-09-21 ai-bench 真跑数据；缺字段时不渲染） */
+    + (d.production?.bench ? `<p class="muted small" style="margin:10px 0 0">${S.ui.icon("chart", 13)} ${S.fmt.escape(S.t("bench.prodBench", d.production.bench.cases, d.production.bench.first_token_median_s, d.production.bench.p95_s, d.production.bench.passed))}</p>` : "");
   const series = [{ name: "Baseline", values: d.ablation.map((x) => +(x.baseline * 100).toFixed(1)) }, { name: "Ours", values: d.ablation.map((x) => +(x.ours * 100).toFixed(1)) }];
   c.querySelectorAll(".card")[1].innerHTML = S.charts.bar(series, { labels: d.ablation.map((x) => x.model) })
     + (d.production?.note ? `<p class="muted small" style="margin:10px 0 0">${S.fmt.escape(d.production.note)}</p>` : "");

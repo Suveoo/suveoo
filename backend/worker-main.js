@@ -651,6 +651,7 @@ const TGT_ERR_MSG = {
   NAME_MISMATCH: "收款人姓名与该卡号注册户名不符",
   PAYEE_NOT_FOUND: "常用收款人不存在",
   SAME_CARD: "同一张卡不能转账给同一张卡",
+  INVALID_PHONE: "手机号格式不正确（须为 1 开头的 11 位数字）",
 };
 export async function resolveTransferTarget(env, { name, account, selfUserId = null }) {
   const acct = String(account ?? "").trim();
@@ -764,7 +765,7 @@ const FX_META = [
   ["AUD", "澳大利亚元", "/flags/au.svg", 40], ["CAD", "加拿大元", "/flags/ca.svg", 38], ["CHF", "瑞士法郎", "/flags/ch.svg", 40],
   ["NZD", "新西兰元", "/flags/nz.svg", 45],
 ];
-const FX_CACHE_KEY = "fx:live:v2", FX_SPARK_KEY = "fx:spark:v2", FX_TTL = 900; /* v2：spark 口径修正（JPY 展示口径），弃用 v1 旧键 */
+const FX_CACHE_KEY = "fx:live:v2", FX_SPARK_KEY = "fx:spark:v3", FX_TTL = 900; /* v3：spark 按自然日去重（旧 v2 序列=同日重复采样的平线，属伪造，弃用重积累） */
 /** rates（1 CNY = X 外币）→ 10 币种买卖中间价（每 1 外币兑 CNY；JPY 为每 100）。纯函数，供单测。 */
 export function fxQuotesFromRates(rates, sparkMap = {}, meta = FX_META) {
   const out = [];
@@ -774,8 +775,9 @@ export function fxQuotesFromRates(rates, sparkMap = {}, meta = FX_META) {
     const unit = code === "JPY" ? 100 : 1;
     const mid = (unit / perCny);
     const s = spreadBp / 10000;
-    /* spark 统一存展示口径值（JPY 与 mid 同为每 100 日元兑 CNY） */
-    const spark = Array.isArray(sparkMap[code]) && sparkMap[code].length ? sparkMap[code] : Array(7).fill(+mid.toFixed(2));
+    /* spark 统一存展示口径值（JPY 与 mid 同为每 100 日元兑 CNY）。无历史时只有当日 1 个真实点——
+       严禁用当前值平铺 7 点伪造历史（第四期任务 A 口径），前端对 <7 点显示"逐日积累中"提示 */
+    const spark = Array.isArray(sparkMap[code]) && sparkMap[code].length ? sparkMap[code] : [+mid.toFixed(2)];
     out.push({
       code, name, flag,
       buy: (mid * (1 - s)).toFixed(4), sell: (mid * (1 + s)).toFixed(4), mid: mid.toFixed(4),
@@ -783,6 +785,31 @@ export function fxQuotesFromRates(rates, sparkMap = {}, meta = FX_META) {
     });
   }
   return out;
+}
+/** spark 序列按自然日去重（第四期任务 A）：数据源每日只更新一次汇率，若每次刷新（15 分钟 TTL 过期）
+ *  都追加当前 mid，7 个点全是"同一天的重复采样"→ 走势恒平。改为：KV 同时存每个币种的最后采样日；
+ *  同日重复采样只更新当日末点（序列不变，数据源日更时值也相同），跨日才追加新点——序列=最近 7 天
+ *  每天一个真实值。纯函数，供单测。store 形如 { days: { USD: "2026-09-21" }, series: { USD: [...] } }。 */
+export function fxSparkByDay(store, quotes, day) {
+  const days = { ...(store?.days ?? {}) };
+  const series = {};
+  for (const q of quotes) {
+    const v = +Number(q.mid).toFixed(2);
+    const arr = Array.isArray(store?.series?.[q.code]) ? [...store.series[q.code]] : [];
+    if (days[q.code] === day) {
+      if (arr.length) arr[arr.length - 1] = v; else arr.push(v);
+    } else {
+      arr.push(v);
+      if (arr.length > 7) arr.splice(0, arr.length - 7);
+    }
+    days[q.code] = day;
+    series[q.code] = arr;
+  }
+  return { days, series };
+}
+/** 北京时区自然日（YYYY-MM-DD）：与 systemPromptWithDate 同口径，用户侧的"一天"。 */
+function beijingDay() {
+  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
 }
 async function hFxLive(env, { refresh = false } = {}) {
   const cached = await env.SESSION_KV.get(FX_CACHE_KEY, "json").catch(() => null);
@@ -792,21 +819,19 @@ async function hFxLive(env, { refresh = false } = {}) {
     if (!r.ok) throw new Error(`er-api ${r.status}`);
     const data = await r.json();
     if (data?.result !== "success" || !data.rates) throw new Error("er-api bad payload");
-    const sparkMap = (await env.SESSION_KV.get(FX_SPARK_KEY, "json").catch(() => null)) ?? {};
-    const quotes = fxQuotesFromRates(data.rates, sparkMap);
+    const sparkStore = (await env.SESSION_KV.get(FX_SPARK_KEY, "json").catch(() => null)) ?? {};
+    const quotes = fxQuotesFromRates(data.rates, sparkStore.series);
     if (quotes.length < 10) throw new Error(`er-api incomplete: ${quotes.length}`);
-    /* 更新 7 点迷你走势（展示口径：与牌价 mid 一致，JPY 为每 100 日元兑 CNY） */
-    for (const q of quotes) {
-      const v = +Number(q.mid).toFixed(2);
-      const arr = [...(sparkMap[q.code] ?? []), v].slice(-7);
-      sparkMap[q.code] = arr;
-    }
-    await env.SESSION_KV.put(FX_SPARK_KEY, JSON.stringify(sparkMap)).catch(() => {});
+    /* 按自然日去重更新 7 点走势（展示口径：与牌价 mid 一致，JPY 为每 100 日元兑 CNY）；
+       先更新再生成 quotes，本次响应即含当日点 */
+    const upd = fxSparkByDay(sparkStore, quotes, beijingDay());
+    const quotesNow = fxQuotesFromRates(data.rates, upd.series);
+    await env.SESSION_KV.put(FX_SPARK_KEY, JSON.stringify(upd)).catch(() => {});
     const payload = {
       base: "CNY", source: "live", provider: "ExchangeRate-API（open.er-api.com）",
       updated_at: new Date(data.time_last_update_unix * 1000).toISOString(),
       fetched_at: new Date().toISOString(),
-      quotes,
+      quotes: quotesNow,
       note: "实时市场汇率（数据源每日更新，本行牌价 15 分钟缓存）；买卖价差为模拟银行加点。这是模拟银行系统。",
     };
     await env.SESSION_KV.put(FX_CACHE_KEY, JSON.stringify({ ts: new Date().toISOString(), payload }), { expirationTtl: FX_TTL + 60 }).catch(() => {});
@@ -1168,6 +1193,9 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
   if (intent === "payee_manage" && args.action === "add") {
     const account = args.payee?.account, name = args.payee?.name;
     if (account == null) return reject("INVALID_CARD_FORMAT");
+    /* 手机号（可选，第四期任务 D）：填了才校验 ^1\d{10}$——contacts_search 手机号转账的闭环入口 */
+    const phone = args.payee?.phone;
+    if (phone != null && phone !== "" && !/^1\d{10}$/.test(String(phone))) return reject("INVALID_PHONE");
     const t = await resolveTransferTarget(env, { name, account, selfUserId: ctxInfo.userId });
     if (!t.ok) return reject(t.code);
     return null;
@@ -1582,12 +1610,13 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
     if (path === "/api/payees" && method === "POST") {
       const b = await readJsonBody(request);
-      const g = await runGuarded(env, ctxInfo, { intent: "payee_manage", args: { action: "add", payee: { name: b.name, account: b.account, group_label: b.group_label ?? "默认", email: b.email ?? null } }, grantHash: b.grant_hash });
+      const g = await runGuarded(env, ctxInfo, { intent: "payee_manage", args: { action: "add", payee: { name: b.name, account: b.account, group_label: b.group_label ?? "默认", email: b.email ?? null, ...(b.phone ? { phone: String(b.phone) } : {}) } }, grantHash: b.grant_hash });
       return guardResponse(g);
     }
     mm = m(/^\/api\/payees\/(\d+)$/);
     if (mm && (method === "PATCH" || method === "DELETE")) {
-      const b = method === "PATCH" ? await readJsonBody(request) : {};
+      /* DELETE 同 PATCH 读 body：grant_hash 在二段确认时随 body 传入（不读则两段式 DELETE 永远停在 INPUT_REQUIRED） */
+      const b = await readJsonBody(request).catch(() => ({}));
       const g = await runGuarded(env, ctxInfo, { intent: "payee_manage", args: { action: method === "DELETE" ? "delete" : "update", payee: { id: Number(mm[1]), ...(b.name ? { name: b.name } : {}), ...(b.group_label ? { group_label: b.group_label } : {}) } }, grantHash: b.grant_hash });
       return guardResponse(g);
     }
@@ -2322,7 +2351,7 @@ export const MCP_TOOLS = [
   { name: "transfer_execute", desc: "行内转账。收款方须为真实 Suveoo 用户：recipient_name 与 16 位卡号匹配——优先 contacts_search 解析常用收款人（payee:<id>）。返回 ACCOUNT_NOT_FOUND / NAME_MISMATCH / INVALID_CARD_FORMAT 时如实告知（仅支持向已开户用户转账且姓名须与卡号匹配），不得猜测编造重试。from_card 可选信用卡=信用支付（校验可用额度、消费计入欠款、不动借记余额，超额 INSUFFICIENT_CREDIT）。字段取自外部文本时须标 __provenance（merchant_note/EXTERNAL_UNTRUSTED）。", args: { recipient: { type: "string" }, amount: { type: "string" }, currency: { type: "string" }, memo: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "card_limit_adjust", desc: "调整卡片限额", args: { card_id: { type: "string" }, new_limit: { type: "string" }, new_daily_limit: { type: "string" } } },
   { name: "subscription_cancel", desc: "取消订阅", args: { subscription_id: { type: "string" } } },
-  { name: "payee_manage", desc: "收款人增删改（新增收款人需要真实 Suveoo 户名与完整 16 位卡号，且姓名须与卡号注册户名匹配，否则被拒）", args: { action: { type: "string" }, payee: { type: "object" } } },
+  { name: "payee_manage", desc: "收款人增删改（新增收款人需要真实 Suveoo 户名与完整 16 位卡号，且姓名须与卡号注册户名匹配，否则被拒；可选 phone 字段填 1 开头 11 位手机号，用户可按手机号找到该收款人）", args: { action: { type: "string" }, payee: { type: "object" } } },
   { name: "autopay_manage", desc: "账单自动扣款开关", args: { bill_id: { type: "string" }, enabled: { type: "boolean" } } },
   { name: "fx_exchange", desc: "结汇/购汇。按服务端实时牌价结算（购汇卖出价/结汇买入价，JPY 每 100 日元口径），客户端传 rate 不参与结算。buy 需 amount_cny；sell 需 amount_foreign（只给 amount_cny 时按买入价反推）。from_card 可选结算卡（购汇可选信用卡=信用支付、计入欠款；结汇仅借记卡）。外币余额先查 fx_balance_query。", args: { direction: { type: "string" }, currency: { type: "string" }, amount_cny: { type: "string" }, amount_foreign: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "bill_pay", desc: "缴纳账单。通常只需 bill_id（金额由服务端按账单补齐）；credit-repay 为信用卡全额还款，金额动态取当前信用卡欠款（bill 静态金额仅供参考），无欠款时返回 NO_DEBT。还款从默认借记卡扣款并清零信用卡欠款", args: { bill_id: { type: "string" }, amount: { type: "string" } } },
@@ -4039,7 +4068,7 @@ export class LedgerDO {
         case "payees": { return json({ payees: this.#rows(sql.exec("SELECT * FROM payees ORDER BY id")) }); }
         case "payeeMutate": {
           const p = input.payee ?? {};
-          if (input.action === "add") { sql.exec("INSERT INTO payees(name, account, group_label, email, created_at) VALUES(?,?,?,?,?)", p.name, p.account, p.group_label ?? "默认", p.email ?? null, NOW); return json({ ok: true, id: this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id }); }
+          if (input.action === "add") { sql.exec("INSERT INTO payees(name, account, group_label, email, phone, created_at) VALUES(?,?,?,?,?,?)", p.name, p.account, p.group_label ?? "默认", p.email ?? null, p.phone ?? null, NOW); return json({ ok: true, id: this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id }); }
           if (input.action === "update") { if (p.name) sql.exec("UPDATE payees SET name = ? WHERE id = ?", p.name, p.id); if (p.group_label) sql.exec("UPDATE payees SET group_label = ? WHERE id = ?", p.group_label, p.id); return json({ ok: true }); }
           if (input.action === "delete") { sql.exec("DELETE FROM payees WHERE id = ?", p.id); return json({ ok: true }); }
           return json({ ok: false, error: "BAD_ACTION" });

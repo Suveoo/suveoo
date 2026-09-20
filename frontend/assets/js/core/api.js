@@ -83,13 +83,15 @@ S.api = {
    * 两段式写操作：INPUT_REQUIRED → 弹确认卡（红级含 OTP）→ 带 grant_hash 重试。
    * 返回最终响应（或 {cancelled:true}）。这是表单通道走五道验证的统一入口。
    * opts.action/opts.subject 为确认卡展示提示（如存款页 action="deposit"）；缺省按 IR intent 推导。
+   * opts.method 指定 HTTP 方法（默认 POST）——PATCH/DELETE 路由（收款人删除、卡片别名/默认卡）
+   * 必须显式传，否则首段即 501（曾致 UI 删除收款人/改别名静默失败）。
    */
-  async mutate(path, body, { onEvent = null, action = null, subject = null } = {}) {
-    let r = await this.post(path, body);
+  async mutate(path, body, { onEvent = null, action = null, subject = null, method = "POST" } = {}) {
+    let r = await this.req(method, path, body === undefined ? {} : body);
     if (r.data && r.data.status === "INPUT_REQUIRED") {
       const confirmed = await S.consent.modal(r.data, { onEvent, action, subject });
       if (!confirmed) return { cancelled: true };
-      r = await this.post(path, { ...body, grant_hash: r.data.grant.grant_hash, otp: confirmed.otp || undefined });
+      r = await this.req(method, path, { ...body, grant_hash: r.data.grant.grant_hash, otp: confirmed.otp || undefined });
     } else if (r.data && r.data.status === "OTP_REQUIRED") {
       S.ui.toast(S.t("consent.otpToast"), true);
     }

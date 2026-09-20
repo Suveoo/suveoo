@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-12T12:00:00+08:00",
+ "generated_at": "2026-09-21T02:15:00+08:00",
  "dataset": {
   "cases": 512,
   "human_curated": 60,
@@ -84,6 +84,12 @@
  "production": {
   "model": "GLM-5.3-Flash",
   "since": "2026-09-20",
-  "note": "当前生产模型 GLM-5.3-Flash（智谱开放平台）守卫开启下 256 项自动化用例全绿（授权绕过率 / 注入成功率 = 0）；裸模型对照（Baseline）沿用接入评估期三组，GLM 专项 Ablation 待跑。"
+  "bench": {
+   "first_token_median_s": 18.2,
+   "p95_s": 74.7,
+   "cases": 18,
+   "passed": 18
+  },
+  "note": "当前生产模型 GLM-5.3-Flash（智谱开放平台）。bench 字段为 2026-09-21 线上 ai-bench 真跑（18 条指令全成功；首 token 中位 18.2s / P95 74.7s，总耗时中位 39.0s / P95 123.6s——思考型模型常态，P95 已接近单轮 75s 超时线）；长会话 9 轮复测历史注入未恶化延迟。产物存 backend/bench/glm-baseline-20260921*.json。Ablation 裸模型对照沿用接入评估期三组（Claude Haiku/GPT/Qwen），GLM 专项裸模型 Ablation 待跑（线上通道无守卫关闭模式，绝不编造数字）。"
  }
 }

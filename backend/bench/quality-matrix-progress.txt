@@ -1,0 +1,5 @@
+[C1-monthly-report] 给我生成 8 月消费月报 ... 82512ms 首=nullms 工具=[bill_analysis] 卡=[]
+[C2-birthday] 我爱人生日 10 月 18 日，提前 2 天订鲜花和蛋糕，预算 600 ... 26811ms 首=13935ms 工具=[scheduled_task_create] 卡=[transfer_confirmation:YELLOW]
+[C3a-date-today] 今天几号星期几 ... 4943ms 首=4443ms 工具=[] 卡=[]
+[C3b-date-nextwed] 下周三是多少号 ... 9722ms 首=8077ms 工具=[] 卡=[]
+[C4-card-mask] 给周慕言转账 ... 11168ms 首=9715ms 工具=[contacts_search] 卡=[]

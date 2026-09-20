@@ -9,7 +9,8 @@ S.i18n = {
   ],
   t(key, ...args) {
     let s = this.dict[key] ?? key;
-    args.forEach((v, i) => { s = s.replace(`{${i}}`, v); });
+    /* split/join 全量替换：同一占位符出现多次时都要替换（String.replace 只换首个，"成功 {3}/{0}"曾漏尾个 {0}） */
+    args.forEach((v, i) => { s = s.split(`{${i}}`).join(v); });
     return s;
   },
   async init() {

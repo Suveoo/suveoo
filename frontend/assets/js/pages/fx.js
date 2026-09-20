@@ -40,11 +40,13 @@ S.router.register("fx", async () => {
     else { u.textContent = S.t("fx.updated", S.fmt.datetime(fx.updated_at)); s.textContent = fx.source ?? ""; }
   };
   const renderTable = () => {
+    /* 序列按自然日逐日积累（服务端去重采样）：不足 7 点时如实提示"积累中"，不伪造历史填充 */
+    const accumulating = fx.quotes.some((q) => (q.spark ?? []).length < 7);
     document.getElementById("tbl").innerHTML = `<table class="table"><thead><tr>
       <th></th><th>${S.fmt.escape(S.t("fx.buy"))}</th><th>${S.fmt.escape(S.t("fx.sell"))}</th><th>${S.fmt.escape(S.t("fx.mid"))}</th><th>7D</th></tr></thead><tbody>
       ${fx.quotes.map((q) => `<tr><td><img class="fx-flag" src="${q.flag}" alt="">${S.fmt.escape(q.name)}</td>
         <td class="mono">${q.buy}</td><td class="mono">${q.sell}</td><td class="mono">${q.mid}</td><td>${S.charts.spark(q.spark, { color: "auto" })}</td></tr>`).join("")}
-      </tbody></table>`;
+      </tbody></table>${accumulating ? `<div class="muted small" style="padding:8px 12px">${S.fmt.escape(S.t("fx.sparkAccumulating"))}</div>` : ""}`;
   };
   const buildSelect = () => {
     const fresh = S.ctl.select({

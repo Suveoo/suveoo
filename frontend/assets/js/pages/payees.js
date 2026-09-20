@@ -25,7 +25,8 @@ S.router.register("payees", async () => {
     S.ui.$$(".go").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
     S.ui.$$(".del").forEach((b) => {
       b.onclick = async () => {
-        const r2 = await S.api.mutate(`/api/payees/${b.dataset.id}`, {}, );
+        /* DELETE 路由（非 POST）：显式传 method，否则首段 501、确认卡流程走不通 */
+        const r2 = await S.api.mutate(`/api/payees/${b.dataset.id}`, {}, { method: "DELETE" });
         if (r2.cancelled) return;
         if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); render(); }
         else S.ui.toast(r2.data?.reason ?? "failed", true);
@@ -42,6 +43,7 @@ S.router.register("payees", async () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("payees.add"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span><input class="input" id="p-name" placeholder="${S.fmt.escape(S.t("payees.namePh"))}"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.accountNo"))}</span><input class="input mono" id="p-acct" placeholder="${S.fmt.escape(S.t("payees.accountPh"))}" maxlength="16"></label>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("payees.phone"))}</span><input class="input mono" id="p-phone" placeholder="13800000000" maxlength="11" inputmode="numeric"></label>
       <div class="field-hint">${S.fmt.escape(S.t("payees.hintReal"))}</div>
       <label class="field" style="margin-top:14px"><span class="lb">${S.fmt.escape(S.t("payees.group"))}</span>
         <span id="p-group"></span>
@@ -62,7 +64,10 @@ S.router.register("payees", async () => {
     m.el.querySelector("#ok").onclick = async () => {
       const customG = m.el.querySelector("#p-group-custom").value.trim();
       const group = groupSel.value === CUSTOM ? (customG || S.t("payees.group.other")) : groupSel.value;
-      const body = { name: m.el.querySelector("#p-name").value.trim(), account: m.el.querySelector("#p-acct").value.replace(/\s/g, ""), group_label: group };
+      const phone = m.el.querySelector("#p-phone").value.trim();
+      /* 手机号可选：填了才校验（1 开头 11 位），与服务端 INVALID_PHONE 同口径 */
+      if (phone && !/^1\d{10}$/.test(phone)) { S.ui.toast(S.t("payees.badPhone"), true); return; }
+      const body = { name: m.el.querySelector("#p-name").value.trim(), account: m.el.querySelector("#p-acct").value.replace(/\s/g, ""), group_label: group, ...(phone ? { phone } : {}) };
       if (!body.name || !/^\d{16}$/.test(body.account)) { S.ui.toast(S.t("transfer.invalidAccount"), true); return; }
       const r2 = await S.api.mutate("/api/payees", body);
       if (r2.cancelled) return;

@@ -51,17 +51,26 @@ async function login() {
 
 async function runInstruction(token, text, idx, sidOverride = null) {
   const t0 = Date.now();
-  const res = await fetch(`${BASE}/api/ai/chat`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ text, session_id: sidOverride ?? `bench_r20_${idx}_${Date.now().toString(36)}` }),
-    signal: AbortSignal.timeout(150_000),
-  });
   const m = {
     firstTokenMs: null, totalMs: null, tokenEvents: 0, chars: 0,
     proposed: 0, resultEvents: 0, cards: [], errors: [], doneAt: null,
-    firstTrustMs: null, answer: "", httpStatus: res.status,
+    firstTrustMs: null, answer: "", httpStatus: null,
   };
+  /* 客户端 150s 超时/网络异常不再炸整轮（曾致 17 条数据随内存丢失）——记为错误行继续 */
+  let res;
+  try {
+    res = await fetch(`${BASE}/api/ai/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text, session_id: sidOverride ?? `bench_r20_${idx}_${Date.now().toString(36)}` }),
+      signal: AbortSignal.timeout(150_000),
+    });
+  } catch (e) {
+    m.errors.push(`FETCH:${e?.name ?? e?.message}`);
+    m.totalMs = Date.now() - t0;
+    return m;
+  }
+  m.httpStatus = res.status;
   if (!res.ok || !res.body) {
     m.errors.push(`HTTP ${res.status}`);
     m.totalMs = Date.now() - t0;
@@ -166,6 +175,9 @@ if (args.includes("--long")) {
 
 const out = [];
 let idx = 0;
+/* 逐行落盘：任一条崩溃/中断，已完成行已在 JSON 里（跑批挂机性质的保险） */
+import * as nodeFs from "node:fs";
+const saveProgress = () => nodeFs.writeFileSync(outPath, JSON.stringify(out, null, 2), "utf-8");
 for (const [scenario, texts] of SCENARIOS) {
   for (const text of texts) {
     idx++;
@@ -174,6 +186,7 @@ for (const [scenario, texts] of SCENARIOS) {
     const m = await runInstruction(token, text, idx);
     const row = { n: idx, scenario, text, ...m, status: classify(m) };
     out.push(row);
+    saveProgress();
     console.error(`${m.totalMs}ms 首token=${m.firstTokenMs}ms tok=${m.tokenEvents} 工具=${m.proposed} → ${row.status}`);
     await new Promise((r) => setTimeout(r, 1500));
   }

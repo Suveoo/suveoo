@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fxQuotesFromRates } from "../../worker-main.js";
+import { fxQuotesFromRates, fxSparkByDay } from "../../worker-main.js";
 /* workerd 沙箱内 fs 只能读 bundle 文件，故 16 只基金 JSON 走静态 import（构建期打包） */
 import f01 from "../../../frontend/assets/data/funds/global-money-1.json";
 import f02 from "../../../frontend/assets/data/funds/global-short-bond.json";
@@ -118,10 +118,53 @@ describe("fxQuotesFromRates（实时汇率 → 牌价）", () => {
     expect(Number(usd.mid) - Number(usd.buy)).toBeCloseTo(Number(usd.mid) * 0.0035, 6);
   });
 
-  it("spark 缺省时填充 7 点；提供历史时原样透传", () => {
+  it("spark 缺省时只有当日 1 个真实点（不伪造历史平铺）；提供历史时原样透传", () => {
     const noSpark = fxQuotesFromRates({ USD: 0.14 });
-    expect(noSpark[0].spark).toHaveLength(7);
+    expect(noSpark[0].spark).toHaveLength(1); /* 严禁用当前值平铺 7 点伪造历史（第四期任务 A 口径） */
+    expect(noSpark[0].spark[0]).toBeCloseTo(1 / 0.14, 2);
     const withSpark = fxQuotesFromRates({ USD: 0.14 }, { USD: [7.1, 7.12, 7.09, 7.13, 7.1, 7.11, 7.14] });
     expect(withSpark[0].spark).toEqual([7.1, 7.12, 7.09, 7.13, 7.1, 7.11, 7.14]);
+  });
+});
+
+describe("fxSparkByDay（spark 序列按自然日去重——第四期任务 A）", () => {
+  const rates = { USD: 0.1487, JPY: 21.22 };
+  const quotesOf = (mids) => mids.map(([code, mid]) => ({ code, mid: String(mid) }));
+
+  it("同日多次采样序列不变（只更新当日末点，数据源日更时值相同）", () => {
+    const store0 = fxSparkByDay({}, quotesOf([["USD", 6.7252]]), "2026-09-21");
+    expect(store0.series.USD).toEqual([6.73]);
+    const store1 = fxSparkByDay(store0, quotesOf([["USD", 6.7252]]), "2026-09-21");
+    expect(store1.series.USD).toEqual([6.73]); /* 同日重复采样：序列长度与值均不变 */
+    const store2 = fxSparkByDay(store1, quotesOf([["USD", 6.7252]]), "2026-09-21");
+    expect(store2.series.USD).toEqual([6.73]);
+  });
+
+  it("跨日追加新点：序列 = 每天一个真实值，最多保留 7 天", () => {
+    let store = {};
+    for (let d = 1; d <= 9; d++) {
+      const day = `2026-09-${String(d).padStart(2, "0")}`;
+      const mid = 6.7 + d * 0.01;
+      store = fxSparkByDay(store, quotesOf([["USD", mid]]), day);
+    }
+    expect(store.series.USD).toHaveLength(7); /* 第 1/2 天滑出窗口，保留第 3-9 天 */
+    expect(store.series.USD).toEqual([6.73, 6.74, 6.75, 6.76, 6.77, 6.78, 6.79]);
+    expect(store.days.USD).toBe("2026-09-09");
+  });
+
+  it("同日数据源更新时当日末点被最新值替换（不追加）", () => {
+    const store0 = fxSparkByDay({}, quotesOf([["USD", 6.7]]), "2026-09-21");
+    const store1 = fxSparkByDay({ ...store0, days: { USD: "2026-09-20" }, series: { USD: [6.7] } }, quotesOf([["USD", 6.75]]), "2026-09-21");
+    /* days 记录已是 09-21 的场景：再次采样只更新末点 */
+    const store2 = fxSparkByDay(store1, quotesOf([["USD", 6.75]]), "2026-09-21");
+    expect(store2.series.USD[store2.series.USD.length - 1]).toBe(6.75);
+    expect(store2.series.USD).toHaveLength(store1.series.USD.length);
+  });
+
+  it("JPY 口径与 mid 一致（每 100 日元兑 CNY），多币种独立累计", () => {
+    const store = fxSparkByDay({}, quotesOf([["USD", 6.7252], ["JPY", 4.7115]]), "2026-09-21");
+    expect(store.series.USD).toEqual([6.73]);
+    expect(store.series.JPY).toEqual([4.71]);
+    expect(store.days).toEqual({ USD: "2026-09-21", JPY: "2026-09-21" });
   });
 });
