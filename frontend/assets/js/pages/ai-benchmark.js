@@ -9,7 +9,7 @@ S.router.register("ai-benchmark", async () => {
     <div class="card">${S.ui.skeleton(2)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("bench.dataset"))}</h2></div>
     <div class="card" id="ds"></div>
-    <p class="muted small" id="ds-note" style="display:none;margin:-6px 0 10px"></p>
+    <p class="muted small" id="ds-note" style="display:none;margin:8px 0 10px"></p>
     <div class="section-title"><h2>${S.fmt.escape(S.t("bench.method"))}</h2></div>
     <div class="card" id="method"></div>`;
   const d = await S.api.json("/assets/data/benchmark.json");
