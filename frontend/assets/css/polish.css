@@ -157,7 +157,7 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
   }
   .ai-layout { display: block; }
   .mobile-tabs { position: sticky; top: 56px; z-index: 60; margin: 0 0 var(--sp-2); box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
-  .chat-area { height: auto; min-height: 0; }
+  .chat-area { height: auto; min-height: 0; background: transparent; border: none; box-shadow: none; border-radius: 0; } /* 去壳：对话区与白页融为一体 */
   .chat-thread { overflow: visible; height: auto; }
   .composer-hint { display: none; }
   .chat-composer {
@@ -174,7 +174,10 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     /* 平板纵向（768-1023）：side drawer 显示，恢复 248px 让位（外层 padding 简写会覆盖掉 layout.css 的让位值，
        曾导致对话内容被抽屉盖住）；输入条与全屏抽屉同步避开抽屉列与 64px 桌面 header */
     .mobile-tabs { top: 64px; }
-    .chat-composer { left: calc(248px + var(--sp-3)); right: var(--sp-4); bottom: calc(10px + env(safe-area-inset-bottom)); }
+    /* 平板对话列 ~720px 居中：消息列/头栏/固定输入条三者对齐（composer 收 max() 让位侧栏与居中取大者） */
+    .chat-thread { padding-left: max(var(--sp-4), calc((100% - 720px) / 2)); padding-right: max(var(--sp-4), calc((100% - 720px) / 2)); }
+    .chat-head { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; }
+    .chat-composer { left: max(calc(248px + var(--sp-3)), calc(50% - 348px)); right: max(var(--sp-4), calc(50% - 348px)); bottom: calc(10px + env(safe-area-inset-bottom)); }
     body[data-page="ai"] .page { padding: var(--sp-6) var(--sp-4) calc(120px + env(safe-area-inset-bottom)) calc(248px + var(--sp-6)); }
     .trust-console { top: 64px; }
   }
@@ -475,11 +478,14 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   .chat-head .hh-short { display: inline; }
 }
 
+/* 手机头栏融入页面（ChatGPT 式无边框）；发丝线只在保留卡壳的桌面出现。注意不能嵌进上方 ≤1023 块——CSS 媒体查询不可嵌套（旧 webview 直接丢弃整条） */
+@media (max-width: 767px) { .chat-head { border-bottom: none; } }
+
 /* 桌面下拉面板（≥1024）：宽同对话卡、紧贴头栏下缘（桌面无 mobile-tabs）、max-height 60vh 滚动 */
 .hist-drop { display: none; }
 @media (min-width: 1024px) {
   .chat-area { position: relative; }
-  .hist-drop { display: block; position: absolute; top: 44px; left: 0; right: 0; z-index: var(--z-dropdown); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow-lg); max-height: 60vh; overflow-y: auto; padding: 6px 0; animation: fade-in .15s ease-out both; }
+  .hist-drop { display: block; position: absolute; top: 44px; left: 50%; right: auto; transform: translateX(-50%); width: min(100%, 768px); z-index: var(--z-dropdown); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow-lg); max-height: 60vh; overflow-y: auto; padding: 6px 0; animation: fade-in .15s ease-out both; }
 }
 
 /* 移动/平板全屏抽屉（≤1023）：复用 Trust Console 抽屉几何（避开移动 header 与底导航），与 TC 抽屉互斥 */

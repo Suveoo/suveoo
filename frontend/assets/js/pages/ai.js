@@ -325,7 +325,6 @@ S.router.register("ai", async ({ user }) => {
     }
     const node = S.genui.render(card);
     if (!node) return;
-    node.style.maxWidth = "82%";
     node.style.alignSelf = "flex-start";
     if (card._status && STATUS_META[card._status]) {
       const [key, cls] = STATUS_META[card._status];
@@ -475,7 +474,7 @@ S.router.register("ai", async ({ user }) => {
       onGenui: (card) => {
         flush(); /* 卡片插入前先追平当前文本，保持"文→卡"顺序自然 */
         const node = S.genui.render(card);
-        if (node) { node.style.maxWidth = "82%"; node.style.alignSelf = "flex-start"; thread.appendChild(node); scroll(); }
+        if (node) { node.style.alignSelf = "flex-start"; thread.appendChild(node); scroll(); }
         if (card && card.component === "transfer_confirmation" && card.grant_hash) attachConfirm(card, aiMsg);
       },
       onTrust: (ev) => S.trust.onEvent(ev),
@@ -491,7 +490,7 @@ S.router.register("ai", async ({ user }) => {
 
   /* GenUI 确认卡：回传 grant_hash 完成两段式（AI 通道） */
   function attachConfirm(card, aiMsg) {
-    const bar = S.ui.el(`<div class="gc-actions" style="max-width:82%">
+    const bar = S.ui.el(`<div class="gc-actions">
       <button class="btn btn-sm btn-ghost" id="gc-cancel">${S.fmt.escape(S.t("common.cancel"))}</button>
       <button class="btn btn-sm btn-primary" id="gc-ok">${S.fmt.escape(S.t("consent.confirm"))}</button></div>`);
     aiMsg.insertAdjacentElement("afterend", bar);
