@@ -31,5 +31,6 @@
   --shadow: 0 1px 2px rgba(23, 27, 64, .04), 0 6px 20px rgba(23, 27, 64, .07);
   --shadow-lg: 0 2px 4px rgba(23, 27, 64, .05), 0 12px 32px rgba(23, 27, 64, .12);
   --grad-primary: linear-gradient(135deg, #1E2A78, #35479E);
-  --z-header: 100; --z-dropdown: 200; --z-modal: 300; --z-toast: 400;
+  /* z 层级律：header < dropdown(浮层) < drawer(全屏抽屉) < modal(确认弹窗必须盖住一切常规 UI) < toast */
+  --z-header: 100; --z-dropdown: 200; --z-drawer: 250; --z-modal: 300; --z-toast: 400;
 }

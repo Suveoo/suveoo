@@ -187,7 +187,7 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     bottom: calc(64px + env(safe-area-inset-bottom));
     left: 0;
     right: 0;
-    z-index: calc(var(--z-modal) + 10);
+    z-index: var(--z-drawer);
     height: auto;
     max-height: none;
     border-radius: 0;
@@ -216,9 +216,10 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
 @media (min-width: 1024px) { .tc-close { display: none; } }
 body.tc-open { overflow: hidden; }
 
-/* ===== 13. 控制台抽屉打开时底导航整体置于抽屉之上（仅 /ai 页；AI 圆钮负 margin 突入抽屉保持可点，几何上其余三钮不与抽屉重叠） ===== */
+/* ===== 13. /ai 底导航置于抽屉层之上（AI 圆钮负 margin 突入抽屉保持可点，几何上其余三钮不与抽屉重叠）；
+   抽屉层 --z-drawer(250) 与底导航 260 都在模态(300)之下——删除确认等弹窗可正常盖住两者 ===== */
 @media (max-width: 767px) {
-  body[data-page="ai"] .bottom-nav { z-index: calc(var(--z-modal) + 20); }
+  body[data-page="ai"] .bottom-nav { z-index: calc(var(--z-drawer) + 10); }
   .trust-console .tc-events { padding-bottom: 12px; }
 }
 
@@ -478,13 +479,13 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .hist-drop { display: none; }
 @media (min-width: 1024px) {
   .chat-area { position: relative; }
-  .hist-drop { display: block; position: absolute; top: 44px; left: 0; right: 0; z-index: calc(var(--z-modal) + 5); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow-lg); max-height: 60vh; overflow-y: auto; padding: 6px 0; animation: fade-in .15s ease-out both; }
+  .hist-drop { display: block; position: absolute; top: 44px; left: 0; right: 0; z-index: var(--z-dropdown); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow-lg); max-height: 60vh; overflow-y: auto; padding: 6px 0; animation: fade-in .15s ease-out both; }
 }
 
 /* 移动/平板全屏抽屉（≤1023）：复用 Trust Console 抽屉几何（避开移动 header 与底导航），与 TC 抽屉互斥 */
 .hist-drawer { display: none; }
 @media (max-width: 1023px) {
-  .hist-drawer { position: fixed; top: calc(56px + env(safe-area-inset-top)); bottom: calc(64px + env(safe-area-inset-bottom)); left: 0; right: 0; z-index: calc(var(--z-modal) + 10); background: #fff; flex-direction: column; }
+  .hist-drawer { position: fixed; top: calc(56px + env(safe-area-inset-top)); bottom: calc(64px + env(safe-area-inset-bottom)); left: 0; right: 0; z-index: var(--z-drawer); background: #fff; flex-direction: column; }
   .hist-drawer.open { display: flex; animation: fade-in .18s ease-out both; }
 }
 .hist-drawer .hd-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--color-line); flex: none; }
