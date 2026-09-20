@@ -297,7 +297,7 @@ export const TOOL_REGISTRY = {
   autopay_manage:         { tier: RISK.YELLOW },
   bill_pay:               { tier: RISK.YELLOW, amountArg: "amount" },
   funds_lock:             { tier: RISK.YELLOW, amountArg: "amount" },
-  scheduled_task_create:  { tier: RISK.YELLOW, amountArg: "amount" },
+  scheduled_task_create:  { tier: RISK.YELLOW, amountArg: "amount", dynamic: true },
   wealth_product_purchase:{ tier: RISK.RED, amountArg: "amount" },
   wealth_product_redeem:  { tier: RISK.RED, amountArg: "amount" },
   card_freeze:            { tier: RISK.RED },
@@ -320,14 +320,28 @@ export function classifyRisk(toolName, args = {}, ctx = {}) {
     let amount = 0n;
     if (reg.amountArg) { try { amount = toCents(args[reg.amountArg] ?? "0"); } catch { amount = 0n; } }
     const daily = ctx.dailyAccumulatedCents ?? 0n;
-    if (daily + amount > POLICY_LIMITS.YELLOW_DAILY_CENTS) {
+    /* 预约转账的日累计按"执行日"口径（赛题"日累计>¥1000 须红"）：execute_at 在未来日期时今日累计不计入——
+       明日执行的单笔仅自身 >¥1000 才红（它必然使执行日累计超限）；今日执行（含"31分钟后"）则今日累计+本笔合并判定。
+       此前 scheduled_task_create 未标 dynamic：¥1131.27 预约也出 YELLOW 卡（队长实测报告，违反赛题口径）。 */
+    let effDaily = daily;
+    if (toolName === "scheduled_task_create") {
+      try {
+        const at = new Date(args.execute_at ?? 0);
+        if (Number.isFinite(at.getTime())) {
+          const bj = new Date(Date.now() + 8 * 3600_000), atBj = new Date(at.getTime() + 8 * 3600_000);
+          const sameDay = bj.getUTCFullYear() === atBj.getUTCFullYear() && bj.getUTCMonth() === atBj.getUTCMonth() && bj.getUTCDate() === atBj.getUTCDate();
+          if (!sameDay) effDaily = 0n;
+        }
+      } catch { /* execute_at 解析失败按今日口径（从严） */ }
+    }
+    if (effDaily + amount > POLICY_LIMITS.YELLOW_DAILY_CENTS) {
       tier = RISK.RED;
-      reasons.push({ code: "DAILY_ACCUM_EXCEEDED", detail: `daily=${centsToStr(daily + amount)}` });
+      reasons.push({ code: "DAILY_ACCUM_EXCEEDED", detail: `daily=${centsToStr(effDaily + amount)}${effDaily !== daily ? "（预约执行日口径，不计今日累计）" : ""}` });
     }
   }
   return { tier, reasons };
 }
-const AI_CAP_TOOLS = new Set(["transfer_execute", "fx_exchange"]);
+const AI_CAP_TOOLS = new Set(["transfer_execute", "fx_exchange", "scheduled_task_create"]);
 export function hardPolicyDenials(toolName, args = {}, ctx = {}) {
   const denials = [];
   const reg = TOOL_REGISTRY[toolName];

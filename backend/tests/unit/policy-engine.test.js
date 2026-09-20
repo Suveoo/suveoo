@@ -62,3 +62,19 @@ describe("③ hardPolicyDenials 硬拒绝", () => {
     expect(POLICY_LIMITS.AI_DAILY_CENTS).toBe(1000000n);    // ¥10,000
   });
 });
+
+/* 第三十二轮：预约转账日累计升红（赛题口径"日累计>¥1000 须红"）——此前 scheduled_task_create 未标 dynamic，
+   ¥1131.27 预约也出 YELLOW（队长实测报告） */
+describe("预约转账三色分级（执行日口径）", () => {
+  it("今日执行（含 X 分钟后）：今日累计+本笔 >¥1000 → RED", () => {
+    const in30min = new Date(Date.now() + 30 * 60000).toISOString();
+    expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "1131.27", execute_at: in30min }, { dailyAccumulatedCents: 0n }).tier).toBe(RISK.RED);
+    expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "300", execute_at: in30min }, { dailyAccumulatedCents: 80000n }).tier).toBe(RISK.RED);
+    expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "300", execute_at: in30min }, { dailyAccumulatedCents: 0n }).tier).toBe(RISK.YELLOW);
+  });
+  it("未来日执行：不计今日累计（明日累计从零起算）——单笔 ≤¥1000 且今日已超 → YELLOW；单笔 >¥1000 恒 RED", () => {
+    const tomorrow = new Date(Date.now() + 86400_000 + 3600_000).toISOString();
+    expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "800", execute_at: tomorrow }, { dailyAccumulatedCents: 90000n }).tier).toBe(RISK.YELLOW);
+    expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "1200", execute_at: tomorrow }, { dailyAccumulatedCents: 0n }).tier).toBe(RISK.RED);
+  });
+});

@@ -248,3 +248,20 @@ describe("AI 任务取消（task_list / task_cancel）", () => {
     expect(JSON.stringify(inner5)).toContain("TASK_NOT_PENDING");
   }, 30000);
 });
+
+/* 第三十二轮：MCP 大额今日预约 → RED 强验证出卡（队长实测 ¥1131.27 出 YELLOW 的回归修复） */
+describe("预约转账日累计升红", () => {
+  it("今日执行 ¥1131.27 → RED 出卡（tier 字段）", async () => {
+    const out = await registerUser("st9@test.dev", "红级预约");
+    const to = await registerUser("st9to@test.dev", "收款红");
+    const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
+    const r = await j(await SELF.fetch(`${BASE}/mcp?sid=st9`, { method: "POST", headers: H, body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "scheduled_task_create", arguments: { task_type: "scheduled_transfer", title: "预约转账 · 红级测", execute_at: new Date(Date.now() + 31 * 60000).toISOString(), repeat: "once", transfer: { recipient_name: "收款红", recipient_account: toDebit.number, amount: "1131.27" } } },
+    }) }));
+    const inner = JSON.parse(r.result.content[0].text);
+    expect(inner.status).toBe("INPUT_REQUIRED");
+    expect(inner.card.tier).toBe("RED");
+  });
+});
