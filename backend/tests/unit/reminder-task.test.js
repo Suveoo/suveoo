@@ -50,14 +50,22 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
     ["外币先查余额", "外币余额先查 fx_balance_query"],
     /* 第二十六轮：历史数值可能过期——续聊上文注入后模型不得拿旧数值当现值答 */
     ["历史数值以实时为准", "历史对话中的数值仅代表当时"],
+    /* 第二十七轮：银行 AI 领域边界（对比文件 standard_ai_vs_bank_ai.md §二）——
+       无关通用请求（火龙果类闲聊）一句话拒答引导；危机场景不机械拒答；专业语气 */
+    ["领域边界拒答", "无关的通用请求"],
+    ["拒答含引导", "引导回可办业务"],
+    ["简单寒暄口径", "简单寒暄一句话得体回应"],
+    ["专业语气称您", "专业克制、称"],
+    ["危机不机械拒答", "不机械拒答、暂停办理"],
+    ["危机转人工", "转人工客服"],
   ];
   it("包含全部安全语义关键句", () => {
     for (const [name, phrase] of MUST_CONTAIN) {
       expect(AI_SYSTEM_PROMPT, `缺失语义：${name}`).toContain(phrase);
     }
   });
-  it("提示词瘦身达标（≤1500 字符，基线 1693；含反幻觉出卡约束）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1500);
+  it("提示词瘦身达标（≤1600 字符；第二十七轮自 1500 上调：新增领域边界/危机应对/专业语气是银行 AI 必需项，非瘦身回退，并同步精简既有措辞 -51 字符）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
   });
   it("工具 desc 总量瘦身达标（≤5200 字符，基线 5949）且数量不变（37）", () => {
     expect(MCP_TOOLS).toHaveLength(37);
