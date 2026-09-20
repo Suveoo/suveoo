@@ -23,7 +23,7 @@ S.chat = {
       return out;
     } catch { return null; }
   },
-  async send(text, { onToken, onGenui, onTrust, onDone, onError } = {}) {
+  async send(text, { onToken, onGenui, onTrust, onDone, onError, onThinking } = {}) {
     if (this.sending || !text.trim()) return;
     this.sending = true;
     const ctrl = new AbortController();
@@ -59,6 +59,7 @@ S.chat = {
           let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
           if (ev.type === "session") this.sid = ev.sid;
           else if (ev.type === "token") safe(() => onToken?.(ev.text));
+          else if (ev.type === "thinking") safe(() => onThinking?.());
           else if (ev.type === "genui_event") safe(() => onGenui?.(ev.card));
           else if (ev.type === "trust_event") safe(() => onTrust?.(ev.event));
           else if (ev.type === "error") safe(() => onError?.(ev.message || ev.code));

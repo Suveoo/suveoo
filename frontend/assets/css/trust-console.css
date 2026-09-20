@@ -58,6 +58,7 @@ body[data-page="ai"] .page { max-width: 1480px; padding-left: calc(248px + var(-
 .msg { font-size: 15px; line-height: 1.7; }
 .msg.user { max-width: 76%; }
 .msg.md { white-space: normal; }
+.msg.thinking .thk-txt { margin-left: 8px; color: var(--color-ink-2); font-size: 13px; }
 .chat-composer .input { font-size: 15px; }
 
 /* ---- 桌面（≥1024）：对话内容列 ~768px 居中（宽屏/TC 收起时防超长行；头栏与输入条同列对齐） ---- */

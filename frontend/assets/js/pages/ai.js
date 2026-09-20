@@ -470,6 +470,12 @@ S.router.register("ai", async ({ user }) => {
       setBusyUI(false);
     };
     await S.chat.send(text, {
+      /* 思考型模型（glm-5.3-flash）长思考期零文本输出：后端首个 thinking_delta 触发本事件，
+         把裸三点动画升级为"深度分析中"文案——消除"等很久没反应"的观感（思考本身不可关，实测参数被网关忽略） */
+      onThinking: () => {
+        if (aiMsg.classList.contains("thinking") && !aiMsg.textContent.trim())
+          aiMsg.innerHTML = `<span class="dots"><i></i><i></i><i></i></span><span class="thk-txt">${S.fmt.escape(S.t("ai.deepThinking"))}</span>`;
+      },
       onToken: (t) => { raw += t; kick(); },
       onGenui: (card) => {
         flush(); /* 卡片插入前先追平当前文本，保持"文→卡"顺序自然 */

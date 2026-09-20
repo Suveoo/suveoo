@@ -940,5 +940,6 @@
   "wealth.suitPrompt": "{0} 适合我吗",
   "wealth.title": "财富",
   "wealth.toolHub": "金融计算工具",
-  "wealth.viewHoldings": "查看持仓"
+  "wealth.viewHoldings": "查看持仓",
+  "ai.deepThinking": "Analyzing your request…"
 }

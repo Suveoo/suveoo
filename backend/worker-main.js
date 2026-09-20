@@ -1129,9 +1129,10 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     return null;
   }
   if (intent === "scheduled_task_create" && (args.task_type ?? "scheduled_transfer") === "scheduled_transfer") {
-    /* 预约时间须在未来（模型偶发把"后天"算成过去日期 → saga alarm 立即触发，违背预约语义） */
+    /* 预约时间须在未来（模型偶发把"后天"算成过去日期 → saga alarm 立即触发，违背预约语义）。
+       拒绝信息携带收发双端时刻与时区写法——模型拿到具体差异可当场自纠（重试正确时区），不再编造拒绝原因 */
     const when = Date.parse(args.execute_at ?? "");
-    if (Number.isFinite(when) && when < Date.now()) return reject("INVALID_SCHEDULE_TIME");
+    if (Number.isFinite(when) && when < Date.now()) return { ...reject("INVALID_SCHEDULE_TIME"), message: `预约时间无效：收到的 execute_at 解析为 ${new Date(when).toISOString()}，不晚于当前北京时间 ${new Date(Date.now() + 8 * 3600_000).toISOString().replace("Z", "+08:00")}。请核对时区换算——北京时间必须带 +08:00 偏移（如 2026-09-20T17:30:00+08:00），无偏移会被当 UTC 解析成过去时间。` };
     /* 预约转账与即时转账同一收款人真实性口径（Luhn+registry+户名匹配）：建单即拦截编造卡号，
        否则到点执行时资金会流向不存在的账户（无对手方入账，凭空消失） */
     const b = args.transfer ?? {};
@@ -2287,7 +2288,7 @@ export const MCP_TOOLS = [
   { name: "fx_exchange", desc: "结汇/购汇。按服务端实时牌价结算（购汇卖出价/结汇买入价，JPY 每 100 日元口径），客户端传 rate 不参与结算。buy 需 amount_cny；sell 需 amount_foreign（只给 amount_cny 时按买入价反推）。from_card 可选结算卡（购汇可选信用卡=信用支付、计入欠款；结汇仅借记卡）。外币余额先查 fx_balance_query。", args: { direction: { type: "string" }, currency: { type: "string" }, amount_cny: { type: "string" }, amount_foreign: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "bill_pay", desc: "缴纳账单。通常只需 bill_id（金额由服务端按账单补齐）；credit-repay 为信用卡全额还款，金额动态取当前信用卡欠款（bill 静态金额仅供参考），无欠款时返回 NO_DEBT。还款从默认借记卡扣款并清零信用卡欠款", args: { bill_id: { type: "string" }, amount: { type: "string" } } },
   { name: "funds_lock", desc: "锁定资金（长程任务预授权）", args: { amount: { type: "string" }, reason: { type: "string" }, task_id: { type: "number" } } },
-  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 含时区，repeat 取 \"once\"|\"monthly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日订花用 task_type=\"birthday_flower\"+item+amount，用户未给日期/预算时先问一句再建。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
+  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 带 +08:00 时区偏移（如 2026-09-20T17:30:00+08:00；无偏移会被当 UTC 解析成过去时间而拒绝），repeat 取 \"once\"|\"monthly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日订花用 task_type=\"birthday_flower\"+item+amount，用户未给日期/预算时先问一句再建。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
   { name: "wealth_product_purchase", desc: "申购理财（红级）", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "wealth_product_redeem", desc: "赎回理财（红级）。赎回按当前净值对成本净值比例结算（浮盈浮亏实时兑现，整数运算），回款入默认借记卡；预计回款额可先查 wealth_holdings_query 的 redeem_value", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
@@ -2643,7 +2644,8 @@ export const AI_SYSTEM_PROMPT = `你是 Suveoo 银行的智能助理（模拟银
 function systemPromptWithDate() {
   const now = new Date(Date.now() + 8 * 3600_000);
   const week = ["日", "一", "二", "三", "四", "五", "六"][now.getUTCDay()];
-  return `今天是 ${now.getUTCFullYear()} 年 ${now.getUTCMonth() + 1} 月 ${now.getUTCDate()} 日（星期${week}，北京时间 UTC+8）。涉及"下周三/后天/月底"等相对日期时，先换算成具体日期再调用工具。\n${AI_SYSTEM_PROMPT}`;
+  const hh = String(now.getUTCHours()).padStart(2, "0"), mm = String(now.getUTCMinutes()).padStart(2, "0");
+  return `今天是 ${now.getUTCFullYear()} 年 ${now.getUTCMonth() + 1} 月 ${now.getUTCDate()} 日（星期${week}），北京时间 ${hh}:${mm}（UTC+8）。涉及"下周三/后天/月底"等相对日期与"25分钟后/两小时后"等相对时刻时，先换算成具体日期时间（ISO 8601 带 +08:00 偏移）再调用工具。\n${AI_SYSTEM_PROMPT}`;
 }
 
 /** Messages API 工具定义（由 MCP_TOOLS 注册表生成；模型名手动配置，不走 /v1/models）。 */
@@ -2653,13 +2655,14 @@ function llmToolDefs() {
 
 /** 消费 Messages API 流式 SSE：text_delta 即时回调 onText；tool_use 的 input_json_delta 聚合为完整 JSON
  *  （content_block_stop 时才 parse——工具执行永远拿到完整参数）。返回与非流式响应同形状 { content, stop_reason }。 */
-export async function consumeLlmSse(res, onText) {
+export async function consumeLlmSse(res, onText, onThinking) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   const blocks = new Map(); /* index -> block（text 累加 / tool_use 存 _json 串） */
   const content = [];
   let stopReason = null;
   let sawText = false;
+  let thought = false; /* 思考型模型（glm-5.3-flash）：首个 thinking_delta 通知前端"深度分析中"，消除长思考期的静默观感 */
   const handle = (evt) => {
     switch (evt.type) {
       case "content_block_start": {
@@ -2672,6 +2675,7 @@ export async function consumeLlmSse(res, onText) {
         if (!b) break;
         if (evt.delta?.type === "text_delta" && evt.delta.text) { b.text = (b.text ?? "") + evt.delta.text; sawText = true; onText(evt.delta.text); }
         else if (evt.delta?.type === "input_json_delta") b._json = (b._json ?? "") + (evt.delta.partial_json ?? "");
+        else if (evt.delta?.type === "thinking_delta" && evt.delta.thinking && onThinking && !thought) { thought = true; onThinking(); }
         break;
       }
       case "content_block_stop": {
@@ -2721,7 +2725,7 @@ export async function consumeLlmSse(res, onText) {
 /** 调用 Messages API（Anthropic 兼容）。流式优先：提供 onText 时加 stream:true，边收 content_block_delta
  *  边回调下发（worker 转发、浏览器打字机平滑只是观感层）；工具轮次由 consumeLlmSse 聚合完整 JSON 后才执行。
  *  上游不支持流式（非 SSE 响应/请求被拒）自动回退非流式；流中途 error 且已有部分文本时返回部分结果不重放。 */
-export async function llmMessages(env, messages, tools, onText) {
+export async function llmMessages(env, messages, tools, onText, onThinking) {
   const base = (env.LLM_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "");
   const model = env.LLM_MODEL ?? "claude-haiku-4.5";
   const key = env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY;
@@ -2731,8 +2735,9 @@ export async function llmMessages(env, messages, tools, onText) {
   const payload = { model, max_tokens: 4096, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}) };
   /* 请求体观测量：字符数按轮记录（性能轮基线——瘦身前后对比的硬数据） */
   logEvent("info", "ai.llm_payload", { chars: JSON.stringify(payload).length, msgs: messages.length, tools: tools?.length ?? 0 });
-  /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中" */
-  const TIMEOUT_MS = 45_000;
+  /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中"；
+     glm-5.3-flash 为思考型（thinking 不受参数控制、实测 disabled/budget_tokens 均被忽略），慢轮 20-40s 常态——45s→75s 适配 */
+  const TIMEOUT_MS = 75_000;
 
   if (onText) {
     /* 连接层失败（DNS/拒绝/超时）也归一为 {err}：聊天循环按失败轮收场（user 侧落库），而不是异常冒泡丢整轮 */
@@ -2744,7 +2749,7 @@ export async function llmMessages(env, messages, tools, onText) {
     }
     if (res.ok && (res.headers.get("content-type") ?? "").includes("text/event-stream")) {
       try {
-        const out = await consumeLlmSse(res, onText);
+        const out = await consumeLlmSse(res, onText, onThinking);
         logEvent("info", "ai.llm_stream", { ok: true });
         return { out, streamed: true };
       } catch (e) {
@@ -2857,7 +2862,7 @@ export async function handleAiChat(request, env, ctx) {
         let hadError = false;
         let pendingGrantTools = new Set(); /* 已产出确认卡/OTP 门工具：防模型无视规则 4 重复发起同一笔 */
         for (let round = 0; round < 8; round++) {
-          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }));
+          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }), () => send({ type: "thinking" }));
           if (err) { hadError = true; await flushAiring(); send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
           const content = out.content ?? [];
           const textPart = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
