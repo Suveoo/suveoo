@@ -49,14 +49,14 @@ SENDER_NOREPLY = "noreply@suveoo.com"
 SENDER_SECURITY = "security@suveoo.com"
 SUPPORT_INBOX = "support@suveoo.com"
 # LLM Provider（可配置；模型名手动指定，不走 /v1/models 自动发现）
-# 当前：阿里云百炼 Anthropic 兼容端点 + qwen3.6-flash（开发期省成本）
-LLM_PROVIDER = "qwen"
-LLM_BASE_URL = "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic"
-LLM_MODEL = "qwen3.6-flash"
+# 当前（第二十八轮）：智谱开放平台 Anthropic 兼容端点 + glm-5.3-flash（思考型；tools/tool_use/流式实测全兼容）
+LLM_PROVIDER = "glm"
+LLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
+LLM_MODEL = "glm-5.3-flash"
 # AI 会话上下文窗口：注入最近 N 轮（2N 条消息；首条用户消息常驻 + 字符预算 ~3000 裁中段）
 AI_HISTORY_TURNS = "8"
-# 切回 Anthropic 直连示例：
-#   LLM_PROVIDER = "anthropic"
-#   LLM_BASE_URL = "https://api.anthropic.com"
-#   LLM_MODEL = "claude-haiku-4.5"
+# 切换示例：
+#   智谱 OpenAI 兼容端点（协议不同，需改 llmMessages，勿仅改此处）：https://open.bigmodel.cn/api/paas/v4
+#   Anthropic 直连：LLM_PROVIDER="anthropic" LLM_BASE_URL="https://api.anthropic.com" LLM_MODEL="claude-haiku-4.5"
+#   阿里百炼（上一代）：LLM_PROVIDER="qwen" LLM_BASE_URL="https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic" LLM_MODEL="qwen3.6-flash"
 # API Key 一律走 secret：npx wrangler secret put LLM_API_KEY

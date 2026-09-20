@@ -2727,7 +2727,8 @@ export async function llmMessages(env, messages, tools, onText) {
   const key = env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY;
   if (!key) return { err: "LLM_API_KEY not configured" };
   const headers = { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" };
-  const payload = { model, max_tokens: 2048, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}) };
+  /* max_tokens 4096：glm-5.3-flash 为思考型（thinking 独立计输出 token），2048 下思考+长回复（对比表/月报）有截断风险 */
+  const payload = { model, max_tokens: 4096, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}) };
   /* 请求体观测量：字符数按轮记录（性能轮基线——瘦身前后对比的硬数据） */
   logEvent("info", "ai.llm_payload", { chars: JSON.stringify(payload).length, msgs: messages.length, tools: tools?.length ?? 0 });
   /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中" */
