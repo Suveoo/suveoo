@@ -52,6 +52,14 @@
 
 /* 外汇表 */
 .fx-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; vertical-align: -3px; margin-right: 8px; }
+/* 货币名不折行（业内惯例）；"（100）"单位整块可折到第二行；窄屏收紧列 padding 给名称列腾位 */
+.fx-cell .fx-name { white-space: nowrap; }
+.fx-cell .fx-unit { display: inline-block; white-space: nowrap; margin-left: 2px; }
+@media (max-width: 767px) {
+  .fx-table th, .fx-table td { padding: 10px 6px; }
+  .fx-table .mono { font-size: 13px; }
+  .fx-cell .fx-name { font-size: 14px; }
+}
 
 /* dashboard 图表 */
 .chart-box { width: 100%; overflow: hidden; }
