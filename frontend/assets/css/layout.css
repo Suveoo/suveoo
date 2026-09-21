@@ -63,24 +63,33 @@
 .fcol-body > ul { overflow: hidden; min-height: 0; }
 .fcol-head .ic { display: none; }
 @media (max-width: 767px) {
-  .app-footer .cols { gap: 0; }
+  /* 队长定稿：有且仅有 4 条等长内缩线（线1=.cols 顶线，线2-4=各 fcol 底线）；footer 自身全宽顶线去除；
+     行距收紧且三行等高（文本在两线间光学居中：上下 padding 严格相等 + 显式 line-height） */
+  .app-footer { border-top: none; padding-top: 10px; padding-bottom: 4px; }
+  .app-footer .cols { gap: 0; border-top: 1px solid var(--color-line); }
   .fcol { border-bottom: 1px solid var(--color-line); }
-  .fcol:last-child { border-bottom: none; }
   .fcol-head { margin: 0; }
-  .fcol-head button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 0; font-size: var(--fs-14); color: var(--color-ink); text-transform: none; letter-spacing: 0; font-weight: 600; }
+  /* 特异性须压过 .app-footer h4 的 margin-bottom(8px)——否则行盒下方多 8px、文本不在两线正中 */
+  .app-footer .fcol-head { margin: 0; }
+  .fcol-head button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 9px 0; line-height: 20px; font-size: var(--fs-14); color: var(--color-ink); text-transform: none; letter-spacing: 0; font-weight: 600; }
   .fcol-head .ic { display: inline-flex; color: var(--color-ink-2); transition: transform .28s cubic-bezier(.4, 0, .2, 1); }
   .fcol.open .fcol-head .ic { transform: rotate(90deg); }
   .fcol-body { grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.4, 0, .2, 1); }
   .fcol.open .fcol-body { grid-template-rows: 1fr; }
-  .fcol-body > ul { padding: 0 0 6px; gap: 12px; }
-  .fcol.open .fcol-body > ul { padding-bottom: 14px; }
+  .fcol-body > ul { padding: 0; gap: 12px; }
+  .fcol.open .fcol-body > ul { padding: 2px 0 12px; }
   .fcol-body > ul > li { opacity: 0; transform: translateY(-4px); transition: opacity .26s ease, transform .26s ease; }
   .fcol.open .fcol-body > ul > li { opacity: 1; transform: none; }
+  .app-footer .foot-bottom { border-top: none; margin-top: 0; padding: 12px 0 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fcol-head .ic, .fcol-body, .fcol-body > ul > li { transition: none; }
 }
-.app-footer .foot-bottom { max-width: 1080px; margin: var(--sp-6) auto 0; padding-top: var(--sp-4); border-top: 1px solid var(--color-line); display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: space-between; color: var(--color-ink-2); font-size: var(--fs-12); }
+.app-footer .foot-bottom { max-width: 1080px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: space-between; color: var(--color-ink-2); font-size: var(--fs-12); }
+/* 桌面：底行上方保留分隔线与留白（移动端队长定稿——线段有且仅有 4 条，底行无线） */
+@media (min-width: 768px) {
+  .app-footer .foot-bottom { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--color-line); }
+}
 
 /* ---- 下拉容器（通知/语言） ---- */
 .dropdown { position: absolute; top: calc(100% + 6px); right: 0; width: 340px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow); z-index: var(--z-dropdown); overflow: hidden; }
