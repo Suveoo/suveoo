@@ -56,6 +56,30 @@
 @media (min-width: 768px) and (max-width: 1180px) { .app-footer .cols { grid-template-columns: repeat(2, 1fr); } }
 .app-footer h4 { font-size: var(--fs-12); color: var(--color-ink-2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: var(--sp-2); }
 .app-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-14); }
+/* —— 移动端 footer 手风琴（队长定稿样式）：一级项全宽行 + 发丝分隔线 + 右侧人字箭头，展开时箭头向下旋转、
+      二级列表 grid 0fr→1fr 高度过渡（自适应内容高度的现代动画，无需 max-height 魔数）；桌面还原三栏直排 —— */
+.fcol-head button { all: unset; cursor: pointer; box-sizing: border-box; }
+.fcol-body { display: grid; grid-template-rows: 1fr; }
+.fcol-body > ul { overflow: hidden; min-height: 0; }
+.fcol-head .ic { display: none; }
+@media (max-width: 767px) {
+  .app-footer .cols { gap: 0; }
+  .fcol { border-bottom: 1px solid var(--color-line); }
+  .fcol:last-child { border-bottom: none; }
+  .fcol-head { margin: 0; }
+  .fcol-head button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 0; font-size: var(--fs-14); color: var(--color-ink); text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .fcol-head .ic { display: inline-flex; color: var(--color-ink-2); transition: transform .28s cubic-bezier(.4, 0, .2, 1); }
+  .fcol.open .fcol-head .ic { transform: rotate(90deg); }
+  .fcol-body { grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.4, 0, .2, 1); }
+  .fcol.open .fcol-body { grid-template-rows: 1fr; }
+  .fcol-body > ul { padding: 0 0 6px; gap: 12px; }
+  .fcol.open .fcol-body > ul { padding-bottom: 14px; }
+  .fcol-body > ul > li { opacity: 0; transform: translateY(-4px); transition: opacity .26s ease, transform .26s ease; }
+  .fcol.open .fcol-body > ul > li { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fcol-head .ic, .fcol-body, .fcol-body > ul > li { transition: none; }
+}
 .app-footer .foot-bottom { max-width: 1080px; margin: var(--sp-6) auto 0; padding-top: var(--sp-4); border-top: 1px solid var(--color-line); display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: space-between; color: var(--color-ink-2); font-size: var(--fs-12); }
 
 /* ---- 下拉容器（通知/语言） ---- */

@@ -121,21 +121,24 @@ S.chrome = {
         <a class="bn-item${act === "account" ? " active" : ""}" href="${user ? "/account" : "/account/login"}">${S.ui.icon("account")}<span>${user ? S.t("nav.account") : S.t("nav.login")}</span></a>
       </nav>`);
     document.body.appendChild(bn);
-    /* footer */
+    /* footer —— 移动端三组为手风琴（点击展开二级项，chevron 向下旋转），桌面保持三栏直排 */
     const footer = S.ui.el(`
       <footer class="app-footer">
         <div class="cols">
-          <div><h4>${S.fmt.escape(S.t("footer.product"))}</h4><ul>
+          <div class="fcol"><h4 class="fcol-head"><button type="button" aria-expanded="false"><span>${S.fmt.escape(S.t("footer.product"))}</span>${S.ui.icon("chevron", 14)}</button></h4>
+            <div class="fcol-body"><ul>
             <li><a href="/home">${S.fmt.escape(S.t("nav.home"))}</a></li><li><a href="/pay">${S.fmt.escape(S.t("nav.pay"))}</a></li>
-            <li><a href="/wealth">${S.fmt.escape(S.t("nav.wealth"))}</a></li><li><a href="/ai">Suveoo AI</a></li></ul></div>
-          <div><h4>${S.fmt.escape(S.t("footer.support"))}</h4><ul>
+            <li><a href="/wealth">${S.fmt.escape(S.t("nav.wealth"))}</a></li><li><a href="/ai">Suveoo AI</a></li></ul></div></div>
+          <div class="fcol"><h4 class="fcol-head"><button type="button" aria-expanded="false"><span>${S.fmt.escape(S.t("footer.support"))}</span>${S.ui.icon("chevron", 14)}</button></h4>
+            <div class="fcol-body"><ul>
             <li><a href="/help">${S.fmt.escape(S.t("footer.help"))}</a></li><li><a href="/contact">${S.fmt.escape(S.t("footer.contact"))}</a></li>
             <li><a href="/notifications">${S.fmt.escape(S.t("footer.notifications"))}</a></li>
-            <li><a href="/about">${S.fmt.escape(S.t("footer.about"))}</a></li></ul></div>
-          <div><h4>${S.fmt.escape(S.t("footer.legal"))}</h4><ul>
+            <li><a href="/about">${S.fmt.escape(S.t("footer.about"))}</a></li></ul></div></div>
+          <div class="fcol"><h4 class="fcol-head"><button type="button" aria-expanded="false"><span>${S.fmt.escape(S.t("footer.legal"))}</span>${S.ui.icon("chevron", 14)}</button></h4>
+            <div class="fcol-body"><ul>
             <li><a href="/terms">${S.fmt.escape(S.t("legal.terms"))}</a></li><li><a href="/privacy-policy">${S.fmt.escape(S.t("legal.privacy"))}</a></li>
             <li><a href="/cookie-privacy">${S.fmt.escape(S.t("legal.cookie"))}</a></li>
-            <li><button class="linklike" id="foot-cookie">${S.fmt.escape(S.t("cookie.prefs"))}</button></li></ul></div>
+            <li><button class="linklike" id="foot-cookie">${S.fmt.escape(S.t("cookie.prefs"))}</button></li></ul></div></div>
         </div>
         <div class="foot-bottom">
           <span>© 2026 Suveoo</span>
@@ -144,6 +147,13 @@ S.chrome = {
       </footer>`);
     document.body.appendChild(footer);
     footer.querySelector("#foot-cookie").onclick = () => S.chrome.cookieModal();
+    /* 移动端 footer 手风琴：点击一级项展开/收起二级列表（桌面按钮无感——body 恒开、chevron 隐藏） */
+    footer.querySelectorAll(".fcol-head button").forEach((btn) => {
+      btn.onclick = () => {
+        const open = btn.closest(".fcol").classList.toggle("open");
+        btn.setAttribute("aria-expanded", open);
+      };
+    });
     /* 通知下拉 */
     header.querySelector("#btn-notif").onclick = (e) => { e.stopPropagation(); this.toggleNotif(e.currentTarget, user); };
     /* 语言下拉 */
