@@ -503,7 +503,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
     background-color .22s ease, box-shadow .22s ease;
 }
 .ch-more.open .ch-more-morph {
-  width: 188px; height: 92px; border-radius: 16px; background: #fff;
+  width: 208px; height: 92px; border-radius: 16px; background: #fff;
   transform: translateY(-14.75px);
   box-shadow: 0 3px 6px rgba(23, 27, 64, .05), 0 16px 40px rgba(23, 27, 64, .16);
   transition: width .38s cubic-bezier(.22, 1.18, .36, 1), height .38s cubic-bezier(.22, 1.18, .36, 1),
@@ -517,7 +517,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 }
 .ch-more.open .ch-more-face { opacity: 0; transform: rotate(120deg) scale(.55); pointer-events: none; transition: opacity .12s ease, transform .18s ease; }
 .ch-more-item {
-  position: absolute; left: 0; right: 0; height: 46px; padding: 0 16px;
+  position: absolute; left: 0; right: 0; height: 46px; padding: 0 16px; white-space: nowrap;
   display: flex; align-items: center; gap: 10px;
   color: var(--color-ink); font-size: var(--fs-14); font-weight: 600; text-decoration: none;
   opacity: 0; transform: translateX(12px); pointer-events: none; /* 透明态不可点——否则盖住三点按钮、首点直接触发导航 */
