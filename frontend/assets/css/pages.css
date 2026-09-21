@@ -163,6 +163,8 @@
 .assets-head { align-items: flex-end; }
 .assets-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; padding-bottom: 3px; }
 @media (max-width: 767px) { .assets-side { align-items: flex-start; text-align: left; padding-bottom: 0; } }
+/* 今日收益行 <550px 恒独占一行靠左：显示态长文本会自然折行靠左，但眼睛掩码后变 ***** 变短挤回首行右侧（space-between 推右）——强制折行保两态一致 */
+@media (max-width: 550px) { .assets-side { flex-basis: 100%; } }
 /* 卡头（logo + 粗体标题）：标题与插画的光学对齐按插画重心分别补偿——
    钱包（重心居中偏上）文字 +0px 下移；金币堆（顶轻底重）文字 -0.5px 上移 */
 .acf-head { display: flex; gap: 10px; align-items: center; }
