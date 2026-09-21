@@ -468,6 +468,9 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 
 /* ===== 31. 对话卡头栏 + 历史会话（第二十六轮：下拉/抽屉/只读重放/继续上次提示条） ===== */
 .chat-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--color-line); flex: none; }
+/* 历史按钮左移、右侧圆钮组右移（等量 ±6px，队长微调——两端更贴屏幕缘） */
+.chat-head #hist-btn { margin-left: -6px; }
+.chat-head #ch-more { margin-right: -6px; }
 .chat-head .ch-btn { display: inline-flex; align-items: center; gap: 5px; background: var(--color-primary-tint); color: var(--color-navy); border: none; border-radius: var(--r-pill); padding: 6px 12px; font-size: var(--fs-12); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .chat-head .ch-btn:hover { filter: brightness(.96); }
 .chat-head .ch-btn .ic { flex: none; }
@@ -517,12 +520,12 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   position: absolute; left: 0; right: 0; height: 46px; padding: 0 16px;
   display: flex; align-items: center; gap: 10px;
   color: var(--color-ink); font-size: var(--fs-14); font-weight: 600; text-decoration: none;
-  opacity: 0; transform: translateX(12px);
+  opacity: 0; transform: translateX(12px); pointer-events: none; /* 透明态不可点——否则盖住三点按钮、首点直接触发导航 */
   transition: opacity .14s ease, transform .14s ease;
 }
 .ch-more-item:nth-child(2) { top: 0; }
 .ch-more-item:nth-child(3) { bottom: 0; }
-.ch-more.open .ch-more-item { opacity: 1; transform: none; transition: opacity .24s ease .13s, transform .32s cubic-bezier(.22, 1, .36, 1) .13s; }
+.ch-more.open .ch-more-item { opacity: 1; transform: none; pointer-events: auto; transition: opacity .24s ease .13s, transform .32s cubic-bezier(.22, 1, .36, 1) .13s; }
 .ch-more.open .ch-more-item:nth-child(3) { transition-delay: .19s, .19s; }
 .ch-more-item:active { background: var(--color-primary-tint); }
 .ch-more-item .ic { color: var(--color-navy); flex: none; }
