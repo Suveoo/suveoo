@@ -12,8 +12,7 @@ S.router.register("home", async ({ user }) => {
     </div>
     <div id="promo" style="margin-top:16px"></div>
     <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"></div><div id="cashflow"></div></div>
-    <div class="section-title"><h2>${S.fmt.escape(S.t("home.services"))}</h2></div>
-    <div class="quick-grid" id="services"></div>
+    <div class="card svc-card" style="margin-top:16px"><h2 class="svc-h">${S.fmt.escape(S.t("home.services"))}</h2><div class="svc-grid" id="services"></div></div>
     <div class="card" id="insight" style="margin-top:16px"></div>
     <div class="brand-banner" style="margin-top:24px">
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
@@ -32,11 +31,15 @@ S.router.register("home", async ({ user }) => {
     ["/pay/bills", "ic-doc-orange", S.t("home.billsShort")],
     ["/account/cards", "ic-card-navy", S.t("acct.grid.cards")],
     ["/wealth/funds", "ic-wealth-gold", S.t("wealth.funds").replace("Suveoo ", "")],
+    ["/wealth/deposits", "ic-bank-teal", S.t("deps.title")],
     ["/wealth/fx", "ic-exchange-rose", S.t("wealth.allFx")],
+    ["/transfer/payees", "ic-star-orange", S.t("payees.title")],
+    ["/pay/subscriptions", "ic-bell-violet", S.t("subs.title")],
+    ["/account/security", "ic-shield-navy", S.t("acct.security")],
     ["/account/downloads", "ic-download-sky", S.t("acct.downloads")],
   ];
   document.getElementById("services").innerHTML = svc.map(([href, ic, label]) =>
-    `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("");
+    `<a class="svc-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span class="svc-label">${S.fmt.escape(label)}</span></a>`).join("");
 
   /* 情境产品卡（未登录/无命中 → 通用卡；规则见 core/insights.js，零 LLM） */
   const promoEl = document.getElementById("promo");
@@ -92,7 +95,7 @@ S.router.register("home", async ({ user }) => {
     /* 桌面端：今日收益纵排放大数字右侧（.assets-side），移动端 wrap 后靠左（模拟声明已按要求移出本卡） */
     document.getElementById("assets-main").innerHTML = `
       <div class="row between assets-head"><div>
-        <div class="acf-head"><img src="/assets/images/illustrations/assets-coins.svg?v=${S.ui.v()}" width="34" height="34" alt="" loading="lazy"><b class="h-txt h-up">${S.fmt.escape(S.t("home.totalAssets"))}</b><button class="eye-toggle" id="eye">${S.ui.icon("eye", 16)}</button></div>
+        <div class="acf-head"><b class="h-txt">${S.fmt.escape(S.t("home.totalAssets"))}</b><button class="eye-toggle" id="eye">${S.ui.icon("eye", 16)}</button></div>
         <div><span class="total mmask" id="amt">${S.fmt.moneyPlain(o.total_assets)}</span><span class="cur">CNY</span></div>
       </div>
       <div class="assets-side">
@@ -123,7 +126,7 @@ S.router.register("home", async ({ user }) => {
     /* 与资产总估值同卡（第二十五轮 1）：灰色横向分隔线 + 无卡壳内容；cashflow 为空时不渲染 → 无分隔线 */
     el.innerHTML = `<hr class="cf-sep">
       <div class="row between" style="align-items:center">
-        <div class="row acf-head"><img src="/assets/images/illustrations/wallet-cashflow.svg?v=${S.ui.v()}" width="34" height="34" alt="" loading="lazy"><b class="h-txt">${S.fmt.escape(S.t("home.monthCashflow"))} · ${mLabel}</b></div>
+        <div class="acf-head"><b class="h-txt">${S.fmt.escape(S.t("home.monthCashflow"))} · ${mLabel}</b></div>
         <a class="small" href="/account/transactions">${S.fmt.escape(S.t("common.more"))} →</a>
       </div>
       <div class="row cf-row">

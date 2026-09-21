@@ -4,13 +4,20 @@
 .hero-input:focus-within, .hero-input:hover { border-color: var(--color-navy); }
 .hero-input img, .hero-input svg { width: 20px; height: 20px; flex: none; }
 .hero-input input { border: none; outline: none; flex: 1; min-width: 0; font-size: var(--fs-16); font-family: inherit; background: transparent; }
-.assets-block .total { font-family: var(--font-mono); font-size: var(--fs-36); font-weight: 700; letter-spacing: -0.5px; }
+.assets-block .total { font-family: var(--font-mono); font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
 .assets-block .cur { font-size: var(--fs-14); color: var(--color-ink-2); margin-left: 6px; }
 .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); }
 @media (max-width: 767px) { .quick-grid { gap: 6px; } }
 .quick-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: var(--sp-4) 4px; border-radius: var(--r-card); background: #fff; border: 1px solid var(--color-line); color: var(--color-ink); font-size: var(--fs-12); text-align: center; }
 .quick-item:hover { border-color: var(--color-navy); text-decoration: none; }
 .quick-item.disabled { opacity: .45; cursor: not-allowed; }
+/* 贴心服务大容器（第三十四轮）：单一大卡，标题卡内左上，条目无独立容器；每行个数随宽度自适应（80px 轨道） */
+.svc-card { padding: 16px 16px 6px; }
+.svc-h { font-size: var(--fs-16); margin: 0 0 6px; }
+.svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 16px 8px; padding: 6px 0 10px; }
+.svc-item { display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; color: var(--color-ink); }
+.svc-item:active { opacity: .65; }
+.svc-label { font-size: var(--fs-12); text-align: center; line-height: 1.3; }
 /* 金刚区图标位（第二十三轮 D：tint 圆底退役，直接放 30px ic-* 彩色 squircle） */
 .quick-item .qi-wrap { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .quick-item .qi-wrap svg { display: block; }
@@ -161,11 +168,13 @@
 
 /* ===== 资产总估值 + 本月收支合并卡（第二十五轮 1）：灰色横向分隔线；桌面端次信息放大数字右侧 ===== */
 .assets-head { align-items: flex-end; }
-.assets-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; padding-bottom: 3px; }
+.assets-side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; text-align: right; padding-bottom: 2px; }
 @media (max-width: 767px) { .assets-side { align-items: flex-start; text-align: left; padding-bottom: 0; } }
 /* 今日收益行 <550px 恒独占一行靠左：显示态长文本会自然折行靠左，但眼睛掩码后变 ***** 变短挤回首行右侧（space-between 推右）——强制折行保两态一致 */
 @media (max-width: 550px) { .assets-side { flex-basis: 100%; } }
-/* 卡头（logo + 粗体标题）：标题与插画的光学对齐按插画重心分别补偿——
+/* 卡头（粗体标题；第三十四轮：左插画退役、标题 16px） */
+.acf-head .h-txt { font-size: var(--fs-16); }
+/* 原卡头（logo：标题与插画的光学对齐按插画重心分别补偿——
    钱包（重心居中偏上）文字 +0px 下移；金币堆（顶轻底重）文字 -0.5px 上移 */
 .acf-head { display: flex; gap: 10px; align-items: center; }
 .acf-head img { width: 34px; height: 34px; flex: none; }
