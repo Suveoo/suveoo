@@ -959,5 +959,6 @@
   "payees.badPhone": "手機號格式不正確（11 位，1 開頭）",
   "bench.prodBench": "生產模型實測（{0} 條指令）：首 token 中位 {1}s · P95 {2}s · 成功 {3}/{0}",
   "fx.buyShort": "買入",
-  "fx.sellShort": "賣出"
+  "fx.sellShort": "賣出",
+  "ai.more": "更多"
 }

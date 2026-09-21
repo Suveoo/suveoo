@@ -81,6 +81,8 @@
   .fcol-body > ul > li { opacity: 0; transform: translateY(-4px); transition: opacity .26s ease, transform .26s ease; }
   .fcol.open .fcol-body > ul > li { opacity: 1; transform: none; }
   .app-footer .foot-bottom { border-top: none; margin-top: 0; padding: 12px 0 6px; }
+  /* /ai 页：fixed 输入条悬浮于内容之上，footer 底部让出一档避免版权行被遮挡（其他页面不受影响） */
+  body[data-page="ai"] .app-footer { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .fcol-head .ic, .fcol-body, .fcol-body > ul > li { transition: none; }

@@ -20,10 +20,16 @@ S.router.register("ai", async ({ user }) => {
           <div class="chat-head">
             <button class="ch-btn" id="hist-btn" type="button">${S.ui.icon("clock", 13)}<span class="hh-full">${S.fmt.escape(S.t("ai.history"))}</span><span class="hh-short">${S.fmt.escape(S.t("ai.historyShort"))}</span>${S.ui.icon("chevron", 11)}</button>
             <div class="ch-title" id="ch-title">${S.fmt.escape(S.t("ai.newChat"))}</div>
-            <button class="ch-btn" id="new-chat" type="button">${S.ui.icon("plus", 13)}<span class="hh-full">${S.fmt.escape(S.t("ai.newChat"))}</span></button>
+            <!-- 头部右侧：圆形新对话 + 三点 morph 菜单（长程任务/评测看板，替代原独立入口行） -->
+          <button class="ch-btn ch-round" id="new-chat" type="button" aria-label="${S.fmt.escape(S.t("ai.newChat"))}">${S.ui.icon("plus", 13)}</button>
+          <div class="ch-more" id="ch-more">
+            <div class="ch-more-morph" id="ch-more-morph" role="menu">
+              <button class="ch-more-face" id="ch-more-btn" type="button" aria-expanded="false" aria-label="${S.fmt.escape(S.t("ai.more"))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="19" r="2.3"/></svg></button>
+              <a class="ch-more-item" role="menuitem" href="/ai/tasks">${S.ui.icon("clock", 14)}<span>${S.fmt.escape(S.t("tasks.title"))}</span></a>
+              <a class="ch-more-item" role="menuitem" href="/ai/benchmark">${S.ui.icon("chart", 14)}<span>${S.fmt.escape(S.t("bench.title"))}</span></a>
+            </div>
           </div>
-          <!-- 手机/平板无 Side Drawer，长程任务与评测看板入口随父页走（桌面隐藏——侧栏已有） -->
-          <div class="ai-sub-links"><a href="/ai/tasks">${S.ui.icon("clock", 13)} ${S.fmt.escape(S.t("tasks.title"))}</a><a href="/ai/benchmark">${S.ui.icon("chart", 13)} ${S.fmt.escape(S.t("bench.title"))}</a></div>
+          </div>
           <div id="pane-chat" style="display:flex;flex-direction:column;flex:1;min-height:0">
             <div class="chat-thread" id="thread">${WELCOME_HTML}${INSIGHTS_HTML}</div>
           <div class="composer-hint">${S.fmt.escape(S.t("ai.hint"))}</div>
@@ -149,6 +155,27 @@ S.router.register("ai", async ({ user }) => {
     if (which === "hist") refreshHistory(histDrawer.querySelector("#hd-list"));
   };
   window.addEventListener("popstate", () => closeDrawer(true));
+  /* 头部三点 morph 菜单：展开/收起（外部点击与系统返回手势关闭；返回手势走独立 pushState 层，
+     与上方的抽屉 popstate 单点收口互不抢占——popstate 到达时两者各自检查自身状态） */
+  {
+    const morphWrap = document.getElementById("ch-more");
+    const morphBtn = document.getElementById("ch-more-btn");
+    let morePushed = false;
+    const closeMore = (fromPop = false) => {
+      if (!morphWrap.classList.contains("open")) return;
+      morphWrap.classList.remove("open");
+      morphBtn.setAttribute("aria-expanded", "false");
+      if (morePushed && !fromPop) { morePushed = false; history.back(); }
+    };
+    morphBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = morphWrap.classList.toggle("open");
+      morphBtn.setAttribute("aria-expanded", open);
+      if (open && !morePushed) { history.pushState({ chMore: true }, ""); morePushed = true; }
+    });
+    window.addEventListener("popstate", () => { morePushed = false; closeMore(true); });
+    document.addEventListener("click", (e) => { if (!morphWrap.contains(e.target)) closeMore(); }, { capture: true });
+  }
   {
     const head = tc.querySelector(".tc-head");
     if (head) {

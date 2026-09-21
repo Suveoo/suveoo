@@ -486,13 +486,47 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .bm-item b { font-size: var(--fs-14); }
 .bm-ico { flex: none; width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary-tint); color: var(--color-navy); }
 
-/* AI 子页入口行：手机/平板（无 Side Drawer）在对话卡头栏下提供长程任务/评测看板直达；桌面隐藏（侧栏已有） */
-.ai-sub-links { display: none; }
-@media (max-width: 1023px) {
-  .ai-sub-links { display: flex; gap: 8px; padding: 8px 16px 2px; }
-  .ai-sub-links a { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: var(--r-pill); background: var(--color-primary-tint); color: var(--color-navy); font-size: var(--fs-12); font-weight: 600; text-decoration: none; }
-  .ai-sub-links a:active { filter: brightness(.96); }
+/* —— 头部三点 morph 菜单（第三十三轮：圆→圆角矩形全新动画，替代原 ai-sub-links 入口行）——
+   展开 .38s easeOutQuint 微回弹（尺寸/圆角/位移四路同步），收起 .26s easeIn 快收；
+   三点图标旋出、菜单行从右随生长方向滑入并 stagger 50ms；白色菜单卡双层层叠阴影。 */
+.chat-head .ch-round { width: 29.5px; height: 29.5px; padding: 0; justify-content: center; border-radius: 50%; }
+.ch-more { position: relative; width: 29.5px; height: 29.5px; flex: none; }
+.ch-more-morph {
+  position: absolute; right: 0; top: 50%; width: 29.5px; height: 29.5px; border-radius: 999px;
+  background: var(--color-primary-tint); color: var(--color-navy);
+  transform: translateY(-50%); overflow: hidden;
+  transition: width .26s cubic-bezier(.5, 0, .75, .2), height .26s cubic-bezier(.5, 0, .75, .2),
+    border-radius .26s cubic-bezier(.5, 0, .75, .2), transform .26s cubic-bezier(.5, 0, .75, .2),
+    background-color .22s ease, box-shadow .22s ease;
 }
+.ch-more.open .ch-more-morph {
+  width: 188px; height: 92px; border-radius: 16px; background: #fff;
+  transform: translateY(-14.75px);
+  box-shadow: 0 3px 6px rgba(23, 27, 64, .05), 0 16px 40px rgba(23, 27, 64, .16);
+  transition: width .38s cubic-bezier(.22, 1.18, .36, 1), height .38s cubic-bezier(.22, 1.18, .36, 1),
+    border-radius .38s cubic-bezier(.22, 1.18, .36, 1), transform .38s cubic-bezier(.22, 1.18, .36, 1),
+    background-color .26s ease, box-shadow .3s ease;
+}
+.ch-more-face {
+  all: unset; cursor: pointer; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .16s ease .08s, transform .26s cubic-bezier(.5, 0, .75, .2) .08s;
+}
+.ch-more.open .ch-more-face { opacity: 0; transform: rotate(120deg) scale(.55); pointer-events: none; transition: opacity .12s ease, transform .18s ease; }
+.ch-more-item {
+  position: absolute; left: 0; right: 0; height: 46px; padding: 0 16px;
+  display: flex; align-items: center; gap: 10px;
+  color: var(--color-ink); font-size: var(--fs-14); font-weight: 600; text-decoration: none;
+  opacity: 0; transform: translateX(12px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.ch-more-item:nth-child(2) { top: 0; }
+.ch-more-item:nth-child(3) { bottom: 0; }
+.ch-more.open .ch-more-item { opacity: 1; transform: none; transition: opacity .24s ease .13s, transform .32s cubic-bezier(.22, 1, .36, 1) .13s; }
+.ch-more.open .ch-more-item:nth-child(3) { transition-delay: .19s, .19s; }
+.ch-more-item:active { background: var(--color-primary-tint); }
+.ch-more-item .ic { color: var(--color-navy); flex: none; }
+@media (prefers-reduced-motion: reduce) { .ch-more-morph, .ch-more-face, .ch-more-item { transition: none; } }
 
 /* 亚像素溢出兜底（组员报告 /pay/subscriptions 390 需左右滚动）：行内 switch/进度条的小数宽度
    会让 scrollWidth 超 1px 触发橡皮筋——clip 吞掉且不创建滚动容器（不影响 sticky；旧 webview 不识别则回退 visible 无害） */

@@ -959,5 +959,6 @@
   "payees.badPhone": "Invalid phone number (11 digits starting with 1)",
   "bench.prodBench": "Production model, live bench ({0} instructions): first-token median {1}s · P95 {2}s · {3}/{0} completed",
   "fx.buyShort": "Buy",
-  "fx.sellShort": "Sell"
+  "fx.sellShort": "Sell",
+  "ai.more": "More"
 }
