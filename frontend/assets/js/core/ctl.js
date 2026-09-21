@@ -4,23 +4,27 @@ S.ctl = {
   /* 全局点外关闭（同一时刻只允许一个下拉展开） */
   _closeAll() { document.querySelectorAll(".ctl-select.open").forEach((s) => s.classList.remove("open")); },
   /**
-   * 自绘下拉。opts = { label, options: [{v, label}], value, onChange }
+   * 自绘下拉。opts = { label, options: [{v, label, header?}], value, onChange }
+   * header:true 的项渲染为不可选分组标题（长列表按类目分段，如 demo-lab 的 90 职业）。
    * 返回根元素（div.ctl-select）：.value 始终为当前选中 v（可赋值切换）；变化时派发 input 事件并回调 onChange，
-   * 因此 S.toolKit.bind / 表单读取 .value 的既有代码无需改动。键盘：↑↓ 移动、Enter 确认、Esc 关闭。
+   * 因此 S.toolKit.bind / 表单读取 .value 的既有代码无需改动。键盘：↑↓ 移动（跳过分组头）、Enter 确认、Esc 关闭。
    */
   select({ label = "", options = [], value, onChange } = {}) {
     const root = S.ui.el(`<div class="ctl-select"></div>`);
     const btn = S.ui.el(`<button type="button" class="ctl-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ctl-val"></span>${S.ui.icon("chevron", 16)}</button>`);
     const list = S.ui.el(`<div class="ctl-list" role="listbox" aria-label="${S.fmt.escape(label)}" hidden></div>`);
     root.append(btn, list);
-    let current = options.find((o) => String(o.v) === String(value)) ?? options[0] ?? { v: "", label: "" };
+    const selectable = options.filter((o) => !o.header);
+    let current = selectable.find((o) => String(o.v) === String(value)) ?? selectable[0] ?? { v: "", label: "" };
     const valEl = btn.querySelector(".ctl-val");
     const render = () => {
       valEl.textContent = current.label;
-      list.innerHTML = options.map((o) => `<div class="ctl-opt" role="option" data-v="${S.fmt.escape(String(o.v))}" aria-selected="${String(o.v) === String(current.v)}">${S.fmt.escape(o.label)}</div>`).join("");
+      list.innerHTML = options.map((o) => o.header
+        ? `<div class="ctl-opt ctl-opt-header" role="presentation">${S.fmt.escape(o.label)}</div>`
+        : `<div class="ctl-opt" role="option" data-v="${S.fmt.escape(String(o.v))}" aria-selected="${String(o.v) === String(current.v)}">${S.fmt.escape(o.label)}</div>`).join("");
     };
     const commit = (v, silent) => {
-      const next = options.find((o) => String(o.v) === String(v));
+      const next = selectable.find((o) => String(o.v) === String(v));
       if (!next) return;
       current = next;
       render();
@@ -57,13 +61,13 @@ S.ctl = {
     btn.onclick = () => (root.classList.contains("open") ? close() : open());
     list.addEventListener("click", (e) => {
       const opt = e.target.closest(".ctl-opt");
-      if (!opt) return;
+      if (!opt || opt.classList.contains("ctl-opt-header")) return;
       commit(opt.dataset.v);
       close();
       btn.focus();
     });
     btn.addEventListener("keydown", (e) => {
-      const opts = [...list.querySelectorAll(".ctl-opt")];
+      const opts = [...list.querySelectorAll(".ctl-opt:not(.ctl-opt-header)")];
       if (!opts.length) return;
       const idx = opts.findIndex((o) => o.dataset.v === String(current.v));
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {

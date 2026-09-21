@@ -29,6 +29,7 @@
 | transfer-flow.test.js | 表单通道两段式（INPUT_REQUIRED→确认→扣款→流水可查）、grant 一次性、突变失效、红级 OTP、MCP 通道同规（initialize/tools list/call）、注入样本经 MCP 阻断、AI 硬上限 |
 | saga-compensation.test.js | seed→锁 ¥600→注入失败→`T1✓ T2✗ C1✓`→资金解锁且余额守恒；正常路径 DONE；手动取消补偿 |
 | scheduled-tasks.test.js | 预约建立（两段式）→alarm 到点执行→DONE+扣款；到期前取消→CANCELLED 不执行 |
+| dimensional-seed.test.js | 维度化注入：覆盖落库=注入计数+卡片按档位+欠款=明细合计+集团签名在册；预检 dry-run=实跑同构；合并只增+payees 无重名+二次幂等；自定义只动勾选块；缺省旧行为回归；非法 preset 兜底 |
 
 ### attack/（对抗用例，回归时与 unit 同跑）
 

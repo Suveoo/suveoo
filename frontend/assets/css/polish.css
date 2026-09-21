@@ -466,6 +466,37 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   body[data-page="demo-lab"] #content > .card { margin-bottom: 16px; }
 }
 
+/* 18.2 demo-lab：维度化注入（第三十五轮）——维度选项卡 / 块勾选 / 预检摘要 / 核对表 */
+.dl-sec { margin-top: 14px; }
+.dl-sec-lb { font-size: var(--fs-13); font-weight: 700; color: var(--color-navy); margin-bottom: 8px; }
+.dl-dim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dl-dim-grid.cols2 { grid-template-columns: repeat(2, 1fr); }
+.dl-opt-card { display: flex; flex-direction: column; gap: 4px; text-align: left; background: #fff; border: 1.5px solid var(--color-line); border-radius: 12px; padding: 10px 12px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.dl-opt-card:hover { border-color: var(--color-navy, #233a6b); }
+.dl-opt-card.on { border-color: var(--color-navy, #233a6b); background: var(--color-primary-tint, #eef2fa); }
+.dl-opt-t { font-weight: 700; font-size: var(--fs-14); color: var(--color-ink, #1c2333); }
+.dl-opt-d { font-size: var(--fs-12); line-height: 1.6; color: var(--color-ink-2, #5a6478); }
+.dl-prof-select { max-width: 420px; }
+.dl-blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px 12px; }
+.dl-block { display: flex; align-items: center; gap: 7px; font-size: var(--fs-13); color: var(--color-ink, #1c2333); cursor: pointer; }
+.dl-preview { border: 1px solid var(--color-line); border-radius: 12px; padding: 4px 14px; background: var(--color-surface, #f7f8fb); }
+.dl-pkv { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--color-line); font-size: var(--fs-13); }
+.dl-pkv:last-child { border-bottom: none; }
+.dl-pkv .v { font-weight: 600; }
+.dl-pkv-h { font-weight: 700; color: var(--color-navy); border-bottom: 1px solid var(--color-line); }
+.dl-vtable { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: var(--fs-13); }
+.dl-vtable th { text-align: right; font-weight: 700; color: var(--color-navy); padding: 6px 8px; border-bottom: 1px solid var(--color-line); }
+.dl-vtable th:first-child { text-align: left; }
+.dl-vtable td { text-align: right; padding: 6px 8px; border-bottom: 1px dashed var(--color-line); }
+.dl-vtable td:first-child { text-align: left; color: var(--color-ink-2, #5a6478); }
+/* ctl.select 分组头（90 职业长列表按类目分段；不可选、悬停无反馈） */
+.ctl-list .ctl-opt-header { font-size: var(--fs-11); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-ink-2, #5a6478); padding: 10px 12px 4px; pointer-events: none; background: transparent; }
+.ctl-list .ctl-opt-header:not(:first-child) { border-top: 1px solid var(--color-line); margin-top: 4px; }
+@media (max-width: 767px) {
+  .dl-dim-grid, .dl-dim-grid.cols2 { grid-template-columns: 1fr; } /* 窄屏单列全显（档位描述是选择依据，不藏） */
+  .dl-prof-select { max-width: none; }
+}
+
 /* ===== 31. 对话卡头栏 + 历史会话（第二十六轮：下拉/抽屉/只读重放/继续上次提示条） ===== */
 .chat-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--color-line); flex: none; }
 /* 历史按钮左移、右侧圆钮组右移（等量 ±6px，队长微调——两端更贴屏幕缘） */
