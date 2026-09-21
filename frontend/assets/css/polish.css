@@ -523,12 +523,14 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   opacity: 0; transform: translateX(12px); pointer-events: none; /* 透明态不可点——否则盖住三点按钮、首点直接触发导航 */
   transition: opacity .14s ease, transform .14s ease;
 }
-.ch-more-item:nth-child(2) { top: 0; }
-.ch-more-item:nth-child(3) { bottom: 0; }
+.ch-more-item:nth-child(2) { top: 8px; }
+.ch-more-item:nth-child(3) { bottom: 3px; }
 .ch-more.open .ch-more-item { opacity: 1; transform: none; pointer-events: auto; transition: opacity .24s ease .13s, transform .32s cubic-bezier(.22, 1, .36, 1) .13s; }
 .ch-more.open .ch-more-item:nth-child(3) { transition-delay: .19s, .19s; }
 .ch-more-item:active { background: var(--color-primary-tint); }
 .ch-more-item .ic { color: var(--color-navy); flex: none; }
+/* 文字光学下压 0.5px——SVG 图标相对 CJK 字形基线偏高 */
+.ch-more-item span { position: relative; top: 0.5px; }
 @media (prefers-reduced-motion: reduce) { .ch-more-morph, .ch-more-face, .ch-more-item { transition: none; } }
 
 /* 亚像素溢出兜底（组员报告 /pay/subscriptions 390 需左右滚动）：行内 switch/进度条的小数宽度

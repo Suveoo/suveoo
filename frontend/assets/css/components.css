@@ -195,3 +195,9 @@ body.modal-open { overflow: hidden; }
 .trend-pill.down { background: var(--color-red-bg); color: var(--color-red); }
 
 /* 多彩宫格图标底（tint 圆底体系已于第二十三轮 D 退役——宫格直接用 S.ui.iconC 生成的 ic-* 彩色 squircle） */
+
+/* iOS Safari 聚焦字号 <16px 的输入框会自动放大页面（队员 iPhone 12 实测"凭空双指拉大"）——
+   移动端所有输入控件统一 16px（覆盖 .chat-composer .input 的 15px 等）；不禁用用户缩放（保留无障碍） */
+@media (max-width: 767px) {
+  .input, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px !important; }
+}
