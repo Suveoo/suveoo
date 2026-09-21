@@ -55,10 +55,15 @@
 /* 货币名不折行（业内惯例）；"（100）"单位整块可折到第二行；窄屏收紧列 padding 给名称列腾位 */
 .fx-cell .fx-name { white-space: nowrap; }
 .fx-cell .fx-unit { display: inline-block; white-space: nowrap; margin-left: 2px; }
+/* 表头单行（业内惯例）：全称桌面显示，≤767 切短标签（买入/卖出）——任何设备表头都不折行 */
+.fx-table th { white-space: nowrap; }
+.fx-table .hh-s { display: none; }
 @media (max-width: 767px) {
   .fx-table th, .fx-table td { padding: 10px 6px; }
   .fx-table .mono { font-size: 13px; }
   .fx-cell .fx-name { font-size: 14px; }
+  .fx-table .hh-l { display: none; }
+  .fx-table .hh-s { display: inline; }
 }
 
 /* dashboard 图表 */

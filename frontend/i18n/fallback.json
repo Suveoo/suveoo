@@ -957,5 +957,7 @@
   "fx.sparkAccumulating": "7D trend accumulates daily (source updates once per day; one real value per day)",
   "payees.phone": "Phone (optional)",
   "payees.badPhone": "Invalid phone number (11 digits starting with 1)",
-  "bench.prodBench": "Production model, live bench ({0} instructions): first-token median {1}s · P95 {2}s · {3}/{0} completed"
+  "bench.prodBench": "Production model, live bench ({0} instructions): first-token median {1}s · P95 {2}s · {3}/{0} completed",
+  "fx.buyShort": "Buy",
+  "fx.sellShort": "Sell"
 }

@@ -957,5 +957,7 @@
   "fx.sparkAccumulating": "7D 走勢逐日累積中（資料來源每日更新一次，序列為每日一個真實值）",
   "payees.phone": "手機號（可選）",
   "payees.badPhone": "手機號格式不正確（11 位，1 開頭）",
-  "bench.prodBench": "生產模型實測（{0} 條指令）：首 token 中位 {1}s · P95 {2}s · 成功 {3}/{0}"
+  "bench.prodBench": "生產模型實測（{0} 條指令）：首 token 中位 {1}s · P95 {2}s · 成功 {3}/{0}",
+  "fx.buyShort": "買入",
+  "fx.sellShort": "賣出"
 }

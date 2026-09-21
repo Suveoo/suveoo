@@ -50,7 +50,7 @@ S.router.register("fx", async () => {
         : `<span class="fx-name">${S.fmt.escape(name)}</span>`;
     };
     document.getElementById("tbl").innerHTML = `<table class="table fx-table"><thead><tr>
-      <th></th><th>${S.fmt.escape(S.t("fx.buy"))}</th><th>${S.fmt.escape(S.t("fx.sell"))}</th><th>${S.fmt.escape(S.t("fx.mid"))}</th><th>7D</th></tr></thead><tbody>
+      <th></th><th><span class="hh-l">${S.fmt.escape(S.t("fx.buy"))}</span><span class="hh-s">${S.fmt.escape(S.t("fx.buyShort"))}</span></th><th><span class="hh-l">${S.fmt.escape(S.t("fx.sell"))}</span><span class="hh-s">${S.fmt.escape(S.t("fx.sellShort"))}</span></th><th>${S.fmt.escape(S.t("fx.mid"))}</th><th>7D</th></tr></thead><tbody>
       ${fx.quotes.map((q) => `<tr><td class="fx-cell"><img class="fx-flag" src="${q.flag}" alt="">${nameCell(q.name)}</td>
         <td class="mono">${q.buy}</td><td class="mono">${q.sell}</td><td class="mono">${q.mid}</td><td>${S.charts.spark(q.spark, { color: "auto" })}</td></tr>`).join("")}
       </tbody></table>${accumulating ? `<div class="muted small" style="padding:8px 12px">${S.fmt.escape(S.t("fx.sparkAccumulating"))}</div>` : ""}`;
