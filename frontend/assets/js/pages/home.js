@@ -11,10 +11,11 @@ S.router.register("home", async ({ user }) => {
       <button class="voice-btn" id="hero-mic" type="button">${S.ui.icon("mic", 16)}</button>
     </div>
     <div id="promo" style="margin-top:16px"></div>
-    <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"></div><div id="cashflow"></div></div>
+    <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"><div class="skeleton" style="width:38%;height:14px;margin-bottom:10px"></div><div class="skeleton" style="width:60%;height:34px;margin-bottom:10px"></div><div class="skeleton" style="width:44%;height:12px"></div></div><div id="cashflow"></div></div>
     <div class="card svc-card" style="margin-top:16px"><h2 class="svc-h">${S.fmt.escape(S.t("home.services"))}</h2><div class="svc-grid" id="services"></div></div>
-    <div class="card" id="insight" style="margin-top:16px"></div>
+    <div class="card" id="insight" style="margin-top:16px"><div class="skeleton" style="width:38%;height:14px;margin-bottom:10px"></div><div class="skeleton" style="width:92%;height:12px;margin-bottom:8px"></div><div class="skeleton" style="width:80%;height:12px"></div></div>
     <div class="brand-banner" style="margin-top:16px">
+      <img class="bb-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="" loading="lazy">
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
     </div>`;
@@ -149,9 +150,9 @@ S.router.register("home", async ({ user }) => {
   if (insData) {
     /* 行即入口（第二十五轮 2）：去底部按钮与行首箭头，行尾回车式图标示意"带去 AI"；
        整行可点击 → 以第一人称指令原文发给 Suveoo AI（S.router.ai → /ai?q=…） */
-    document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
+    document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><span class="ins-badge"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="" loading="lazy"></span>
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
-      ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
+      ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
       </div></div>`;
     S.ui.$$("#insight .insight-li").forEach((p) => {
       const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));

@@ -2,6 +2,14 @@
 /* home hero 输入条（第二十三轮 A 极简化：全宽胶囊、无外容器；C 修复：input 可收缩 + 容器防溢出） */
 .hero-input { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 8px 8px 8px 16px; cursor: text; overflow: hidden; }
 .hero-input:focus-within, .hero-input:hover { border-color: var(--color-navy); }
+/* 聚焦轻拟态（第四十一轮 P1）：白底转 navy 渐变+白字+麦克风反白——ChatGPT 桌面端经典处理 */
+.hero-input { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
+.hero-input:focus-within { background: linear-gradient(135deg, #101851, #1E2A78 55%, #35479E); border-color: transparent; }
+.hero-input:focus-within input { color: #fff; }
+.hero-input:focus-within input::placeholder { color: rgba(255,255,255,.55); }
+.hero-input:focus-within .voice-btn { color: #fff; }
+.hero-input:focus-within .voice-btn:hover { background: rgba(255,255,255,.15); }
+.hero-input:focus-within .voice-btn.listening { color: #ffb4b4; background: rgba(255,255,255,.12); }
 .hero-input img, .hero-input svg { width: 20px; height: 20px; flex: none; }
 .hero-input input { border: none; outline: none; flex: 1; min-width: 0; font-size: var(--fs-16); font-family: inherit; background: transparent; }
 .assets-block .total { font-family: var(--font-mono); font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
@@ -21,7 +29,9 @@
 /* 金刚区图标位（第二十三轮 D：tint 圆底退役，直接放 30px ic-* 彩色 squircle） */
 .quick-item .qi-wrap { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .quick-item .qi-wrap svg { display: block; }
-.brand-banner { border-radius: 16px; overflow: hidden; position: relative; min-height: 200px; display: flex; align-items: center; background: linear-gradient(120deg, #101851, #1E2A78 55%, #35479e); color: #fff; padding: var(--sp-8); }
+.brand-banner { border-radius: var(--r-card-lg); overflow: hidden; position: relative; min-height: 190px; display: flex; align-items: center; background: linear-gradient(135deg, #101851, #1E2A78 55%, #35479E); color: #fff; padding: var(--sp-8); animation: rise-in .3s cubic-bezier(.25,.6,.3,1) both; }
+.brand-banner::after { content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122,143,255,.35), transparent); pointer-events: none; }
+.brand-banner .bb-art { position: absolute; right: 12px; bottom: -8px; width: 128px; height: 128px; z-index: 0; opacity: .95; pointer-events: none; }
 .brand-banner .bb-text { max-width: 520px; }
 .brand-banner p { color: rgba(255,255,255,.82); margin: var(--sp-2) 0 var(--sp-4); font-size: var(--fs-14); }
 
@@ -331,3 +341,9 @@
 .acct-pnl { font-size: 13px; color: var(--color-ink-2); margin-top: 4px; }
 .acct-ovrow { background: var(--color-surface); border-radius: 10px; padding: 8px 12px; margin: 4px 0; border-bottom: none !important; }
 @media (prefers-reduced-motion: reduce) { .acct-hero { animation: none; } }
+
+/* AI 洞察卡渐变徽标（第四十一轮 P2，与 /ai 首屏同款） */
+.ins-badge { flex: none; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #101851, #35479E); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16,24,81,.25); }
+.ins-badge img { width: 30px; height: 30px; }
+.insight-card { align-items: flex-start; }
+@media (prefers-reduced-motion: reduce) { .brand-banner { animation: none; } }
