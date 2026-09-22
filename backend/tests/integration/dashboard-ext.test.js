@@ -62,3 +62,19 @@ describe("dashboard 扩展字段（by_category_month / income_recent）", () => 
     expect(fromA.count).toBeGreaterThanOrEqual(1);
   });
 });
+
+/* 第四十轮：/api/home/bundle —— 主页五查询一次往返聚合 */
+describe("home bundle", () => {
+  it("鉴权后返回 overview/dashboard/subscriptions/bills/insight 五键，overview 与独立端点同口径", async () => {
+    const reg = await j(await post("/api/auth/email-code", { scene: "register", email: "hb1@test.dev" }));
+    const out = await j(await post("/api/auth/register", { email: "hb1@test.dev", code: await lastCode("hb1@test.dev"), name: "聚合甲", password: "jinrongkeji2026", risk_answers: [3, 3, 3, 3, 3], aml_consented: true }));
+    const H = { authorization: `Bearer ${out.token}` };
+    const b = await j(await SELF.fetch(BASE + "/api/home/bundle", { headers: H }));
+    expect(b.ok).toBe(true);
+    for (const k of ["overview", "dashboard", "subscriptions", "bills", "insight"]) expect(b[k]).toBeTruthy();
+    const solo = await j(await SELF.fetch(BASE + "/api/overview", { headers: H }));
+    expect(String(b.overview.total_assets)).toBe(String(solo.total_assets));
+    const anon = await SELF.fetch(BASE + "/api/home/bundle");
+    expect(anon.status).toBe(401);
+  });
+});

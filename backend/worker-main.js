@@ -1649,6 +1649,21 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       return guardResponse(g);
     }
     if (path === "/api/subscriptions" && method === "GET") { const r = await UU({ op: "subs" }); return json(r); }
+    /* 主页聚合（第四十轮性能）：一次鉴权请求 + 一次 DO 往返取全部首屏数据——此前 home 需 5 个 API
+       （overview×2 冗余 + dashboard + subs + bills + insight），同用户 DO 串行门控下逐个排队，快网也慢 */
+    if (path === "/api/home/bundle" && method === "GET") {
+      const navs = await fundNavs(env); /* 勿与函数同名（曾致 TDZ 500） */
+      const b = await UU({ ops: [
+        { k: "overview", op: "overview", fundNavs: navs },
+        { k: "dashboard", op: "dashboard" },
+        { k: "subscriptions", op: "subs" },
+        { k: "bills", op: "bills" },
+        { k: "insight", op: "insight" },
+      ] });
+      const out = { ok: b.ok === true };
+      for (const r of (b.results ?? [])) out[r.k] = r.r;
+      return json(out);
+    }
     mm = m(/^\/api\/subscriptions\/([a-z0-9-]+)\/(cancel|reminders)$/);
     if (mm) {
       const b = await readJsonBody(request);
@@ -4798,6 +4813,18 @@ export class LedgerDO {
     await this.#ensureSchema();
     const sql = this.state.storage.sql;
     const NOW = this.#now();
+    /* 批量算子（第四十轮）：一个外部请求内串行执行多个既有算子并合并返回——主页 5 个首屏查询
+       从 5 次 DO 往返（各自承担鉴权/派发/网络开销，且同用户 DO 门控排队）压成 1 次 */
+    if (Array.isArray(input.ops)) {
+      const results = [];
+      for (const part of input.ops) {
+        const sub = await this.fetch(new Request("https://self.internal/", {
+          method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" }, body: JSON.stringify(part),
+        })).then((r) => r.json());
+        results.push({ k: part.k ?? part.op, r: sub });
+      }
+      return json({ ok: true, results });
+    }
     try {
       switch (input.op) {
         /* ---- registry ---- */

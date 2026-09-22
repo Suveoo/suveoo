@@ -34,17 +34,20 @@ S.insights = (() => {
   }
 
   async function collect() {
-    const out = [];
     const [ovR, dashR, subsR, billsR] = await Promise.all([
       S.api.get("/api/overview").catch(() => null),
       S.api.get("/api/dashboard").catch(() => null),
       S.api.get("/api/subscriptions").catch(() => null),
       S.api.get("/api/bills").catch(() => null),
     ]);
-    const ov = ovR?.ok ? ovR.data : null;
-    const dash = dashR?.ok ? dashR.data : null;
-    const subs = (subsR?.ok ? subsR?.data?.subscriptions : null) ?? [];
-    const bills = (billsR?.ok ? billsR?.data?.bills : null) ?? [];
+    return fromData(ovR?.ok ? ovR.data : null, dashR?.ok ? dashR.data : null, subsR?.ok ? subsR.data : null, billsR?.ok ? billsR.data : null);
+  }
+
+  /* 第四十轮：bundle 版（/api/home/bundle 单次往返取全量）——规则逻辑与 collect 完全同源 */
+  function fromData(ov, dash, subsD, billsD) {
+    const out = [];
+    const subs = subsD?.subscriptions ?? [];
+    const bills = billsD?.bills ?? [];
     const cards = ov?.cards ?? [];
     const credit = cards.find((x) => x.kind === "credit");
     const debitBal = num(ov?.total_balance);
@@ -105,5 +108,5 @@ S.insights = (() => {
     return { list: out, cashflow: dash ? cf : null, hasCreditCard: !!credit, salary, subsMonthly };
   }
 
-  return { collect, cashflowOf };
+  return { collect, fromData, cashflowOf };
 })();
