@@ -257,3 +257,11 @@
 .tx-sum-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
 .tx-main-change { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 6px 14px; }
 .tx-main-change svg { color: var(--color-navy); }
+
+/* ===== 账户中心（第三十六轮）：资产概要移动端第四至六行占满整行（标签左/数值右对齐）；快捷入口带阴影大卡 ===== */
+@media (max-width: 767px) {
+  .acct-ov-side { flex-basis: 100%; }
+}
+.acct-grid-card { box-shadow: var(--shadow-lg); padding: 16px 12px 6px; }
+.acct-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px 8px; }
+@media (max-width: 767px) { .acct-grid { grid-template-columns: repeat(3, 1fr); } }

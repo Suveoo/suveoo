@@ -20,8 +20,8 @@ S.router.register("account", async ({ user }) => {
     <div class="card" id="ov">${S.ui.skeleton(2)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("acct.recent"))}</h2><a class="more" href="/account/transactions">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card" id="recent">${S.ui.skeleton(3)}</div>
-    <div class="grid grid-4" style="margin-top:16px">
-      ${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}
+    <div class="card acct-grid-card" style="margin-top:16px">
+      <div class="acct-grid">${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}</div>
     </div>
     <div class="card" style="margin-top:16px">
       <h3>${S.fmt.escape(S.t("acct.prefs"))}</h3>
@@ -43,7 +43,7 @@ S.router.register("account", async ({ user }) => {
       <div><div class="muted small">${S.fmt.escape(S.t("home.totalAssets"))}（CNY）</div>
         <div class="total mono" style="font-size:28px;font-weight:700">¥ ${S.fmt.moneyPlain(ov.data.total_assets)}</div>
         <div class="muted small">${S.fmt.escape(S.t("home.todayPnl"))} ${S.fmt.escape(String(ov.data.today_pnl?.amount ?? "—"))}（${S.fmt.escape(String(ov.data.today_pnl?.percent ?? "—"))}）</div></div>
-      <div style="text-align:right">
+      <div class="acct-ov-side" style="text-align:right">
         <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("acct.balance"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.total_balance)}</span></div>
         <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.holdings_total)}</span></div>
         ${fxSum > 0 ? `<a class="gc-kv" href="/wealth/fx"><span class="muted">${S.fmt.escape(S.t("acct.fxAssets"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(fxSum.toFixed(2))} →</span></a>` : ""}
