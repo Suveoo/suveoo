@@ -152,7 +152,7 @@ S.router.register("home", async ({ user }) => {
        整行可点击 → 以第一人称指令原文发给 Suveoo AI（S.router.ai → /ai?q=…） */
     document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><img class="ins-logo" src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
-      ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
+      ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
       </div></div>`;
     S.ui.$$("#insight .insight-li").forEach((p) => {
       const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));

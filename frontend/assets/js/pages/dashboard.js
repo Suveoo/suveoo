@@ -17,8 +17,14 @@ S.router.register("dashboard", async () => {
   const d = r.data;
   const ins = await S.api.get("/api/dashboard/insight");
   document.getElementById("ai-read").innerHTML = ins.ok
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("dash.aiRead"))}</b>
-       ${(ins.data.insights ?? []).map((t) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(t)}</p>`).join("")}</div></div>` : "";
+    ? `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("dash.aiRead"))}</b>
+       ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}</div></div>` : "";
+  /* 行即入口（与 /home AI 洞察同款）：整行可点击 → 第一人称原文发 Suveoo AI */
+  S.ui.$$("#ai-read .insight-li").forEach((p) => {
+    const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));
+    p.onclick = ask;
+    p.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
+  });
   /* 支出分类 → 桑基 */
   const palette = ["#1E2A78", "#3A4FA5", "#5B7C99", "#7A6A53", "#2C6E63", "#A44A3F", "#666B8F", "#8C8C9A"];
   const cats = (d.by_category ?? []).map((x, i) => ({ label: x.category, value: Number(x.total) / 100, color: palette[i % 8] }));
