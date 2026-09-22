@@ -1026,5 +1026,11 @@
   "wealth.suitPrompt": "{0} 适合我吗",
   "wealth.title": "财富",
   "wealth.toolHub": "金融计算工具",
-  "wealth.viewHoldings": "查看持仓"
+  "wealth.viewHoldings": "查看持仓",
+  "pay.heroSub": "向 Suveoo 用户实时到账 · 免手续费",
+  "pay.comingSoon": "即将上线",
+  "pay.addPayee": "添加收款人",
+  "pay.today": "今天",
+  "pay.yesterday": "昨天",
+  "pay.earlier": "更早"
 }

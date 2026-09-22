@@ -1026,5 +1026,11 @@
   "wealth.suitPrompt": "Does {0} suit me?",
   "wealth.title": "Wealth",
   "wealth.toolHub": "Financial Calculators",
-  "wealth.viewHoldings": "View Holdings"
+  "wealth.viewHoldings": "View Holdings",
+  "pay.heroSub": "Instant to Suveoo users · zero fee",
+  "pay.comingSoon": "Soon",
+  "pay.addPayee": "Add payee",
+  "pay.today": "Today",
+  "pay.yesterday": "Yesterday",
+  "pay.earlier": "Earlier"
 }

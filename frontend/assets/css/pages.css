@@ -265,3 +265,41 @@
 .acct-grid-card { box-shadow: var(--shadow-lg); padding: 16px 12px; } /* 上下对称 16px：首行顶缘到卡顶 = 末行底缘到卡底（光学严格） */
 .acct-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px 8px; }
 @media (max-width: 767px) { .acct-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* ===== /pay 改版（第三十七轮）：渐变 Hero + 玻璃块 + 无边框宫格 + tint 收款人卡 + 分类图标流水 ===== */
+.pay-hero { border-radius: var(--r-card-lg); padding: 14px 16px 16px; color: #fff; margin-bottom: 16px; animation: rise-in .28s cubic-bezier(.25,.6,.3,1) both; }
+.ph-ai { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.18); padding: 2px 0 12px; cursor: pointer; color: rgba(255,255,255,.85); font-size: 13px; }
+.ph-ai img { width: 22px; height: 22px; flex: none; }
+.ph-ai:hover { color: #fff; }
+.ph-go { flex: none; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.16); display: inline-flex; align-items: center; justify-content: center; color: #fff; }
+.ph-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 14px; }
+.ph-main-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ph-main-txt b { font-size: 18px; }
+.ph-main-txt span { font-size: 12px; color: rgba(255,255,255,.72); }
+.ph-cta { flex: none; display: inline-flex; align-items: center; gap: 6px; background: #fff; color: var(--color-navy); font-weight: 700; font-size: var(--fs-14); border-radius: var(--r-pill); padding: 10px 18px; text-decoration: none; box-shadow: 0 6px 18px rgba(9,16,54,.28); transition: transform .15s ease; }
+.ph-cta:active { transform: scale(.96); }
+.ph-glass-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ph-glass { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 11px 4px 9px; border-radius: 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #fff; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform .15s ease, background-color .15s ease; }
+.ph-glass:hover { background: rgba(255,255,255,.2); }
+.ph-glass:active { transform: scale(.96); }
+.ph-glass .ic { color: #fff; }
+.ph-soon { position: absolute; top: -7px; right: -4px; font-style: normal; font-size: 9px; line-height: 1; padding: 3px 6px; border-radius: 999px; background: var(--color-gold, #F5B301); color: #4A3200; font-weight: 700; white-space: nowrap; }
+/* 次级宫格卡（与首页贴心服务同构） */
+.pay-svc-card { padding: 14px 12px; box-shadow: var(--shadow-lg); margin-bottom: 0; }
+.pay-svc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 8px; }
+/* 区块节奏：标题 margin 16px（与首页板块等距口径一致） */
+.pay-sec { margin: 16px 0 8px; }
+/* 收款人 tint 卡 */
+.payees { padding-bottom: var(--sp-2); }
+.payee-card { position: relative; flex: none; min-width: 176px; max-width: 200px; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; scroll-snap-align: start; }
+.payee-badge { position: absolute; top: 10px; right: 10px; font-size: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.7); color: var(--color-ink-2); }
+.payee-ava { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--color-navy); }
+.payee-card .btn { margin-top: 10px; align-self: flex-start; }
+.payee-add { align-items: center; justify-content: center; gap: 8px; border: 1.5px dashed var(--color-navy); background: var(--color-primary-tint); color: var(--color-navy); font-weight: 600; font-size: var(--fs-13, 13px); text-decoration: none; }
+.payee-add .pc-plus { width: 34px; height: 34px; border-radius: 50%; background: var(--color-navy); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+/* 流水：日期分组 + 发丝虚线 + 大阴影卡 */
+.pay-recent { box-shadow: var(--shadow-lg); }
+.pay-day { font-weight: 600; padding: 10px 0 2px; }
+.pay-tx { border-bottom: 1px dashed var(--color-line); }
+.pay-tx:last-child { border-bottom: none; }
+@media (prefers-reduced-motion: reduce) { .pay-hero { animation: none; } }
