@@ -1,7 +1,7 @@
 /* wealth.js — P04 财富总览（共享助手见 core/app.js 的 S.wealth/S.fundCache/S.purchaseModal） */
 S.router.register("wealth", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("wealth.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("wealth.title"))}</h1>
     <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("wealth.aiAsk"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="card">${S.ui.skeleton(3)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.funds"))}</h2><a class="more" href="/wealth/funds">${S.fmt.escape(S.t("wealth.allFunds"))} →</a></div>
@@ -19,22 +19,22 @@ S.router.register("wealth", async () => {
   if (h.ok) {
     const list = h.data.holdings ?? [];
     const total = list.reduce((a, x) => a + Number(x.value ?? x.amount ?? 0), 0);
-    hc.innerHTML = `<div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("wealth.holdings"))}</div>
+    /* 持仓折叠（第四十二轮）：>3 项先收 3 行 + 展开钮——多持仓用户不必长滚才见产品区；
+       赎回全部按钮退役（真银行无此设计），逐项赎回移入 /wealth/my 我的持仓页 */
+    const HOLDING_PREVIEW = 3;
+    const renderHoldings = (expanded) => {
+      const shown = expanded ? list : list.slice(0, HOLDING_PREVIEW);
+      hc.innerHTML = `<div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("wealth.holdings"))}</div>
       <div class="total mono" style="font-size:32px;font-weight:700">¥ ${S.fmt.moneyPlain(total)}</div></div>
-      <button class="btn btn-light" id="redeem-all" ${total ? "" : "disabled"}>${S.fmt.escape(S.t("wealth.redeem"))}（RED）</button></div>
-      ${list.map((x) => `<div class="list-row"><div class="grow"><b>${S.fmt.escape(x.name ?? x.fund)}</b>
+      <a class="btn btn-light" href="/wealth/my">${S.fmt.escape(S.t("wealth.manage"))} →</a></div>
+      ${shown.map((x) => `<div class="list-row"><div class="grow"><b>${S.fmt.escape(x.name ?? x.fund)}</b>
         <div class="muted small">${S.ui.badge("R" + (x.risk_level ?? "?"), "risk-R" + (x.risk_level ?? 1))} NAV ${x.nav ?? "—"} · ${S.fmt.escape(S.t("wealth.cost"))} ¥${S.fmt.moneyPlain(x.amount ?? 0)}</div></div>
-        <div class="amt mono">¥${S.fmt.moneyPlain(x.value ?? x.amount ?? 0)}</div></div>`).join("") || `<div class="muted small">${S.fmt.escape(S.t("common.noData"))}</div>`}`;
-    const ra = document.getElementById("redeem-all");
-    if (ra && total) ra.onclick = async () => {
-      for (const x of list) {
-        if (!(Number(x.value ?? x.amount) > 0)) continue; /* 0 值持仓不发起赎回（否则多弹一张无意义确认卡） */
-        const r = await S.api.mutate("/api/wealth/redeem", { product_id: x.fund, amount: "ALL" }, { subject: x.name ?? x.fund });
-        if (r.cancelled) return;
-        if (r.data?.status !== "EXECUTED") { S.ui.toast(r.data?.reason ?? "failed", true); return; }
-      }
-      S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800);
+        <div class="amt mono">¥${S.fmt.moneyPlain(x.value ?? x.amount ?? 0)}</div></div>`).join("") || `<div class="muted small">${S.fmt.escape(S.t("common.noData"))}</div>`}
+      ${list.length > HOLDING_PREVIEW ? `<button class="btn btn-ghost btn-block wh-expand" style="margin-top:10px">${S.fmt.escape(expanded ? S.t("wealth.collapse") : S.t("wealth.expand", list.length - HOLDING_PREVIEW))}</button>` : ""}`;
+      const ex = hc.querySelector(".wh-expand");
+      if (ex) ex.onclick = () => renderHoldings(!expanded);
     };
+    renderHoldings(false);
   }
   /* 基金 / 存款 / 外汇（设计语言现代化：品类插画 + 大数字主视觉，字段零删减） */
   const funds = (await S.fundCache()).filter(Boolean);

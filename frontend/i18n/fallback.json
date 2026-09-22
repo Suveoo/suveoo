@@ -1032,5 +1032,14 @@
   "pay.addPayee": "Add payee",
   "pay.today": "Today",
   "pay.yesterday": "Yesterday",
-  "pay.earlier": "Earlier"
+  "pay.earlier": "Earlier",
+  "wealth.my": "My Portfolio",
+  "wealth.mySub": "Review and manage each of your wealth products",
+  "wealth.manage": "Manage",
+  "wealth.expand": "Show {0} more holdings",
+  "wealth.collapse": "Collapse",
+  "wealth.costNav": "Cost NAV",
+  "wealth.redeemItem": "Redeem",
+  "wealth.tryConvert": "Convert",
+  "wealth.emptyFx": "No FX assets yet"
 }

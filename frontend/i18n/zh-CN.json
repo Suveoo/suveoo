@@ -1032,5 +1032,14 @@
   "pay.addPayee": "添加收款人",
   "pay.today": "今天",
   "pay.yesterday": "昨天",
-  "pay.earlier": "更早"
+  "pay.earlier": "更早",
+  "wealth.my": "我的持仓",
+  "wealth.mySub": "逐项查看与管理您的每一项理财产品",
+  "wealth.manage": "管理",
+  "wealth.expand": "展开其余 {0} 项持仓",
+  "wealth.collapse": "收起",
+  "wealth.costNav": "成本净值",
+  "wealth.redeemItem": "赎回",
+  "wealth.tryConvert": "换汇试算",
+  "wealth.emptyFx": "暂无外币资产"
 }

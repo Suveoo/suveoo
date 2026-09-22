@@ -150,7 +150,7 @@ S.router.register("home", async ({ user }) => {
   if (insData) {
     /* 行即入口（第二十五轮 2）：去底部按钮与行首箭头，行尾回车式图标示意"带去 AI"；
        整行可点击 → 以第一人称指令原文发给 Suveoo AI（S.router.ai → /ai?q=…） */
-    document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><span class="ins-badge"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="" loading="lazy"></span>
+    document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><img class="ins-logo" src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
       ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.ui.icon("arrow-right", 12)} ${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
       </div></div>`;

@@ -10,7 +10,7 @@ S.chrome = {
   SUB_STATIC: {
     home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
     pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/account/transactions", "list", "pay.txHistory"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
-    wealth: [["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
+    wealth: [["/wealth/my", "chart", "wealth.my"], ["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
   },
   active() {
     const p = location.pathname;
