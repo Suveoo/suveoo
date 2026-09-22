@@ -144,7 +144,6 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
   .app-footer { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .auth-wrap { margin-top: var(--sp-4); }
   .brand-banner { padding: var(--sp-6) var(--sp-4); }
-  .about-banner { padding: var(--sp-6) var(--sp-4); }
 }
 
 /* ===== 11. 移动端/平板 AI 页：自然页面滚动 + 固定输入条 + 控制台全屏抽屉 ===== */
