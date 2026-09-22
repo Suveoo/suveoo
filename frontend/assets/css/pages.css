@@ -12,7 +12,7 @@
 .quick-item:hover { border-color: var(--color-navy); text-decoration: none; }
 .quick-item.disabled { opacity: .45; cursor: not-allowed; }
 /* 贴心服务大容器（第三十四轮）：单一大卡，标题卡内左上，条目无独立容器；每行个数随宽度自适应（80px 轨道） */
-.svc-card { padding: 16px 16px 6px; }
+.svc-card { padding-top: 16px; padding-bottom: 6px; } /* 左右继承 .card 各断点 padding——与资产总估值文本严格左对齐 */
 .svc-h { font-size: var(--fs-16); margin: 0 0 6px; }
 .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 16px 8px; padding: 6px 0 10px; }
 .svc-item { display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; color: var(--color-ink); }
@@ -262,6 +262,6 @@
 @media (max-width: 767px) {
   .acct-ov-side { flex-basis: 100%; }
 }
-.acct-grid-card { box-shadow: var(--shadow-lg); padding: 16px 12px 6px; }
+.acct-grid-card { box-shadow: var(--shadow-lg); padding: 16px 12px; } /* 上下对称 16px：首行顶缘到卡顶 = 末行底缘到卡底（光学严格） */
 .acct-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px 8px; }
 @media (max-width: 767px) { .acct-grid { grid-template-columns: repeat(3, 1fr); } }

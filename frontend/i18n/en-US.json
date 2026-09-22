@@ -656,7 +656,7 @@
   "offline.body": "Check your network and retry. This is a simulated banking system.",
   "offline.title": "You are offline",
   "pay.aiTry": "Try: split last night's hotpot bill with Zhang San and Li Si",
-  "pay.billsEntry": "Bills & Subscriptions",
+  "pay.billsEntry": "Bills",
   "pay.history": "Transfer History",
   "pay.intrabank": "Intra-bank Transfer",
   "pay.limits": "Transfer Limits",

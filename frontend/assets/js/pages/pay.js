@@ -8,8 +8,7 @@ S.router.register("pay", async () => {
       <div class="pay-action disabled" id="dis-cross"><span class="pi">${S.ui.icon("exchange", 26)}</span>${S.fmt.escape(S.t("home.crossBank"))}</div>
       <div class="pay-action disabled" id="dis-border"><span class="pi">${S.ui.icon("globe2", 26)}</span>${S.fmt.escape(S.t("home.crossBorder"))}</div>
     </div>
-    <div class="section-title"><h2></h2></div>
-    <div class="mini-actions">
+    <div class="mini-actions" style="margin-top:12px">
       <a class="mini-action" href="/transfer/intrabank-scheduled">${S.ui.icon("clock", 16)}${S.fmt.escape(S.t("pay.scheduled"))}</a>
       <a class="mini-action" href="/transfer/history">${S.ui.icon("list", 16)}${S.fmt.escape(S.t("pay.history"))}</a>
       <a class="mini-action" href="/account/transactions">${S.ui.icon("doc", 16)}${S.fmt.escape(S.t("pay.txHistory"))}</a>

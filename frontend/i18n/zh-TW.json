@@ -656,7 +656,7 @@
   "offline.body": "請檢查網路後重試。這是模擬銀行系統，不涉及真實資金行為。",
   "offline.title": "你已離線",
   "pay.aiTry": "試試：把昨晚的火鍋帳單和張三李四 AA",
-  "pay.billsEntry": "帳單與訂閱",
+  "pay.billsEntry": "賬單繳費",
   "pay.history": "轉帳紀錄",
   "pay.intrabank": "行內轉帳",
   "pay.limits": "轉帳限額",

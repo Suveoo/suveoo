@@ -14,7 +14,7 @@ S.router.register("home", async ({ user }) => {
     <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"></div><div id="cashflow"></div></div>
     <div class="card svc-card" style="margin-top:16px"><h2 class="svc-h">${S.fmt.escape(S.t("home.services"))}</h2><div class="svc-grid" id="services"></div></div>
     <div class="card" id="insight" style="margin-top:16px"></div>
-    <div class="brand-banner" style="margin-top:24px">
+    <div class="brand-banner" style="margin-top:16px">
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
     </div>`;

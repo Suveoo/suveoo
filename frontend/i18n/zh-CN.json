@@ -656,7 +656,7 @@
   "offline.body": "请检查网络后重试。这是模拟银行系统，不涉及真实资金行为。",
   "offline.title": "你已离线",
   "pay.aiTry": "试试：把昨晚的火锅账单和张三李四 AA",
-  "pay.billsEntry": "账单与订阅",
+  "pay.billsEntry": "账单缴费",
   "pay.history": "转账记录",
   "pay.intrabank": "行内转账",
   "pay.limits": "转账限额",
