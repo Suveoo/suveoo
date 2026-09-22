@@ -259,6 +259,13 @@
 }
 
 /* ===== 主页/账单页洞察：行即入口（第二十五轮 2/6）——行首无符号（首字与标题对齐），行尾回车图标示意"带去 AI"，整行可点 ===== */
+/* dashboard 月度解读卡头（第四十五轮）：标题行 + "本月解读"入口胶囊（原 ai-quick-bar 并入，消重名） */
+.dash-rhead { display: flex; align-items: center; gap: 8px; }
+.dash-rhead b { flex: 1; min-width: 0; }
+.dash-rgo { flex: none; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--color-navy); background: var(--c-sky-tint); border: none; border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: transform .12s ease, opacity .12s ease; }
+.dash-rgo:active { transform: scale(.94); }
+.dash-rgo .ic { width: 13px; height: 13px; }
+
 .rows-live .insight-li { display: block; cursor: pointer; transition: color .12s ease; }
 .rows-live .insight-li:hover { color: var(--color-navy); }
 .rows-live .insight-li .ic { width: 14px; height: 14px; margin-left: 5px; vertical-align: -2px; color: var(--color-ink-2); transition: color .12s ease; }

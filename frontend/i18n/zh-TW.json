@@ -241,6 +241,7 @@
   "dash.anomaly": "異常交易標記",
   "dash.cat": "支出分類（近90天）",
   "dash.inout": "月度收支對比",
+  "dash.readBtn": "本月解讀",
   "dash.spendCategory": "分類",
   "dash.spendSource": "支出",
   "dash.title": "儀表板",

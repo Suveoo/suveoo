@@ -1,8 +1,7 @@
 /* dashboard.js — P27 仪表盘（自研 SVG 图表 + AI 解读） */
 S.router.register("dashboard", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("dash.aiRead"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
-    <div class="card" id="ai-read">${S.ui.skeleton(1)}</div>
+  c.innerHTML = `<div class="card" id="ai-read">${S.ui.skeleton(1)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("dash.trend"))}</h2></div>
     <div class="card chart-box" id="d-trend">${S.ui.skeleton(1)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("dash.cat"))}</h2></div>
@@ -11,14 +10,20 @@ S.router.register("dashboard", async () => {
     <div class="card chart-box" id="d-inout">${S.ui.skeleton(1)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("dash.anomaly"))}</h2></div>
     <div class="card" id="anomaly"></div>`;
-  document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.monthlyInsight"));
+  /* 原 ai-quick-bar 入口条与卡标题同名重复（第四十五轮）：入口并入卡标题行——
+     "本月解读"胶囊发 prompt.monthlyInsight 原文；任一 API 失败也保底渲染标题+入口 */
+  const rhead = () => `<div class="dash-rhead"><b>${S.fmt.escape(S.t("dash.aiRead"))}</b><button class="dash-rgo" id="dash-rgo" type="button">${S.fmt.escape(S.t("dash.readBtn"))}${S.ui.icon("enter", 14)}</button></div>`;
+  const rheadOnly = () => {
+    document.getElementById("ai-read").innerHTML = `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div>${rhead()}</div></div>`;
+    document.getElementById("dash-rgo").onclick = () => S.router.ai(S.t("prompt.monthlyInsight"));
+  };
   const r = await S.api.get("/api/dashboard");
-  if (!r.ok) return;
+  if (!r.ok) { rheadOnly(); return; }
   const d = r.data;
   const ins = await S.api.get("/api/dashboard/insight");
-  document.getElementById("ai-read").innerHTML = ins.ok
-    ? `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("dash.aiRead"))}</b>
-       ${(ins.data.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}</div></div>` : "";
+  document.getElementById("ai-read").innerHTML = `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div>${rhead()}
+     ${(ins.ok ? ins.data.insights ?? [] : []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}</div></div>`;
+  document.getElementById("dash-rgo").onclick = () => S.router.ai(S.t("prompt.monthlyInsight"));
   /* 行即入口（与 /home AI 洞察同款）：整行可点击 → 第一人称原文发 Suveoo AI */
   S.ui.$$("#ai-read .insight-li").forEach((p) => {
     const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));

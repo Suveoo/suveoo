@@ -241,6 +241,7 @@
   "dash.anomaly": "Anomaly Flags",
   "dash.cat": "Spending by Category (90D)",
   "dash.inout": "Monthly Income vs Spending",
+  "dash.readBtn": "Monthly briefing",
   "dash.spendCategory": "Category",
   "dash.spendSource": "Spending",
   "dash.title": "Dashboard",
