@@ -3,7 +3,7 @@ S.router.register("payees", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<div class="row between"><h1>${S.fmt.escape(S.t("payees.title"))}</h1>
     <button class="btn btn-primary" id="add">${S.ui.icon("plus", 16)} ${S.fmt.escape(S.t("payees.add"))}</button></div>
-    ${S.sim.footnote()}<div class="card">${S.ui.skeleton(4)}</div>`;
+    <div class="card">${S.ui.skeleton(4)}</div>`;
   const el = c.querySelector(".card");
   const render = async () => {
     const r = await S.api.get("/api/payees");
@@ -12,16 +12,20 @@ S.router.register("payees", async () => {
     const gLabel = (g) => { const k = GROUP_KEY[g]; return k ? S.t("payees.group." + k) : g; };
     const groups = {};
     for (const p of r.data?.payees ?? []) (groups[p.group_label ?? S.t("payees.group.default")] ??= []).push(p);
-    el.innerHTML = Object.entries(groups).map(([g, list]) => `
-      <h3 style="margin:8px 0 4px">${S.fmt.escape(gLabel(g))}</h3>
+    const TINTS = ["teal", "orange", "violet", "gold", "rose", "sky"];
+    let gi = 0;
+    el.innerHTML = Object.entries(groups).map(([g, list]) => {
+      const tint = TINTS[gi++ % TINTS.length];
+      return `
+      <div class="pye-group"><span class="pye-gh bg-tint-${tint}">${S.fmt.escape(gLabel(g))}</span></div>
       ${list.map((p) => `
-      <div class="list-row">
-        <span class="avatar">${S.fmt.escape(p.name.slice(0, 1))}</span>
+      <div class="list-row pye-row">
+        <span class="payee-ava bg-tint-${tint}">${S.fmt.escape(p.name.slice(0, 1))}</span>
         <div class="grow"><b>${S.fmt.escape(p.name)}</b><div class="muted small mono">${S.fmt.escape(p.account ?? "—")}</div></div>
         ${p.verified === false ? S.ui.badge(S.t("payees.unverified"), "badge-gray") : ""}
         <button class="btn btn-sm btn-light go" data-id="${p.id}" ${p.verified === false ? "disabled title=" + S.fmt.escape(S.t("payees.unverified")) : ""}>${S.ui.icon("send", 12)} ${S.fmt.escape(S.t("payees.transfer"))}</button>
         <button class="bc-btn del" data-id="${p.id}" title="${S.fmt.escape(S.t("common.delete"))}">${S.ui.icon("x", 13)}</button>
-      </div>`).join("")}`).join("") || S.ui.empty(S.t("common.noData"));
+      </div>`).join("")}`;}).join("") || S.ui.empty(S.t("common.noData"));
     S.ui.$$(".go").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
     S.ui.$$(".del").forEach((b) => {
       b.onclick = async () => {
@@ -76,4 +80,6 @@ S.router.register("payees", async () => {
     };
   };
   render();
+  /* /pay 添加卡直达：带 ?add=1 进入时自动弹出添加收款人表单 */
+  if (new URLSearchParams(location.search).get("add") === "1") document.getElementById("add")?.click();
 });

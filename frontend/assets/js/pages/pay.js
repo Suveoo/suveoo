@@ -38,10 +38,11 @@ S.router.register("pay", async () => {
     const el = document.getElementById("payees");
     const TINTS = ["teal", "orange", "violet", "gold", "rose", "sky"];
     el.className = "hscroll payees";
-    el.innerHTML = `<a class="payee-card payee-add" href="/transfer/payees"><span class="pc-plus">${S.ui.icon("plus", 18)}</span><span>${S.fmt.escape(S.t("pay.addPayee"))}</span></a>` + (pr.data.payees ?? []).slice(0, 6).map((p, i) => `
+    /* 手机端（≤767）首屏含添加卡后右上角不缺位：收款人 6→5；桌面不受影响 */
+    const showN = window.matchMedia("(max-width: 767px)").matches ? 5 : 6;
+    el.innerHTML = `<a class="payee-card payee-add" href="/transfer/payees?add=1"><span class="pc-plus">${S.ui.icon("plus", 18)}</span><span>${S.fmt.escape(S.t("pay.addPayee"))}</span></a>` + (pr.data.payees ?? []).slice(0, showN).map((p, i) => `
       <div class="payee-card bg-tint-${TINTS[i % TINTS.length]}">
-        <span class="payee-badge">${S.fmt.escape(p.group_label ?? "")}</span>
-        <div class="row" style="gap:8px"><span class="payee-ava">${S.fmt.escape(p.name.slice(0, 1))}</span><b>${S.fmt.escape(p.name)}</b></div>
+        <div class="row" style="gap:8px;min-width:0"><span class="payee-ava">${S.fmt.escape(p.name.slice(0, 1))}</span><b class="pye-nm">${S.fmt.escape(p.name)}</b><span class="payee-badge">${S.fmt.escape(p.group_label ?? "")}</span></div>
         <div class="muted small mono" style="margin-top:6px">**** ${S.fmt.escape(String(p.account).slice(-4))}</div>
         <button class="btn btn-sm btn-light pay-now" data-id="${p.id}" data-name="${S.fmt.escape(p.name)}">${S.fmt.escape(S.t("payees.transfer"))}</button>
       </div>`).join("") || S.ui.empty(S.t("common.noData"));

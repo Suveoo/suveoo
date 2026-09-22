@@ -292,7 +292,8 @@
 /* 收款人 tint 卡 */
 .payees { padding-bottom: var(--sp-2); }
 .payee-card { position: relative; flex: none; min-width: 176px; max-width: 200px; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; scroll-snap-align: start; }
-.payee-badge { position: absolute; top: 10px; right: 10px; font-size: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.7); color: var(--color-ink-2); }
+.payee-badge { flex: none; margin-left: auto; align-self: center; font-size: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--color-ink-2); white-space: nowrap; }
+.payee-card .row b.pye-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .payee-ava { flex: none; width: 34px; height: 34px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--color-navy); }
 .payee-card .btn { margin-top: 10px; align-self: flex-start; }
 .payee-add { align-items: center; justify-content: center; gap: 8px; border: 1.5px dashed var(--color-navy); background: var(--color-primary-tint); color: var(--color-navy); font-weight: 600; font-size: var(--fs-13, 13px); text-decoration: none; }
@@ -303,3 +304,9 @@
 .pay-tx { border-bottom: 1px dashed var(--color-line); }
 .pay-tx:last-child { border-bottom: none; }
 @media (prefers-reduced-motion: reduce) { .pay-hero { animation: none; } }
+
+/* /transfer/payees 现代化（第三十七轮续）：tint 分组胶囊 + 彩色首字头像行 */
+.pye-group { margin: 14px 0 2px; }
+.pye-gh { display: inline-block; font-size: var(--fs-12); font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+.pye-row { padding: 10px 0; border-bottom: 1px dashed var(--color-line); }
+.pye-row:last-child { border-bottom: none; }
