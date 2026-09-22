@@ -544,7 +544,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
     background-color .22s ease, box-shadow .22s ease;
 }
 .ch-more.open .ch-more-morph {
-  width: 208px; height: 92px; border-radius: 16px; background: #fff;
+  width: 208px; height: 154px; border-radius: 16px; background: #fff;
   transform: translateY(-14.75px);
   box-shadow: 0 3px 6px rgba(23, 27, 64, .05), 0 16px 40px rgba(23, 27, 64, .16);
   transition: width .38s cubic-bezier(.22, 1.18, .36, 1), height .38s cubic-bezier(.22, 1.18, .36, 1),
@@ -565,7 +565,8 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   transition: opacity .14s ease, transform .14s ease;
 }
 .ch-more-item:nth-child(2) { top: 6.5px; }
-.ch-more-item:nth-child(3) { bottom: 4.5px; }
+.ch-more-item:nth-child(3) { top: 56px; }
+.ch-more-item:nth-child(4) { bottom: 5px; }
 .ch-more.open .ch-more-item { opacity: 1; transform: none; pointer-events: auto; transition: opacity .24s ease .13s, transform .32s cubic-bezier(.22, 1, .36, 1) .13s; }
 .ch-more.open .ch-more-item:nth-child(3) { transition-delay: .19s, .19s; }
 .ch-more-item:active { background: var(--color-primary-tint); }

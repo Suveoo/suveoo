@@ -16,7 +16,7 @@ S.genuiCards = {
     card_limit_adjust:   { title: "genui.confirmLimit",    icon: "gear",     field: "genui.card",     fee: false },
     card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
     card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
-    subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: null,             fee: false },
+    subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: "genui.merchant",  fee: false },
     task_cancel:         { title: "genui.confirmTaskCancel", icon: "clock",  field: null,             fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
@@ -37,13 +37,14 @@ S.genuiCards = {
       else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
     }
     const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
-    /* "ALL" 全额赎回占位无数值可显示，以文案替代，避免渲染 ¥ NaN */
-    const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : S.t("genui.redeemAll");
+    /* "ALL" 全额赎回占位按文案显示；既无金额也无 ALL（退订/开关类操作）不渲染金额行——
+       此前误落 genui.redeemAll 把退订确认卡显示成"全部持仓"（第六期 idle 生产实测抓出，存量 bug） */
+    const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : (String(rawAmt) === "ALL" ? S.t("genui.redeemAll") : null);
     /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
     const verifiedBadge = c.action == null || c.action === "transfer_execute" ? (c.params?.verified ? ` ${S.ui.badge(S.t("genui.verified"), "badge-green")}` : "") : "";
     return `<div class="genui-card">
       <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(meta.title)} ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
-      <div class="gc-amount">${amtText}</div>
+      ${amtText ? `<div class="gc-amount">${amtText}</div>` : ""}
       ${S.genuiCards.kv([
         ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),

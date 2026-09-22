@@ -304,6 +304,7 @@ export const TOOL_REGISTRY = {
   card_unfreeze:          { tier: RISK.RED },
   task_cancel:            { tier: RISK.YELLOW },
   task_list:              { tier: RISK.GREEN },
+  proposal_list:          { tier: RISK.GREEN },
   ecommerce_order_mock:   { tier: RISK.RED, amountArg: "amount" },
 };
 /* 提醒类长程任务不涉及资金（到期仅站内通知），金额可缺省；预约转账/订花等其余 amountArg 工具仍须正金额。
@@ -631,6 +632,20 @@ function riskAssessmentMail(prLevel) {
   const text = "您的风险承受能力评估已完成，风险承受等级更新为 PR" + prLevel + "。\n该等级实时生效，将决定您可申购产品的风险上限（产品风险等级需不高于 PR 等级）。\n如非本人操作，请立即登录并修改密码、开启两步验证。\n\n这是模拟银行系统，不涉及真实资金行为。";
   const html = "<p>您的风险承受能力评估已完成，风险承受等级更新为 <b>PR" + prLevel + "</b>。</p><p>该等级实时生效，将决定您可申购产品的风险上限（产品风险等级需不高于 PR 等级）。</p><p style=\"color:#C0392B\">如非本人操作，请立即登录并修改密码、开启两步验证。</p><p class=\"muted\">这是模拟银行系统，不涉及真实资金行为。</p>";
   return { subject: title, text, html };
+}
+
+/* ===== AI 主动银行（第六期 idle）：提议两触点邮件（克制模板：无 emoji、含金额与入口） ===== */
+function proposalScanMail(n, lines) {
+  const text = `Suveoo AI 扫描了你的账户，发现 ${n} 条可办提议：\n\n${lines}\n\n查看全部与执行（每笔均需你在确认卡上确认）：\nhttps://suveoo.com/ai/proposals\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">AI 为你发现 ${n} 条可办提议</h2><p style="line-height:1.8">${escHtml(lines).replace(/\n/g, "<br>")}</p><p><a href="https://suveoo.com/ai/proposals">查看全部与执行</a>（每笔均需你在确认卡上确认）</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】AI 为你发现 ${n} 条可办提议`, text, html };
+}
+function proposalSettledMail(p) {
+  const impactTxt = p.impact_cents ? `，此后每月约省 ¥${centsToStr(BigInt(p.impact_cents))}` : "";
+  const s = String(p.params?.summary ?? p.rule);
+  const text = `你确认执行的 AI 提议已办妥：\n\n${s}${impactTxt}\n\n月度战报已更新：https://suveoo.com/ai/proposals\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">AI 提议已办妥</h2><p>${escHtml(s)}${escHtml(impactTxt)}</p><p><a href="https://suveoo.com/ai/proposals">查看月度战报</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】AI 提议已办妥：${s.slice(0, 30)}`, text, html };
 }
 
 function transferReceiptMail({ amount, to, txId, memo }) {
@@ -1736,6 +1751,51 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       return json({ balances, updated_at: fx.updated_at ?? null, source: fx.source ?? null, note: "cny_estimate 按银行买入价折算（结汇参考）。这是模拟银行系统。" });
     }
 
+    /* ---- AI 主动银行：提议（第六期 idle；扫描+列表单 DO 往返，新提议触发三渠道通知） ---- */
+    if (path === "/api/proposals" && method === "GET") {
+      const r = await UU({ op: "proposalPage" });
+      if ((r.added ?? 0) > 0) {
+        const pend = (r.proposals ?? []).filter((p) => p.status === "PENDING").slice(0, 3);
+        const lines = pend.map((p) => `· ${p.params?.summary ?? p.rule}`).join("\n");
+        await UU({ op: "notify", type: "SYSTEM", title: `Suveoo AI 为你发现 ${r.added} 条可办提议`, body: `${lines}\n查看全部：https://suveoo.com/ai/proposals` });
+        await sendMail(env, { to: email, ...proposalScanMail(r.added, lines) });
+        tgFire(env, ctxInfo.waitUntil, [
+          "🤖 <b>AI 提议已生成</b>", "",
+          "<b>User</b>: <code>" + escHtml(userId) + "</code>",
+          "新增 <b>" + r.added + "</b> 条：",
+          ...pend.map((p) => "· " + escHtml(String(p.params?.summary ?? p.rule))),
+          "<b>Time</b>: " + new Date().toISOString(),
+        ]);
+      }
+      return json(r);
+    }
+    {
+      const mp = /^\/api\/proposals\/(\d+)\/(dismiss|settle)$/.exec(path);
+      if (mp && method === "POST") {
+        if (mp[2] === "dismiss") {
+          const r = await UU({ op: "proposalDismiss", id: Number(mp[1]) });
+          if (!r.ok) return apiError(r.error ?? "FAILED", "提议不存在或已处理", 404);
+          return json(r);
+        }
+        /* settle：核验事实（订阅确实已退/账单确实已缴/任务确实建立…）后才置 EXECUTED——防"假装完成" */
+        const r = await UU({ op: "proposalSettle", id: Number(mp[1]) });
+        if (!r.ok) return apiError(r.error ?? "NOT_EXECUTED", "执行结果核验未通过（对象状态未变化），无法记账为已办妥", 409);
+        const p = r.proposal;
+        const impactTxt = p.impact_cents ? `，此后每月约省 ¥${centsToStr(BigInt(p.impact_cents))}` : "";
+        const summ = String(p.params?.summary ?? p.rule);
+        await UU({ op: "notify", type: "TASK", title: "AI 提议已办妥", body: `${summ}——已经你确认执行${impactTxt}。` });
+        await sendMail(env, { to: email, ...proposalSettledMail(p) });
+        tgFire(env, ctxInfo.waitUntil, [
+          "✅ <b>AI 提议已办妥</b>", "",
+          "<b>User</b>: <code>" + escHtml(userId) + "</code>",
+          escHtml(summ + impactTxt),
+          "<b>proposal</b>: <code>#" + mp[1] + "</code>",
+          "<b>Time</b>: " + new Date().toISOString(),
+        ]);
+        return json({ ok: true, proposal: p, report: r.report ?? null });
+      }
+    }
+
     /* ---- 通知 / 审计 / 报告 / 安全 ---- */
     if (path === "/api/notifications" && method === "GET") { const r = await UU({ op: "notifications", cursor: url.searchParams.get("cursor") ?? "0" }); return json(r); }
     if (path === "/api/notifications/read" && method === "POST") { const b = await readJsonBody(request); const r = await UU({ op: "notifRead", ids: b.ids ?? "all" }); return json(r); }
@@ -2336,9 +2396,177 @@ export function calcBudgetAllocator(a = {}) {
 }
 
 /* ================================================================
+ * ③.6 AI 主动银行——提议引擎（第六期 idle）
+ *    确定性规则（零 LLM、可在前端标注"本地规则引擎生成"）：从用户账本快照产出
+ *    可执行提议；执行通道全部复用既有 intent（subscription_cancel / scheduled_task_create /
+ *    autopay_manage / bill_pay / wealth_product_purchase），走同一套 BankAction IR + 五道验证。
+ *    AI 通道只有查询权（proposal_list，GREEN）；执行权硬属于用户在确认卡上的点击。
+ * ================================================================ */
+/** 订阅月费折算（分）：年付 ÷12、季付 ÷3，其余原值。BigInt 整除向下取整。 */
+export function subMonthlyCents(sub) {
+  const c = BigInt(sub.amount_cents ?? "0");
+  if (sub.cycle === "年" || sub.cycle === "年付" || sub.cycle === "yearly") return c / 12n;
+  if (sub.cycle === "季" || sub.cycle === "季度") return c / 3n;
+  return c;
+}
+/** 下一个"每月 day 日 09:00 北京时间"的 ISO 时刻（UTC 01:00 存储；day 超出次月天数时钳到月末）。
+ *  与既有预约任务 day_of_month 锚定同口径。纯函数（nowMs 注入）供单测。 */
+export function nextMonthlyRunIso(day, nowMs) {
+  const bj = new Date(nowMs + 8 * 3600_000);
+  const y = bj.getUTCFullYear(), m = bj.getUTCMonth();
+  const daysIn = (yy, mm) => new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate();
+  const clamp = (yy, mm) => Math.min(day, daysIn(yy, mm));
+  let run = new Date(Date.UTC(y, m, clamp(y, m), 1, 0, 0));
+  if (run.getTime() <= nowMs) run = new Date(Date.UTC(y, m + 1, clamp(y, m + 1), 1, 0, 0));
+  return run.toISOString();
+}
+/**
+ * 提议生成（纯函数）：输入账本快照，输出建议数组（未持久化；由 DO proposalPage 落库）。
+ * snap: { subs, bills, payees, tasks, routine_tx(近 120 天 OUT 流水), creditDebtCents, debitBalanceCents, gmHoldingCents }
+ * opts: { monthKey: "YYYY-MM"（北京月）, nowMs }
+ * 规则六条：dormant_sub / low_use_sub（SAVE）、routine_transfer（ROUTINE）、
+ *          bill_autopay / credit_debt（GUARD）、idle_cash（WEALTH）。
+ */
+export function generateProposals(snap, opts = {}) {
+  const monthKey = opts.monthKey ?? new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 7);
+  const nowMs = opts.nowMs ?? Date.now();
+  const out = [];
+  const activeSubs = (snap.subs ?? []).filter((s) => (s.status ?? "ACTIVE") === "ACTIVE");
+
+  /* --- SAVE：沉睡订阅（usage<20）与低使用高费订阅（usage<35 且月费≥¥25）--- */
+  const dormant = activeSubs.filter((s) => Number(s.usage_score ?? 100) < 20);
+  const lowUse = activeSubs.filter((s) => {
+    const sc = Number(s.usage_score ?? 100);
+    return sc >= 20 && sc < 35 && subMonthlyCents(s) >= 2500n;
+  });
+  const saveCands = [
+    ...dormant.map((s) => ({ s, rule: "dormant_sub", sc: Number(s.usage_score ?? 100) })),
+    ...lowUse.map((s) => ({ s, rule: "low_use_sub", sc: Number(s.usage_score ?? 100) })),
+  ].sort((a, b) => Number(subMonthlyCents(b.s) - subMonthlyCents(a.s)));
+  for (const { s, rule, sc } of saveCands.slice(0, 5)) {
+    const mc = subMonthlyCents(s);
+    if (mc <= 0n) continue;
+    const days = Math.max(1, Math.round((100 - sc) / 3));
+    out.push({
+      kind: "SAVE", rule, target: s.id, tier: "YELLOW", priority: rule === "dormant_sub" ? 100 : 80,
+      dedup_key: `${rule}:${s.id}:${monthKey}`, impact_cents: String(mc),
+      params: {
+        merchant: s.merchant, plan: s.plan, days: rule === "dormant_sub" ? days : null, usage: sc,
+        monthly: centsToStr(mc), amount: centsToStr(BigInt(s.amount_cents)), cycle: s.cycle,
+        summary: `退订 ${s.merchant}（${rule === "dormant_sub" ? days + " 天未使用" : "使用率 " + sc + "%"}，月省 ¥${centsToStr(mc)}）`,
+        exec: { intent: "subscription_cancel", endpoint: `/api/subscriptions/${s.id}/cancel`, method: "POST", args: {} },
+      },
+    });
+  }
+
+  /* --- ROUTINE：周期转账识别（收款人 ∩ 常用收款人；≥2 个月每月 1-2 笔、金额中位数 ±5% 一致；
+         已有同收款人 monthly 任务则不重复提议）--- */
+  const payees = snap.payees ?? [];
+  const byName = new Map(payees.filter((p) => p.account).map((p) => [p.name, p]));
+  const byCp = {};
+  for (const t of snap.routine_tx ?? []) {
+    if (!byName.has(t.counterparty)) continue;
+    (byCp[t.counterparty] ??= []).push(t);
+  }
+  const tasked = new Set();
+  for (const t of snap.tasks ?? []) {
+    if (String(t.repeat) !== "monthly") continue;
+    const pl = typeof t.payload === "object" && t.payload ? t.payload : (() => { try { return JSON.parse(t.payload ?? "{}"); } catch { return {}; } })();
+    const rn = (pl.transfer ?? pl).recipient_name;
+    if (rn) tasked.add(String(rn));
+    if (t.title) tasked.add(String(t.title));
+  }
+  for (const [name, txs] of Object.entries(byCp)) {
+    if (tasked.has(name) || (snap.tasks ?? []).some((t) => t.title && String(t.title).includes(name))) continue;
+    const months = {};
+    for (const t of txs) (months[String(t.ts).slice(0, 7)] ??= []).push(t);
+    const mkeys = Object.keys(months).filter((m) => months[m].length >= 1 && months[m].length <= 2);
+    if (mkeys.length < 2) continue;
+    const sorted = txs.map((t) => BigInt(t.amount_cents)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const med = sorted[Math.floor(sorted.length / 2)];
+    if (med <= 0n) continue;
+    const consistent = txs.every((t) => {
+      const c = BigInt(t.amount_cents);
+      const diff = c > med ? c - med : med - c;
+      return diff * 100n <= med * 5n;
+    });
+    if (!consistent) continue;
+    const dayCount = {};
+    for (const t of txs) { const d = Number(String(t.ts).slice(8, 10)); dayCount[d] = (dayCount[d] ?? 0) + 1; }
+    const day = Number(Object.entries(dayCount).sort((a, b) => b[1] - a[1])[0][0]);
+    const payee = byName.get(name);
+    const executeAt = nextMonthlyRunIso(day, nowMs);
+    out.push({
+      kind: "ROUTINE", rule: "routine_transfer", target: name,
+      tier: med > POLICY_LIMITS.YELLOW_DAILY_CENTS ? "RED" : "YELLOW", priority: 70,
+      dedup_key: `routine_transfer:${name}:${monthKey}`, impact_cents: null,
+      params: {
+        name, amount: centsToStr(med), day, months: mkeys.length,
+        summary: `把每月 ${day} 日给 ${name} 的 ¥${centsToStr(med)} 转账自动化（已连续 ${mkeys.length} 个月）`,
+        exec: {
+          intent: "scheduled_task_create", endpoint: "/api/schedules", method: "POST",
+          args: { recipient_name: name, recipient_account: payee.account, amount: centsToStr(med), memo: "AI 提议的周期转账自动化", execute_at: executeAt, repeat: "monthly" },
+        },
+      },
+    });
+  }
+
+  /* --- GUARD：未开自动扣款的账单（按金额降序至多 2 条，防逾期）--- */
+  const noAutopay = (snap.bills ?? [])
+    .filter((b) => !Number(b.autopay) && b.id !== "credit-repay")
+    .sort((a, b) => Number(BigInt(b.amount_cents ?? "0") - BigInt(a.amount_cents ?? "0")))
+    .slice(0, 2);
+  for (const b of noAutopay) {
+    out.push({
+      kind: "GUARD", rule: "bill_autopay", target: b.id, tier: "YELLOW", priority: 60,
+      dedup_key: `bill_autopay:${b.id}:${monthKey}`, impact_cents: null,
+      params: {
+        billId: b.id, billName: b.name, amount: centsToStr(BigInt(b.amount_cents ?? "0")), dueDay: b.due_day,
+        summary: `为「${b.name}」开启自动扣款（¥${centsToStr(BigInt(b.amount_cents ?? "0"))}/期，每月 ${b.due_day} 日）`,
+        exec: { intent: "autopay_manage", endpoint: `/api/bills/${b.id}/autopay`, method: "PATCH", args: { enabled: true } },
+      },
+    });
+  }
+
+  /* --- GUARD：信用卡欠款全额还款 --- */
+  const debt = snap.creditDebtCents ?? 0n;
+  if (debt > 50000n) {
+    out.push({
+      kind: "GUARD", rule: "credit_debt", target: "credit-repay", tier: "YELLOW", priority: 65,
+      dedup_key: `credit_debt:${monthKey}`, impact_cents: null,
+      params: {
+        debt: centsToStr(debt),
+        summary: `全额偿还信用卡欠款 ¥${centsToStr(debt)}`,
+        exec: { intent: "bill_pay", endpoint: "/api/bills/credit-repay/pay", method: "POST", args: {} },
+      },
+    });
+  }
+
+  /* --- WEALTH：闲置资金（借记余额 ≥¥5 万部分，按 ¥1 万步进，封顶 ¥10 万；R1 货基适当性恒通过）--- */
+  const bal = snap.debitBalanceCents ?? 0n;
+  if (bal >= 5000000n) {
+    let suggest = ((bal - 5000000n) / 1000000n) * 1000000n; /* ¥1 万步进，BigInt 整除 */
+    if (suggest > 10000000n) suggest = 10000000n;
+    if (suggest >= 1000000n) {
+      out.push({
+        kind: "WEALTH", rule: "idle_cash", target: "global-money-1", tier: "RED", priority: 50,
+        dedup_key: `idle_cash:${monthKey}`, impact_cents: null,
+        params: {
+          balance: centsToStr(bal), suggest: centsToStr(suggest), prev_holding_cents: String(snap.gmHoldingCents ?? 0n),
+          summary: `闲钱理财：借记余额 ¥${centsToStr(bal)}，建议 ¥${centsToStr(suggest)} 配置货币基金（R1）`,
+          exec: { intent: "wealth_product_purchase", endpoint: "/api/wealth/purchase", method: "POST", args: { product_id: "global-money-1", amount: centsToStr(suggest) } },
+        },
+      });
+    }
+  }
+
+  out.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  return out;
+}
+
+/* ================================================================
  * ④ MCP Tool Gateway（/mcp · Streamable HTTP JSON 模式 · JWT 鉴权）
  * ================================================================ */
-
 export const MCP_TOOLS = [
   { name: "account_query", desc: "查询用户总余额与卡片概览", args: {} },
   { name: "transaction_history", desc: "查询交易流水", args: { days: { type: "number" }, category: { type: "string" } } },
@@ -2377,6 +2605,7 @@ export const MCP_TOOLS = [
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
   { name: "task_list", desc: "查询用户的长程任务列表（预约转账/提醒/订花）：返回 id、标题、类型、状态、下次执行时间。用户要查看或取消任务时先查此工具拿到 task_id", args: {} },
   { name: "task_cancel", desc: "取消长程任务（预约转账/提醒/订花）。task_id 用 task_list 查询；仅 PENDING 可取消，取消即生效；生日订花类取消会同步解锁已锁资金（补偿）。黄级：确认卡等待用户点击", args: { task_id: { type: "number" } } },
+  { name: "proposal_list", desc: "查询 AI 主动提议（本地规则引擎扫描账户产出的可执行建议：沉睡订阅退订/周期转账自动化/账单自动扣款/信用卡还款/闲钱理财）。返回待办提议的 id、类型、摘要与金额。用户问“最近有什么提议/AI 有什么建议/能帮我省什么”时先查此工具并如实转述（含金额，不夸大）；执行必须引导用户到 https://suveoo.com/ai/proposals 页面点击「让 AI 办」走确认卡，不得代为执行", args: {} },
   { name: "card_unfreeze", desc: "解冻卡片（红级）", args: { card_id: { type: "string" } } },
   { name: "ecommerce_order_mock", desc: "演示商户下单（红级，仅 DEMO_MODE 场景 6）", args: { item: { type: "string" }, amount: { type: "string" }, task_id: { type: "number" } } },
 ];
@@ -2671,6 +2900,18 @@ async function mcpGreen(env, ctxInfo, name, args) {
     case "task_list": {
       const r = await UU({ op: "tasks" });
       return { tasks: (r.tasks ?? []).map((t) => ({ id: t.id, title: t.title, type: t.type, status: t.status, next_run_at: t.next_run_at, repeat: t.repeat })) };
+    }
+    case "proposal_list": {
+      /* AI 主动银行：只读列出待办提议（执行权在用户——desc 已引导去 /ai/proposals 点确认卡）。
+         op 用 proposalPage（与 REST 同视图；内部含 6h 节流扫描，保持 MCP 侧数据新鲜） */
+      const r = await UU({ op: "proposalPage" });
+      const pend = (r.proposals ?? []).filter((p) => p.status === "PENDING");
+      return {
+        proposals: pend.map((p) => ({ id: p.id, kind: p.kind, rule: p.rule, tier: p.tier, summary: p.params?.summary ?? null })),
+        report: r.report ?? null,
+        url: "https://suveoo.com/ai/proposals",
+        note: "提议由本地规则引擎确定性生成（零模型调用）；执行须用户在页面上点击「让 AI 办」并完成黄/红确认卡，AI 不得代为执行。这是模拟银行系统。",
+      };
     }
     case "contacts_search": {
       const r = await UU({ op: "payees" });
@@ -3453,6 +3694,23 @@ export function genDemoSeedRich(rng) {
   /* 信用卡欠款=本种子全部信用卡消费合计（动态计算——外币消费金额随机，动态合计保证账本可精确复算欠款） */
   const richCreditDebt = txs.filter((t) => t.card === "credit-card-1" && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents), 0);
   return { txs, payees, bills, subs, holdings, notifs, tasks, fx_balances, credit_debt_cents: String(richCreditDebt) };
+}
+
+/* demo 提议种子（第六期 idle）：3 条 EXECUTED 预置——月度战报登录即见非零数字。
+ * 对象状态由 seedDemo #seedProposals 同步（芒果 TV 置 CANCELLED / 物业费置 autopay=1），
+ * 与流水/任务事实一致（女儿生活费任务在 genDemoSeedRich.tasks 内已存在）。零 rng：纯静态行。 */
+export function demoProposalSeed(nowMs = Date.now()) {
+  const month = new Date(nowMs + 8 * 3600_000).toISOString().slice(0, 7);
+  return [
+    { kind: "SAVE", rule: "dormant_sub", target: "mango-tv", dedup_key: `dormant_sub:mango-tv:${month}`, impact_cents: "1633",
+      params: { merchant: "芒果 TV", plan: "会员 · 连续包季", days: 29, usage: 12, monthly: "16.33", amount: "49.00", cycle: "季", tier: "YELLOW", summary: "退订 芒果 TV（29 天未使用，月省 ¥16.33）" },
+      apply: { sub_cancel: "mango-tv" } },
+    { kind: "ROUTINE", rule: "routine_transfer", target: "女儿", dedup_key: `routine_transfer:女儿:${month}`, impact_cents: null,
+      params: { name: "女儿", amount: "2000.00", day: 1, months: 4, tier: "YELLOW", summary: "把每月 1 日给 女儿 的 ¥2000.00 转账自动化（已连续 4 个月）" } },
+    { kind: "GUARD", rule: "bill_autopay", target: "property", dedup_key: `bill_autopay:property:${month}`, impact_cents: null,
+      params: { billId: "property", billName: "物业费（西湖文三公寓）", amount: "412.70", dueDay: 25, tier: "YELLOW", summary: "为「物业费（西湖文三公寓）」开启自动扣款（¥412.70/期，每月 25 日）" },
+      apply: { bill_autopay: "property" } },
+  ];
 }
 /* ===== 维度化拟真种子体系（第三十五轮 /demo-lab）：财富水平 × 薪资来源 × 职业档案 × 企业数据 =====
  * 职业清单 = 任务书列举的 70 个职业全量 + 20 个同类目相邻扩充（凑足 90；扩充清单见 notes/idle-quad.md 第三十五轮）。
@@ -4539,6 +4797,7 @@ async function seedDemo(env, targetEmail, opts = {}) {
     var personasCount = Object.keys(personas).length;
   }
   const r = await ledgerOp(env, userInstance(userId), { op: "seedDemo", txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt,
+    ...(isDemo && !opts.preset ? { proposals_seed: demoProposalSeed() } : {}),
     ...(preset ? { mode: preset.mode, blocks: preset.blocks, card_updates: cardUpdates } : {}) });
   if (isDemo) await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读；真实账户 2FA 状态不动
   if (r.ok) {
@@ -4770,6 +5029,11 @@ const DDL = [
   "CREATE TABLE IF NOT EXISTS user_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, detail TEXT, channel TEXT, trace_id TEXT, ts TEXT)",
   "CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, payload TEXT, status TEXT DEFAULT 'PENDING', next_run_at TEXT, repeat TEXT DEFAULT 'once', fail_next INTEGER DEFAULT 0, created_at TEXT)",
   "CREATE TABLE IF NOT EXISTS nonces(nonce TEXT PRIMARY KEY, ts TEXT)",
+  /* 第六期 idle：AI 主动银行——提议状态机（PENDING → EXECUTED / DISMISSED；dedup_key 月度幂等） */
+  `CREATE TABLE IF NOT EXISTS proposals(
+     id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, rule TEXT, target TEXT,
+     dedup_key TEXT UNIQUE, params TEXT, status TEXT DEFAULT 'PENDING',
+     impact_cents TEXT, created_at TEXT, executed_at TEXT, dismissed_at TEXT)`,
   "CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, title TEXT, ts TEXT)",
   /* 第二十六轮：消息级持久化——chat_msgs 为事实源（aihist: KV 只是热缓存）；cards 存该轮 GenUI 卡片 JSON 供只读重放 */
   "CREATE TABLE IF NOT EXISTS chat_msgs(id INTEGER PRIMARY KEY AUTOINCREMENT, sid TEXT, role TEXT, content TEXT, cards TEXT, err INTEGER, created_at TEXT)",
@@ -5428,6 +5692,7 @@ export class LedgerDO {
               if (cu.limit_cents != null) sql.exec("UPDATE cards SET balance_cents = ?, limit_cents = ? WHERE slug = ?", String(cu.balance_cents), String(cu.limit_cents), cu.slug);
               else sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(cu.balance_cents), cu.slug);
             }
+            this.#seedProposals(sql, input.proposals_seed, { wipe: true });
             const taskIds = [];
             for (const t of input.tasks) {
               /* day_of_month 优先：锚定"下一个该日期的北京时间 09:00"（UTC 01:00）——执行日与任务标题严格一致；
@@ -5549,6 +5814,9 @@ export class LedgerDO {
               for (const fxb of input.fx_balances ?? []) sql.exec("INSERT INTO fx_balances(currency, amount) VALUES(?,?)", fxb.currency, fxb.amount);
             }
           }
+          /* 提议种子：合并模式按 dedup_key 幂等补齐（不清既有 EXECUTED 战报）；自定义模式勾选块整段替换 */
+          if (mode === "merge") this.#seedProposals(sql, input.proposals_seed, { wipe: false });
+          else this.#seedProposals(sql, input.proposals_seed, { wipe: touched("proposals") });
           /* 维度化卡片调整：覆盖模式总是应用；自定义模式仅当"信用卡消费/额度"块勾选；合并模式不动卡片（既有卡片资产保持） */
           if (input.card_updates?.length && (mode === "overwrite" || (mode === "custom" && touched("credit")))) {
             for (const cu of input.card_updates) {
@@ -5563,6 +5831,92 @@ export class LedgerDO {
           }
           const after = cntAll();
           return json({ ok: true, task_ids: taskIds, before, after, credit_debt_cents: after.credit_debt });
+        }
+        /* ---- AI 主动银行：提议扫描 + 列表 + 状态机（第六期 idle） ---- */
+        case "proposalPage": {
+          /* 扫描节流：距上次 >6h 才重算（input.force 供测试直通）；生成 → 落库（dedup_key 月度幂等，
+             DISMISSED 行同月天然挡住重生）→ 列表 + 北京月战报。单 op 单往返。 */
+          const scannedRaw = (this.#rows(sql.exec("SELECT v FROM meta WHERE k = 'prop_scan_at'"))[0] ?? {}).v ?? null;
+          const stale = !scannedRaw || Date.now() - Date.parse(scannedRaw) > 6 * 3600_000;
+          let added = 0;
+          if (stale || input.force) {
+            const subs = this.#rows(sql.exec("SELECT * FROM subscriptions"));
+            const bills = this.#rows(sql.exec("SELECT * FROM bills"));
+            const payees = this.#rows(sql.exec("SELECT * FROM payees"));
+            const tasks = this.#rows(sql.exec("SELECT * FROM tasks"));
+            const txs = this.#rows(sql.exec("SELECT counterparty, amount_cents, ts FROM tx WHERE direction='OUT' AND ts >= datetime('now','-120 days')"));
+            const cred = this.#rows(sql.exec("SELECT balance_cents FROM cards WHERE kind='credit' LIMIT 1"))[0];
+            const bal = this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(balance_cents AS INTEGER)),0) AS s FROM cards WHERE kind='debit'"))[0];
+            const gm = this.#rows(sql.exec("SELECT amount_cents FROM holdings WHERE fund = 'global-money-1'"))[0];
+            const bjNow = new Date(Date.now() + 8 * 3600_000);
+            const gen = generateProposals(
+              { subs, bills, payees, tasks, routine_tx: txs, creditDebtCents: BigInt(cred?.balance_cents ?? "0"), debitBalanceCents: BigInt(bal?.s ?? 0), gmHoldingCents: BigInt(gm?.amount_cents ?? "0") },
+              { monthKey: bjNow.toISOString().slice(0, 7), nowMs: Date.now() },
+            );
+            for (const p of gen) {
+              if (this.#rows(sql.exec("SELECT id FROM proposals WHERE dedup_key = ?", p.dedup_key))[0]) continue;
+              sql.exec("INSERT INTO proposals(kind, rule, target, dedup_key, params, impact_cents, status, created_at) VALUES(?,?,?,?,?,?, 'PENDING', ?)",
+                p.kind, p.rule, p.target, p.dedup_key, JSON.stringify({ ...p.params, tier: p.tier }), p.impact_cents, NOW);
+              added++;
+            }
+            sql.exec("INSERT OR REPLACE INTO meta(k, v) VALUES('prop_scan_at', ?)", NOW);
+          }
+          const { list, report } = this.#proposalView(sql);
+          return json({ ok: true, added, proposals: list, report, scanned_at: scannedRaw ?? NOW });
+        }
+        case "proposalDismiss": {
+          const r = this.#rows(sql.exec("SELECT * FROM proposals WHERE id = ?", input.id))[0];
+          if (!r) return json({ ok: false, error: "NOT_FOUND" });
+          if (r.status !== "PENDING") return json({ ok: false, error: "NOT_PENDING" });
+          sql.exec("UPDATE proposals SET status = 'DISMISSED', dismissed_at = ? WHERE id = ?", NOW, input.id);
+          const { list, report } = this.#proposalView(sql);
+          return json({ ok: true, report });
+        }
+        case "proposalSettle": {
+          /* 核验事实后才置 EXECUTED（防"假装完成"）：订阅须已 CANCELLED / 任务须已建立 /
+             autopay 须已开启 / credit-repay 须本月已缴 / 货基持仓须较提议时增加 */
+          const r = this.#rows(sql.exec("SELECT * FROM proposals WHERE id = ?", input.id))[0];
+          if (!r) return json({ ok: false, error: "NOT_FOUND" });
+          if (r.status === "EXECUTED") { const v = this.#proposalView(sql); return json({ ok: true, already: true, proposal: v.list.find((p) => p.id === r.id) ?? null, report: v.report }); }
+          if (r.status !== "PENDING") return json({ ok: false, error: "NOT_PENDING" });
+          const pr = (() => { try { return JSON.parse(r.params ?? "{}"); } catch { return {}; } })();
+          const bjMonth = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 7);
+          const bjMonthOf = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t + 8 * 3600_000).toISOString().slice(0, 7) : ""; };
+          let verified = false;
+          switch (r.rule) {
+            case "dormant_sub":
+            case "low_use_sub": {
+              const s = this.#rows(sql.exec("SELECT status FROM subscriptions WHERE id = ?", r.target))[0];
+              verified = s?.status === "CANCELLED";
+              break;
+            }
+            case "routine_transfer": {
+              verified = this.#rows(sql.exec(
+                "SELECT id FROM tasks WHERE repeat = 'monthly' AND (instr(title, ?) > 0 OR instr(payload, ?) > 0) LIMIT 1",
+                r.target, `"recipient_name":"${r.target}"`,
+              )).length > 0;
+              break;
+            }
+            case "bill_autopay": {
+              const b = this.#rows(sql.exec("SELECT autopay FROM bills WHERE id = ?", r.target))[0];
+              verified = Number(b?.autopay) === 1;
+              break;
+            }
+            case "credit_debt": {
+              const b = this.#rows(sql.exec("SELECT last_paid_at FROM bills WHERE id = 'credit-repay'"))[0];
+              verified = !!b?.last_paid_at && bjMonthOf(b.last_paid_at) === bjMonth;
+              break;
+            }
+            case "idle_cash": {
+              const h = this.#rows(sql.exec("SELECT amount_cents FROM holdings WHERE fund = 'global-money-1'"))[0];
+              verified = BigInt(h?.amount_cents ?? "0") > BigInt(String(pr.prev_holding_cents ?? "0"));
+              break;
+            }
+          }
+          if (!verified) return json({ ok: false, error: "NOT_EXECUTED" });
+          sql.exec("UPDATE proposals SET status = 'EXECUTED', executed_at = ? WHERE id = ?", NOW, input.id);
+          const { list, report } = this.#proposalView(sql);
+          return json({ ok: true, proposal: list.find((p) => p.id === r.id) ?? null, report });
         }
         case "blockCounts": {
           /* 只读：各业务块行数 + 信用欠款复算值（demo-lab 预检"当前状态"与核对"注入后"共用） */
@@ -5579,6 +5933,36 @@ export class LedgerDO {
   }
   #notify(sql, type, title, body) {
     sql.exec("INSERT INTO notifications(type, title, body, read, ts) VALUES(?,?,?,0,?)", type, title, body, new Date().toISOString());
+  }
+  /* 提议列表 + 北京月战报（proposalPage / Dismiss / Settle 共用视图）：PENDING（60 天内）+ 本月 EXECUTED；
+     saved_cents 只累计 SAVE 类 impact（不把理财申购额当"省下"——绝不幸存收益口径） */
+  #proposalView(sql) {
+    const bjMonth = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 7);
+    const bjMonthOf = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t + 8 * 3600_000).toISOString().slice(0, 7) : ""; };
+    const rows = this.#rows(sql.exec("SELECT * FROM proposals ORDER BY id"));
+    const fmt = (r) => {
+      let pr = {};
+      try { pr = JSON.parse(r.params ?? "{}"); } catch { /* 保底空参数 */ }
+      return { id: r.id, kind: r.kind, rule: r.rule, target: r.target, status: r.status, tier: pr.tier ?? "YELLOW", impact_cents: r.impact_cents, created_at: r.created_at, executed_at: r.executed_at, params: pr };
+    };
+    const cutoff = new Date(Date.now() - 60 * 86400_000).toISOString();
+    const pending = rows.filter((r) => r.status === "PENDING" && String(r.created_at ?? "") >= cutoff).map(fmt);
+    const done = rows.filter((r) => r.status === "EXECUTED" && bjMonthOf(r.executed_at) === bjMonth).map(fmt);
+    const saved = done.reduce((a, r) => a + (r.impact_cents ? BigInt(r.impact_cents) : 0n), 0n);
+    return { list: [...pending, ...done], report: { month: bjMonth, saved_cents: String(saved), done_count: done.length, routine_count: done.filter((r) => r.kind === "ROUTINE").length } };
+  }
+  /* 提议种子（demo 战报非零）：EXECUTED 预置行 + 对象状态同步（订阅置 CANCELLED / 账单置 autopay）——
+     settle 核验若重跑也能通过，账本口径自洽 */
+  #seedProposals(sql, seed, { wipe }) {
+    if (!Array.isArray(seed) || !seed.length) return;
+    if (wipe) sql.exec("DELETE FROM proposals");
+    const NOW = this.#now();
+    for (const p of seed) {
+      sql.exec("INSERT OR IGNORE INTO proposals(kind, rule, target, dedup_key, params, impact_cents, status, executed_at, created_at) VALUES(?,?,?,?,?,?, 'EXECUTED', ?, ?)",
+        p.kind, p.rule, p.target, p.dedup_key, JSON.stringify(p.params ?? {}), p.impact_cents ?? null, NOW, NOW);
+      if (p.apply?.sub_cancel) sql.exec("UPDATE subscriptions SET status = 'CANCELLED' WHERE id = ?", p.apply.sub_cancel);
+      if (p.apply?.bill_autopay) sql.exec("UPDATE bills SET autopay = 1 WHERE id = ?", p.apply.bill_autopay);
+    }
   }
   /* DO → DO：给另一用户的账本实例入账（跨用户转账双记的第一步；credit 内含 trace_id 幂等） */
   async #crossCredit(userId, payload) {

@@ -26,6 +26,7 @@ S.router.register("ai", async ({ user }) => {
             <div class="ch-more-morph" id="ch-more-morph" role="menu">
               <button class="ch-more-face" id="ch-more-btn" type="button" aria-expanded="false" aria-label="${S.fmt.escape(S.t("ai.more"))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="19" r="2.3"/></svg></button>
               <a class="ch-more-item" role="menuitem" href="/ai/tasks">${S.ui.icon("clock", 14)}<span>${S.fmt.escape(S.t("tasks.title"))}</span></a>
+              <a class="ch-more-item" role="menuitem" href="/ai/proposals">${S.ui.icon("bell", 14)}<span>${S.fmt.escape(S.t("prop.title"))}</span></a>
               <a class="ch-more-item" role="menuitem" href="/ai/benchmark">${S.ui.icon("chart", 14)}<span>${S.fmt.escape(S.t("bench.title"))}</span></a>
             </div>
           </div>

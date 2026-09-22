@@ -430,3 +430,38 @@
 .wmy-redeem:disabled { opacity: .5; }
 .wmy-fxname { min-width: 64px; }
 @media (prefers-reduced-motion: reduce) { .wmy-hero { animation: none; } }
+
+/* ===== AI 提议（/ai/proposals · 第六期 idle：AI 主动银行）===== */
+.pp-hero { position: relative; border-radius: var(--r-card-lg); overflow: hidden; padding: 26px 26px 22px; color: #fff; animation: pp-in .5s ease both; }
+.pp-art { position: absolute; right: -18px; bottom: -22px; width: 168px; height: 168px; opacity: .92; pointer-events: none; }
+.pp-hero-txt { position: relative; z-index: 1; }
+.pp-hero-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.32); border-radius: 999px; padding: 3px 12px; }
+.pp-hero-tag .ic { opacity: .9; }
+.pp-hero h1 { font-size: 22px; margin: 12px 0 6px; color: #fff; }
+.pp-month { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55); margin-left: 10px; }
+.pp-hero-sub { font-size: 12.5px; color: rgba(255,255,255,.82); max-width: 62ch; margin: 0 0 16px; line-height: 1.6; }
+.pp-nums { display: flex; gap: 30px; flex-wrap: wrap; }
+.pp-nums .num-xl .n { color: #fff; }
+.pp-nums .num-xl .lb { color: rgba(255,255,255,.65); }
+.pp-nums .num-xl .u { color: rgba(255,255,255,.55); }
+.pp-engine { margin: 14px 0 0; font-size: 11px; color: rgba(255,255,255,.5); }
+.pp-card { border-radius: var(--r-card-lg); padding: 16px; display: flex; gap: 14px; margin-top: 12px; align-items: flex-start; }
+.pp-ico { flex: none; line-height: 0; }
+.pp-body { min-width: 0; flex: 1; }
+.pp-khead { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.pp-kind { font-size: 11px; font-weight: 700; letter-spacing: .05em; }
+.pp-title { display: block; font-size: 15.5px; font-weight: 700; line-height: 1.4; }
+.pp-desc { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.65; margin: 6px 0 12px; }
+.pp-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.pp-card.done { opacity: .92; }
+.pp-card.done .pp-acts { display: none; }
+.pp-card.done .pp-desc { margin-bottom: 0; }
+.pp-check { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; background: var(--color-green-bg); color: var(--color-green); flex: none; }
+@keyframes pp-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 767px) {
+  .pp-hero { padding: 20px 18px 18px; }
+  .pp-art { width: 110px; height: 110px; right: -12px; bottom: -14px; }
+  .pp-nums { gap: 18px; }
+  .pp-nums .num-xl .n { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .pp-hero { animation: none; } }

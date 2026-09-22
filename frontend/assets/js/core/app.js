@@ -55,12 +55,12 @@ S.chrome = {
         ? [["/account/dashboard", "chart", "dash.title"], ["/account/cards", "card", "acct.grid.cards"], ["/account/security", "shield", "sec.title"], ["/account/downloads", "download", "acct.downloads"]]
         : [["/account/register", "plus", "login.toRegister"], ["/account/recovery", "help", "login.toRecovery"]],
     };
-    const AI_SUB = [["/ai/tasks", "clock", "tasks.title"], ["/ai/benchmark", "chart", "bench.title"]];
+    const AI_SUB = [["/ai/tasks", "clock", "tasks.title"], ["/ai/proposals", "bell", "prop.title"], ["/ai/benchmark", "chart", "bench.title"]];
     /* 路径 → 图标/i18n 键注册表（一级+二级全并）；「最近」只收录其中条目，保证标签与图标三语可用 */
     const PATH_INFO = {
       "/home": ["home", "nav.home"], "/pay": ["pay", "nav.pay"], "/wealth": ["wealth", "nav.wealth"],
       "/account": ["account", "nav.account"], "/ai": ["ai", "nav.ai"], "/account/login": ["account", "nav.login"],
-      "/ai/tasks": ["clock", "tasks.title"], "/ai/benchmark": ["chart", "bench.title"],
+      "/ai/tasks": ["clock", "tasks.title"], "/ai/proposals": ["bell", "prop.title"], "/ai/benchmark": ["chart", "bench.title"],
       ...Object.values(SUB).flat().reduce((m, [p, ic, k]) => ({ ...m, [p]: [ic, k] }), {}),
     };
     /* 记录最近访问（仅注册表内路径；去重置顶，上限 5） */
