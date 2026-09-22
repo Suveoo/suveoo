@@ -531,8 +531,11 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 /* —— 头部三点 morph 菜单（第三十三轮：圆→圆角矩形全新动画，替代原 ai-sub-links 入口行）——
    展开 .38s easeOutQuint 微回弹（尺寸/圆角/位移四路同步），收起 .26s easeIn 快收；
    三点图标旋出、菜单行从右随生长方向滑入并 stagger 50ms；白色菜单卡双层层叠阴影。 */
+.chat-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--color-line); flex: none; position: relative; z-index: 5; }
+/* ↑ 局部层级（第四十三轮）：头栏在 DOM 先于消息流——消息/GenUI 卡片的动画与定位建立层叠上下文后
+   会盖住三点菜单展开面板；头栏取局部 z:5、morph 容器 z:6（仍远低于全局 dropdown 200/drawer 250 档） */
 .chat-head .ch-round { width: 29.5px; height: 29.5px; padding: 0; justify-content: center; border-radius: 50%; }
-.ch-more { position: relative; width: 29.5px; height: 29.5px; flex: none; }
+.ch-more { position: relative; width: 29.5px; height: 29.5px; flex: none; z-index: 6; }
 .ch-more-morph {
   position: absolute; right: 0; top: 50%; width: 29.5px; height: 29.5px; border-radius: 999px;
   background: var(--color-primary-tint); color: var(--color-navy);
