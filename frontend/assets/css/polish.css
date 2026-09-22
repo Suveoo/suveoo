@@ -443,6 +443,9 @@ body.tc-open { overflow: hidden; }
   .hscroll.payees .fund-card { min-width: 0; width: auto; }
   .hscroll.deps .fund-card, .hscroll.payees .fund-card { min-width: 0 !important; max-width: none !important; }
   .hscroll.payees .fund-card[style] { min-width: 0 !important; }
+  /* 新版 tint 收款人卡（第三十八轮）：min-width 176 会把 1fr 轨道撑爆 2px——右列越界、
+     右缘距屏 14 < 左缘 16 不对称（队长实测）。归零 min/max 让 1fr 精确分配，两端严格 16px */
+  .hscroll.payees .payee-card { min-width: 0; max-width: none; width: auto; }
 }
 
 /* ===== 18. /demo-lab 队员隐藏数据入口（实验室风格：深色 hero + 密码门 + 数据源清单） ===== */
