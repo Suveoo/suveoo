@@ -387,6 +387,11 @@ body.tc-open { overflow: hidden; }
   .hscroll { flex-direction: column; overflow-x: visible; }
   .hscroll .fund-card { min-width: 0; width: 100%; }
 }
+/* 横滑容器全宽出血（第三十八轮）：滚动内容两端与页面列对称——左 16px 起右 16px 收，
+   消除"左缘贴内容列、右缘被滚动区吞掉"的不对称；仅 ≤767（页面 padding=16px 档） */
+@media (max-width: 767px) {
+  .hscroll { margin: 0 -16px; padding: 0 16px var(--sp-2); }
+}
 
 /* ===== 26. Header logo 适度放大（全端；移动端尤甚） ===== */
 .app-header .logo-link img { height: 31px; transition: height .2s ease; }

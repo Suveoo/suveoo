@@ -3,7 +3,7 @@ S.router.register("payees", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<div class="row between"><h1>${S.fmt.escape(S.t("payees.title"))}</h1>
     <button class="btn btn-primary" id="add">${S.ui.icon("plus", 16)} ${S.fmt.escape(S.t("payees.add"))}</button></div>
-    <div class="card">${S.ui.skeleton(4)}</div>`;
+    <div class="card" style="margin-top:14px">${S.ui.skeleton(4)}</div>`;
   const el = c.querySelector(".card");
   const render = async () => {
     const r = await S.api.get("/api/payees");

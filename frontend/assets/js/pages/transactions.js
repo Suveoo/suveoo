@@ -72,15 +72,33 @@ S.router.register("transactions", async () => {
   if (!first) return;
   let next = first.next_cursor;
   el.innerHTML = `<div id="tx-list"></div><div class="center" style="margin-top:12px" id="more-wrap"></div>`;
+  /* 分类 → 彩色 squircle 图标（第三十八轮：统一蓝 logo 退役）+ 今天/昨天/更早日期分组 */
+  const CAT_ICON = {
+    "转账": "ic-pay-sky", "餐饮": "ic-star-orange", "购物": "ic-card-rose", "交通": "ic-exchange-teal",
+    "娱乐": "ic-ai-violet", "生活服务": "ic-doc-gold", "医疗": "ic-shield-rose", "订阅": "ic-bell-teal",
+    "理财": "ic-wealth-gold", "数码科技": "ic-chart-violet", "潮流收藏": "ic-trend-rose", "信用还款": "ic-card-navy",
+  };
+  const dayKey = (ts) => {
+    const b = new Date(new Date(ts).getTime() + 8 * 3600_000), n = new Date(Date.now() + 8 * 3600_000);
+    const n0 = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+    const b0 = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
+    const diff = Math.round((n0 - b0) / 86400_000);
+    return diff === 0 ? "pay.today" : diff === 1 ? "pay.yesterday" : "pay.earlier";
+  };
+  let lastDay = null;
   const render = (list) => {
-    document.getElementById("tx-list").insertAdjacentHTML("beforeend", list.map((t) => `
-      <div class="list-row tx-row" data-tx='${S.fmt.escape(JSON.stringify(t))}'>
-        <img src="/assets/images/suveoo-logo-circular.svg" width="32" height="32" alt="">
+    document.getElementById("tx-list").insertAdjacentHTML("beforeend", list.map((t) => {
+      const dk = dayKey(t.ts);
+      const head = dk !== lastDay ? `<div class="muted small pay-day">${S.fmt.escape(S.t(dk))}</div>` : "";
+      lastDay = dk;
+      return head + `
+      <div class="list-row tx-row pay-tx" data-tx='${S.fmt.escape(JSON.stringify(t))}'>
+        <span class="qi-wrap" style="width:34px;height:34px;flex:none">${S.ui.icon(CAT_ICON[t.category] ?? "ic-doc-navy", 26)}</span>
         <div class="grow"><b>${S.fmt.escape(t.counterparty ?? "—")}</b>
           <div class="muted small">${S.fmt.datetime(t.ts)} · ${S.fmt.escape(t.category ?? "")}${t.channel === "ai" ? " · " + S.fmt.escape(S.t("channel.ai")) : ""}${t.channel === "task" ? " · " + S.fmt.escape(S.t("history.taskTag")) : ""}</div></div>
         <div style="text-align:right"><div class="amt" style="color:${t.direction === "IN" ? "var(--color-green)" : "inherit"}">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain((Number(t.amount_cents) / 100).toFixed(2))}</div>
         <div class="muted small">${S.fmt.escape(t.status ?? "")}</div></div>
-      </div>`).join(""));
+      </div>`;}).join(""));
     S.ui.$$(".tx-row").forEach((row) => {
       row.onclick = () => {
         const t = JSON.parse(row.dataset.tx);
