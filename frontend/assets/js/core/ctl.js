@@ -52,7 +52,10 @@ S.ctl = {
       list.style.minWidth = Math.max(r.width, 160) + "px";
       const below = window.innerHeight - r.bottom, listH = list.offsetHeight;
       list.style.top = (below < listH + 12 && r.top > listH + 12 ? r.top - listH - 4 : r.bottom + 4) + "px";
-      onScroll = () => close();
+      /* 仅当滚动发生在菜单外部（页面滚动/锚点漂移）才收起；菜单内部自身滚动（触屏拖动/滚轮）必须放行——
+         scroll 不冒泡但走捕获，window capture 会收到文档内任何滚动容器的 scroll（含 .ctl-list 自身，
+         手机触摸菜单内部即被误关的根因）。overscroll-behavior:contain 已防滚动铰链外溢。 */
+      onScroll = (e) => { if (e && e.target && e.target !== window && (e.target === list || list.contains(e.target))) return; close(); };
       window.addEventListener("scroll", onScroll, { capture: true, passive: true });
       window.addEventListener("resize", onScroll);
       const sel = list.querySelector('[aria-selected="true"]');
