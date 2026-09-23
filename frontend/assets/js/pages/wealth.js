@@ -2,7 +2,7 @@
 S.router.register("wealth", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("wealth.title"))}</h1>
-    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("wealth.aiAsk"))}</span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
+    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="card">${S.ui.skeleton(3)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.funds"))}</h2><a class="more" href="/wealth/funds">${S.fmt.escape(S.t("wealth.allFunds"))} →</a></div>
     <div class="hscroll" id="funds"></div>
@@ -12,9 +12,19 @@ S.router.register("wealth", async () => {
     <div class="card" id="fx"></div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.toolHub"))}</h2><a class="more" href="/wealth/tools">${S.fmt.escape(S.t("tc.navTitle"))} →</a></div>
     <div class="tool-grid" id="tool-hub"></div>`;
-  document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.carFund"));
+  /* AI 快捷条（第七期大扫除）：默认中性能力句按日轮换；持仓数据到位且有持仓时升级为数据驱动句
+     （"我当前的持仓"是本页真实持有的）。点按发送的即所见句，不编"5 万闲钱买车"类情境。 */
+  let aiSentence = "";
+  const setAsk = (s) => {
+    aiSentence = s;
+    const span = document.querySelector("#ai-bar .grow");
+    if (span) span.textContent = S.t("wealth.askPrefix", s);
+  };
+  setAsk([S.t("wealth.askIdle"), S.t("wealth.askRisk")][Math.floor(Date.now() / 86400_000) % 2]);
+  document.getElementById("ai-bar").onclick = () => { if (aiSentence) S.router.ai(aiSentence); };
   /* 持仓 */
   const h = await S.api.get("/api/wealth/holdings");
+  if (h.ok && (h.data.holdings ?? []).length) setAsk(S.t("wealth.askHold"));
   const hc = c.querySelector(".card");
   if (h.ok) {
     const list = h.data.holdings ?? [];

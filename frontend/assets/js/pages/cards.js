@@ -26,7 +26,7 @@ S.router.register("cards", async () => {
           <a class="bc-btn" href="/transfer/intrabank?from=${cd.slug}">${S.ui.icon("send", 13)} ${S.fmt.escape(S.t("cards.transfer"))}</a>
           <button class="bc-btn fz" data-slug="${cd.slug}" data-st="${cd.status}">${S.ui.icon("snow", 13)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}</button>
           <a class="bc-btn" href="/account/card/${cd.slug}/settings">${S.ui.icon("gear", 13)} ${S.fmt.escape(S.t("cards.more"))}</a>
-          <button class="bc-btn ai-m" data-slug="${cd.slug}">${S.ui.icon("ai", 13)} ${S.fmt.escape(S.t("cards.aiManage"))}</button>
+          <button class="bc-btn ai-m" data-slug="${cd.slug}" data-l4="${S.fmt.escape(String(cd.number).replace(/\D/g, "").slice(-4))}">${S.ui.icon("ai", 13)} ${S.fmt.escape(S.t("cards.aiManage"))}</button>
         </div>
       </div>`).join("");
     S.ui.$$(".fz").forEach((b) => {
@@ -50,7 +50,7 @@ S.router.register("cards", async () => {
         else S.ui.toast(r2.data?.reason ?? "failed", true);
       };
     });
-    S.ui.$$(".ai-m").forEach((b) => { b.onclick = () => S.router.ai(S.t("cards.aiPrompt", b.dataset.slug)); });
+    S.ui.$$(".ai-m").forEach((b) => { b.onclick = () => S.router.ai(S.t("cards.aiPrompt", b.dataset.l4)); });
   };
   render();
   document.getElementById("eye").onclick = () => { hidden = !hidden; document.getElementById("eye").innerHTML = S.ui.icon(hidden ? "eye-off" : "eye", 20); render(); };

@@ -13,7 +13,14 @@ S.router.register("subscriptions", async () => {
        <button class="ai-chip" style="margin-top:8px" id="ask">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div>`
     : `<div class="muted small">—</div>`;
   const ask = document.getElementById("ask");
-  if (ask) ask.onclick = () => S.router.ai(S.t("prompt.subsCleanup"));
+  if (ask) ask.onclick = () => {
+    /* 第七期大扫除：本页已持有真实沉睡清单——把真实商户（含使用分）带给 AI 请它分析；
+       无沉睡项时回落中性能力句。不再发送"退掉最少用的"这类替我办式指令（执行仍走确认卡）。 */
+    if (sleepy.length) {
+      const items = sleepy.slice(0, 3).map((s) => S.t("subs.aiItem", s.merchant, s.usage_score)).join(S.t("subs.aiSep"));
+      S.router.ai(S.t("subs.aiList", items));
+    } else S.router.ai(S.t("subs.aiGeneral"));
+  };
   const el = document.getElementById("subs");
   if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
   el.innerHTML = subs.map((s) => `

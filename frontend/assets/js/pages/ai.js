@@ -11,6 +11,7 @@ S.router.register("ai", async ({ user }) => {
               <div class="ai-welcome">
                 <img src="/assets/images/illustrations/ai-hero.svg${av ? "?v=" + av : ""}" alt="">
                 <h2>${S.fmt.escape(S.t("ai.welcome"))}</h2>
+                <a class="ai-pp-pill" id="ai-pp" href="/ai/proposals" hidden>${S.ui.icon("bell", 13)}<span></span>${S.ui.icon("chevron", 11)}</a>
               </div>`;
   const INSIGHTS_HTML = `<div class="ai-insights" id="ai-insights"><div class="ai-ins-loading"><span class="ail-badge"><img src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt=""></span><span>${S.fmt.escape(S.t("ai.insLoading"))}</span><span class="dots"><i></i><i></i><i></i></span></div></div>`;
   c.innerHTML = `
@@ -119,8 +120,21 @@ S.router.register("ai", async ({ user }) => {
   function mountFirstScreen() {
     thread.insertAdjacentHTML("afterbegin", WELCOME_HTML + INSIGHTS_HTML);
     startInsights();
+    ppPill();
   }
   startInsights();
+  /* 欢迎区新提议胶囊（第七期 idle）：有新提议时在欢迎语下方浮现直达入口——badge 走 sessionStorage
+     缓存（chrome 挂载时通常已取过，同会话零额外请求）；无新提议/失败静默不渲染。
+     挂在 mountFirstScreen 内重建时刷新（历史加载让位/新对话回归），元素不在 DOM 时静默跳过。 */
+  function ppPill() {
+    S.pp.badge().then((d) => {
+      const el = document.getElementById("ai-pp");
+      if (!el || !d || !(d.fresh > 0) || !el.closest(".ai-welcome")) return;
+      el.hidden = false;
+      el.querySelector("span").textContent = S.t("ai.ppPill", d.fresh);
+    }).catch(() => { /* 静默 */ });
+  }
+  ppPill();
 
   /* 抽屉统一管理（≤1023）：Trust Console 与历史会话两个全屏抽屉互斥——切换时 replaceState 原位换层
      （不多压一层历史记录）；系统返回手势 = 关抽屉回对话（popstate 单点收口），不退出 /ai。 */

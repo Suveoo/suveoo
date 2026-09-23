@@ -20,7 +20,7 @@ S.router.register("notifications", async () => {
     el.innerHTML = list.map((n) => `
       <div class="list-row ${n.read ? "" : "unread"}">
         <span class="avatar">${S.ui.icon(icon(n.type), 14)}</span>
-        <div class="grow"><b>${S.fmt.escape(n.title)}</b><div class="muted small">${S.fmt.escape(n.body)}</div></div>
+        <div class="grow"><b>${S.fmt.escape(n.title)}</b><div class="muted small">${S.fmt.linkify(n.body)}</div></div>
         <span class="muted small">${S.fmt.relTime(n.ts)}</span>
       </div>`).join("") || S.ui.empty(tab === "unread" ? S.t("notif.emptyUnread") : S.t("notif.empty"));
   };

@@ -1674,6 +1674,8 @@ export async function handleDataApi(request, env, url, ctxInfo) {
         { k: "subscriptions", op: "subs" },
         { k: "bills", op: "bills" },
         { k: "insight", op: "insight" },
+        /* 第七期 idle：提议速览行并入同一 DO 批量往返（只读徽标，不触发扫描；since=上次查看提议页时间） */
+        { k: "proposals", op: "proposalBadge", since: url.searchParams.get("since") ?? "" },
       ] });
       const out = { ok: b.ok === true };
       for (const r of (b.results ?? [])) out[r.k] = r.r;
@@ -1752,6 +1754,11 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
 
     /* ---- AI 主动银行：提议（第六期 idle；扫描+列表单 DO 往返，新提议触发三渠道通知） ---- */
+    /* 徽标（第七期 idle）：轻量只读，供 Drawer/Footer 徽标与气泡、home 速览行判"新"；不触发扫描 */
+    if (path === "/api/proposals/badge" && method === "GET") {
+      const r = await UU({ op: "proposalBadge", since: url.searchParams.get("since") ?? "" });
+      return json(r);
+    }
     if (path === "/api/proposals" && method === "GET") {
       const r = await UU({ op: "proposalPage" });
       if ((r.added ?? 0) > 0) {
@@ -5863,6 +5870,16 @@ export class LedgerDO {
           }
           const { list, report } = this.#proposalView(sql);
           return json({ ok: true, added, proposals: list, report, scanned_at: scannedRaw ?? NOW });
+        }
+        /* 只读轻量徽标（第七期 idle 凸显机制）：PENDING 计数 + since(上次查看时间戳 ISO，空=全部视为新)
+           之后新增数 + 首条 PENDING（速览行用）+ 北京月战报。绝不触发扫描（扫描仅 proposalPage/MCP）。 */
+        case "proposalBadge": {
+          const since = String(input.since ?? "");
+          const { list, report } = this.#proposalView(sql);
+          const pending = list.filter((p) => p.status === "PENDING");
+          const fresh = since ? pending.filter((p) => String(p.created_at ?? "") > since).length : pending.length;
+          const top = pending[0] ?? null;
+          return json({ ok: true, pending: pending.length, fresh, top: top ? { id: top.id, kind: top.kind, rule: top.rule, tier: top.tier, impact_cents: top.impact_cents, params: top.params } : null, report });
         }
         case "proposalDismiss": {
           const r = this.#rows(sql.exec("SELECT * FROM proposals WHERE id = ?", input.id))[0];

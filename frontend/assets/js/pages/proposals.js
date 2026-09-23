@@ -16,7 +16,6 @@ S.router.register("ai-proposals", async ({ user }) => {
           <div class="skeleton" style="width:120px;height:44px"></div>
           <div class="skeleton" style="width:120px;height:44px"></div>
         </div>
-        <p class="pp-engine">${S.fmt.escape(S.t("prop.localEngine"))}</p>
       </div>
     </div>
     <div class="section-title" style="margin-top:20px"><h2>${S.fmt.escape(S.t("prop.pending"))}</h2></div>
@@ -136,6 +135,9 @@ S.router.register("ai-proposals", async ({ user }) => {
     const listEl = document.getElementById("pp-list");
     if (!r.ok) { listEl.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
     const d = r.data;
+    /* 到达即视为已读（第七期 idle 凸显机制的未读判定锚点）：刷新查看戳 + 清 badge 会话缓存，
+       Drawer/Footer 徽标与气泡在下次页面加载时归零 */
+    S.pp.markSeen();
     renderHero(d.report);
     const pending = (d.proposals ?? []).filter((p) => p.status === "PENDING");
     const done = (d.proposals ?? []).filter((p) => p.status === "EXECUTED");

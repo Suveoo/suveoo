@@ -78,6 +78,21 @@ describe("AI 主动银行：提议全链路", () => {
     const p2 = await j(await SELF.fetch(BASE + "/api/proposals", { headers: H }));
     expect(p2.added).toBe(0);
 
+    /* ②b 徽标端点（第七期 idle 凸显机制）：只读不扫描；无 since=全部视为新；since 之后 → 0；
+       top 供速览行（rule/params 齐全）；未鉴权 401 */
+    const b1 = await j(await SELF.fetch(BASE + "/api/proposals/badge", { headers: H }));
+    expect(b1.ok).toBe(true);
+    expect(b1.pending).toBeGreaterThanOrEqual(5);
+    expect(b1.fresh).toBe(b1.pending);
+    expect(b1.top?.rule).toBeTruthy();
+    expect(b1.top?.params).toBeTruthy();
+    expect(b1.report.month).toBeTruthy();
+    const b2 = await j(await SELF.fetch(BASE + "/api/proposals/badge?since=2999-01-01T00:00:00.000Z", { headers: H }));
+    expect(b2.fresh).toBe(0);
+    expect(b2.pending).toBe(b1.pending);
+    const anonB = await SELF.fetch(BASE + "/api/proposals/badge");
+    expect(anonB.status).toBe(401);
+
     /* ③ settle 前置核验：未执行直接 settle → 409 NOT_EXECUTED（防"假装完成"） */
     const keepId = pend1.find((p) => p.rule === "dormant_sub" && p.target === "keep").id;
     const early = await post(`/api/proposals/${keepId}/settle`, {}, me.token);

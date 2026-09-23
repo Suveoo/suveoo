@@ -8,7 +8,7 @@ S.router.register("intrabank", async () => {
       <div class="row between" style="margin-bottom:12px">
         <label class="field" style="flex:1;margin:0"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span>
           <input class="input" id="t-name" placeholder="${S.fmt.escape(S.t("transfer.namePh"))}"></label>
-        <button class="ai-chip" id="ai-fill" style="flex:none;margin-top:22px">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("transfer.aiFill"))}</button>
+        <button class="ai-chip" id="ai-fill" style="flex:none;margin-top:22px">${S.ui.icon("ai", 14)} <span id="ai-fill-txt">${S.fmt.escape(S.t("transfer.aiAsk"))}</span></button>
       </div>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toAccount"))}</span>
         <input class="input mono" id="t-acct" placeholder="6222 88xx xxxx xxxx" maxlength="16" inputmode="numeric">
@@ -81,6 +81,7 @@ S.router.register("intrabank", async () => {
         document.getElementById("t-name").value = row.dataset.name;
         document.getElementById("t-acct").value = row.dataset.acct;
         hideErr();
+        syncAiBtn(); /* 程序化回填也切换 AI 按钮语义（核对态） */
         m.close();
       };
     });
@@ -97,17 +98,41 @@ S.router.register("intrabank", async () => {
         document.getElementById("t-name").value = S.t("transfer.self");
         document.getElementById("t-acct").value = row.dataset.name.replace(/\D/g, "");
         document.getElementById("t-acct").readOnly = true;
+        syncAiBtn();
         m.close();
       };
     });
   };
   let selfTransfer = null;
 
-  document.getElementById("ai-fill").onclick = () => S.router.ai(S.t("prompt.transferFill"));
+  /* AI 入口重做（第七期大扫除）：语义是"问/核/补"，不是"替我办"——
+     表单为空 → 开放式问句，让 AI 反问要素（收款人/金额/付款卡/备注）；
+     已填 → 把已填要素如实带给 AI 请它核对（contacts_search 等工具）并引导出确认卡。
+     绝不让 AI 编造收款人或金额；发出的语句不含任何"并执行"类指令。 */
+  const aiBtn = document.getElementById("ai-fill");
+  const aiTxt = document.getElementById("ai-fill-txt");
+  const formVals = () => ({
+    name: document.getElementById("t-name").value.trim(),
+    acct: document.getElementById("t-acct").value.replace(/\s/g, ""),
+    amt: document.getElementById("t-amt").value.trim(),
+    memo: document.getElementById("t-memo").value.trim(),
+  });
+  const syncAiBtn = () => {
+    const f = formVals();
+    aiTxt.textContent = S.t(f.name || f.acct || f.amt || f.memo ? "transfer.aiCheck" : "transfer.aiAsk");
+  };
+  ["t-name", "t-acct", "t-amt", "t-memo"].forEach((id) => document.getElementById(id).addEventListener("input", syncAiBtn));
+  aiBtn.onclick = () => {
+    const f = formVals();
+    if (!(f.name || f.acct || f.amt || f.memo)) { S.router.ai(S.t("transfer.aiQEmpty")); return; }
+    const card = payFrom.find((d) => d.slug === fromSlug);
+    const cardTxt = card ? String(card.number).replace(/\D/g, "").slice(-4) : "";
+    S.router.ai(S.t("transfer.aiQFilled", f.name || "—", f.acct.slice(-4) || "—", f.amt || "—", f.memo || "—", cardTxt ? "**** " + cardTxt : "—"));
+  };
   if (presetPayee) {
     const r = await S.api.get("/api/payees");
     const p = (r.data?.payees ?? []).find((x) => String(x.id) === presetPayee);
-    if (p) { document.getElementById("t-name").value = p.name; document.getElementById("t-acct").value = p.account; }
+    if (p) { document.getElementById("t-name").value = p.name; document.getElementById("t-acct").value = p.account; syncAiBtn(); }
   }
 
   document.getElementById("t-go").onclick = async () => {

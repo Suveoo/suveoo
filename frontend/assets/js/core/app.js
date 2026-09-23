@@ -161,6 +161,49 @@ S.chrome = {
     /* 首访 cookie 提示：延迟 4 秒、右下角非阻塞小卡（不打断首屏） */
     if (!S.ga4.status()) setTimeout(() => { if (!S.ga4.status() && !document.querySelector(".cookie-pop")) this.cookieModal(true); }, 4000);
     if (user) this.pollUnread(header);
+    if (user) this.mountProposalHints(drawer, bn);
+  },
+  /* AI 提议自动凸显（第七期 idle）：桌面 Drawer「AI 提议」子项 / 移动底栏 AI 圆钮挂数字徽标；
+     每会话至多一次引导气泡（sessionStorage 频控），4.5s 自动收起为徽标。克制优先：无新提议零打扰。 */
+  async mountProposalHints(drawer, bn) {
+    if (location.pathname === "/ai/proposals") return; /* 提议页自身不挂（到达即视为已看） */
+    const d = await S.pp.badge();
+    if (!d || !(d.fresh > 0) || !document.body.contains(drawer)) return;
+    const desktop = window.matchMedia("(min-width: 768px)").matches;
+    /* §24：非 /ai 分区页 AI 组折叠（.drawer-subs display:none）——子项不可见时徽标/气泡锚到
+       常显的 Suveoo AI 大卡（.drawer-ai，点击即入 /ai，气泡仍直达提议页） */
+    let anchor;
+    if (desktop) {
+      const sub = drawer.querySelector('a.drawer-sub[href="/ai/proposals"]');
+      anchor = sub && sub.getBoundingClientRect().width > 0 ? sub : drawer.querySelector("a.drawer-ai");
+    } else {
+      anchor = bn.querySelector(".bn-ai .ai-circle");
+    }
+    if (!anchor) return;
+    anchor.classList.add("pp-anchor");
+    anchor.insertAdjacentHTML("beforeend", `<span class="pp-count" aria-label="${S.fmt.escape(S.t("pp.badgeAria", d.fresh))}">${d.fresh > 99 ? "99+" : d.fresh}</span>`);
+    let bubbled = false;
+    try { bubbled = sessionStorage.getItem(S.pp.BUBBLE_KEY) === "1"; } catch { /* 静默 */ }
+    if (bubbled) return;
+    try { sessionStorage.setItem(S.pp.BUBBLE_KEY, "1"); } catch { /* 静默 */ }
+    const saved = Number(d.report?.saved_cents ?? 0);
+    const txt = saved > 0
+      ? S.t("pp.bubble", d.fresh, S.fmt.moneyPlain((saved / 100).toFixed(2)))
+      : S.t("pp.bubblePlain", d.fresh);
+    /* 气泡挂 body、fixed 定位（不嵌进锚点——嵌套 <a> 会被浏览器拆散；坐标按锚点实测矩形计算） */
+    const bub = S.ui.el(`<a class="pp-bubble" href="/ai/proposals">${S.ui.icon("bell", 13)}<span>${S.fmt.escape(txt)}</span>${S.ui.icon("chevron", 11)}</a>`);
+    document.body.appendChild(bub);
+    const ar = anchor.getBoundingClientRect();
+    const bw = bub.offsetWidth || 200;
+    if (desktop) {
+      bub.style.left = Math.min(ar.right + 10, window.innerWidth - bw - 8) + "px";
+      bub.style.top = ar.top + ar.height / 2 - bub.offsetHeight / 2 + "px";
+    } else {
+      bub.style.left = Math.min(Math.max(ar.left + ar.width / 2 - bw / 2, 12), window.innerWidth - bw - 12) + "px";
+      bub.style.bottom = window.innerHeight - ar.top + 10 + "px";
+    }
+    const dismiss = () => { bub.classList.add("pp-out"); setTimeout(() => bub.remove(), 180); };
+    setTimeout(dismiss, 4500); /* 自动收起为徽标 */
   },
     /* 即时语言切换：清除旧 chrome 与未读轮询后按新词典重建（cookie 小卡若未选择则一并以新语言重开） */
     async rerender() {
@@ -196,7 +239,7 @@ S.chrome = {
     if (!r.ok) { list.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
     list.innerHTML = r.data.notifications.slice(0, 8).map((n) => `
       <div class="notif-item${n.read ? "" : " unread"}">
-        <div class="grow"><div class="nt">${S.fmt.escape(n.title)}</div><div class="muted small">${S.fmt.escape(n.body)}</div>
+        <div class="grow"><div class="nt">${S.fmt.escape(n.title)}</div><div class="muted small">${S.fmt.linkify(n.body)}</div>
         <div class="muted small">${S.fmt.relTime(n.ts)}</div></div>
       </div>`).join("") || S.ui.empty(S.t("notif.empty"));
   },
@@ -279,6 +322,44 @@ S.fundCache = () => Promise.all(S.wealth.FUND_IDS.map((id) => S.api.json(`/asset
 S.depCache = () => Promise.all(S.wealth.DEP_IDS.map((s) => S.api.json(`/assets/data/deposits/${s}.json`)));
 S.fundSlug = () => (location.pathname.match(/\/wealth\/funds\/([a-z0-9-]+)/) ?? [])[1];
 S.depSlug = () => (location.pathname.match(/\/wealth\/deposits\/([a-z0-9-]+)/) ?? [])[1];
+
+/* AI 提议凸显（第七期 idle）：徽标/气泡/速览行的共用数据层。
+   未读判定 = GET /api/proposals/badge 的 fresh（PENDING 中 created_at > 上次查看戳）；
+   查看 /ai/proposals 即刷新戳并清缓存；未登录由调用方跳过。sessionStorage 缓存 5 分钟，
+   Drawer/Footer/ai 胶囊同一会话共享一次请求，不给页面加瀑布。 */
+S.pp = {
+  SEEN_KEY: "suveoo.pp.seen",
+  CACHE_KEY: "suveoo.pp.badge",
+  BUBBLE_KEY: "suveoo.pp.bubbled",
+  seen() { try { return localStorage.getItem(this.SEEN_KEY) ?? ""; } catch { return ""; } },
+  markSeen() {
+    try { localStorage.setItem(this.SEEN_KEY, new Date().toISOString()); } catch { /* 隐私模式静默 */ }
+    try { sessionStorage.removeItem(this.CACHE_KEY); } catch { /* 同上 */ }
+  },
+  async badge(force = false) {
+    try {
+      const c = JSON.parse(sessionStorage.getItem(this.CACHE_KEY) ?? "null");
+      if (!force && c && Date.now() - c.ts < 300000) return c.data;
+    } catch { /* 缓存损坏视同未命中 */ }
+    const r = await S.api.get("/api/proposals/badge?since=" + encodeURIComponent(this.seen())).catch(() => null);
+    if (!r?.ok || r.data?.ok === false || typeof r.data?.fresh !== "number") return null;
+    try { sessionStorage.setItem(this.CACHE_KEY, JSON.stringify({ ts: Date.now(), data: r.data })); } catch { /* 静默 */ }
+    return r.data;
+  },
+  /* 提议标题（速览行/气泡兜底用）：与 proposals.js copyOf 同键插值，服务端 params 均为确定性引擎产物 */
+  titleOf(p) {
+    const q = p?.params ?? {};
+    switch (p?.rule) {
+      case "dormant_sub": return S.t("prop.rDormantT", q.merchant ?? "");
+      case "low_use_sub": return S.t("prop.rLowUseT", q.merchant ?? "");
+      case "routine_transfer": return S.t("prop.rRoutineT", q.day ?? "", q.name ?? "");
+      case "bill_autopay": return S.t("prop.rBillT", q.billName ?? "");
+      case "credit_debt": return S.t("prop.rDebtT");
+      case "idle_cash": return S.t("prop.rIdleT");
+      default: return "";
+    }
+  },
+};
 S.purchaseModal = async (fund) => {
   const sess = await S.auth.session();
   const pr = sess?.pr_level ?? 3;

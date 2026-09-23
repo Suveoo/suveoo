@@ -636,3 +636,33 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .cont-bar .cb-go { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; border: none; background: none; color: var(--color-navy); font-size: var(--fs-12); font-weight: 600; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 0; }
 .cont-bar .cb-x { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; border: none; background: none; color: var(--color-ink-2); border-radius: 6px; cursor: pointer; }
 .cont-bar .cb-x:hover { color: var(--color-ink); }
+
+/* ===== 32. AI 提议自动凸显（第七期 idle）：徽标 / 引导气泡 / home 速览行 / /ai 欢迎胶囊 ===== */
+/* 徽标锚点（Drawer「AI 提议」子项 / 底栏 AI 圆钮） */
+.pp-anchor { position: relative; }
+.pp-count { position: absolute; top: -5px; right: -7px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--color-red); color: #fff; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center;
+  box-shadow: 0 0 0 2px #fff; animation: ppPulse 240ms cubic-bezier(.25,.6,.3,1) 1 both; pointer-events: none; }
+@keyframes ppPulse { 0% { transform: scale(.6); opacity: 0; } 55% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+/* 引导气泡：挂 body、position:fixed（不嵌进锚点内——嵌套 <a> 会被浏览器拆散；也不受 drawer overflow 裁剪）。
+   坐标由 JS 按锚点实测矩形定位（桌面=Drawer 子项右侧，移动=底栏 AI 圆钮正上方）；整泡是链接，无遮罩不挡邻钮。
+   局部档 z=120（底栏 100 之上、全局 dropdown 200 之下，不越档） */
+.pp-bubble { position: fixed; z-index: 120; display: inline-flex; align-items: center; gap: 6px; max-width: min(320px, 86vw);
+  padding: 8px 12px; background: #fff; border: 1px solid var(--color-line); border-radius: 12px;
+  box-shadow: var(--shadow-lg, 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06));
+  color: var(--color-navy); font-size: var(--fs-12); font-weight: 600; text-decoration: none; white-space: nowrap;
+  animation: ppRise 200ms cubic-bezier(.25,.6,.3,1) 1 both; }
+.pp-bubble > span { overflow: hidden; text-overflow: ellipsis; }
+@keyframes ppRise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.pp-bubble.pp-out { opacity: 0; transition: opacity 160ms ease; pointer-events: none; }
+/* home AI 洞察卡内提议速览行：gold 提议胶囊打头，其余与洞察行同款（rows-live 样式族） */
+.pp-chip { display: inline-flex; align-items: center; margin-right: 8px; padding: 1px 8px; border-radius: 10px;
+  background: var(--c-gold-tint); color: var(--c-gold-deep); font-size: 10px; font-weight: 600; vertical-align: 1px; }
+/* /ai 欢迎区新提议胶囊 */
+.ai-pp-pill { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 14px; border-radius: 16px;
+  background: var(--c-sky-tint); color: var(--color-navy); font-size: var(--fs-12); font-weight: 600; text-decoration: none; }
+.ai-pp-pill[hidden] { display: none; }
+.ai-pp-pill:hover { background: #d8ecfa; }
+/* 通知正文站内链接（linkify 产物） */
+.notif-link { color: var(--color-navy); text-decoration: underline; word-break: break-all; }
+@media (prefers-reduced-motion: reduce) { .pp-count, .pp-bubble { animation: none !important; } .pp-bubble.pp-out { transition: none; } }

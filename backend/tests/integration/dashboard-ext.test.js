@@ -63,15 +63,21 @@ describe("dashboard 扩展字段（by_category_month / income_recent）", () => 
   });
 });
 
-/* 第四十轮：/api/home/bundle —— 主页五查询一次往返聚合 */
+/* 第四十轮：/api/home/bundle —— 主页五查询一次往返聚合（第七期 idle 增 proposals 徽标键，仍单往返） */
 describe("home bundle", () => {
-  it("鉴权后返回 overview/dashboard/subscriptions/bills/insight 五键，overview 与独立端点同口径", async () => {
+  it("鉴权后返回 overview/dashboard/subscriptions/bills/insight/proposals 六键，overview 与独立端点同口径", async () => {
     const reg = await j(await post("/api/auth/email-code", { scene: "register", email: "hb1@test.dev" }));
     const out = await j(await post("/api/auth/register", { email: "hb1@test.dev", code: await lastCode("hb1@test.dev"), name: "聚合甲", password: "jinrongkeji2026", risk_answers: [3, 3, 3, 3, 3], aml_consented: true }));
     const H = { authorization: `Bearer ${out.token}` };
     const b = await j(await SELF.fetch(BASE + "/api/home/bundle", { headers: H }));
     expect(b.ok).toBe(true);
-    for (const k of ["overview", "dashboard", "subscriptions", "bills", "insight"]) expect(b[k]).toBeTruthy();
+    for (const k of ["overview", "dashboard", "subscriptions", "bills", "insight", "proposals"]) expect(b[k]).toBeTruthy();
+    /* proposals 徽标键（第七期）：只读形状齐全（新账户 pending=0 亦返回结构与 report），且可带 since */
+    expect(typeof b.proposals.fresh).toBe("number");
+    expect(typeof b.proposals.pending).toBe("number");
+    expect(b.proposals.report.month).toBeTruthy();
+    const b2 = await j(await SELF.fetch(BASE + "/api/home/bundle?since=2999-01-01T00:00:00.000Z", { headers: H }));
+    expect(typeof b2.proposals.fresh).toBe("number");
     const solo = await j(await SELF.fetch(BASE + "/api/overview", { headers: H }));
     expect(String(b.overview.total_assets)).toBe(String(solo.total_assets));
     const anon = await SELF.fetch(BASE + "/api/home/bundle");

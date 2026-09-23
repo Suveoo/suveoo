@@ -3,7 +3,7 @@ S.router.register("pay", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `
     <div class="pay-hero bg-grad-navy">
-      <div class="ph-ai" id="ai-bar" role="button" tabindex="0"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow">${S.fmt.escape(S.t("pay.aiTry"))}</span><span class="ph-go">${S.ui.icon("arrow-right", 14)}</span></div>
+      <div class="ph-ai" id="ai-bar" role="button" tabindex="0"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="ph-go">${S.ui.icon("arrow-right", 14)}</span></div>
       <div class="ph-main">
         <div class="ph-main-txt">
           <b>${S.fmt.escape(S.t("pay.intrabank"))}</b>
@@ -29,12 +29,26 @@ S.router.register("pay", async () => {
     <div class="hscroll payees" id="payees">${S.ui.skeleton(2)}</div>
     <div class="section-title pay-sec"><h2>${S.fmt.escape(S.t("pay.recentAll"))}</h2><a class="more" href="/account/transactions">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>
     <div class="card pay-recent" id="recent">${S.ui.skeleton(3)}</div>`;
-  document.getElementById("ai-bar").onclick = () => S.router.ai(S.t("prompt.hotpotAA"));
+  /* AI 快捷条（第七期大扫除）：建议句三选一——有真实收款人时优先数据驱动句（收款人来自本页 /api/payees），
+     否则中性能力句；按日轮换（同日稳定）。点按发送的即所见句——所见即所发，不编数据、不带"并执行"。 */
+  let aiSentence = "";
+  const setAiTry = (payeeNames) => {
+    const rot = Math.floor(Date.now() / 86400_000);
+    const pool = [];
+    if (payeeNames.length) pool.push(S.t("pay.tryPayee", payeeNames[rot % payeeNames.length]));
+    pool.push(S.t("pay.trySpend"), S.t("pay.tryCards"));
+    aiSentence = pool[rot % pool.length];
+    const span = document.querySelector("#ai-bar .grow");
+    if (span) span.textContent = S.t("pay.tryPrefix", aiSentence);
+  };
+  setAiTry([]);
+  document.getElementById("ai-bar").onclick = () => { if (aiSentence) S.router.ai(aiSentence); };
   const showDis = () => S.ui.modal(`<h2>${S.fmt.escape(S.t("common.more"))}</h2><p class="muted">${S.fmt.escape(S.t("home.crossDisabled"))}</p>${S.sim.footnote()}`);
   document.getElementById("dis-cross").onclick = showDis;
   document.getElementById("dis-border").onclick = showDis;
   const pr = await S.api.get("/api/payees");
   if (pr.ok) {
+    setAiTry((pr.data.payees ?? []).map((p) => p.name)); /* 收款人数据到位后升级为数据驱动句 */
     const el = document.getElementById("payees");
     const TINTS = ["teal", "orange", "violet", "gold", "rose", "sky"];
     el.className = "hscroll payees";

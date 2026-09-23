@@ -83,9 +83,10 @@ S.router.register("home", async ({ user }) => {
     return;
   }
   /* 首屏数据（第四十轮性能）：单次 /api/home/bundle（一次鉴权 + 一次 DO 往返）取 overview/dashboard/
-     subs/bills/insight 全量——替代此前 5-6 个独立 API（overview 还被拉两次；同用户 DO 串行门控下逐个排队，
-     快网也慢）。资产/情境卡/收支/洞察全部由同一份数据即时渲染，不再有瀑布等待。 */
-  const bunR = await S.api.get("/api/home/bundle").catch(() => null);
+     subs/bills/insight/proposals 全量——替代此前 5-6 个独立 API（overview 还被拉两次；同用户 DO 串行门控下逐个排队，
+     快网也慢）。资产/情境卡/收支/洞察/提议速览全部由同一份数据即时渲染，不再有瀑布等待。
+     since=上次查看提议页时间戳：供 badge 的 fresh（新提议数）判定（第七期 idle）。 */
+  const bunR = await S.api.get("/api/home/bundle?since=" + encodeURIComponent(S.pp.seen())).catch(() => null);
   const bun = bunR?.ok ? bunR.data : null;
   const o = bun?.overview ?? null;
   /* 眼睛按钮全量掩码（第二十五轮续 5）：卡内所有 .mmask 数值（总资产/今日收益/本月收支各项）一起隐藏-恢复 */
@@ -119,7 +120,8 @@ S.router.register("home", async ({ user }) => {
     else renderPromo({ id: "generic", tone: "sky", icon: "ai", tag: "ins.tagGeneric", title: "ins.genericTitle", body: S.t("ins.genericBody"), cta: "/ai", ctaLabel: "ins.genericCta" });
     const cf = ins.cashflow;
     const el = document.getElementById("cashflow");
-    if (!cf || (!cf.inThis && !cf.outThis)) return;
+    /* 收支为空只跳过本区块（不 return——否则下方洞察卡/提议速览行也被跳过，骨架永挂；第七期加固） */
+    if (cf && (cf.inThis || cf.outThis)) {
     const mLabel = new Date().toLocaleDateString(S.i18n.lang || "zh-CN", { month: "long" });
     const pill = (p, inverse) => {
       if (p == null) return "";
@@ -145,16 +147,29 @@ S.router.register("home", async ({ user }) => {
         <span><i class="dot dot-out"></i> ${S.fmt.escape(S.t("ch.outLabel"))} <span class="mmask">${100 - inFrac}%</span></span>
       </div>`;
     if (hidden) setMask(true);
+    }
   }
   const insData = bun?.insight ?? null;
-  if (insData) {
+  /* 提议速览行（第七期 idle）：有新提议时在 AI 洞察卡家族内置顶一条（gold 提议胶囊 + 首条提议标题，
+     与洞察行同款克制样式），点击直达 /ai/proposals。数据来自 bundle 同次往返，零新增请求。 */
+  const pp = bun?.proposals ?? null;
+  const ppTitle = pp && Number(pp.fresh) > 0 && pp.top ? S.pp.titleOf(pp.top) : "";
+  if (insData || ppTitle) {
+    const ppRow = ppTitle ? `<p class="muted small insight-li pp-quick" style="margin-top:6px" role="button" tabindex="0" data-href="/ai/proposals"><span class="pp-chip">${S.fmt.escape(S.t("prop.title"))}</span>${S.fmt.escape(ppTitle)}${S.ui.icon("enter", 14)}</p>` : "";
     /* 行即入口（第二十五轮 2）：去底部按钮与行首箭头，行尾回车式图标示意"带去 AI"；
        整行可点击 → 以第一人称指令原文发给 Suveoo AI（S.router.ai → /ai?q=…） */
     document.getElementById("insight").innerHTML = `<div class="insight-card rows-live"><img class="ins-logo" src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <div><b>${S.fmt.escape(S.t("home.insight"))}</b>
-      ${(insData.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
+      ${ppRow}
+      ${(insData?.insights ?? []).map((t) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(t)}">${S.fmt.escape(t)}${S.ui.icon("enter", 14)}</p>`).join("")}
       </div></div>`;
-    S.ui.$$("#insight .insight-li").forEach((p) => {
+    const ppQ = document.querySelector("#insight .pp-quick");
+    if (ppQ) {
+      const go = () => (location.href = ppQ.dataset.href);
+      ppQ.onclick = go;
+      ppQ.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    }
+    S.ui.$$("#insight .insight-li:not(.pp-quick)").forEach((p) => {
       const ask = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));
       p.onclick = ask;
       p.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } };
