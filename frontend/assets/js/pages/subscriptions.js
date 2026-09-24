@@ -1,17 +1,23 @@
 /* subscriptions.js — P07 订阅管理（场景5） */
 S.router.register("subscriptions", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("subs.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("subs.title"))}</h1>
     <div class="card" id="sleepy">${S.ui.skeleton(1)}</div>
     <div class="card" style="margin-top:16px" id="subs">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get("/api/subscriptions");
   const subs = r.data?.subscriptions ?? [];
   const sleepy = subs.filter((s) => Number(s.usage_score) < 20 && s.status === "ACTIVE");
   document.getElementById("sleepy").innerHTML = sleepy.length
-    ? `<div class="insight-card"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("subs.sleepy"))}</b>
-       ${sleepy.map((s) => `<p class="muted small" style="margin-top:4px">· ${S.fmt.escape(S.t("subs.usageRow", s.merchant, s.usage_score, s.amount))}</p>`).join("")}
+    ? `<div class="insight-card rows-live"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><div><b>${S.fmt.escape(S.t("subs.sleepy"))}</b>
+       ${sleepy.map((s) => `<p class="muted small insight-li" style="margin-top:6px" role="button" tabindex="0" data-q="${S.fmt.escape(S.t("subs.aiItem", s.merchant, s.usage_score))}">${S.fmt.escape(S.t("subs.usageRow", s.merchant, s.usage_score, s.amount))}${S.ui.icon("enter", 14)}</p>`).join("")}
        <button class="ai-chip" style="margin-top:8px" id="ask">${S.ui.icon("ai", 14)} ${S.fmt.escape(S.t("genui.insight"))}</button></div></div>`
     : `<div class="muted small">—</div>`;
+  /* 行即入口（与 /home AI 洞察同款）：整行可点击 → 该订阅的问询原文发 Suveoo AI */
+  S.ui.$$("#sleepy .insight-li").forEach((p) => {
+    const askRow = () => S.router.ai(S.t("home.insightAsk", p.dataset.q));
+    p.onclick = askRow;
+    p.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); askRow(); } };
+  });
   const ask = document.getElementById("ask");
   if (ask) ask.onclick = () => {
     /* 第七期大扫除：本页已持有真实沉睡清单——把真实商户（含使用分）带给 AI 请它分析；

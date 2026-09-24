@@ -644,6 +644,11 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   background: var(--color-red); color: #fff; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center;
   box-shadow: 0 0 0 2px #fff; animation: ppPulse 240ms cubic-bezier(.25,.6,.3,1) 1 both; pointer-events: none; }
 @keyframes ppPulse { 0% { transform: scale(.6); opacity: 0; } 55% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+/* 第八轮：Drawer 二级项「AI 提议」徽标改行内——文本右侧、flex 居中光学对齐（一级大卡与移动圆钮保持右上角标） */
+.drawer-sub.pp-anchor .pp-count { position: static; margin-left: 2px; }
+/* 第八轮：/ai 三点菜单「AI 提议」项内徽标同步行内（菜单项 flex 居中；
+   top 0.5px 与项内 span 的光学下压同步，保证与文本纵向光学对齐） */
+.ch-more-item .pp-count { position: static; position: relative; top: 0.5px; }
 /* 引导气泡：挂 body、position:fixed（不嵌进锚点内——嵌套 <a> 会被浏览器拆散；也不受 drawer overflow 裁剪）。
    坐标由 JS 按锚点实测矩形定位（桌面=Drawer 子项右侧，移动=底栏 AI 圆钮正上方）；整泡是链接，无遮罩不挡邻钮。
    局部档 z=120（底栏 100 之上、全局 dropdown 200 之下，不越档） */

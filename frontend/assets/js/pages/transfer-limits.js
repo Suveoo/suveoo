@@ -1,7 +1,7 @@
 /* transfer-limits.js — P11 转账限额 */
 S.router.register("transfer-limits", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("limits.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("limits.title"))}</h1>
     <div class="banner">${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("limits.tierNote"))}</div></div>
     <div class="card">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get("/api/cards");

@@ -2,7 +2,7 @@
    可选结算卡（购汇支付卡/结汇收款卡）、我的外币余额卡；行内错误提示）。 */
 S.router.register("fx", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("fx.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("fx.title"))}</h1>
     <div class="row between wrap" style="gap:8px;margin:4px 0 8px">
       <span class="muted small" id="upd">…</span>
       <span class="row" style="gap:8px">

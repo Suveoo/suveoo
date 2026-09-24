@@ -11,8 +11,7 @@ S.router.register("contact", async () => {
       <button class="btn btn-primary btn-block" id="ct-go">${S.fmt.escape(S.t("contact.submit"))}</button>
     </div>
     <div class="card card-surface" style="margin-top:12px"><h3>${S.fmt.escape(S.t("contact.emails"))}</h3>
-      <div class="muted small mono">support@suveoo.com · security@suveoo.com</div></div>
-    ${S.sim.footnote()}</div>`;
+      <div class="muted small mono">support@suveoo.com · security@suveoo.com</div></div></div>`;
   const catKeys = ["catAccount", "catTransfer", "catWealth", "catSecurity", "catOther"];
   const catSel = S.ctl.select({ label: S.t("contact.category"), options: catKeys.map((k) => ({ v: S.t("contact." + k), label: S.t("contact." + k) })) });
   catSel.id = "ct-cat";

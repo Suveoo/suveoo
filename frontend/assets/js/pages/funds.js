@@ -1,7 +1,7 @@
 /* funds.js — P15 全部基金（搜索 + 排序 + 风险 tab；E：近12月收益率大数字主视觉，字段零删减） */
 S.router.register("funds", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("funds.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("funds.title"))}</h1>
     <div class="tabs" id="f-tabs"></div>
     <div class="row" style="gap:8px;margin:12px 0;flex-wrap:wrap">
       <input class="input" id="f-q" placeholder="${S.fmt.escape(S.t("funds.searchPh"))}" style="max-width:260px" aria-label="${S.fmt.escape(S.t("funds.searchPh"))}">

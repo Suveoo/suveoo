@@ -1,7 +1,7 @@
 /* bills.js — P06 账单支付 */
 S.router.register("bills", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("bills.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("bills.title"))}</h1>
     <div class="card" id="insight">${S.ui.skeleton(1)}</div>
     <div class="card" style="margin-top:16px" id="bills">${S.ui.skeleton(4)}</div>`;
   const ins = await S.api.get("/api/dashboard/insight");

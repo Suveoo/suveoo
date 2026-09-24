@@ -27,7 +27,7 @@ S.router.register("ai", async ({ user }) => {
             <div class="ch-more-morph" id="ch-more-morph" role="menu">
               <button class="ch-more-face" id="ch-more-btn" type="button" aria-expanded="false" aria-label="${S.fmt.escape(S.t("ai.more"))}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="19" r="2.3"/></svg></button>
               <a class="ch-more-item" role="menuitem" href="/ai/tasks">${S.ui.icon("clock", 14)}<span>${S.fmt.escape(S.t("tasks.title"))}</span></a>
-              <a class="ch-more-item" role="menuitem" href="/ai/proposals">${S.ui.icon("bell", 14)}<span>${S.fmt.escape(S.t("prop.title"))}</span></a>
+              <a class="ch-more-item" role="menuitem" href="/ai/proposals">${S.ui.icon("bell", 14)}<span>${S.fmt.escape(S.t("prop.title"))}</span><span class="pp-count" id="ch-pp-count" hidden></span></a>
               <a class="ch-more-item" role="menuitem" href="/ai/benchmark">${S.ui.icon("chart", 14)}<span>${S.fmt.escape(S.t("bench.title"))}</span></a>
             </div>
           </div>
@@ -136,6 +136,19 @@ S.router.register("ai", async ({ user }) => {
   }
   ppPill();
 
+  /* 三点菜单「AI 提议」项内同步徽标（第八轮）：每次展开刷新（badge 有 sessionStorage 缓存，零开销） */
+  function ppMenuCount() {
+    S.pp.badge().then((d) => {
+      const el = document.getElementById("ch-pp-count");
+      if (!el) return;
+      if (d && d.fresh > 0) {
+        el.hidden = false;
+        el.textContent = d.fresh > 99 ? "99+" : d.fresh;
+        el.setAttribute("aria-label", S.t("pp.badgeAria", d.fresh));
+      } else el.hidden = true;
+    }).catch(() => { /* 静默 */ });
+  }
+
   /* 抽屉统一管理（≤1023）：Trust Console 与历史会话两个全屏抽屉互斥——切换时 replaceState 原位换层
      （不多压一层历史记录）；系统返回手势 = 关抽屉回对话（popstate 单点收口），不退出 /ai。 */
   const thread = document.getElementById("thread");
@@ -186,6 +199,7 @@ S.router.register("ai", async ({ user }) => {
       e.stopPropagation();
       const open = morphWrap.classList.toggle("open");
       morphBtn.setAttribute("aria-expanded", open);
+      if (open) ppMenuCount();
       if (open && !morePushed) { history.pushState({ chMore: true }, ""); morePushed = true; }
     });
     window.addEventListener("popstate", () => { morePushed = false; closeMore(true); });

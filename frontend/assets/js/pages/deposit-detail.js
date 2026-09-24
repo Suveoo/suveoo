@@ -21,7 +21,7 @@ S.router.register("deposit-detail", async () => {
   const fund = await S.api.json(`/assets/data/funds/${productId}.json`);
   const pr = (await S.auth.session())?.pr_level ?? 3;
   const mismatch = fund && Number(fund.risk_level) > Number(pr);
-  c.innerHTML = `<h1>${S.fmt.escape(d.name)}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(d.name)}</h1>
     ${mismatch ? `<div class="banner" style="background:var(--color-red-bg);color:var(--color-red)">${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("wealth.riskMismatch", fund.risk_level, pr))}</div></div>` : ""}
     <div class="card">
       <div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("deps.rate"))}</div>

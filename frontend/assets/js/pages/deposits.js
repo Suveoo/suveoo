@@ -1,7 +1,7 @@
 /* deposits.js — P17 全部存款方案（E：利率大数字主视觉，条款字段零删减；对比表与 deposit-compare 同口径） */
 S.router.register("deposits", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("deps.title"))}</h1>${S.sim.banner()}<div class="grid grid-2" id="grid">${S.ui.skeleton(4)}</div>
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("deps.title"))}</h1><div class="grid grid-2" id="grid">${S.ui.skeleton(4)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("deps.compare"))}</h2><a class="more" href="/wealth/tools/deposit-compare">${S.fmt.escape(S.t("tc.depName"))} →</a></div>
     <div class="card">
       <label class="field"><span class="lb">${S.fmt.escape(S.t("tc.principal"))}（CNY）</span><input class="input input-lg" id="d-cmp-p" value="50000" inputmode="decimal"></label>

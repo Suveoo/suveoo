@@ -2,7 +2,7 @@
 S.router.register("card-settings", async () => {
   const c = document.getElementById("content");
   const slug = (location.pathname.match(/\/account\/card\/([a-z0-9-]+)/) ?? [])[1];
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("card.settings"))}</h1>${S.sim.banner()}<div class="card" id="pane">${S.ui.skeleton(3)}</div>`;
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("card.settings"))}</h1><div class="card" id="pane">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get(`/api/cards/${slug}`);
   const pane = document.getElementById("pane");
   if (!r.ok) { pane.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }

@@ -3,7 +3,7 @@ S.router.register("intrabank", async () => {
   const c = document.getElementById("content");
   const presetPayee = new URLSearchParams(location.search).get("payee");
   const presetFrom = new URLSearchParams(location.search).get("from");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("transfer.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("transfer.title"))}</h1>
     <div class="card" style="max-width:560px">
       <div class="row between" style="margin-bottom:12px">
         <label class="field" style="flex:1;margin:0"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span>

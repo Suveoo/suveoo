@@ -5,7 +5,7 @@ S.router.register("tools", async () => {
     ["deposit", S.t("tools.deposit"), "calc"], ["fund", S.t("tools.fund"), "calc"], ["loan", S.t("tools.loan"), "calc"],
     ["fxCalc", S.t("tools.fxCalc"), "calc"], ["split", S.t("tools.split"), "calc"], ["inflation", S.t("tools.inflation"), "calc"],
   ];
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("tools.title"))}</h1>${S.sim.footnote()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("tools.title"))}</h1>
     <div class="tabs" id="t-tabs">${T.map(([id, name], i) => `<button class="tab${i === 0 ? " active" : ""}" data-t="${id}">${S.fmt.escape(name)}</button>`).join("")}</div>
     <div class="card" style="max-width:520px" id="pane"></div>
     <p class="muted small" style="margin-top:12px">${S.fmt.escape(S.t("tools.deeplink", "/wealth/tools?tool=split&total=860&n=3"))}</p>

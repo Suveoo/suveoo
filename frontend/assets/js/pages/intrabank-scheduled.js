@@ -1,7 +1,7 @@
 /* intrabank-scheduled.js — P09 预约转账（双时区显示） */
 S.router.register("intrabank-scheduled", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("sch.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("sch.title"))}</h1>
     <div class="card" style="max-width:560px">
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toName"))}</span><input class="input" id="s-name"></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("transfer.toAccount"))}</span><input class="input mono" id="s-acct" maxlength="16" inputmode="numeric"></label>

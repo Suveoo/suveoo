@@ -4,7 +4,7 @@ S.router.register("security", async ({ user }) => {
   const sec = (await S.api.get("/api/security")).data ?? {};
   const pwInput = (id, ac = "new-password") => `<span class="pw-field"><input class="input" id="${id}" type="password" autocomplete="${ac}">
       <button type="button" class="eye-toggle" data-eye="${id}" aria-label="${S.fmt.escape(S.t("common.showPass"))}" title="${S.fmt.escape(S.t("common.showPass"))}">${S.ui.icon("eye", 18)}</button></span>`;
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("sec.title"))}</h1>${S.sim.banner()}
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("sec.title"))}</h1>
     <div class="card">
       <div class="list-row"><span class="avatar">${S.ui.icon("lock", 14)}</span>
         <div class="grow"><b>${S.fmt.escape(S.t("sec.password"))}</b><div class="muted small">${S.fmt.escape(S.t("sec.oldNotNeeded"))}</div></div>

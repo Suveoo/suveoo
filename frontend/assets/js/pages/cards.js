@@ -3,7 +3,7 @@ S.router.register("cards", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<div class="row between"><h1>${S.fmt.escape(S.t("cards.title"))}</h1>
     <button class="eye-toggle" id="eye" title="${S.fmt.escape(S.t("cards.showBalance"))}">${S.ui.icon("eye", 20)}</button></div>
-    ${S.sim.banner()}<div class="cardwall" id="wall">${S.ui.skeleton(3)}</div>`;
+    <div class="cardwall" id="wall">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get("/api/cards");
   const wall = document.getElementById("wall");
   if (!r.ok) { wall.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
