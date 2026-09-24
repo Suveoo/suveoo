@@ -22,6 +22,8 @@
 .tc-evt.fail { background: var(--color-red-bg); border-radius: 6px; padding: 6px 8px; margin: 2px 0; color: var(--color-red); }
 .tc-evt .msg { flex: 1; word-break: break-all; }
 .tc-demo { padding: var(--sp-3) var(--sp-4); border-top: 1px dashed var(--color-yellow); background: #FFFBEF; display: flex; gap: 8px; align-items: center; }
+/* Bug E：display:flex 特异性压过全局 [hidden] —— 不补此条时区块永远显示 */
+.tc-demo[hidden] { display: none; }
 .tc-demo .btn { flex: none; }
 .tc-ir { font-size: 10px; }
 .tc-ir summary { cursor: pointer; color: var(--color-ink-2); font-family: var(--font-mono); }

@@ -658,6 +658,22 @@ function inboundTransferMail({ amount, from, txId, memo }) {
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">您收到一笔转账</h2><p>金额：<b>¥${amount}</b></p><p>付款人：${escHtml(from)}</p><p>流水号：<code>${txId}</code></p>${memo ? `<p>备注：${escHtml(memo)}</p>` : ""}<p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】您收到一笔转账 ¥${amount}（${from}）`, text, html };
 }
+/* ===== 生日预订链三触点邮件（第八期：锁定/履约/补偿，数字全部系统侧给出） ===== */
+function taskCreatedMail({ title, item, amount, executeAt }) {
+  const text = `生日预订任务已建立。\n\n任务：${title}\n预订内容：${item ?? title}\n锁定金额：¥${amount}（活期可用额度减少，执行后扣款，取消即解锁）\n执行时间：${executeAt}\n\n可随时在长程任务中心取消（取消即解锁退回）。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">生日预订任务已建立</h2><p>任务：${escHtml(title)}</p><p>预订内容：${escHtml(item ?? title)}</p><p>锁定金额：<b>¥${escHtml(amount)}</b>（活期可用额度减少，执行后扣款，取消即解锁）</p><p>执行时间：${escHtml(executeAt)}</p><p>可随时在<a href="https://suveoo.com/ai/tasks">长程任务中心</a>取消（取消即解锁退回）。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】生日预订已建立并锁定 ¥${amount}`, text, html };
+}
+function taskFulfilledMail({ title, amount, txId, yearly }) {
+  const text = `生日预订已履约。\n\n任务：${title}\n支付金额：¥${amount}（从锁定资金扣款）\n流水号：${txId}${yearly ? "\n每年模式：明年同期将自动再次锁定并预订。" : ""}\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">生日预订已履约</h2><p>任务：${escHtml(title)}</p><p>支付金额：<b>¥${escHtml(amount)}</b>（从锁定资金扣款）</p><p>流水号：<code>${txId}</code></p>${yearly ? "<p>每年模式：明年同期将自动再次锁定并预订。</p>" : ""}<p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】生日预订已履约，支付 ¥${amount}`, text, html };
+}
+function taskCompensatedMail({ title, amount, reason }) {
+  const text = `生日预订履约失败，已自动执行补偿。\n\n任务：${title}\n锁定金额：¥${amount} 已全额解锁退回（余额未受影响）\n原因：${reason}\n\n可重新建立任务或联系支持。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">生日预订失败已自动补偿</h2><p>任务：${escHtml(title)}</p><p>锁定金额：<b>¥${escHtml(amount)}</b> 已全额解锁退回（余额未受影响）</p><p>原因：${escHtml(reason)}</p><p>可重新建立任务或联系支持。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】生日预订失败已补偿，解锁 ¥${amount}`, text, html };
+}
 
 /* ===== 收款方真实性校验（单一真相源）：格式 → 存在性 → 户名匹配。转账/收款人三处接入同此。 ===== */
 const TGT_ERR_MSG = {
@@ -921,6 +937,11 @@ function tgFire(env, waitUntil, lines) {
   if (typeof waitUntil === "function") waitUntil(p);
   return p;
 }
+/* 生日预订类任务统一口径：历史 desc 曾教模型用单数 birthday_flower，履约/补偿/解锁/种子全判复数——
+ * AI 建的单数任务到点只标 DONE。全线放宽为前缀兼容（不迁移存量数据，队长已建的单数任务修后即活）。 */
+function isBirthdayTask(type) {
+  return String(type ?? "").startsWith("birthday_flower");
+}
 /* 请求侧公共遥测行（IP/ASN/UA 等，注册/登录类消息复用） */
 function tgRequestLines(request) {
   const cf = request.cf ?? {};
@@ -966,7 +987,19 @@ function tgActionLines(ir, ex) {
     case "subscription_cancel": title = "❌ 订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
     case "payee_manage": title = "👥 收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
     case "funds_lock": title = "🔒 资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
-    case "scheduled_task_create": title = "⏰ 长程任务已建立"; facts = ["任务 " + escHtml(p.title ?? p.task_type), "执行于 " + escHtml(p.execute_at ?? "—")]; break;
+    case "scheduled_task_create":
+      title = "⏰ 长程任务已建立";
+      facts = [
+        "任务 " + escHtml(p.title ?? p.task_type),
+        "金额 <b>¥" + escHtml(p.amount ?? "—") + "</b>",
+        "执行于 " + escHtml(p.execute_at ?? "—"),
+        ...(isBirthdayTask(p.task_type) ? ["已锁定 ¥" + escHtml(p.amount ?? "—") + "（执行后扣款，取消即解锁）"] : []),
+      ];
+      break;
+    case "task_cancel":
+      title = "↩️ 长程任务已取消";
+      facts = ["任务 " + escHtml(p.task_title ?? ("#" + String(p.task_id ?? "—"))), ex?.compensated ? "补偿 C1 ✓ 已解锁锁定资金" : "无资金动作"];
+      break;
     case "ecommerce_order_mock": title = "🛍 演示商户订单已执行"; facts = ["商品 " + escHtml(p.item ?? "—"), "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
     default: facts = ["intent <code>" + escHtml(ir.intent) + "</code>"];
   }
@@ -1422,7 +1455,7 @@ async function executeIntent(env, ir) {
           const stub = env.SAGA.get(env.SAGA.idFromName(`task:${uid}:${p.task_id}`));
           await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "cancel" }) });
         } catch { /* saga 侧取消失败不回滚账本（alarm 触发时任务已 CANCELLED 自然跳过） */ }
-        await U(env, uid)({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? "任务取消并已执行补偿（资金解锁）。" : "任务已取消。" });
+        await U(env, uid)({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? `「${cur.title ?? p.task_id}」已取消并执行补偿（解锁 ¥${r.unlocked ?? "0.00"} 退回）。` : `「${cur.title ?? p.task_id}」已取消。` });
       }
       await U(env, uid)({ op: "audit", action: "task_cancel", detail: { task_id: p.task_id, compensated: !!r.compensated }, channel: ir.channel, trace_id: ir.trace_id });
       return r;
@@ -1444,14 +1477,33 @@ async function executeIntent(env, ir) {
       return r;
     }
     case "scheduled_task_create": {
-      const r = await U(env, uid)({ op: "taskCreate", type: p.task_type, title: p.title ?? p.task_type, payload: p, execute_at: p.execute_at, repeat: p.repeat ?? "once" });
+      /* 生日预订类建单即锁资金（赛题"当月锁定"语义）：先锁后建，建失败反解；
+         金额不足（INSUFFICIENT_BALANCE）整个建单失败——AI 承诺"确认后锁定 ¥X"必须兑现 */
+      const bdTask = isBirthdayTask(p.task_type);
+      let lockedCents = 0n;
+      if (bdTask) {
+        let amtCents;
+        try { amtCents = toCents(String(p.amount ?? "0")); } catch { amtCents = 0n; }
+        if (amtCents <= 0n) return { ok: false, error: "INVALID_AMOUNT" };
+        const lk = await U(env, uid)({ op: "fundsLock", amount_cents: String(amtCents), reason: "birthday_reservation" });
+        if (!lk.ok) return lk;
+        lockedCents = amtCents;
+      }
+      const r = await U(env, uid)({ op: "taskCreate", type: p.task_type, title: p.title ?? p.task_type, payload: bdTask ? { ...p, locked: true } : p, execute_at: p.execute_at, repeat: p.repeat ?? "once" });
+      if (!r.ok && lockedCents > 0n) await U(env, uid)({ op: "fundsUnlock", amount_cents: String(lockedCents) });
       if (r.ok) {
         const stub = env.SAGA.get(env.SAGA.idFromName(`task:${uid}:${r.id}`));
         await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "schedule", user_id: uid, task_id: r.id, execute_at: p.execute_at }) });
       }
-      await U(env, uid)({ op: "audit", action: "scheduled_task_create", detail: { type: p.task_type, execute_at: p.execute_at }, channel: ir.channel, trace_id: ir.trace_id });
-      await U(env, uid)({ op: "notify", type: "TASK", title: "长程任务已建立", body: `${p.title ?? p.task_type} 将于 ${p.execute_at} 执行（可随时取消，取消即补偿）。` });
-      return r;
+      await U(env, uid)({ op: "audit", action: "scheduled_task_create", detail: { type: p.task_type, execute_at: p.execute_at, locked_cents: lockedCents > 0n ? String(lockedCents) : null }, channel: ir.channel, trace_id: ir.trace_id });
+      const lockTxt = bdTask && r.ok ? `已锁定 ¥${p.amount}（执行后扣款，取消即解锁），` : "";
+      await U(env, uid)({ op: "notify", type: "TASK", title: "长程任务已建立", body: `「${p.title ?? p.task_type}」${lockTxt}将于 ${p.execute_at} 执行（可随时取消，取消即补偿）。` });
+      /* 建单触点邮件（birthday）：金额/执行时间由系统给出，模型不参与 */
+      if (bdTask && r.ok) {
+        const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (prof.email) await sendMail(env, { to: prof.email, ...taskCreatedMail({ title: p.title ?? p.task_type, item: p.item, amount: p.amount, executeAt: p.execute_at }) });
+      }
+      return r.ok ? { ok: true, id: r.id, task_id: r.id } : r;
     }
     case "wealth_product_purchase": {
       const fund = await fundMeta(env, p.product_id);
@@ -1591,8 +1643,21 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       if (r.ok) {
         const stub = env.SAGA.get(env.SAGA.idFromName(`task:${userId}:${mm[1]}`));
         await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "cancel" }) });
-        await UU({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? "任务取消并已执行补偿（资金解锁）。" : "任务已取消。" });
+        await UU({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? `任务取消并已执行补偿（解锁 ¥${r.unlocked ?? "0.00"} 退回）。` : "任务已取消。" });
       }
+      return json(r);
+    }
+    /* 立即演示执行（§5.3）：决赛演示不用把 execute_at 改到过去——复用 taskDue 原语义
+       （幂等 / 状态机 / fail_next 故障注入全生效），仅生日预订类 PENDING 任务 */
+    mm = m(/^\/api\/tasks\/(\d+)\/demo-run$/);
+    if (mm && method === "POST") {
+      if (env.DEMO_MODE !== "true") return apiError("FORBIDDEN", "DEMO_MODE off", 403);
+      const t = ((await UU({ op: "tasks" })).tasks ?? []).find((x) => String(x.id) === mm[1]);
+      if (!t) return apiError("TASK_NOT_FOUND", "task not found", 404);
+      if (!isBirthdayTask(t.type)) return apiError("INVALID_TASK_TYPE", "demo-run supports birthday tasks only", 400);
+      if (t.status !== "PENDING") return apiError("NOT_PENDING", `task status ${t.status}`, 409);
+      await audit(env, { user_id: userId, action: "admin_demo_run", detail: { task_id: Number(mm[1]), type: t.type } });
+      const r = await UU({ op: "taskDue", id: Number(mm[1]) });
       return json(r);
     }
     if (path === "/api/demo/inject-failure" && method === "POST") {
@@ -2606,7 +2671,7 @@ export const MCP_TOOLS = [
   { name: "fx_exchange", desc: "结汇/购汇。按服务端实时牌价结算（购汇卖出价/结汇买入价，JPY 每 100 日元口径），客户端传 rate 不参与结算。buy 需 amount_cny；sell 需 amount_foreign（只给 amount_cny 时按买入价反推）。from_card 可选结算卡（购汇可选信用卡=信用支付、计入欠款；结汇仅借记卡）。外币余额先查 fx_balance_query。", args: { direction: { type: "string" }, currency: { type: "string" }, amount_cny: { type: "string" }, amount_foreign: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "bill_pay", desc: "缴纳账单。通常只需 bill_id（金额由服务端按账单补齐）；credit-repay 为信用卡全额还款，金额动态取当前信用卡欠款（bill 静态金额仅供参考），无欠款时返回 NO_DEBT。还款从默认借记卡扣款并清零信用卡欠款", args: { bill_id: { type: "string" }, amount: { type: "string" } } },
   { name: "funds_lock", desc: "锁定资金（长程任务预授权）", args: { amount: { type: "string" }, reason: { type: "string" }, task_id: { type: "number" } } },
-  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 带 +08:00 时区偏移（如 2026-09-20T17:30:00+08:00；无偏移会被当 UTC 解析成过去时间而拒绝），repeat 取 \"once\"|\"monthly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日订花用 task_type=\"birthday_flower\"+item+amount，用户未给日期/预算时先问一句再建。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
+  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 带 +08:00 时区偏移（如 2026-09-20T17:30:00+08:00；无偏移会被当 UTC 解析成过去时间而拒绝），repeat 取 \"once\"|\"monthly\"|\"yearly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日预订用 task_type=\"birthday_flowers\"+item+amount（建单即锁定该金额，执行后扣款，取消即解锁），每年生日场景 repeat 用 \"yearly\"（明年同期自动再锁定并预订）；用户要鲜花、蛋糕等多品种时按品种建多条任务（每条独立 item+amount，各出确认卡）；用户未给日期/预算时先问一句再建。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
   { name: "wealth_product_purchase", desc: "申购理财（红级）", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "wealth_product_redeem", desc: "赎回理财（红级）。赎回按当前净值对成本净值比例结算（浮盈浮亏实时兑现，整数运算），回款入默认借记卡；预计回款额可先查 wealth_holdings_query 的 redeem_value", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
@@ -2649,6 +2714,19 @@ async function airingDrain(env, sid) {
  * 返回 { text, isError } —— 即 JSON-RPC content[0].text 语义。
  * airing 事件经 push 收集，由外层包装器整批一次 KV 写（见 mcpExecuteTool）。
  */
+/* Trust Console IR 面板载荷（修复 6）：编译完成的 IR 裁剪版——steps 只留 op 名（facts 已含参数），
+   facts 超限截断并标注，控制 airing/SSE 载荷长度 */
+function consoleIr(ir) {
+  const facts = (ir.facts ?? []).slice(0, 14).map((f) => ({ field: f.field, value: f.value == null ? null : String(typeof f.value === "object" ? JSON.stringify(f.value) : f.value).slice(0, 160), provenance: f.provenance, trust: f.trust }));
+  if ((ir.facts ?? []).length > 14) facts.push({ field: "…", value: `+${ir.facts.length - 14} more (truncated)`, provenance: "SYSTEM", trust: "SYSTEM" });
+  return {
+    ir_version: ir.ir_version, trace_id: ir.trace_id, nonce: ir.nonce, intent: ir.intent,
+    user_id: ir.user_id, channel: ir.channel, model: ir.model ?? null,
+    risk: ir.risk, facts, steps: (ir.steps ?? []).map((s) => ({ op: s.op })),
+    preconditions: ir.preconditions, compensation: ir.compensation,
+    created_at: ir.created_at, expires_at: ir.expires_at,
+  };
+}
 async function mcpExecuteTool(env, ctxInfo, name, args, sid, { exposeGrant = true } = {}) {
   const events = [];
   try {
@@ -2730,11 +2808,21 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     balanceOf: balanceIntent ? { op: "cardAvailable", slug: args.from_card ?? null } : null,
   });
   if (g.circuit_tripped) push({ kind: "trust", type: "trust_event", event: { kind: "CIRCUIT", ok: false, reason: "CIRCUIT_TRIPPED", detail: `安全熔断已触发（${g.reason}），写操作临时锁定` } });
+  /* 修复 6：IR 编译完成即推 COMPILED 事件（携裁剪版 IR）——Trust Console 面板从"等待操作…"占位变为真实 trace/nonce/facts */
+  if (g.ir) push({ kind: "trust", type: "trust_event", event: { kind: "COMPILED", ir: consoleIr(g.ir) } });
   for (const s of g.stages ?? []) push({ kind: "trust", type: "trust_event", event: { kind: s.stage, ok: s.ok, reason: s.reason ?? null } });
 
   if (g.status === "EXECUTED") {
     push({ kind: "trust", type: "trust_event", event: { kind: "RESULT", ok: true, tool: name } });
-    return { text: JSON.stringify({ status: "EXECUTED", ...g.result }), isError: false };
+    /* 修复 3：MCP 通道确认执行响应补顶层 trace_id（REST 通道 1965 行先例）；task_id 由执行段透传 */
+    const out = { status: "EXECUTED", trace_id: g.ir?.trace_id ?? null, ...g.result };
+    /* §5.1 对话闭环汇报：生日预订建单成功附确定性 summary（锁定金额/任务/执行时间/可取消）——数字由系统给，模型与横幅照实复述 */
+    if (name === "scheduled_task_create" && g.result?.ok && isBirthdayTask(args?.task_type)) {
+      let amtTxt = String(args.amount ?? "0");
+      try { amtTxt = centsToStr(toCents(String(args.amount))); } catch { /* 非法金额保留原样 */ }
+      out.summary = `任务「${args.title ?? args.task_type}」已建立并锁定 ¥${amtTxt}（执行后扣款，取消即解锁），将于 ${args.execute_at} 自动执行，可随时取消（取消即解锁退回）。`;
+    }
+    return { text: JSON.stringify(out), isError: false };
   }
   if (g.status === "INPUT_REQUIRED") {
     const card = await genuiCardFor(env, ctxInfo, g);
@@ -5509,14 +5597,20 @@ export class LedgerDO {
           const t = this.#rows(sql.exec("SELECT * FROM tasks WHERE id = ?", input.id))[0];
           if (!t) return json({ ok: false, error: "TASK_NOT_FOUND" });
           sql.exec("UPDATE tasks SET status = 'CANCELLED' WHERE id = ?", input.id);
-          let compensated = false;
-          if (t.type === "birthday_flowers") {
+          let compensated = false, unlocked = "0.00";
+          if (isBirthdayTask(t.type)) {
+            /* 按本任务 payload.amount 精确解锁（夹持到 held≥0，防误清其他任务的锁定；
+               修复 2 之前建的存量任务未锁资金——unlock 夹持为 0 自然无动作 */
             const p = JSON.parse(t.payload ?? "{}");
-            sql.exec("UPDATE cards SET held_cents = '0' WHERE is_default = 1");
+            let amt; try { amt = BigInt(toCents(String(p.amount ?? "0"))); } catch { amt = 0n; }
+            const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1"))[0];
+            const heldNow = BigInt(card.held_cents ?? "0");
+            const unlock = amt > heldNow ? heldNow : amt;
+            if (unlock > 0n) sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(heldNow - unlock));
             compensated = true;
-            void p;
+            unlocked = centsToStr(unlock);
           }
-          return json({ ok: true, compensated });
+          return json({ ok: true, compensated, unlocked });
         }
         case "taskInjectFailure": { sql.exec("UPDATE tasks SET fail_next = 1 WHERE id = ?", input.id); return json({ ok: true }); }
         case "taskDue": {
@@ -5524,23 +5618,45 @@ export class LedgerDO {
           if (!t || t.status !== "PENDING") return json({ ok: false, error: "NOT_PENDING" });
           const p = JSON.parse(t.payload ?? "{}");
           if (t.fail_next) {
-            // T2 ✗ → C1 ✓（Saga 补偿演示：解锁资金并标记已补偿）
+            // T2 ✗ → C1 ✓（Saga 补偿演示：按本任务金额精确解锁（夹持 held≥0），标记已补偿）
             sql.exec("UPDATE tasks SET status = 'COMPENSATED' WHERE id = ?", input.id);
-            if (t.type === "birthday_flowers") sql.exec("UPDATE cards SET held_cents = '0' WHERE is_default = 1");
-            this.#notify(sql, "TASK", "任务失败已自动补偿", `「${t.title}」履约失败，已执行逆向补偿（资金解锁），余额未受影响。`);
+            if (isBirthdayTask(t.type)) {
+              let amt; try { amt = BigInt(toCents(String(p.amount ?? "0"))); } catch { amt = 0n; }
+              const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1"))[0];
+              const heldNow = BigInt(card.held_cents ?? "0");
+              const unlock = amt > heldNow ? heldNow : amt;
+              if (unlock > 0n) sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(heldNow - unlock));
+              this.#notify(sql, "TASK", "任务失败已自动补偿", `「${t.title}」履约失败，已执行逆向补偿（解锁 ¥${centsToStr(unlock)}），余额未受影响。`);
+              await this.#taskTouch("compensated", { title: t.title, amount: centsToStr(unlock), reason: "演示故障注入（商户履约失败）", steps: ["T1 ✓ LockFunds", "T2 ✗ MerchantOrder", "C1 ✓ UnlockFunds"] });
+            } else {
+              this.#notify(sql, "TASK", "任务失败已自动补偿", `「${t.title}」履约失败，已执行逆向补偿（资金解锁），余额未受影响。`);
+            }
             return json({ ok: true, outcome: "COMPENSATED", steps: ["T1 ✓ LockFunds", "T2 ✗ MerchantOrder", "C1 ✓ UnlockFunds"] });
           }
-          if (t.type === "birthday_flowers") {
+          if (isBirthdayTask(t.type)) {
             const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1"))[0];
-            const amt = BigInt(toCents(p.amount ?? "600"));
+            const amt = BigInt(toCents(String(p.amount ?? "600")));
+            /* held 扣减夹持：修复 2 之前建的存量任务未锁资金（held=0）——余额直扣，绝不出现负 held */
+            const heldNow = BigInt(card.held_cents ?? "0");
+            const fromHeld = heldNow >= amt ? amt : heldNow;
             sql.exec("UPDATE cards SET held_cents = ?, balance_cents = ? WHERE is_default = 1",
-              String(BigInt(card.held_cents ?? "0") - amt), String(BigInt(card.balance_cents) - amt));
-            sql.exec("UPDATE tasks SET status = 'DONE' WHERE id = ?", input.id);
+              String(heldNow - fromHeld), String(BigInt(card.balance_cents) - amt));
             const txId = this.#txId();
             sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,?,?,'鲜花已预订','SUCCESS','task',NULL,'购物', ?)",
               txId, NOW, String(amt), "OUT", `演示商户·${p.item ?? "鲜花礼盒"}`, card.slug);
-            this.#notify(sql, "TASK", "生日订花已履约", `已从锁定资金支付 ¥${p.amount ?? "600.00"}，订单完成。`);
-            return json({ ok: true, outcome: "DONE", steps: ["T1 ✓ LockFunds", "T2 ✓ MerchantOrder"] });
+            if (t.repeat === "yearly") {
+              /* 每年模式（§5.2）：明年同期再跑，本期履约后重新锁定同等金额（每年生日都"当月锁定"） */
+              const nextRun = new Date(Date.now() + 365 * 86400000).toISOString();
+              sql.exec("UPDATE tasks SET status = 'PENDING', next_run_at = ? WHERE id = ?", nextRun, input.id);
+              sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(heldNow - fromHeld + amt));
+              this.#notify(sql, "TASK", "生日订花已履约", `「${t.title}」已从锁定资金支付 ¥${centsToStr(amt)}，订单完成；明年同期将自动再次锁定并预订。`);
+              await this.#taskTouch("fulfilled", { title: t.title, amount: centsToStr(amt), txId, yearly: true, steps: ["T1 ✓ LockFunds", "T2 ✓ MerchantOrder"] });
+              return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun, steps: ["T1 ✓ LockFunds", "T2 ✓ MerchantOrder"] });
+            }
+            sql.exec("UPDATE tasks SET status = 'DONE' WHERE id = ?", input.id);
+            this.#notify(sql, "TASK", "生日订花已履约", `「${t.title}」已从锁定资金支付 ¥${centsToStr(amt)}，订单完成。`);
+            await this.#taskTouch("fulfilled", { title: t.title, amount: centsToStr(amt), txId, steps: ["T1 ✓ LockFunds", "T2 ✓ MerchantOrder"] });
+            return json({ ok: true, outcome: "DONE", tx_id: txId, steps: ["T1 ✓ LockFunds", "T2 ✓ MerchantOrder"] });
           }
           if (t.type === "scheduled_transfer") {
             const b = p.transfer ?? p;
@@ -5711,7 +5827,7 @@ export class LedgerDO {
                 t.type, t.title, JSON.stringify(t.payload), execute_at, t.type === "scheduled_transfer" ? "monthly" : "once", NOW);
               const id = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;
               taskIds.push({ id, execute_at });
-              if (t.type === "birthday_flowers") {
+              if (isBirthdayTask(t.type)) {
                 sql.exec("UPDATE cards SET held_cents = '60000' WHERE is_default = 1");
               }
             }
@@ -5950,6 +6066,25 @@ export class LedgerDO {
   }
   #notify(sql, type, title, body) {
     sql.exec("INSERT INTO notifications(type, title, body, read, ts) VALUES(?,?,?,0,?)", type, title, body, new Date().toISOString());
+  }
+  /* 生日链履约/补偿触点的邮件+TG 外发（站内 notify 由调用处发）：数字全部系统侧给出。
+     DO 内无 waitUntil——直接 await（alarm/sweep 语境多几百毫秒可接受）；失败不抛（通知缺送不回滚账本）。 */
+  async #taskTouch(kind, { title, amount, txId = null, reason = null, yearly = false, steps = [] }) {
+    try {
+      const prof = await this.fetch(new Request("https://ledger.internal/", {
+        method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+        body: JSON.stringify({ op: "getProfile" }),
+      })).then((r) => r.json());
+      const email = prof?.profile?.email;
+      if (email) {
+        const m = kind === "fulfilled" ? taskFulfilledMail({ title, amount, txId, yearly }) : taskCompensatedMail({ title, amount, reason: reason ?? "演示故障注入（商户履约失败）" });
+        await sendMail(this.env, { to: email, ...m });
+      }
+      const lines = kind === "fulfilled"
+        ? [`🌸 <b>生日预订已履约</b>`, "", `任务 ${escHtml(title)}`, `支付 <b>¥${escHtml(amount)}</b>（从锁定资金扣款）${txId ? ` · 流水 <code>${escHtml(txId)}</code>` : ""}`, ...(yearly ? ["每年模式：明年同期自动再锁定并预订"] : [])]
+        : [`🛡 <b>生日预订失败已自动补偿</b>`, "", `任务 ${escHtml(title)}`, `解锁 <b>¥${escHtml(amount)}</b>（余额未受影响）`, `原因 ${escHtml(reason ?? "演示故障注入")}`];
+      await tgNotify(this.env, [...lines, ...(steps.length ? ["路径 " + escHtml(steps.join(" → "))] : []), `<b>Time</b>: ` + new Date().toISOString()].join("\n"));
+    } catch { /* 通知外发失败不影响账本结果 */ }
   }
   /* 提议列表 + 北京月战报（proposalPage / Dismiss / Settle 共用视图）：PENDING（60 天内）+ 本月 EXECUTED；
      saved_cents 只累计 SAVE 类 impact（不把理财申购额当"省下"——绝不幸存收益口径） */

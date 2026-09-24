@@ -579,12 +579,39 @@ S.router.register("ai", async ({ user }) => {
       try { out = JSON.parse(r.data?.result?.content?.[0]?.text ?? "null") ?? r.data; } catch { /* 保留原始响应 */ }
       const okExec = out?.status === "EXECUTED";
       const done = S.ui.el(`<div class="msg ai"></div>`);
-      done.innerHTML = okExec
-        ? `${S.ui.icon("check", 14)} ${S.fmt.escape(S.t("common.opOk"))} · ${S.fmt.escape(out.tx_id ?? "")} <span class="muted small mono">trace ${S.fmt.escape(String(out.trace_id || "").slice(0, 18))}…</span>`
-        : `${S.ui.icon("x", 14)} ${S.fmt.escape(out?.reason || out?.error?.message || r.data?.error?.message || "BLOCKED")}`;
-      if (!okExec) done.classList.add("err");
+      /* 修复 3 + §5.1：无 tx_id 不渲染"·"段、无 trace_id 不渲染 trace 段（此前显示"操作成功 · trace …"）；
+         birthday 建单以系统 summary 为主文案（锁定金额/执行时间/可取消——数字由系统给） */
+      if (okExec) {
+        const parts = [`${S.ui.icon("check", 14)} ${S.fmt.escape(out.summary || S.t("common.opOk"))}`];
+        if (out.tx_id) parts.push(S.fmt.escape(String(out.tx_id)));
+        let traceHtml = "";
+        if (out.trace_id) {
+          const tr = String(out.trace_id);
+          traceHtml = ` <span class="muted small mono" title="${S.fmt.escape(tr)}">trace ${S.fmt.escape(tr.slice(0, 18))}…</span>`;
+        }
+        done.innerHTML = parts.join(" · ") + traceHtml;
+      } else {
+        done.innerHTML = `${S.ui.icon("x", 14)} ${S.fmt.escape(out?.reason || out?.error?.message || r.data?.error?.message || "BLOCKED")}`;
+        done.classList.add("err");
+      }
       bar.replaceWith(done);
       S.trust.onEvent({ kind: okExec ? "RESULT" : "BLOCKED", ok: okExec, reason: out?.reason });
+      /* 修复 4：birthday 建单确认执行成功 → Trust Console 演示注入按钮接通（此前 showDemo 全站零调用） */
+      if (okExec && out?.task_id && String(card.params?.task_type ?? "").startsWith("birthday_flower")) {
+        S.trust.showDemo(async () => {
+          const r2 = await S.api.post("/api/demo/inject-failure", { task_id: Number(out.task_id) });
+          const btn = document.getElementById("tc-inject");
+          const note = document.querySelector("#tc-demo .small");
+          if (r2.data?.ok) {
+            S.ui.toast(S.t("tasks.injected"));
+            S.trust.evt("DEMO", null, S.t("trust.injectedNote"));
+            if (btn) btn.disabled = true;
+            if (note) note.textContent = S.t("trust.injectedNote");
+          } else {
+            S.ui.toast(r2.data?.error?.message ?? "failed", true);
+          }
+        });
+      }
       scroll();
     };
   }

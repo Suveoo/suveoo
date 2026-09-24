@@ -42,6 +42,8 @@ S.trust = {
   onEvent(ev) {
     const map = { PROPOSED: null, COMPILED: null, POLICY: "POLICY", CONSENT: "CONSENT", PROVENANCE: "PROVENANCE", INVARIANTS: "INVARIANTS", REPLAY: "REPLAY", EXEC: null, COMPENSATE: null, RESULT: null, BLOCKED: null };
     if (ev.kind === "PROPOSED") { this.resetVerifiers(); this.trace(ev.tool ? `tool:${ev.tool}` : ""); this.evt("PROPOSED", null, ev.args ?? ""); }
+    /* 修复 6：IR 编译完成事件——面板显示真实 trace/nonce/intent/facts/risk（不再是"等待操作…"占位） */
+    else if (ev.kind === "COMPILED" && ev.ir) { this._ir = ev.ir; this.ir(ev.ir); }
     else if (ev.kind === "CIRCUIT") this.evt("CIRCUIT", false, ev.detail ?? ev.reason ?? ""); /* 安全熔断：连续失败/可疑行为触发写操作锁定（赛题"异常熔断"可视化） */
     else if (ev.kind === "BLOCKED") this.evt("BLOCKED", false, ev.reason ?? "");
     else if (map[ev.kind] !== null && map[ev.kind] !== undefined) {
@@ -49,7 +51,11 @@ S.trust = {
       // input_required / skipped 不是失败，显示为中性进行/跳过态
       const sym = ev.ok === true ? true : ev.ok === false ? false : null;
       this.evt(ev.kind, sym, ev.reason ?? (ev.ok === "input_required" ? "input_required" : ev.ok === "skipped" ? "skipped" : ""));
-    } else if (ev.kind === "RESULT") this.evt("RESULT", true, ev.tool ?? "done");
+    } else if (ev.kind === "RESULT") {
+      this.evt("RESULT", true, ev.tool ?? "done");
+      /* 终态徽标：执行成功在当前 IR 上补 _status（面板即时反映 EXECUTED） */
+      if (this._ir && !this._ir._status) { this._ir._status = "EXECUTED"; this.ir(this._ir); }
+    }
   },
   showDemo(onInject) {
     if (!this.el) return;

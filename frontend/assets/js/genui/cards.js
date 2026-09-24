@@ -26,7 +26,14 @@ S.genuiCards = {
        display/memo/execute_at 等非授权字段一律以服务端展开的外层为准 */
     const p = { ...(c.snapshot?.params ?? {}), ...(c.params ?? {}) };
     const meta = c.action == null ? this.confirmMeta.transfer_execute : (this.confirmMeta[c.action] ?? this.confirmMeta.generic);
-    /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号 */
+    /* 修复 5：长程任务确认卡按 task_type 分型——birthday/reminder 不再套"预约转账确认"（前缀兼容口径同后端） */
+    const tt = c.action === "scheduled_task_create" ? String(p.task_type ?? "") : "";
+    const isBd = tt.startsWith("birthday_flower");
+    const isRem = tt === "reminder";
+    const titleKey = isBd ? "genui.confirmBirthday" : isRem ? "genui.confirmReminder" : meta.title;
+    const fieldKey = isBd ? "genui.taskItem" : isRem ? "genui.remindItem" : meta.field;
+    /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号；
+       birthday 收预订内容（缺 item 回落任务标题）、reminder 收任务标题 */
     let subject = c.subject ?? null;
     if (!subject) {
       if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
@@ -34,6 +41,8 @@ S.genuiCards = {
       else if (c.action === "subscription_cancel") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
       else if (c.action === "task_cancel") subject = p.task_title ?? ("#" + (p.task_id ?? "—"));
       else if (c.action === "fx_exchange") subject = null;
+      else if (isBd) subject = p.item ?? p.title ?? null;
+      else if (isRem) subject = p.title ?? null;
       else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
     }
     const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
@@ -43,10 +52,10 @@ S.genuiCards = {
     /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
     const verifiedBadge = c.action == null || c.action === "transfer_execute" ? (c.params?.verified ? ` ${S.ui.badge(S.t("genui.verified"), "badge-green")}` : "") : "";
     return `<div class="genui-card">
-      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(meta.title)} ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
+      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(titleKey)} ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
       ${amtText ? `<div class="gc-amount">${amtText}</div>` : ""}
       ${S.genuiCards.kv([
-        ...(meta.field && subject != null ? [[S.t(meta.field), subject]] : []),
+        ...(fieldKey && subject != null ? [[S.t(fieldKey), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
         ...(p.memo != null && String(p.memo) !== "" ? [[S.t("genui.memo"), p.memo]] : []),
         ...(c.action === "subscription_cancel" ? [
@@ -55,12 +64,13 @@ S.genuiCards = {
         ] : []),
         ...(c.action === "task_cancel" && p.task_next != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.task_next)]] : []),
         ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
-        ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : S.t("sch.once")]] : []),
+        ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : p.repeat === "yearly" ? S.t("sch.yearly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
         ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
+      ${isBd && amtText ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.lockNote", S.fmt.moneyPlain(rawAmt)))}</p>` : ""}
       ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
       ${c.action === "task_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.taskCancelNote"))}</p>` : ""}
       <div class="gc-grant">grant ${String(c.grant_hash ?? "").slice(0, 12)}…</div>
