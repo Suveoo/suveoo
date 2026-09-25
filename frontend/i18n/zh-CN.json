@@ -564,6 +564,8 @@
   "help.f3a": "它实时展示每次 AI 操作的 BankAction IR、五道验证器的通过状态与 Saga 步骤，让安全从黑盒变成玻璃盒。",
   "help.faq": "常见问题",
   "help.guideTitle": "快速指引",
+  "help.heroSub": "搜索或浏览常见问题、操作指引与安全须知——大多数问题都能在这里自助解决。",
+  "help.pillFast": "自助优先 · 没找到就问我们",
   "help.results": "条结果",
   "help.searchPh": "搜索帮助：转账、验证码、Cookie、基金……",
   "help.title": "帮助中心",

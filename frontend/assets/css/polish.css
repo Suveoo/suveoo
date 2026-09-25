@@ -323,6 +323,12 @@ body.tc-open { overflow: hidden; }
 .hs-num { width: 26px; height: 26px; border-radius: 50%; background: var(--color-primary-tint); color: var(--color-navy); font-weight: 700; font-size: var(--fs-12); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); }
 .help-step .btn { margin-top: auto; }
 .faq-cat-name { margin: var(--sp-6) 0 var(--sp-2); font-size: var(--fs-16); }
+/* 第十一轮：FAQ 分类头 tint 胶囊（pye-gh 复用）内联图标光学对齐 + hpill 滚动激活态 */
+.faq-cat-name .pye-gh { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; font-size: var(--fs-14); }
+.faq-cat-name .pye-gh .ic-c { width: 20px; height: 20px; }
+.hpill.on { background: var(--color-navy); border-color: var(--color-navy); color: #fff; font-weight: 600; }
+.help-sec-h { scroll-margin-top: 128px; }
+.faq-cat { scroll-margin-top: 128px; }
 .help-ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; color: var(--color-ink); font-size: var(--fs-14); }
 .help-cta { margin-top: var(--sp-8); display: flex; align-items: center; gap: 12px; }
 .help-cta .btn { flex: none; margin-left: auto; }
@@ -378,6 +384,9 @@ body.tc-open { overflow: hidden; }
 .help-ul { list-style: none; padding-left: 0 !important; }
 .help-ul li { display: flex; align-items: flex-start; gap: 8px; }
 .help-ul li svg { flex: none; margin-top: 3px; color: var(--color-navy); }
+/* 第十一轮：防诈骗/AI 安全行首彩色 squircle 图标行对齐 */
+.help-ul li .ic-c { width: 20px; height: 20px; margin-top: 1px; }
+.task-step .st .ic-c { width: 24px; height: 24px; }
 /* 通知未读：整行柔色 + 圆角（替代与 logo/时间戳相切的 inset 硬边） */
 .notif-item.unread { box-shadow: none !important; }
 

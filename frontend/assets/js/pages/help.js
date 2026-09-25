@@ -1,23 +1,38 @@
-/* help.js — P32 帮助中心（实时搜索 + 分类锚点 + 平滑手风琴 + 滚动渐显；三语深度内容来自 docs-help.js） */
+/* help.js — P32 帮助中心（第十一轮改版：渐变 Hero + SEC_ICONS 章节头 + 分类 tint 胶囊头 + pills 滚动激活 + 图标化列表；
+   功能零删减：实时搜索/命中计数/平滑手风琴/事件委托/滚动渐显 全保留。三语深度内容来自 docs-help.js） */
 S.router.register("help", async () => {
   const c = document.getElementById("content");
   const lang = S.i18n.lang;
   const D = S.HELP_DOCS?.[lang] ?? S.HELP_DOCS?.["zh-CN"] ?? { cats: [], guide: [], trouble: [], antifraud: [], ai: {} };
   const esc = (s) => S.fmt.escape(s);
+  /* 章节头（/about ab-sec 同款：渐变竖条+彩色 squircle 图标）与 FAQ 分类 tint 图标映射 */
+  const secHead = (id, icon, key) => `<h2 class="ab-sec help-sec-h" id="${id}"><span class="ab-sec-bar"></span><span class="ab-sec-ic">${S.ui.icon(icon, 22)}</span><span class="ab-sec-t">${esc(S.t(key))}</span></h2>`;
+  const CAT_META = [
+    { icon: "ic-bank-navy", tint: "sky" }, { icon: "ic-pay-sky", tint: "sky" }, { icon: "ic-wealth-gold", tint: "gold" },
+    { icon: "ic-star-orange", tint: "orange" }, { icon: "ic-lock-violet", tint: "violet" },
+  ];
+  const AI_STEPS = ["ic-shield-navy", "ic-lock-violet", "ic-doc-sky", "ic-exchange-teal", "ic-star-gold"];
 
   c.innerHTML = `
-    <h1>${esc(S.t("help.title"))}</h1>
+    <section class="ct-hero bg-grad-navy">
+      <div class="ab-hero-txt" style="padding-right:0">
+        <h1>${esc(S.t("help.title"))}</h1>
+        <p>${esc(S.t("help.heroSub"))}</p>
+        <div class="ab-pills"><span class="ab-pill">${S.ui.icon("clock", 14)}${esc(S.t("help.pillFast"))}</span></div>
+      </div>
+      <img class="ab-hero-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="">
+    </section>
     <div class="help-search card">
       <span class="hs-ic">${S.ui.icon("doc", 18)}</span>
       <input class="input" id="help-q" type="search" placeholder="${esc(S.t("help.searchPh"))}" autocomplete="off">
       <span class="muted small mono" id="help-count"></span>
     </div>
     <div class="help-pills" id="help-pills"></div>
-    <section class="help-sec" id="sec-guide"><h2>${esc(S.t("help.guideTitle"))}</h2><div id="guide-body"></div></section>
-    <section class="help-sec" id="sec-faq"><h2>${esc(S.t("help.faq"))}</h2><div id="faq-body"></div></section>
-    <section class="help-sec" id="sec-trouble"><h2>${esc(S.t("trouble.title"))}</h2><div id="trouble-body"></div></section>
-    <section class="help-sec" id="sec-anti"><h2>${esc(S.t("help.antifraud"))}</h2><div id="anti-body"></div></section>
-    <section class="help-sec" id="sec-ai"><h2>${esc(S.t("help.aiSecurity"))}</h2><div id="ai-body"></div></section>
+    <section class="help-sec" id="sec-guide">${secHead("sec-guide-h", "ic-doc-sky", "help.guideTitle")}<div id="guide-body"></div></section>
+    <section class="help-sec" id="sec-faq">${secHead("sec-faq-h", "ic-ai-violet", "help.faq")}<div id="faq-body"></div></section>
+    <section class="help-sec" id="sec-trouble">${secHead("sec-trouble-h", "ic-doc-orange", "trouble.title")}<div id="trouble-body"></div></section>
+    <section class="help-sec" id="sec-anti">${secHead("sec-anti-h", "ic-shield-rose", "help.antifraud")}<div id="anti-body"></div></section>
+    <section class="help-sec" id="sec-ai">${secHead("sec-ai-h", "ic-shield-teal", "help.aiSecurity")}<div id="ai-body"></div></section>
     <div class="help-cta card card-surface">${S.ui.icon("shield", 16)}<div>${esc(S.t("help.contactCta"))}</div>
       <a class="btn btn-sm btn-primary" href="/contact">${esc(S.t("help.contactBtn"))}</a></div>`;
 
@@ -27,57 +42,40 @@ S.router.register("help", async () => {
       <button class="acc-head" type="button" aria-expanded="false"><span>${esc(it.q)}</span>${S.ui.icon("arrow-right", 14)}</button>
       <div class="acc-body"><div class="acc-inner">${esc(it.a)}</div></div>
     </div>`).join("");
-  /* 手风琴：JS 测高 + max-height 过渡（兼容所有浏览器；关时回 0 便于再次测高） */
-  const wireAcc = (root) => {
-    S.ui.$(".hacc .acc-head", root).forEach((btn) => {
-      btn.onclick = () => {
-        const item = btn.closest(".hacc");
-        const body = item.querySelector(".acc-body");
-        const opening = !item.classList.contains("open");
-        item.classList.toggle("open", opening);
-        btn.setAttribute("aria-expanded", opening);
-        if (opening) {
-          body.style.maxHeight = body.scrollHeight + "px";
-          body.addEventListener("transitionend", function te(ev) {
-            if (ev.propertyName === "max-height" && item.classList.contains("open")) body.style.maxHeight = "none";
-            body.removeEventListener("transitionend", te);
-          });
-        } else {
-          if (body.style.maxHeight === "none") { body.style.maxHeight = body.scrollHeight + "px"; void body.offsetHeight; }
-          body.style.maxHeight = "0px";
-        }
-      };
-    });
-  };
 
   /* 快速指引（编号步骤卡） */
   document.getElementById("guide-body").innerHTML = `<div class="help-grid">${(D.guide ?? []).map((g, i) => `
     <div class="help-step card"><span class="hs-num">${i + 1}</span><b>${esc(g.t)}</b><p class="muted small">${esc(g.a)}</p>
     ${g.href ? `<a class="btn btn-sm btn-light" href="${g.href}">${esc(g.cta)}</a>` : ""}</div>`).join("")}</div>`;
 
-  /* FAQ 分类手风琴 */
-  document.getElementById("faq-body").innerHTML = D.cats.map((cat, i) => `
-    <div class="faq-cat" id="faq-cat-${i}"><h3 class="faq-cat-name">${esc(cat.name)}</h3>${acc(cat.items)}</div>`).join("");
+  /* FAQ 分类手风琴：分类头改 tint 胶囊+彩色图标（pye-gh 同族） */
+  document.getElementById("faq-body").innerHTML = D.cats.map((cat, i) => {
+    const meta = CAT_META[i % CAT_META.length];
+    return `<div class="faq-cat" id="faq-cat-${i}"><h3 class="faq-cat-name"><span class="pye-gh bg-tint-${meta.tint}">${S.ui.icon(meta.icon, 18)} ${esc(cat.name)}</span></h3>${acc(cat.items)}</div>`;
+  }).join("");
 
   /* 故障排查手风琴 */
   document.getElementById("trouble-body").innerHTML = acc(D.trouble ?? []);
 
-  /* 防诈骗清单（箭头 SVG 符号） */
-  document.getElementById("anti-body").innerHTML = `<div class="card card-surface"><ul class="help-ul">${(D.antifraud ?? []).map((s) => `<li>${S.ui.icon("arrow-right", 12)} ${esc(s)}</li>`).join("")}</ul></div>`;
+  /* 防诈骗清单：警示语义 → shield-rose 行图标（列表语义保留） */
+  document.getElementById("anti-body").innerHTML = `<div class="card card-surface"><ul class="help-ul">${(D.antifraud ?? []).map((s) => `<li>${S.ui.icon("ic-shield-rose", 20)} ${esc(s)}</li>`).join("")}</ul></div>`;
 
-  /* AI 安全（五道验证，箭头 SVG 符号） */
+  /* AI 安全（五道验证：行首五族彩色 squircle 图标轮转） */
   document.getElementById("ai-body").innerHTML = `<div class="card">
     <p class="muted">${esc(D.ai?.intro ?? "")}</p>
-    <div class="stack" style="gap:6px">${(D.ai?.items ?? []).map((s) => `<div class="task-step"><span class="st">${S.ui.icon("arrow-right", 12)}</span>${esc(s)}</div>`).join("")}</div>
+    <div class="stack" style="gap:8px;margin-top:10px">${(D.ai?.items ?? []).map((s, i) => `<div class="task-step"><span class="st">${S.ui.icon(AI_STEPS[i % AI_STEPS.length], 24)}</span>${esc(s)}</div>`).join("")}</div>
     <p class="muted small" style="margin-top:12px">${esc(D.ai?.chain ?? "")}</p></div>`;
 
-  /* 分类锚点 pills（粘性） */
+  /* 分类锚点 pills（粘性；滚动激活态由下方 observer 驱动） */
+  const pillDefs = [
+    ["sec-guide", S.t("help.guideTitle")],
+    ...D.cats.map((n, i) => [`faq-cat-${i}`, n.name]),
+    ["sec-trouble", S.t("trouble.title")],
+    ["sec-anti", S.t("help.antifraud")],
+    ["sec-ai", S.t("help.aiSecurity")],
+  ];
   document.getElementById("help-pills").innerHTML =
-    `<a class="hpill" href="#sec-guide">${esc(S.t("help.guideTitle"))}</a>` +
-    D.cats.map((n, i) => `<a class="hpill" href="#faq-cat-${i}">${esc(n.name)}</a>`).join("") +
-    `<a class="hpill" href="#sec-trouble">${esc(S.t("trouble.title"))}</a>` +
-    `<a class="hpill" href="#sec-anti">${esc(S.t("help.antifraud"))}</a>` +
-    `<a class="hpill" href="#sec-ai">${esc(S.t("help.aiSecurity"))}</a>`;
+    pillDefs.map(([id, label]) => `<a class="hpill" href="#${id}" data-for="${id}">${esc(label)}</a>`).join("");
 
   /* 实时搜索过滤：FAQ + 故障排查联动隐藏，命中计数 */
   const applyFilter = () => {
@@ -130,4 +128,22 @@ S.router.register("help", async () => {
     S.ui.$$(".help-sec").forEach((sec) => io.observe(sec));
     setTimeout(revealAll, 1200);
   } else revealAll();
+
+  /* pills 滚动激活态（/about TOC 同款：rAF 节流；到底亮最后一枚；路由替换自清） */
+  let ticking = false;
+  const pillsEl = document.getElementById("help-pills");
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      if (!document.contains(pillsEl)) { window.removeEventListener("scroll", onScroll); return; }
+      let cur = pillDefs[0][0];
+      for (const [id] of pillDefs) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top <= 120) cur = id; }
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4) cur = pillDefs[pillDefs.length - 1][0];
+      S.ui.$$(".hpill", pillsEl).forEach((a) => a.classList.toggle("on", a.dataset.for === cur));
+    });
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
 });

@@ -564,6 +564,8 @@
   "help.f3a": "It shows each AI action's BankAction IR, the five verifiers' status and Saga steps in real time — security as a glass box.",
   "help.faq": "FAQ",
   "help.guideTitle": "Quick guide",
+  "help.heroSub": "Search or browse FAQs, how-to guides and security notes — most answers are one click away.",
+  "help.pillFast": "Self-serve first · ask us anytime",
   "help.results": "results",
   "help.searchPh": "Search help: transfer, code, cookies, funds…",
   "help.title": "Help",
