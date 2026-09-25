@@ -1,18 +1,29 @@
-/* transactions.js — P31 交易记录（D 改版：页顶"结果优先"结论区——本月收/支/结余 + 分类环比 + 主要变化来源；全部流水原样保留在下方，一条不删） */
+/* transactions.js — P31 交易记录（第十四轮改版：结论区图表重排 + 搜索/方向/时间/分类筛选 + 导出 CSV；
+   全部流水原样保留，点击行回执弹窗保留。无渐变 Hero——工具页简单大标题。） */
 S.router.register("transactions", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("pay.txHistory"))}</h1>
+  c.innerHTML = `<div class="row between" style="align-items:center"><h1 style="margin:0">${S.fmt.escape(S.t("pay.txHistory"))}</h1>
+      <button class="btn btn-sm btn-light th-export" id="tx-export">${S.ui.icon("download", 14)} ${S.fmt.escape(S.t("hist.export"))}</button></div>
     <div id="tx-summary"></div>
-    <div class="card">${S.ui.skeleton(6)}</div>`;
-  const el = c.querySelector(".card");
+    <div class="help-search card th-search">
+      <span class="hs-ic">${S.ui.icon("doc", 18)}</span>
+      <input class="input" id="tx-q" type="search" placeholder="${S.fmt.escape(S.t("tx.searchPh"))}" autocomplete="off">
+      <span class="muted small mono" id="tx-count"></span>
+    </div>
+    <div class="th-chips" id="tx-chips"></div>
+    <div class="card" id="tx-list-card">${S.ui.skeleton(6)}</div>`;
+  const el = document.getElementById("tx-list-card");
   let cursor = "0";
+  const all = [];
+  const filters = { q: "", dir: "all", days: 0, cat: "" };
   const load = async () => {
     const r = await S.api.get(`/api/transfers?scope=all${cursor && cursor !== "0" ? `&cursor=${cursor}` : ""}`);
-    if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return null; }
+    if (!r.ok) return null;
     return r.data;
   };
-  /* 结论区（零 LLM、纯聚合）：本月收/支/结余 + 环比 + 主要变化来自哪类 */
-  S.api.get("/api/dashboard").then((r) => { if (!r.ok) return; renderSummary(r.data); }).catch(() => {});
+
+  /* ---- 结论区（零 LLM、纯聚合）：本月收/支/结余 + 环比（pill 移到标签右侧）+ 分类环比（标题-图空白压缩） ---- */
+  S.api.get("/api/dashboard").then((r) => { if (r.ok) renderSummary(r.data); }).catch(() => {});
   const renderSummary = (dash) => {
     const now = new Date();
     const thisM = now.toISOString().slice(0, 7);
@@ -56,23 +67,29 @@ S.router.register("transactions", async () => {
           [{ name: S.t("tx.thisMonth"), values: names.map((k) => Math.round(cat[k].t / 100)) }, { name: S.t("tx.lastMonth"), values: names.map((k) => Math.round(cat[k].l / 100)) }],
           { colors: ["#1E2A78", "#B7C0E8"], labels: names })
       : "";
+    /* 环比胶囊移到"收入/支出"标签右侧（tx-cell-h 行内）；分类环比标题下距 2px 压空白 */
     document.getElementById("tx-summary").innerHTML = `
       <div class="card" style="margin-bottom:16px">
         <div class="row between" style="align-items:center"><b>${S.fmt.escape(S.t("tx.summaryTitle"))} · ${now.toLocaleDateString(S.i18n.lang || "zh-CN", { month: "long" })}</b></div>
         <div class="tx-sum-row">
-          <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.inLabel"))}</span><span class="n trend-up">¥${y(g.inT)}</span></div>${pill(pct(g.inT, g.inL))}</div>
-          <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("ch.outLabel"))}</span><span class="n">¥${y(g.outT)}</span></div>${pill(pct(g.outT, g.outL), true)}</div>
-          <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("tx.net"))}</span><span class="n ${g.inT - g.outT >= 0 ? "trend-up" : "trend-down"}">¥${y(g.inT - g.outT)}</span></div></div>
+          <div class="tx-cell"><div class="tx-cell-h"><span class="lb2">${S.fmt.escape(S.t("ch.inLabel"))}</span>${pill(pct(g.inT, g.inL))}</div><span class="n trend-up">¥${y(g.inT)}</span></div>
+          <div class="tx-cell"><div class="tx-cell-h"><span class="lb2">${S.fmt.escape(S.t("ch.outLabel"))}</span>${pill(pct(g.outT, g.outL), true)}</div><span class="n">¥${y(g.outT)}</span></div>
+          <div class="tx-cell"><div class="tx-cell-h"><span class="lb2">${S.fmt.escape(S.t("tx.net"))}</span></div><span class="n ${g.inT - g.outT >= 0 ? "trend-up" : "trend-down"}">¥${y(g.inT - g.outT)}</span></div>
         </div>
         ${mainChange ? `<div class="tx-main-change">${S.ui.icon("trend", 14)} ${S.fmt.escape(mainChange)}</div>` : ""}
-        ${chart ? `<div class="section-title" style="margin:14px 0 6px"><h2 style="font-size:14px">${S.fmt.escape(S.t("tx.catCompare"))}</h2></div>${chart}` : ""}
+        ${chart ? `<div class="tx-cat-title">${S.fmt.escape(S.t("tx.catCompare"))}</div>${chart}` : ""}
       </div>`;
   };
-  const first = await load();
-  if (!first) return;
-  let next = first.next_cursor;
-  el.innerHTML = `<div id="tx-list"></div><div class="center" style="margin-top:12px" id="more-wrap"></div>`;
-  /* 分类 → 彩色 squircle 图标（第三十八轮：统一蓝 logo 退役）+ 今天/昨天/更早日期分组 */
+
+  /* ---- 列表（过滤+分组+回执）：all 全集持有，筛选后全量重绘 ---- */
+  await (async () => {
+    const first = await load();
+    if (!first) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
+    all.push(...(first.txs ?? []));
+    cursor = first.next_cursor;
+  })();
+  if (!all.length && !cursor) { el.innerHTML = S.ui.empty(S.t("common.emptyTx")); }
+  /* 分类 → 彩色 squircle 图标（pay/transactions/account 三副本律：改一处须同步三处） */
   const CAT_ICON = {
     "转账": "ic-pay-sky", "餐饮": "ic-star-orange", "购物": "ic-card-rose", "交通": "ic-exchange-teal",
     "娱乐": "ic-ai-violet", "生活服务": "ic-doc-gold", "医疗": "ic-shield-rose", "订阅": "ic-bell-teal",
@@ -85,47 +102,106 @@ S.router.register("transactions", async () => {
     const diff = Math.round((n0 - b0) / 86400_000);
     return diff === 0 ? "pay.today" : diff === 1 ? "pay.yesterday" : "pay.earlier";
   };
-  let lastDay = null;
-  const render = (list) => {
-    document.getElementById("tx-list").insertAdjacentHTML("beforeend", list.map((t) => {
+  const yuan = (cents) => (Number(cents) / 100).toFixed(2);
+  const match = (t) => {
+    if (filters.dir !== "all" && t.direction !== filters.dir) return false;
+    if (filters.days) { const cut = Date.now() - filters.days * 86400_000; if (new Date(t.ts).getTime() < cut) return false; }
+    if (filters.cat && (t.category ?? "") !== filters.cat) return false;
+    if (filters.q) {
+      const hay = `${t.counterparty ?? ""} ${t.memo ?? ""} ${t.category ?? ""} ${t.id}`.toLowerCase();
+      if (!hay.includes(filters.q)) return false;
+    }
+    return true;
+  };
+  const receipt = (t) => S.ui.modal(`<h2>${S.fmt.escape(S.t("transfer.receipt"))}</h2>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.txId"))}</span><span class="v mono">${S.fmt.escape(t.id)}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.date"))}</span><span class="v">${S.fmt.datetime(t.ts)}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.counterparty"))}</span><span class="v">${S.fmt.escape(t.counterparty ?? "")}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("contact.category"))}</span><span class="v">${S.fmt.escape(t.category ?? "")}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.amount"))}</span><span class="v mono">¥${S.fmt.moneyPlain(yuan(t.amount_cents))}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.note"))}</span><span class="v">${S.fmt.escape(t.memo ?? "—")}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.channel"))}</span><span class="v">${S.fmt.escape(t.channel === "ai" ? S.t("channel.ai") : t.channel === "task" ? S.t("channel.task") : t.channel === "mcp" ? "MCP" : S.t("channel.form"))}</span></div>
+      ${t.trace_id ? `<div class="gc-kv"><span class="muted">Trace</span><span class="v mono small">${S.fmt.escape(t.trace_id)}</span></div>` : ""}`);
+  const renderList = () => {
+    const list = all.filter(match);
+    document.getElementById("tx-count").textContent = (filters.q || filters.cat) ? `${list.length} ${S.t("help.results")}` : "";
+    if (!list.length) { el.innerHTML = S.ui.empty(S.t(all.length ? "hist.noMatch" : "common.emptyTx")); return; }
+    let html = "", lastDay = null;
+    for (const t of list) {
       const dk = dayKey(t.ts);
-      const head = dk !== lastDay ? `<div class="muted small pay-day">${S.fmt.escape(S.t(dk))}</div>` : "";
-      lastDay = dk;
-      return head + `
+      if (dk !== lastDay) { html += `<div class="muted small pay-day">${S.fmt.escape(S.t(dk))}</div>`; lastDay = dk; }
+      html += `
       <div class="list-row tx-row pay-tx" data-tx='${S.fmt.escape(JSON.stringify(t))}'>
         <span class="qi-wrap" style="width:34px;height:34px;flex:none">${S.ui.icon(CAT_ICON[t.category] ?? "ic-doc-navy", 26)}</span>
         <div class="grow"><b>${S.fmt.escape(t.counterparty ?? "—")}</b>
           <div class="muted small">${S.fmt.datetime(t.ts)} · ${S.fmt.escape(t.category ?? "")}${t.channel === "ai" ? " · " + S.fmt.escape(S.t("channel.ai")) : ""}${t.channel === "task" ? " · " + S.fmt.escape(S.t("history.taskTag")) : ""}</div></div>
-        <div style="text-align:right"><div class="amt" style="color:${t.direction === "IN" ? "var(--color-green)" : "inherit"}">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain((Number(t.amount_cents) / 100).toFixed(2))}</div>
+        <div style="text-align:right"><div class="amt" style="color:${t.direction === "IN" ? "var(--color-green)" : "inherit"}">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain(yuan(t.amount_cents))}</div>
         <div class="muted small">${S.fmt.escape(t.status ?? "")}</div></div>
-      </div>`;}).join(""));
-    S.ui.$$(".tx-row").forEach((row) => {
-      row.onclick = () => {
-        const t = JSON.parse(row.dataset.tx);
-        S.ui.modal(`<h2>${S.fmt.escape(S.t("transfer.receipt"))}</h2>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.txId"))}</span><span class="v mono">${S.fmt.escape(t.id)}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.date"))}</span><span class="v">${S.fmt.datetime(t.ts)}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.counterparty"))}</span><span class="v">${S.fmt.escape(t.counterparty ?? "")}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("contact.category"))}</span><span class="v">${S.fmt.escape(t.category ?? "")}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.amount"))}</span><span class="v mono">¥${S.fmt.moneyPlain((Number(t.amount_cents) / 100).toFixed(2))}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.note"))}</span><span class="v">${S.fmt.escape(t.memo ?? "—")}</span></div>
-          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.channel"))}</span><span class="v">${S.fmt.escape(t.channel === "ai" ? S.t("channel.ai") : t.channel === "task" ? S.t("channel.task") : t.channel === "mcp" ? "MCP" : S.t("channel.form"))}</span></div>
-          ${t.trace_id ? `<div class="gc-kv"><span class="muted">Trace</span><span class="v mono small">${S.fmt.escape(t.trace_id)}</span></div>` : ""}`);
-      };
+      </div>`;
+    }
+    el.innerHTML = html;
+    S.ui.$$(".tx-row", el).forEach((row) => { row.onclick = () => receipt(JSON.parse(row.dataset.tx)); });
+  };
+
+  /* ---- chips（方向/时间，hpill 激活 navy）+ 分类下拉（动态类别集） ---- */
+  const chipDefs = [
+    ["dir", "all", "hist.dirAll"], ["dir", "IN", "hist.dirIn"], ["dir", "OUT", "hist.dirOut"],
+    ["days", 0, "hist.dAll"], ["days", 7, "hist.d7"], ["days", 30, "hist.d30"],
+  ];
+  const catSelBox = document.createElement("span");
+  document.getElementById("tx-chips").after(catSelBox);
+  catSelBox.style.cssText = "display:inline-block;vertical-align:top";
+  const renderChips = () => {
+    document.getElementById("tx-chips").innerHTML = chipDefs.map(([k, v, key]) =>
+      `<button class="hpill${String(filters[k]) === String(v) ? " on" : ""}" data-k="${k}" data-v="${v}">${S.fmt.escape(S.t(key))}</button>`).join("");
+    S.ui.$$("#tx-chips .hpill").forEach((b) => {
+      b.onclick = () => { filters[b.dataset.k] = b.dataset.k === "days" ? Number(b.dataset.v) : b.dataset.v; renderChips(); renderList(); };
     });
   };
-  render(first.txs ?? []);
-  const mw = document.getElementById("more-wrap");
-  if (!next && !(first.txs ?? []).length) { el.innerHTML = S.ui.empty(S.t("common.emptyTx")); return; }
-  if (next) {
-    mw.innerHTML = `<button class="btn btn-ghost" id="more">${S.fmt.escape(S.t("common.more"))}</button>`;
-    document.getElementById("more").onclick = async () => {
-      cursor = next;
+  const catSet = [...new Set(all.map((t) => t.category).filter(Boolean))];
+  const catSel = S.ctl.select({
+    label: S.t("tx.catCompare"), value: "",
+    options: [{ v: "", label: S.t("tx.catAll") }, ...catSet.map((k) => ({ v: k, label: k }))],
+    onChange: (v) => { filters.cat = v; renderList(); },
+  });
+  catSelBox.appendChild(catSel);
+  const q = document.getElementById("tx-q");
+  q.addEventListener("input", () => { filters.q = q.value.trim().toLowerCase(); renderList(); });
+  renderChips();
+  renderList();
+
+  /* ---- 导出 CSV（已加载全集；BOM+转义，同 /transfer/history） ---- */
+  document.getElementById("tx-export").onclick = () => {
+    const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["单号", "时间", "对手方", "方向", "金额", "分类", "状态", "备注", "渠道", "Trace"],
+      ...all.map((t) => [t.id, S.fmt.datetime(t.ts), t.counterparty ?? "", t.direction === "IN" ? "收入" : "支出", yuan(t.amount_cents), t.category ?? "", t.status ?? "", t.memo ?? "", t.channel ?? "", t.trace_id ?? ""])];
+    const csv = "\uFEFF" + rows.map((r2) => r2.map(cell).join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `suveoo-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    S.ui.toast(S.t("hist.exported"));
+  };
+
+  /* ---- 加载更多（追加后重绘列表；分类下拉选项不回填——新分类少见，重进页面即全量） ---- */
+  const mw = document.createElement("div");
+  mw.className = "center";
+  mw.style.marginTop = "12px";
+  el.after(mw);
+  const moreWrap = () => {
+    if (!cursor) { mw.innerHTML = ""; return; }
+    mw.innerHTML = `<button class="btn btn-ghost" id="tx-more">${S.fmt.escape(S.t("common.more"))}</button>`;
+    document.getElementById("tx-more").onclick = async () => {
       const r2 = await load();
       if (!r2) return;
-      render(r2.txs ?? []);
-      next = r2.next_cursor;
-      if (!next) mw.innerHTML = "";
+      all.push(...(r2.txs ?? []));
+      cursor = r2.next_cursor;
+      renderList();
+      moreWrap();
     };
-  }
+  };
+  renderList();
+  if (!cursor && !all.length) { el.innerHTML = S.ui.empty(S.t("common.emptyTx")); }
+  moreWrap();
 });
