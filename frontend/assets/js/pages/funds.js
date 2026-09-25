@@ -8,6 +8,16 @@ S.router.register("funds", async () => {
       <span id="f-sort"></span>
     </div><div class="grid grid-2" id="grid">${S.ui.skeleton(4)}</div>`;
   const funds = (await S.fundCache()).filter(Boolean);
+  /* 第九期 NAV 实时化：叠加 /api/wealth/funds-navs（服务端实时聚合+三级降级）——
+     卡片 NAV/申购弹窗用实时值；未登录/降级时保持静态 JSON 值 */
+  const live = await S.api.get("/api/wealth/funds-navs").catch(() => null);
+  const lv = live?.ok ? live.data : null;
+  if (lv?.funds) {
+    for (const f of funds) {
+      const v = lv.funds[f.slug];
+      if (v?.nav != null) { f.nav = v.nav; f.day_change = v.day_change; f._lv = v; }
+    }
+  }
   let filter = "ALL";
   let sort = "default";
   const sortSel = S.ctl.select({
@@ -29,7 +39,7 @@ S.router.register("funds", async () => {
     return `
     <div class="card fund-card2">
       <div class="row between fc-top"><span class="fc-name"><b>${S.fmt.escape(f.name)}</b>${f.asset_class ? S.ui.badge(f.asset_class, "badge-gray fc-cat") : ""}</span>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
-      <div class="muted small mono" style="margin:4px 0 10px">${S.fmt.escape(f.code)} · NAV ${f.nav}</div>
+      <div class="muted small mono" style="margin:4px 0 10px">${S.fmt.escape(f.code)} · NAV ${f.nav} ${S.fundLiveMeta(f._lv, lv?.as_of)}</div>
       <div class="fc-hero bg-tint-gold">
         <img class="fc-art" src="/assets/images/illustrations/cat-fund.svg?v=${S.ui.v()}" alt="" loading="lazy">
         <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.m12"))}${S.fmt.escape(S.t("funds.yield"))}</span>

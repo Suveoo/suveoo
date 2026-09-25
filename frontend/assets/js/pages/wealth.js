@@ -46,12 +46,24 @@ S.router.register("wealth", async () => {
     };
     renderHoldings(false);
   }
-  /* 基金 / 存款 / 外汇（设计语言现代化：品类插画 + 大数字主视觉，字段零删减） */
-  const funds = (await S.fundCache()).filter(Boolean);
-  document.getElementById("funds").innerHTML = funds.slice(0, 5).map((f) => `
+  /* 基金 / 存款 / 外汇（设计语言现代化：品类插画 + 大数字主视觉，字段零删减）
+     第九期 NAV 实时化：热门条 NAV 叠加实时值（实时/闭市徽标随行） */
+  const [funds, liveNavs] = await Promise.all([
+    S.fundCache(),
+    S.api.get("/api/wealth/funds-navs").catch(() => null),
+  ]);
+  const lv = liveNavs?.ok ? liveNavs.data : null;
+  const fundsOk = funds.filter(Boolean);
+  if (lv?.funds) {
+    for (const f of fundsOk) {
+      const v = lv.funds[f.slug];
+      if (v?.nav != null) { f.nav = v.nav; f.day_change = v.day_change; f._lv = v; }
+    }
+  }
+  document.getElementById("funds").innerHTML = fundsOk.slice(0, 5).map((f) => `
     <div class="fund-card">
       <div class="fname">${S.fmt.escape(f.name)}</div>
-      <div style="margin:8px 0">${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)} <span class="muted small mono">NAV ${f.nav}</span></div>
+      <div style="margin:8px 0">${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)} <span class="muted small mono">NAV ${f.nav}</span> ${S.fundLiveMeta(f._lv, lv?.as_of)}</div>
       <div class="fc-mini bg-tint-gold"><img class="fc-art-sm" src="/assets/images/illustrations/cat-fund.svg?v=${S.ui.v()}" alt="" loading="lazy">
         <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.m12"))}${S.fmt.escape(S.t("funds.yield"))}</span><span class="n trend-up" style="font-size:22px">+${f.returns["1y"]}</span><span class="u trend-up">%</span></div></div>
       <div class="row between" style="margin-top:8px"><div><div class="muted small">${S.fmt.escape(S.t("wealth.m6"))}</div><div class="fret">+${f.returns["6m"]}%</div></div>

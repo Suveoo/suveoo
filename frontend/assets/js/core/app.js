@@ -322,6 +322,16 @@ S.fundCache = () => Promise.all(S.wealth.FUND_IDS.map((id) => S.api.json(`/asset
 S.depCache = () => Promise.all(S.wealth.DEP_IDS.map((s) => S.api.json(`/assets/data/deposits/${s}.json`)));
 S.fundSlug = () => (location.pathname.match(/\/wealth\/funds\/([a-z0-9-]+)/) ?? [])[1];
 S.depSlug = () => (location.pathname.match(/\/wealth\/deposits\/([a-z0-9-]+)/) ?? [])[1];
+/* 第九期 NAV 实时化：实时/闭市徽标 + 更新时间（as_of → 刚刚/X 分钟前）——列表卡/详情页/财富总览共用。
+   v = /api/wealth/funds-navs 的 funds[slug]（{live, market_open}）；未登录/降级静态时返回空串 */
+S.fundLiveMeta = (v, asOf) => {
+  if (!v || !v.live) return "";
+  const mins = asOf ? Math.max(0, Math.round((Date.now() - Date.parse(asOf)) / 60000)) : null;
+  const when = mins == null ? "" : `<span class="fund-live-when">${S.fmt.escape(mins < 1 ? S.t("funds.justNow") : S.t("funds.updatedAgo", mins))}</span>`;
+  return v.market_open
+    ? `<span class="fund-live">${S.fmt.escape(S.t("funds.live"))}</span>${when}`
+    : `<span class="fund-live closed">${S.fmt.escape(S.t("funds.mktClosed"))}</span>${when}`;
+};
 
 /* AI 提议凸显（第七期 idle）：徽标/气泡/速览行的共用数据层。
    未读判定 = GET /api/proposals/badge 的 fresh（PENDING 中 created_at > 上次查看戳）；

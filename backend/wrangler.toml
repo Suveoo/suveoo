@@ -17,6 +17,10 @@ class_name = "LedgerDO"
 name = "SAGA"
 class_name = "SagaDO"
 
+# Cron（第九期 NAV 实时化）：每 5 分钟预热底层价格 KV 与汇率，用户请求命中热缓存
+[triggers]
+crons = ["*/5 * * * *"]
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LedgerDO", "SagaDO"]

@@ -889,6 +889,7 @@ async function hFxLive(env, { refresh = false } = {}) {
       updated_at: new Date(data.time_last_update_unix * 1000).toISOString(),
       fetched_at: new Date().toISOString(),
       quotes: quotesNow,
+      rates: data.rates, /* 原始汇率（1 CNY = X 外币，全币种）——第九期 NAV 实时层复用（KRW/TWD 等 10 币种牌价之外也覆盖），零新增上游请求 */
       note: "实时市场汇率（数据源每日更新，本行牌价 15 分钟缓存）；买卖价差为模拟银行加点。这是模拟银行系统。",
     };
     await env.SESSION_KV.put(FX_CACHE_KEY, JSON.stringify({ ts: new Date().toISOString(), payload }), { expirationTtl: FX_TTL + 60 }).catch(() => {});
@@ -901,6 +902,267 @@ async function hFxLive(env, { refresh = false } = {}) {
     const fx = await new Response(obj.body).json();
     return { ...fx, source: "fallback", note: "实时源不可用，已回退至最近一次快照。这是模拟银行系统。" };
   }
+}
+
+/* ================================================================
+ * ①.5b 理财产品净值实时化（第九期 idle）：Worker 端聚合底层资产实时价
+ *  - 16 只基金"当前净值/日涨跌"由底层资产（美股/港股/A股/台韩日股/债券ETF/黄金/现金应计）实时加权计算；
+ *  - 主源 Yahoo query1 spark（无 key，一次约 15 符号，fulldayPrice + chartPreviousClose）；备源 stooq CSV（美标的+伦敦金）；
+ *  - 外汇复用 hFxLive（open.er-api.com；payload.rates 附原始汇率，覆盖 KRW/TWD 等 10 币种牌价之外的币种）；
+ *  - 货币/现金为确定性应计资产 ACC:币种:年化%（无外呼，day_change 即应计日增长）；
+ *  - 校准常数（KV fund:calib:v1，永久保存）：k = 静态 nav / 实时原始篮子值(t0)，此后 nav = k×raw(t)——
+ *    上线零断层（持仓成本/历史流水全锚在旧 NAV），波动全部来自底层资产真实价格；
+ *  - 三级降级：实时（KV fund:prices:v1，TTL 120s，stale-while-revalidate）→ KV 旧值（as_of 如实标注）→ 静态 JSON；
+ *  - 历史走势保留既有月度模拟序列（第四期"严禁伪造历史"纪律），仅当前点实时化；
+ *  - 申购/赎回/市值/列表/详情/home bundle/AI 通道全部经 fundNavsLive→fundMeta 同一真相源（账务一致）。
+ * ================================================================ */
+const FUND_IDS = ["global-money-1","global-short-bond","esg-bond","cn-dividend","consumer-staples","quant-neutral","em-gov-bond","global-mixed-1","reit-global","global-mixed-2","global-equity-index","gold-index","healthcare-bio","new-energy","apac-tech","ai-semi"];
+/* 底层持仓表：slug → [ticker, 权重%(每基金合计 100), 计价币种, 市场标签]。
+ * 列示持仓与基金 JSON holdings 对应；未列示部分用同主题宽基 ETF 代理（SMH/VPL/VT/XLV/XLP/ICLN/VNQ/BNDX 等），
+ * 或按列示权重归一（cn-dividend）。ETF 代理本身是真实可交易资产，波动特征与主题一致。 */
+export const FUND_HOLDINGS = { /* 导出供单测校验权重/币种完备性 */
+  "ai-semi": [["NVDA",9.6,"USD","US"],["2330.TW",9.1,"TWD","TW"],["ASML",7.4,"USD","US"],["AVGO",6.2,"USD","US"],["AMD",5.5,"USD","US"],["000660.KS",5.0,"KRW","KR"],["AMAT",4.3,"USD","US"],["LRCX",3.8,"USD","US"],["SMH",49.1,"USD","US"]],
+  "apac-tech": [["2330.TW",9.2,"TWD","TW"],["0700.HK",8.4,"HKD","HK"],["005930.KS",7.6,"KRW","KR"],["9988.HK",6.8,"HKD","HK"],["000660.KS",5.4,"KRW","KR"],["300750.SZ",4.7,"CNY","CN"],["9984.T",4.1,"JPY","JP"],["0981.HK",3.5,"HKD","HK"],["VPL",50.3,"USD","US"]],
+  "cn-dividend": [["601398.SS",15.2,"CNY","CN"],["601939.SS",13.2,"CNY","CN"],["601088.SS",11.6,"CNY","CN"],["600900.SS",10.7,"CNY","CN"],["601857.SS",10.0,"CNY","CN"],["601288.SS",9.4,"CNY","CN"],["0883.HK",8.7,"HKD","HK"],["601225.SS",8.0,"CNY","CN"],["601006.SS",6.9,"CNY","CN"],["600941.SS",6.3,"CNY","CN"]],
+  "consumer-staples": [["PG",7.2,"USD","US"],["KO",6.5,"USD","US"],["NSRGY",6.1,"USD","US"],["WMT",5.8,"USD","US"],["PEP",5.2,"USD","US"],["UL",4.9,"USD","US"],["600519.SS",4.4,"CNY","CN"],["COST",4.1,"USD","US"],["CL",3.5,"USD","US"],["KMB",3.0,"USD","US"],["XLP",49.3,"USD","US"]],
+  "em-gov-bond": [["EMLC",70,"USD","US"],["EMB",30,"USD","US"]],
+  "esg-bond": [["GRNB",55,"USD","US"],["BNDX",45,"USD","US"]],
+  "global-equity-index": [["AAPL",4.6,"USD","US"],["MSFT",4.1,"USD","US"],["NVDA",3.2,"USD","US"],["GOOGL",2.5,"USD","US"],["AMZN",2.2,"USD","US"],["META",1.6,"USD","US"],["TSM",1.4,"USD","US"],["0700.HK",1.1,"HKD","HK"],["ASML",0.9,"USD","US"],["005930.KS",0.8,"KRW","KR"],["VT",77.6,"USD","US"]],
+  "global-mixed-1": [["IEF",8.5,"USD","US"],["AAPL",4.2,"USD","US"],["MSFT",3.8,"USD","US"],["NVO",3.1,"USD","US"],["TSM",2.9,"USD","US"],["600519.SS",2.4,"CNY","CN"],["0700.HK",2.2,"HKD","HK"],["MC.PA",1.9,"EUR","US"],["7203.T",1.7,"JPY","JP"],["VT",32.0,"USD","US"],["BNDX",32.0,"USD","US"],["ACC:USD:4.5",5.3,"USD","ACC"]],
+  "global-mixed-2": [["MSFT",5.6,"USD","US"],["AAPL",5.1,"USD","US"],["NVDA",4.7,"USD","US"],["TSM",3.9,"USD","US"],["ASML",3.2,"USD","US"],["0700.HK",2.6,"HKD","HK"],["VT",45.0,"USD","US"],["IEF",8.2,"USD","US"],["BNDX",12.6,"USD","US"],["GC=F",5.0,"USD","METAL"],["ACC:USD:4.5",4.1,"USD","ACC"]],
+  "global-money-1": [["ACC:CNY:1.9",100,"CNY","ACC"]],
+  "global-short-bond": [["SHY",50,"USD","US"],["ICSH",20,"USD","US"],["BNDX",30,"USD","US"]],
+  "gold-index": [["GC=F",95.7,"USD","METAL"],["ACC:USD:4.5",4.3,"USD","ACC"]],
+  "healthcare-bio": [["LLY",5.8,"USD","US"],["NVO",5.4,"USD","US"],["UNH",4.9,"USD","US"],["JNJ",4.2,"USD","US"],["ABBV",3.8,"USD","US"],["MRK",3.5,"USD","US"],["ISRG",3.0,"USD","US"],["603259.SS",2.6,"CNY","CN"],["XLV",66.8,"USD","US"]],
+  "new-energy": [["300750.SZ",8.2,"CNY","CN"],["601012.SS",6.4,"CNY","CN"],["002594.SZ",6.1,"CNY","CN"],["300274.SZ",5.2,"CNY","CN"],["TSLA",4.6,"USD","US"],["600438.SS",4.2,"CNY","CN"],["002202.SZ",3.6,"CNY","CN"],["ICLN",61.7,"USD","US"]],
+  "quant-neutral": [["000300.SS",8,"CNY","CN"],["ACC:CNY:6.0",92,"CNY","ACC"]],
+  "reit-global": [["PLD",7.8,"USD","US"],["AMT",7.2,"USD","US"],["EQIX",6.5,"USD","US"],["SPG",5.9,"USD","US"],["WELL",5.1,"USD","US"],["8951.T",4.6,"JPY","JP"],["0823.HK",4.2,"HKD","HK"],["VNQ",58.7,"USD","US"]],
+};
+const FUND_TICKERS = [...new Set(Object.values(FUND_HOLDINGS).flat().map((h) => h[0]).filter((t) => !t.startsWith("ACC:")))];
+const FUND_TICKER_MKT = {}; /* ticker → 市场标签（备源路由用） */
+for (const list of Object.values(FUND_HOLDINGS)) for (const [t, , , m] of list) if (!t.startsWith("ACC:")) FUND_TICKER_MKT[t] = m;
+const FUND_PRICE_KEY = "fund:prices:v1", FUND_CALIB_KEY = "fund:calib:v1", FUND_NAV_TTL = 120;
+const ACC_ANCHOR_MS = Date.parse("2026-09-26T00:00:00+08:00"), YEAR_MS = 365 * 86_400_000;
+const PRICE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36 SuveooBank/1.0";
+
+/** 应计资产价格（基期 100，按年化利率线性应计）：确定性纯函数，无外呼。prev 取 24h 前值（应计日增长）。 */
+export function accrualPrice(ratePct, ms) {
+  return 100 * (1 + (Number(ratePct) / 100) * Math.max(0, ms - ACC_ANCHOR_MS) / YEAR_MS);
+}
+/** Yahoo spark 响应 → { ticker: {p, prev} }。兼容两种形状：新（顶层按符号为 map）与旧（spark.result 数组）。纯函数，供单测。 */
+export function parseYahooSpark(json) {
+  const out = {};
+  const pick = (sym, d) => {
+    if (!d) return;
+    const closes = Array.isArray(d.close) ? d.close.filter((x) => Number.isFinite(x)) : [];
+    const p = Number(d.fulldayPrice ?? closes.at(-1));
+    const prev = Number(d.chartPreviousClose ?? d.previousClose ?? closes.at(-2));
+    /* 下限 0.05：真实报价不会低于 5 美分——实测 AGGG 在 Yahoo 返回 1e-4 的脏数据会污染组合计算 */
+    if (Number.isFinite(p) && p >= 0.05) out[sym] = { p, prev: Number.isFinite(prev) && prev > 0 ? prev : null };
+  };
+  if (json?.spark?.result) { for (const r of json.spark.result) pick(r.symbol, r.response?.[0]); return out; }
+  for (const [sym, d] of Object.entries(json ?? {})) {
+    if (d && typeof d === "object" && (d.fulldayPrice != null || Array.isArray(d.close))) pick(sym, d);
+  }
+  return out;
+}
+/** stooq 日线 CSV（Symbol,Date,Time,Open,High,Low,Close,Volume）→ { 大写符号: {p, prev:null} }。备源；纯函数，供单测。 */
+export function parseStooqCsv(text) {
+  const out = {};
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const cols = line.split(",");
+    if (cols.length < 7 || /^symbol$/i.test(cols[0])) continue;
+    const close = Number(cols[6]);
+    if (Number.isFinite(close) && close >= 0.05) out[cols[0].trim().toUpperCase()] = { p: close, prev: null };
+  }
+  return out;
+}
+/** 美东时区 UTC 偏移小时（EDT=-4 / EST=-5）：3 月第二个周日～11 月第一个周日为夏令时（展示级精度，按整点近似）。 */
+function usEtOffsetHours(nowMs) {
+  const d = new Date(nowMs), y = d.getUTCFullYear();
+  const nthSun = (month, nth) => {
+    const s = new Date(Date.UTC(y, month - 1, 1));
+    s.setUTCDate(1 + ((7 - s.getUTCDay()) % 7) + (nth - 1) * 7);
+    s.setUTCHours(7, 0, 0, 0);
+    return s.getTime();
+  };
+  return nowMs >= nthSun(3, 2) && nowMs < nthSun(11, 1) ? -4 : -5;
+}
+/** 市场开市判定（展示级提示用，不含节假日：节日当天价格冻结本身如实）。纯函数，供单测。
+ *  偏移为相对 UTC 的小时；分钟区间 [起,止)，半点集合竞价忽略。 */
+export function marketOpen(tag, nowMs = Date.now()) {
+  if (tag === "ACC") return true;
+  const loc = (offH) => { const d = new Date(nowMs + offH * 3600_000); return { wd: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes() }; };
+  const wd = (l) => l.wd >= 1 && l.wd <= 5;
+  const inS = (l, s) => s.some(([a, b]) => l.min >= a && l.min < b);
+  switch (tag) {
+    case "US": { const l = loc(usEtOffsetHours(nowMs)); return wd(l) && inS(l, [[570, 960]]); }
+    case "HK": { const l = loc(8); return wd(l) && inS(l, [[570, 720], [780, 960]]); }
+    case "CN": { const l = loc(8); return wd(l) && inS(l, [[570, 690], [780, 900]]); }
+    case "JP": { const l = loc(9); return wd(l) && inS(l, [[540, 690], [750, 900]]); }
+    case "TW": { const l = loc(8); return wd(l) && inS(l, [[540, 810]]); }
+    case "KR": { const l = loc(8); return wd(l) && inS(l, [[540, 930]]); }
+    case "METAL": { /* CME 金：周日 18:00 ET 开 → 周五 17:00 ET 收（每日 17:00-18:00 ET 维护窗忽略，展示级） */
+      const l = loc(usEtOffsetHours(nowMs));
+      if (l.wd === 6) return false;
+      if (l.wd === 5) return l.min < 17 * 60;
+      if (l.wd === 0) return l.min >= 18 * 60;
+      return true;
+    }
+    default: return false;
+  }
+}
+/** 组合计算纯函数：价格×汇率→CNY 加权 → ×校准常数 → nav(4dp)/day_change(2dp%)。
+ *  - 任一 ticker 价格缺失或币种汇率缺失 → 该基金整只降级静态（missing 列出；不允许半实时）；
+ *  - day_change = raw/rawPrev − 1（昨收口径；汇率取当前值——汇率源为日更，日内汇率变动不计入，见已知边界）；
+ *  - calib 缺该基金时用 staticNavs 现场标定并经 recalibrated 返回（调用方持久化 KV）。 */
+export function computeNavs({ holdings = FUND_HOLDINGS, prices = {}, rates = {}, calib = {}, staticNavs = {}, staticDays = {}, nowMs = Date.now() } = {}) {
+  const fxOf = (ccy) => (ccy === "CNY" ? 1 : Number.isFinite(+rates[ccy]) && +rates[ccy] > 0 ? 1 / +rates[ccy] : null);
+  const navs = {}, missing = [], recalibrated = {};
+  for (const [slug, list] of Object.entries(holdings)) {
+    let raw = 0, rawPrev = 0, ok = true;
+    for (const [t, w, ccy] of list) {
+      let p, prev;
+      if (t.startsWith("ACC:")) {
+        p = accrualPrice(t.split(":")[2], nowMs);
+        prev = accrualPrice(t.split(":")[2], nowMs - 86_400_000);
+      } else {
+        const e = prices[t];
+        p = e?.p;
+        prev = e?.prev;
+        if (!Number.isFinite(p) || p <= 0) { ok = false; break; }
+      }
+      const fx = fxOf(ccy);
+      if (fx == null) { ok = false; break; }
+      raw += (w / 100) * p * fx;
+      rawPrev += (w / 100) * (Number.isFinite(prev) && prev > 0 ? prev : p) * fx;
+    }
+    const open = list.some((h) => marketOpen(h[3], nowMs));
+    const hasCalib = Number.isFinite(+calib[slug]) && +calib[slug] > 0;
+    if (!ok || raw <= 0 || (!hasCalib && !(staticNavs[slug] > 0))) {
+      missing.push(slug);
+      navs[slug] = { nav: staticNavs[slug] ?? null, day_change: staticDays[slug] ?? 0, market_open: open, live: false };
+      continue;
+    }
+    const k = hasCalib ? +calib[slug] : staticNavs[slug] / raw;
+    if (!hasCalib) recalibrated[slug] = k;
+    const dc = rawPrev > 0 ? (raw / rawPrev - 1) * 100 : 0;
+    navs[slug] = { nav: +(k * raw).toFixed(4), day_change: +dc.toFixed(2), market_open: open, live: true };
+  }
+  return { navs, missing, recalibrated };
+}
+async function fetchYahooBatch(symbols) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(symbols.join(","))}&range=1d&interval=1d`,
+    { headers: { "user-agent": PRICE_UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+  if (r.status === 429) { const e = new Error("yahoo 429"); e.code = 429; throw e; }
+  if (!r.ok) throw new Error(`yahoo ${r.status}`);
+  const parsed = parseYahooSpark(await r.json());
+  if (!Object.keys(parsed).length) throw new Error("yahoo empty");
+  return parsed;
+}
+/** stooq 备源符号：美标的加 .us；伦敦金映射 xauusd。其余市场 stooq 不覆盖（返回 null）。 */
+const stooqSymOf = (t) => (t === "GC=F" ? "xauusd" : FUND_TICKER_MKT[t] === "US" ? `${t.toLowerCase()}.us` : null);
+async function fetchStooqOne(stooqSym) {
+  const r = await fetch(`https://stooq.com/q/l/?s=${stooqSym}&f=sd2t2ohlcv&h&e=csv`,
+    { headers: { "user-agent": PRICE_UA }, signal: AbortSignal.timeout(6000) });
+  if (!r.ok) throw new Error(`stooq ${r.status}`);
+  return parseStooqCsv(await r.text());
+}
+/** 全量底层价格刷新：spark 分批（15/批）并行；整批失败记 429 冷却；主源全灭时 stooq 单符号兜底（≤30 子请求）。
+ *  部分失败保留 KV 旧值条目（合并写回）——闭市时段价格本就不变，旧值即真值。
+ *  NO_PRICE_FETCH=1（仅 wrangler.test.toml）：vitest 池禁止真实外呼（硬规则：测试不得打外网），
+ *  返回空价表 → computeNavs 逐基金回退静态 NAV，与实时化之前行为一致。 */
+async function refreshFundPrices(env) {
+  if (env.NO_PRICE_FETCH === "1") return (await env.SESSION_KV.get(FUND_PRICE_KEY, "json").catch(() => null)) ?? { prices: {} };
+  const old = (await env.SESSION_KV.get(FUND_PRICE_KEY, "json").catch(() => null)) ?? { prices: {} };
+  if (old.cooldownUntil && Date.now() < old.cooldownUntil) return old;
+  const batches = [];
+  for (let i = 0; i < FUND_TICKERS.length; i += 15) batches.push(FUND_TICKERS.slice(i, i + 15));
+  const parts = await Promise.all(batches.map((b) => fetchYahooBatch(b).catch((e) => (e?.code === 429 ? "429" : null))));
+  let hit429 = false, merged = {};
+  for (const part of parts) { if (part === "429") hit429 = true; else if (part) Object.assign(merged, part); }
+  if (!Object.keys(merged).length) {
+    const cands = FUND_TICKERS.map((t) => [t, stooqSymOf(t)]).filter((x) => x[1]).slice(0, 30);
+    const stParts = await Promise.all(cands.map(([t, s]) =>
+      fetchStooqOne(s).then((m) => { const e = m[s.toUpperCase()]; return e ? { [t]: e } : null; }).catch(() => null)));
+    for (const p of stParts) if (p) Object.assign(merged, p);
+  }
+  if (!Object.keys(merged).length) { /* 主备源全灭：保住旧值并冷却 60s，降级链交由 KV 旧值/静态兜底 */
+    old.cooldownUntil = Date.now() + 60_000;
+    await env.SESSION_KV.put(FUND_PRICE_KEY, JSON.stringify(old), { expirationTtl: 86400 }).catch(() => {});
+    return old;
+  }
+  const blob = { ts: new Date().toISOString(), prices: { ...(old.prices ?? {}), ...merged } };
+  if (hit429) blob.cooldownUntil = Date.now() + 120_000;
+  await env.SESSION_KV.put(FUND_PRICE_KEY, JSON.stringify(blob), { expirationTtl: 86400 }).catch(() => {});
+  return blob;
+}
+/* 基金静态 JSON 的 isolate 级记忆（R2 只读一次；实时层标定与 fundMeta 叠加共用，杜绝循环依赖） */
+const _fundJsonMemo = new Map();
+async function staticFundJson(env, fundId) {
+  if (_fundJsonMemo.has(fundId)) return _fundJsonMemo.get(fundId);
+  const obj = await env.ASSETS.get(`assets/data/funds/${fundId}.json`).catch(() => null);
+  let f = null;
+  try { f = obj ? await new Response(obj.body).json() : null; } catch { f = null; }
+  _fundJsonMemo.set(fundId, f);
+  return f;
+}
+async function staticFundNavs(env) {
+  const out = {};
+  await Promise.all(FUND_IDS.map(async (id) => { const f = await staticFundJson(env, id); if (f) out[id] = { nav: f.nav, day_change: f.day_change ?? 0 }; }));
+  return out;
+}
+/** NAV 层汇率（perCny 口径：1 CNY = X 外币）：优先 hFxLive 缓存的原始 rates（覆盖 KRW/TWD）；
+ *  旧缓存无 rates 时强刷一次；er-api 也不可用时用 10 币种牌价 mid 反推（缺 KRW/TWD → 相关基金降级静态）。 */
+async function fundFxRates(env) {
+  if (env.NO_PRICE_FETCH === "1") { /* 测试池禁外呼：直读 KV 缓存的原始 rates（种子即真值），无缓存则空表（相关基金回退静态） */
+    const c = await env.SESSION_KV.get(FX_CACHE_KEY, "json").catch(() => null);
+    return c?.payload?.rates ?? {};
+  }
+  let fx = null;
+  try { fx = await hFxLive(env); } catch { fx = null; }
+  if (fx?.rates) return fx.rates;
+  try { fx = await hFxLive(env, { refresh: true }); if (fx?.rates) return fx.rates; } catch { /* 走牌价反推 */ }
+  const out = {};
+  for (const q of fx?.quotes ?? []) { const mid = Number(q.mid); if (mid > 0) out[q.code] = 1 / mid; }
+  return out;
+}
+/* 实时 NAV 层（单一真相源）：isolate 60s 记忆 + KV 120s 共享缓存 + stale-while-revalidate + 三级降级 */
+let _fundLiveMemo = null;
+async function fundNavsLive(env, { refresh = false, waitUntil = null } = {}) {
+  if (!refresh && _fundLiveMemo && Date.now() - _fundLiveMemo.ts < 60_000) return _fundLiveMemo.data;
+  const isFresh = (b) => !!b?.ts && Date.now() - Date.parse(b.ts) < FUND_NAV_TTL * 1000;
+  const build = async () => {
+    let blob = await env.SESSION_KV.get(FUND_PRICE_KEY, "json").catch(() => null);
+    let fresh = isFresh(blob);
+    if (!fresh || refresh) {
+      if (blob && !refresh && waitUntil) waitUntil(refreshFundPrices(env).catch(() => {})); /* 旧值先行，后台刷新 */
+      else blob = await refreshFundPrices(env); /* 冷启动 / 强刷：同步等待一次 */
+      fresh = isFresh(blob);
+    }
+    const statics = await staticFundNavs(env);
+    const staticNavs = {}, staticDays = {};
+    for (const [id, s] of Object.entries(statics)) { staticNavs[id] = s.nav; staticDays[id] = s.day_change; }
+    const rates = await fundFxRates(env).catch(() => ({}));
+    const calib = (await env.SESSION_KV.get(FUND_CALIB_KEY, "json").catch(() => null)) ?? {};
+    const r = computeNavs({ prices: blob?.prices ?? {}, rates, calib, staticNavs, staticDays });
+    if (Object.keys(r.recalibrated).length) {
+      await env.SESSION_KV.put(FUND_CALIB_KEY, JSON.stringify({ ...calib, ...r.recalibrated })).catch(() => {});
+    }
+    const liveCount = Object.values(r.navs).filter((v) => v.live).length;
+    const hasCache = !!blob?.ts;
+    return {
+      ok: true,
+      source: liveCount === 0 ? "static" : fresh || !hasCache ? "live" : "cache",
+      as_of: blob?.ts ?? null,
+      live_count: liveCount,
+      funds: r.navs,
+      note: "当前净值由底层资产实时聚合（上线时与静态净值校准连续）；12 个月走势仍为月度模拟序列。这是模拟银行系统。",
+    };
+  };
+  const data = await build();
+  _fundLiveMemo = { ts: Date.now(), data };
+  return data;
 }
 
 /* ===== 换汇参数归一（任务四）：结算一律以服务端 hFxLive 牌价为准（客户端 rate 仅展示参考）。
@@ -1190,9 +1452,23 @@ async function todayOutCents(env, userId) {
   return BigInt(r.cents ?? "0");
 }
 async function fundMeta(env, fundId) {
-  const obj = await env.ASSETS.get(`assets/data/funds/${fundId}.json`).catch(() => null);
-  if (!obj) return null;
-  try { return await new Response(obj.body).json(); } catch { return null; }
+  const f = await staticFundJson(env, fundId);
+  if (!f) return null;
+  /* 第九期 NAV 实时化：静态 JSON 之上叠加实时净值——申购计价/赎回结算/持仓市值/MCP 工具等全部消费方
+     自动统一到同一实时源（fundNavsLive 单一真相源）；实时层不可用时保持静态值（降级链终点）。 */
+  let out = { ...f, nav_source: "static" };
+  try {
+    const live = await fundNavsLive(env);
+    const v = live?.funds?.[fundId];
+    if (v?.nav != null) {
+      out = {
+        ...f, nav: v.nav, day_change: v.day_change ?? 0, nav_static: f.nav,
+        nav_source: v.live ? (live.source === "live" ? "live" : "cache") : "static",
+        nav_as_of: live.as_of,
+      };
+    }
+  } catch { /* 实时层异常 → 静态兜底 */ }
+  return out;
 }
 
 /** 非消费式 grant 预检（红级 OTP 校验前先确认快照未被篡改，保证 CONSENT_INVALIDATED 语义）。 */
@@ -1786,6 +2062,16 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
 
     /* ---- 理财 / 外汇 ---- */
+    /* 实时净值（第九期）：前端列表/详情叠加层。?refresh=1 强刷（fx-live 先例）。
+       三级降级：live → cache（KV 旧值，as_of 如实标注）→ static（逐基金）。 */
+    if (path === "/api/wealth/funds-navs" && method === "GET") {
+      const live = await fundNavsLive(env, { refresh: url.searchParams.get("refresh") === "1", waitUntil: ctxInfo.waitUntil });
+      return json({
+        ok: true, source: live.source, as_of: live.as_of,
+        age_seconds: live.as_of ? Math.max(0, Math.round((Date.now() - Date.parse(live.as_of)) / 1000)) : null,
+        live_count: live.live_count, funds: live.funds, note: live.note,
+      });
+    }
     if (path === "/api/wealth/holdings" && method === "GET") {
       const r = await UU({ op: "holdings" });
       const out = [];
@@ -2049,11 +2335,14 @@ export async function handleDataApi(request, env, url, ctxInfo) {
 }
 
 async function fundNavs(env) {
-  const ids = ["global-money-1","global-short-bond","esg-bond","cn-dividend","consumer-staples","quant-neutral","em-gov-bond","global-mixed-1","reit-global","global-mixed-2","global-equity-index","gold-index","healthcare-bio","new-energy","apac-tech","ai-semi"];
+  /* 第九期 NAV 实时化：返回 { slug: {nav, day_change} }，DO overview（市值/今日浮动）与 AI 通道消费。
+     实时层内置逐基金降级（缺价/缺汇率 → 静态），此处再兜一层静态保证 16 键齐全。 */
+  const live = await fundNavsLive(env).catch(() => null);
   const out = {};
-  for (const id of ids) {
-    const f = await fundMeta(env, id);
-    if (f) out[id] = { nav: f.nav, day_change: f.day_change ?? 0 };
+  for (const id of FUND_IDS) {
+    const v = live?.funds?.[id];
+    if (v?.nav != null) out[id] = { nav: v.nav, day_change: v.day_change ?? 0 };
+    else { const f = await staticFundJson(env, id); if (f) out[id] = { nav: f.nav, day_change: f.day_change ?? 0 }; }
   }
   return out;
 }
@@ -2967,9 +3256,8 @@ async function mcpGreen(env, ctxInfo, name, args) {
     case "transaction_history": return await UU({ op: "transfers", cursor: "0", days: args.days ?? 30, category: args.category ?? null });
     case "bill_analysis": return await UU({ op: "dashboard" });
     case "wealth_product_query": {
-      const ids = ["global-money-1","global-short-bond","esg-bond","cn-dividend","consumer-staples","quant-neutral","em-gov-bond","global-mixed-1","reit-global","global-mixed-2","global-equity-index","gold-index","healthcare-bio","new-energy","apac-tech","ai-semi"];
       const out = [];
-      for (const id of ids) {
+      for (const id of FUND_IDS) {
         const f = await fundMeta(env, id);
         if (!f) continue;
         if (args.risk_level && Number(f.risk_level) !== Number(args.risk_level)) continue;
@@ -5133,6 +5421,10 @@ export default {
       return handleDataApi(request, env, url, { userId: claims.sub, email: claims.email, waitUntil: ctx ? (p) => ctx.waitUntil(p) : null });
     }
     return serveStatic(env, request, url);
+  },
+  /* 第九期 NAV 实时化：每 5 分钟预热（价格 KV + 汇率），用户请求永远命中热缓存——首请求不再等外网拉取 */
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(Promise.allSettled([refreshFundPrices(env), hFxLive(env).catch(() => {})]));
   },
 };
 

@@ -246,6 +246,14 @@
 .fc-mini { position: relative; border-radius: 12px; padding: 10px 12px; overflow: hidden; }
 .fc-art-sm { position: absolute; right: -6px; bottom: -8px; width: 56px; height: 56px; z-index: 0; opacity: .9; pointer-events: none; }
 .fc-mini .num-xl { position: relative; z-index: 1; }
+/* 第九期 NAV 实时化：实时/闭市徽标 + 更新时间（funds 列表卡 / fund-detail 头部 / wealth 热门条共用） */
+.fund-live { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--color-green); vertical-align: middle; }
+.fund-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-green); animation: fund-live-pulse 2s infinite; }
+.fund-live.closed { color: var(--color-ink-2); }
+.fund-live.closed::before { background: var(--color-ink-2); animation: none; }
+.fund-live-when { font-size: 11px; color: var(--color-ink-2); margin-left: 6px; vertical-align: middle; }
+@keyframes fund-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .fund-live::before { animation: none; } }
 
 /* ===== 语音按钮（hero 与 /ai composer 共用）：聆听态红色脉冲 = 功能性反馈 =====
    （第二十三轮 C：box-sizing/padding 归零防撑破，36→32px 更纤细） */

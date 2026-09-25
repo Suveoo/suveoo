@@ -4,8 +4,17 @@
 S.router.register("fund-detail", async () => {
   const c = document.getElementById("content");
   const slug = S.fundSlug();
-  const f = await S.api.json(`/assets/data/funds/${slug}.json`);
+  /* 第九期 NAV 实时化：静态 JSON（历史/持仓/费率）与实时净值并行取——
+     头部净值/日涨跌/申购弹窗用实时值（服务端底层资产聚合，三级降级永不空白）；走势图仍为月度模拟序列 */
+  const [f0, live] = await Promise.all([
+    S.api.json(`/assets/data/funds/${slug}.json`),
+    S.api.get("/api/wealth/funds-navs").catch(() => null),
+  ]);
+  const f = f0;
   if (!f) { c.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
+  const lv = live?.ok ? live.data : null;
+  const lvThis = lv?.funds?.[slug];
+  if (lvThis?.nav != null) { f.nav = lvThis.nav; f.day_change = lvThis.day_change; }
 
   const NAV = f.nav_history ?? [];
   const BCH = f.benchmark_history ?? NAV;
@@ -27,7 +36,8 @@ S.router.register("fund-detail", async () => {
     <div class="card">
       <div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("funds.nav"))}</div>
         <div class="total mono" style="font-size:32px;font-weight:700">${f.nav}</div>
-        <div class="small" style="color:${up ? "var(--color-green)" : "var(--color-red)"}">${up ? "+" : ""}${f.day_change}% · ${S.fmt.escape(S.t("fd.dayChange"))}</div></div>
+        <div class="small" style="color:${up ? "var(--color-green)" : "var(--color-red)"}">${up ? "+" : ""}${f.day_change}% · ${S.fmt.escape(S.t("fd.dayChange"))}</div>
+        <div style="margin-top:4px">${S.fundLiveMeta(lvThis, lv?.as_of)}</div></div>
         <div class="small" style="text-align:right;color:var(--color-ink-2)">
           <div class="mono">${S.fmt.escape(f.code)}</div>
           <div>${S.fmt.escape(S.t("funds.since"))} ${f.inception}</div>
@@ -39,6 +49,7 @@ S.router.register("fund-detail", async () => {
         <span class="row" style="gap:5px"><i style="width:16px;height:2px;border-top:2px dashed #A44A3F;display:inline-block"></i>${S.fmt.escape(S.t("fd.benchmark"))}</span>
       </div>
       <div class="chart-box" id="fd-chart"></div>
+      <div class="muted small" style="margin-top:6px">${S.fmt.escape(S.t("funds.histSimNote"))}</div>
     </div>
 
     <div class="section-title"><h2>${S.fmt.escape(S.t("funds.perf"))}</h2></div>

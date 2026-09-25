@@ -45,6 +45,8 @@ SENDER_NOREPLY = "noreply@suveoo.com"
 SENDER_SECURITY = "security@suveoo.com"
 SUPPORT_INBOX = "support@suveoo.com"
 LLM_PROVIDER = "anthropic"
+# 第九期 NAV 实时化：测试池禁真实外呼（价格/汇率源），NAV 逐基金回退静态——同实时化之前行为
+NO_PRICE_FETCH = "1"
 # 第二十六轮：会话历史测试——假 LLM 端点（127.0.0.1:1 即刻拒连）驱动失败轮路径（user 侧落库）；
 # 上下文窗口轮数与生产一致
 AI_HISTORY_TURNS = "8"
