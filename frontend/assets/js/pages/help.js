@@ -18,7 +18,6 @@ S.router.register("help", async () => {
       <div class="ab-hero-txt" style="padding-right:0">
         <h1>${esc(S.t("help.title"))}</h1>
         <p>${esc(S.t("help.heroSub"))}</p>
-        <div class="ab-pills"><span class="ab-pill">${S.ui.icon("clock", 14)}${esc(S.t("help.pillFast"))}</span></div>
       </div>
       <img class="ab-hero-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="">
     </section>

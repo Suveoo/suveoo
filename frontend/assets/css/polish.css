@@ -387,6 +387,16 @@ body.tc-open { overflow: hidden; }
 /* 第十一轮：防诈骗/AI 安全行首彩色 squircle 图标行对齐 */
 .help-ul li .ic-c { width: 20px; height: 20px; margin-top: 1px; }
 .task-step .st .ic-c { width: 24px; height: 24px; }
+
+/* ===== /transfer/history 改版（第十二轮）：统计条 + 工具条（搜索/方向/时间 chips）——无渐变 Hero ===== */
+.th-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 12px; }
+.th-stat { background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.th-stat .lb { font-size: 12px; color: var(--color-ink-2); }
+.th-stat .n { font-size: 20px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-search { margin: 0 0 10px; }
+.th-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.th-chips .hpill { cursor: pointer; font-family: inherit; }
+@media (max-width: 600px) { .th-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; } .th-stat { padding: 10px 10px; } .th-stat .n { font-size: 16px; } }
 /* 通知未读：整行柔色 + 圆角（替代与 logo/时间戳相切的 inset 硬边） */
 .notif-item.unread { box-shadow: none !important; }
 

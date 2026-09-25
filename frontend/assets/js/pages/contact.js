@@ -8,7 +8,6 @@ S.router.register("contact", async () => {
       <div class="ab-hero-txt" style="padding-right:0">
         <h1>${S.fmt.escape(S.t("contact.title"))}</h1>
         <p>${S.fmt.escape(S.t("contact.heroSub"))}</p>
-        <div class="ab-pills"><span class="ab-pill">${S.ui.icon("clock", 14)}${S.fmt.escape(S.t("contact.sla"))}</span></div>
       </div>
       <img class="ab-hero-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="">
     </section>
