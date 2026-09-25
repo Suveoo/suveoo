@@ -351,6 +351,7 @@
 }
 
 /* ===== 交易记录页"结果优先"结论区（第二十二轮 D） ===== */
+/* tx-main-change（智能分析）样式第十五轮移入 polish.css 并缩小、移至柱状图之下 */
 .tx-sum-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
 /* 第十四轮：环比胶囊移到标签右侧（tx-cell-h 行内）+ 手机三格一行紧凑小字号 + 分类环比标题压空白 */
 .tx-cell { display: flex; flex-direction: column; gap: 3px; }
@@ -366,8 +367,6 @@
   .tx-cell-h .trend-pill { font-size: 10px; padding: 1px 6px; }
   .tx-cat-title { margin: 10px 0 0; }
 }
-.tx-main-change { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 6px 14px; }
-.tx-main-change svg { color: var(--color-navy); }
 
 /* ===== 账户中心（第三十六轮）：资产概要移动端第四至六行占满整行（标签左/数值右对齐）；快捷入口带阴影大卡 ===== */
 @media (max-width: 767px) {

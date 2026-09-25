@@ -396,6 +396,18 @@ body.tc-open { overflow: hidden; }
 .th-search { margin: 0 0 10px; }
 .th-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .th-chips .hpill { cursor: pointer; font-family: inherit; }
+/* 第十五轮：手机端 >360px 一行不换行（可横向滑动兜底）；列表卡内分类下拉头 */
+@media (min-width: 361px) { .th-chips { flex-wrap: nowrap; overflow-x: auto; } .th-chips .hpill { flex: none; } }
+.tl-head { display: flex; align-items: center; padding: 10px 14px 2px; }
+.tl-head .ctl-select { width: auto; min-width: 150px; }
+/* 智能分析缩小（第十四轮）+ 移到柱状图之下 */
+.tx-main-change { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 4px 12px; }
+.tx-main-change svg { color: var(--color-navy); width: 12px; height: 12px; }
+/* 分类环比标题行：左标题右图例（横向对齐） */
+.tx-cat-title { display: flex; align-items: baseline; justify-content: space-between; }
+.tx-legend-row { display: inline-flex; align-items: center; gap: 12px; }
+.tx-legend { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-ink-2); }
+.tx-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 @media (max-width: 600px) { .th-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; } .th-stat { padding: 10px 10px; } .th-stat .n { font-size: 16px; } }
 /* 通知未读：整行柔色 + 圆角（替代与 logo/时间戳相切的 inset 硬边） */
 .notif-item.unread { box-shadow: none !important; }

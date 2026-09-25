@@ -11,8 +11,8 @@ S.router.register("transactions", async () => {
       <span class="muted small mono" id="tx-count"></span>
     </div>
     <div class="th-chips" id="tx-chips"></div>
-    <div class="card" id="tx-list-card">${S.ui.skeleton(6)}</div>`;
-  const el = document.getElementById("tx-list-card");
+    <div class="card" id="tx-list-card"><div class="tl-head" id="tl-head"></div><div id="tx-list">${S.ui.skeleton(6)}</div></div>`;
+  const el = document.getElementById("tx-list");
   let cursor = "0";
   const all = [];
   const filters = { q: "", dir: "all", days: 0, cat: "" };
@@ -65,8 +65,10 @@ S.router.register("transactions", async () => {
     const chart = names.length
       ? S.charts.bar(
           [{ name: S.t("tx.thisMonth"), values: names.map((k) => Math.round(cat[k].t / 100)) }, { name: S.t("tx.lastMonth"), values: names.map((k) => Math.round(cat[k].l / 100)) }],
-          { colors: ["#1E2A78", "#B7C0E8"], labels: names })
+          { colors: ["#1E2A78", "#B7C0E8"], labels: names, padT: 8, noLegend: true })
       : "";
+    /* 图例（本月/上月）由调用方拼进标题行右侧；智能分析（tx-main-change）按队长要求移到卡内最底（柱状图之下）并缩小 */
+    const legendHtml = names.length ? `<span class="tx-legend"><i style="background:#1E2A78"></i>${S.fmt.escape(S.t("tx.thisMonth"))}</span><span class="tx-legend"><i style="background:#B7C0E8"></i>${S.fmt.escape(S.t("tx.lastMonth"))}</span>` : "";
     /* 环比胶囊移到"收入/支出"标签右侧（tx-cell-h 行内）；分类环比标题下距 2px 压空白 */
     document.getElementById("tx-summary").innerHTML = `
       <div class="card" style="margin-bottom:16px">
@@ -76,8 +78,8 @@ S.router.register("transactions", async () => {
           <div class="tx-cell"><div class="tx-cell-h"><span class="lb2">${S.fmt.escape(S.t("ch.outLabel"))}</span>${pill(pct(g.outT, g.outL), true)}</div><span class="n">¥${y(g.outT)}</span></div>
           <div class="tx-cell"><div class="tx-cell-h"><span class="lb2">${S.fmt.escape(S.t("tx.net"))}</span></div><span class="n ${g.inT - g.outT >= 0 ? "trend-up" : "trend-down"}">¥${y(g.inT - g.outT)}</span></div>
         </div>
-        ${mainChange ? `<div class="tx-main-change">${S.ui.icon("trend", 14)} ${S.fmt.escape(mainChange)}</div>` : ""}
-        ${chart ? `<div class="tx-cat-title">${S.fmt.escape(S.t("tx.catCompare"))}</div>${chart}` : ""}
+        ${chart ? `<div class="tx-cat-title"><span>${S.fmt.escape(S.t("tx.catCompare"))}</span><span class="tx-legend-row">${legendHtml}</span></div>${chart}` : ""}
+        ${mainChange ? `<div class="tx-main-change">${S.ui.icon("trend", 12)} ${S.fmt.escape(mainChange)}</div>` : ""}
       </div>`;
   };
 
@@ -143,14 +145,11 @@ S.router.register("transactions", async () => {
     S.ui.$$(".tx-row", el).forEach((row) => { row.onclick = () => receipt(JSON.parse(row.dataset.tx)); });
   };
 
-  /* ---- chips（方向/时间，hpill 激活 navy）+ 分类下拉（动态类别集） ---- */
+  /* ---- chips（方向/时间，hpill 激活 navy）；分类下拉（动态类别集）挪进列表卡内部左上（第十四轮队长要求） ---- */
   const chipDefs = [
     ["dir", "all", "hist.dirAll"], ["dir", "IN", "hist.dirIn"], ["dir", "OUT", "hist.dirOut"],
     ["days", 0, "hist.dAll"], ["days", 7, "hist.d7"], ["days", 30, "hist.d30"],
   ];
-  const catSelBox = document.createElement("span");
-  document.getElementById("tx-chips").after(catSelBox);
-  catSelBox.style.cssText = "display:inline-block;vertical-align:top";
   const renderChips = () => {
     document.getElementById("tx-chips").innerHTML = chipDefs.map(([k, v, key]) =>
       `<button class="hpill${String(filters[k]) === String(v) ? " on" : ""}" data-k="${k}" data-v="${v}">${S.fmt.escape(S.t(key))}</button>`).join("");
@@ -164,7 +163,7 @@ S.router.register("transactions", async () => {
     options: [{ v: "", label: S.t("tx.catAll") }, ...catSet.map((k) => ({ v: k, label: k }))],
     onChange: (v) => { filters.cat = v; renderList(); },
   });
-  catSelBox.appendChild(catSel);
+  document.getElementById("tl-head").appendChild(catSel);
   const q = document.getElementById("tx-q");
   q.addEventListener("input", () => { filters.q = q.value.trim().toLowerCase(); renderList(); });
   renderChips();
@@ -188,7 +187,7 @@ S.router.register("transactions", async () => {
   const mw = document.createElement("div");
   mw.className = "center";
   mw.style.marginTop = "12px";
-  el.after(mw);
+  document.getElementById("tx-list-card").after(mw);
   const moreWrap = () => {
     if (!cursor) { mw.innerHTML = ""; return; }
     mw.innerHTML = `<button class="btn btn-ghost" id="tx-more">${S.fmt.escape(S.t("common.more"))}</button>`;
