@@ -398,9 +398,10 @@ body.tc-open { overflow: hidden; }
 .th-chips .hpill { cursor: pointer; font-family: inherit; }
 /* 第十五轮：手机端 >360px 一行不换行（可横向滑动兜底）；列表卡内分类下拉头 */
 @media (min-width: 361px) { .th-chips { flex-wrap: nowrap; overflow-x: auto; } .th-chips .hpill { flex: none; } }
-.tl-head { display: flex; align-items: center; padding: 10px 14px 2px; }
+.tl-head { display: flex; align-items: center; padding: 10px 0 2px; } /* 横向 0——卡 padding 24 已是基准，日期文本同基准（第十六轮量测校准：勿双重缩进） */
 .tl-head .ctl-select { width: auto; min-width: 150px; }
 /* 智能分析缩小（第十四轮）+ 移到柱状图之下 */
+#tx-summary { margin-top: 14px; } /* 第十六轮：离页面大标题稍远 */
 .tx-main-change { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 4px 12px; }
 .tx-main-change svg { color: var(--color-navy); width: 12px; height: 12px; }
 /* 分类环比标题行：左标题右图例（横向对齐） */
