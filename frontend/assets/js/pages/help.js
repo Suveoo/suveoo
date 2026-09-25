@@ -14,13 +14,7 @@ S.router.register("help", async () => {
   const AI_STEPS = ["ic-shield-navy", "ic-lock-violet", "ic-doc-sky", "ic-exchange-teal", "ic-star-gold"];
 
   c.innerHTML = `
-    <section class="ct-hero bg-grad-navy">
-      <div class="ab-hero-txt" style="padding-right:0">
-        <h1>${esc(S.t("help.title"))}</h1>
-        <p>${esc(S.t("help.heroSub"))}</p>
-      </div>
-      <img class="ab-hero-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="">
-    </section>
+    <h1>${esc(S.t("help.title"))}</h1>
     <div class="help-search card">
       <span class="hs-ic">${S.ui.icon("doc", 18)}</span>
       <input class="input" id="help-q" type="search" placeholder="${esc(S.t("help.searchPh"))}" autocomplete="off">

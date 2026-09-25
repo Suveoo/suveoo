@@ -3,14 +3,7 @@ S.router.register("contact", async () => {
   const c = document.getElementById("content");
   const sess = S.auth._session ?? (await S.auth.session().catch(() => null));
   const email = typeof sess?.email === "string" ? sess.email : "";
-  c.innerHTML = `
-    <section class="ct-hero bg-grad-navy">
-      <div class="ab-hero-txt" style="padding-right:0">
-        <h1>${S.fmt.escape(S.t("contact.title"))}</h1>
-        <p>${S.fmt.escape(S.t("contact.heroSub"))}</p>
-      </div>
-      <img class="ab-hero-art" src="/assets/images/illustrations/ai-deco.svg?v=${S.ui.v()}" alt="">
-    </section>
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("contact.title"))}</h1>
     <div class="ct-grid">
       <div class="card ct-form-card" id="ct-card">
         <div id="ct-form">

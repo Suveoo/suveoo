@@ -175,18 +175,7 @@
 .ab-updated { margin-top: 14px; }
 @media (max-width: 767px) { .ab-contact { flex-direction: column; } }
 
-/* ===== /contact 改版（第十轮）：渐变 Hero + 双列表单 + 行内校验 + 成功态面板 ===== */
-.ct-hero { position: relative; overflow: hidden; border-radius: var(--r-card-lg); color: #fff; padding: 22px 20px; margin-bottom: 16px; animation: rise-in .28s cubic-bezier(.25,.6,.3,1) both; }
-.ct-hero::after { content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(122,143,255,.35), transparent); pointer-events: none; }
-.ct-hero h1 { font-size: 22px; font-weight: 700; }
-.ct-hero p { color: rgba(255,255,255,.82); margin: 10px 0 0; font-size: var(--fs-14); max-width: 640px; }
-.ct-hero .ab-hero-art { position: absolute; right: 10px; bottom: -6px; width: 118px; height: 118px; opacity: .95; pointer-events: none; }
-.ct-hero .ab-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.ct-hero .ab-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); font-size: 12px; font-weight: 600; }
-.ct-hero .ab-pill .ic { color: #fff; }
-@media (max-width: 767px) { .ct-hero { padding: 18px 16px; } .ct-hero .ab-hero-art { display: none; } }
-@media (prefers-reduced-motion: reduce) { .ct-hero { animation: none; } }
-
+/* ===== /contact 改版（第十轮；第十二轮补：Hero 按队长要求移除改简单大标题）===== */
 .ct-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .ct-grid { grid-template-columns: 1fr; } }
 .ct-form-card { padding: 18px 16px 16px; }
