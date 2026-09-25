@@ -198,6 +198,8 @@
 .ct-err[hidden] { display: none; }
 .input.ct-bad { border-color: var(--color-red); background: var(--color-red-bg); }
 .ct-done { text-align: center; padding: 26px 8px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* display:flex 压过 [hidden]（.tc-demo 同款坑）——成功态面板初始必须真隐藏 */
+.ct-done[hidden] { display: none; }
 .ct-done-ic { width: 52px; height: 52px; border-radius: 50%; background: var(--c-teal-tint); color: #0D9488; display: inline-flex; align-items: center; justify-content: center; }
 .ct-done b { font-size: 16px; }
 .ct-faq { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 12px 14px; font-size: 13px; color: var(--color-ink-2); text-decoration: none; }

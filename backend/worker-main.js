@@ -2024,6 +2024,13 @@ export async function handleDataApi(request, env, url, ctxInfo) {
 
     if (path === "/api/contact" && method === "POST") {
       const b = await readJsonBody(request);
+      /* 登录态掩码/缺省邮箱 → 以 Bearer JWT 内真实邮箱为准（hEmailCode 同款；否则邮件"来自 de**@…"不可回复） */
+      if (!b.email || b.email.includes("*")) {
+        const auth = request.headers.get("authorization") ?? "";
+        const claims = auth.startsWith("Bearer ") ? await verifyJwt(auth.slice(7), env.JWT_SECRET).catch(() => null) : null;
+        if (claims?.email && !claims.email.includes("*")) b.email = claims.email;
+      }
+      if (b.email?.includes("*")) return apiError("INVALID_EMAIL", "请填写有效邮箱（登录态请清空邮箱栏以自动使用账户邮箱）", 400);
       if (!EMAIL_RE.test(b.email ?? "") || !b.message) return apiError("INVALID_REQUEST", "请填写邮箱与留言", 400);
       await sendMail(env, {
         to: env.SUPPORT_INBOX ?? "support@suveoo.com", subject: `[联系表单] ${b.category ?? "其他"}`,
@@ -5041,6 +5048,12 @@ export default {
     }
     if (url.pathname === "/api/contact" && request.method === "POST") {
       const b = await readJsonBody(request).catch(() => ({}));
+      if (!b.email || b.email.includes("*")) {
+        const auth = request.headers.get("authorization") ?? "";
+        const claims = auth.startsWith("Bearer ") ? await verifyJwt(auth.slice(7), env.JWT_SECRET).catch(() => null) : null;
+        if (claims?.email && !claims.email.includes("*")) b.email = claims.email;
+      }
+      if (b.email?.includes("*")) return apiError("INVALID_EMAIL", "请填写有效邮箱（登录态请清空邮箱栏以自动使用账户邮箱）", 400);
       if (!EMAIL_RE.test(b.email ?? "") || !b.message) return apiError("INVALID_REQUEST", "请填写邮箱与留言", 400);
       await sendMail(env, { to: env.SUPPORT_INBOX ?? "support@suveoo.com", subject: `[联系表单] ${b.category ?? "其他"}`, text: `来自 ${b.name ?? "匿名"} <${b.email}>\n类别：${b.category ?? "其他"}\n\n${b.message}`, html: contactFormMail(b) });
       return json({ ok: true, message: "已收到，1-3 个工作日回复（模拟）。" });

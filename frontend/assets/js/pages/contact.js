@@ -57,7 +57,8 @@ S.router.register("contact", async () => {
   const setErr = (el, input, on) => { el.hidden = !on; input.classList.toggle("ct-bad", on); };
   const validate = () => {
     const em = $("ct-email").value.trim();
-    const badEmail = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+    /* 掩码邮箱（登录态预填 de**@suveoo.com）视作有效——提交时传空，服务端以 JWT 内真实邮箱为准 */
+    const badEmail = !em.includes("*") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
     const badMsg = !msg.value.trim();
     setErr(errEmail, $("ct-email"), badEmail);
     errEmail.textContent = badEmail ? S.t("contact.errEmail") : "";
@@ -75,7 +76,8 @@ S.router.register("contact", async () => {
     go.textContent = S.t("contact.sending");
     const r = await S.api.post("/api/contact", {
       name: $("ct-name").value.trim(),
-      email: $("ct-email").value.trim(),
+      /* 掩码邮箱不上送（服务端以 JWT 真实邮箱为准）——否则邮件"来自 de**@…"不可回复 */
+      email: $("ct-email").value.trim().includes("*") ? "" : $("ct-email").value.trim(),
       category: catSel.value,
       message: msg.value.trim(),
     });
