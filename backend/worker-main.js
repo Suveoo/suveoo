@@ -602,7 +602,33 @@ const EMAIL_SIGNATURE_TEXT = [
   "联系：support@suveoo.com · https://suveoo.com",
 ].join("\n");
 
+/* html 缺省时从 text 生成兜底 HTML（转义+换行）——此前 contact 表单只传 text，
+   `html + SIGNATURE` 拼成 "undefined<div…>"，Tuta 等 HTML 优先客户端只渲染该串，
+   text 里的姓名/类别/留言全部不可见（队长实测抓出） */
+function textToHtml(text) {
+  return `<div style="font-family:sans-serif;max-width:480px;white-space:pre-wrap;color:#111">${String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+}
+
+/* 联系表单邮件：字段表格 + 多行留言块 + 一键回复（用户邮箱 mailto）——全部要素经 HTML 转义 */
+function contactFormMail(b) {
+  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const name = esc(b.name) || "匿名";
+  const email = esc(b.email ?? "");
+  const cat = esc(b.category) || "其他";
+  const msg = esc(b.message).replace(/\n/g, "<br>");
+  return `<div style="font-family:sans-serif;max-width:520px">
+  <p style="margin:0 0 14px;font-weight:700;color:#1E2A78">Suveoo 联系表单</p>
+  <table style="border-collapse:collapse;width:100%;font-size:14px">
+    <tr><td style="color:#666;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top">来自</td><td style="padding:6px 0"><b>${name}</b> &lt;<a href="mailto:${email}" style="color:#1E2A78">${email}</a>&gt;</td></tr>
+    <tr><td style="color:#666;padding:6px 12px 6px 0;white-space:nowrap">类别</td><td style="padding:6px 0">${cat}</td></tr>
+  </table>
+  <div style="margin:14px 0;padding:12px 16px;background:#F7F7F8;border-radius:10px;font-size:14px;line-height:1.7;color:#111">${msg}</div>
+  <p style="margin:14px 0 0;font-size:13px"><a href="mailto:${email}?subject=Re: ${encodeURIComponent("[联系表单] " + (b.category ?? "其他"))}" style="color:#1E2A78">直接回复该用户 →</a></p>
+</div>`;
+}
+
 export async function sendMail(env, { to, subject, text, html }) {
+  html = html ?? textToHtml(text);
   if (env.MAIL_OUTBOX) {
     const key = `outbox:${to}`;
     const prev = JSON.parse((await env.MAIL_OUTBOX.get(key)) ?? "[]");
@@ -2002,6 +2028,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       await sendMail(env, {
         to: env.SUPPORT_INBOX ?? "support@suveoo.com", subject: `[联系表单] ${b.category ?? "其他"}`,
         text: `来自 ${b.name ?? "匿名"} <${b.email}>\n类别：${b.category ?? "其他"}\n\n${b.message}`,
+        html: contactFormMail(b),
       });
       return json({ ok: true, message: "已收到，1-3 个工作日回复（模拟）。" });
     }
@@ -5015,7 +5042,7 @@ export default {
     if (url.pathname === "/api/contact" && request.method === "POST") {
       const b = await readJsonBody(request).catch(() => ({}));
       if (!EMAIL_RE.test(b.email ?? "") || !b.message) return apiError("INVALID_REQUEST", "请填写邮箱与留言", 400);
-      await sendMail(env, { to: env.SUPPORT_INBOX ?? "support@suveoo.com", subject: `[联系表单] ${b.category ?? "其他"}`, text: `来自 ${b.name ?? "匿名"} <${b.email}>\n类别：${b.category ?? "其他"}\n\n${b.message}` });
+      await sendMail(env, { to: env.SUPPORT_INBOX ?? "support@suveoo.com", subject: `[联系表单] ${b.category ?? "其他"}`, text: `来自 ${b.name ?? "匿名"} <${b.email}>\n类别：${b.category ?? "其他"}\n\n${b.message}`, html: contactFormMail(b) });
       return json({ ok: true, message: "已收到，1-3 个工作日回复（模拟）。" });
     }
     if (url.pathname === "/api/demo/seed" && request.method === "POST") {
