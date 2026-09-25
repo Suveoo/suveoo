@@ -358,14 +358,14 @@
 .tx-cell-h { display: flex; align-items: center; gap: 6px; }
 .tx-cell-h .lb2 { font-size: var(--fs-12); color: var(--color-ink-2); white-space: nowrap; }
 .tx-cell .n { font-size: 26px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
-.tx-cat-title { margin: 12px 0 2px; font-size: 14px; font-weight: 700; }
+.tx-cat-title { margin: 16px 0 2px; font-size: 14px; font-weight: 700; } /* 第十七轮：环比区块（标题/图例/柱图/分析条）整体 +4px */
 @media (max-width: 600px) {
   .tx-sum-row { flex-wrap: nowrap; gap: 12px; justify-content: space-between; }
   .tx-cell .n { font-size: 15px; letter-spacing: 0; }
   .tx-cell-h { gap: 4px; }
   .tx-cell-h .lb2 { font-size: 11px; }
   .tx-cell-h .trend-pill { font-size: 10px; padding: 1px 6px; }
-  .tx-cat-title { margin: 10px 0 0; }
+  .tx-cat-title { margin: 14px 0 0; }
 }
 
 /* ===== 账户中心（第三十六轮）：资产概要移动端第四至六行占满整行（标签左/数值右对齐）；快捷入口带阴影大卡 ===== */

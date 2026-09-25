@@ -23,7 +23,11 @@ S.router.register("transactions", async () => {
   };
 
   /* ---- 结论区（零 LLM、纯聚合）：本月收/支/结余 + 环比（pill 移到标签右侧）+ 分类环比（标题-图空白压缩） ---- */
-  S.api.get("/api/dashboard").then((r) => { if (r.ok) renderSummary(r.data); }).catch(() => {});
+  let lastDash = null;
+  S.api.get("/api/dashboard").then((r) => { if (r.ok) { lastDash = r.data; renderSummary(r.data); } }).catch(() => {});
+  /* 视口跨越手机/桌面阈值时重绘（手机端柱图满宽 padX=0，桌面默认留白） */
+  const mq = window.matchMedia("(max-width: 600px)");
+  (mq.addEventListener ? mq.addEventListener("change", (e) => { if (lastDash && document.getElementById("tx-summary")) renderSummary(lastDash); }) : mq.addListener((e) => { if (lastDash && document.getElementById("tx-summary")) renderSummary(lastDash); }));
   const renderSummary = (dash) => {
     const now = new Date();
     const thisM = now.toISOString().slice(0, 7);
@@ -65,7 +69,9 @@ S.router.register("transactions", async () => {
     const chart = names.length
       ? S.charts.bar(
           [{ name: S.t("tx.thisMonth"), values: names.map((k) => Math.round(cat[k].t / 100)) }, { name: S.t("tx.lastMonth"), values: names.map((k) => Math.round(cat[k].l / 100)) }],
-          { colors: ["#1E2A78", "#B7C0E8"], labels: names, padT: 8, noLegend: true })
+          { colors: ["#1E2A78", "#B7C0E8"], labels: names, padT: 8, noLegend: true,
+            /* 手机端柱图满宽：左右留白归零，使最左/最右柱与标题首字、图例末字对齐（第十五轮队长要求） */
+            padX: window.matchMedia("(max-width: 600px)").matches ? 0 : 30 })
       : "";
     /* 图例（本月/上月）由调用方拼进标题行右侧；智能分析（tx-main-change）按队长要求移到卡内最底（柱状图之下）并缩小 */
     const legendHtml = names.length ? `<span class="tx-legend"><i style="background:#1E2A78"></i>${S.fmt.escape(S.t("tx.thisMonth"))}</span><span class="tx-legend"><i style="background:#B7C0E8"></i>${S.fmt.escape(S.t("tx.lastMonth"))}</span>` : "";
