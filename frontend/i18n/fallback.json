@@ -23,6 +23,8 @@
   "acct.grid.notif": "通知",
   "acct.lang": "语言",
   "acct.logout": "退出登录",
+  "acct.logoutBody": "退出后需重新登录才能查看账户与进行交易。",
+  "acct.logoutTitle": "确认退出登录？",
   "acct.opened": "开户日期",
   "acct.overview": "资产概要",
   "acct.prefs": "偏好",

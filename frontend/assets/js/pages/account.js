@@ -83,7 +83,14 @@ S.router.register("account", async ({ user }) => {
     }
     rcBox.innerHTML = parts.join("") || S.ui.empty(S.t("common.emptyTx"));
   } else rcBox.innerHTML = S.ui.empty(S.t("common.loadFailed"));
-  document.getElementById("logout").onclick = () => S.auth.logout();
+  /* 退出登录两段式：点击先弹确认窗（防误触），确认才登出 */
+  document.getElementById("logout").onclick = () => {
+    const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("acct.logoutTitle"))}</h2>
+      <p class="muted small" style="margin-top:4px">${S.fmt.escape(S.t("acct.logoutBody"))}</p>
+      <div class="modal-actions"><button class="btn btn-ghost" id="lo-no">${S.fmt.escape(S.t("common.cancel"))}</button><button class="btn acct-logout" id="lo-yes" style="width:auto;margin-top:0">${S.fmt.escape(S.t("acct.logout"))}</button></div>`);
+    m.el.querySelector("#lo-no").onclick = () => m.close();
+    m.el.querySelector("#lo-yes").onclick = () => S.auth.logout();
+  };
   /* 偏好 · 语言：点击弹出三语选择（选择后即时生效） */
   document.getElementById("pref-lang").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("acct.lang"))}</h2>

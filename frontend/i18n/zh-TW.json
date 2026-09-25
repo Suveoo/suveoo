@@ -23,6 +23,8 @@
   "acct.grid.notif": "通知",
   "acct.lang": "語言",
   "acct.logout": "登出",
+  "acct.logoutBody": "登出後需重新登入才能查看帳戶與進行交易。",
+  "acct.logoutTitle": "確認登出？",
   "acct.opened": "開戶日期",
   "acct.overview": "資產概覽",
   "acct.prefs": "偏好",

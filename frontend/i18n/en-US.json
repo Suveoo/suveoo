@@ -23,6 +23,8 @@
   "acct.grid.notif": "Notifications",
   "acct.lang": "Language",
   "acct.logout": "Log out",
+  "acct.logoutBody": "You will need to sign in again to view your account and make transactions.",
+  "acct.logoutTitle": "Sign out?",
   "acct.opened": "Opened",
   "acct.overview": "Assets Overview",
   "acct.prefs": "Preferences",
