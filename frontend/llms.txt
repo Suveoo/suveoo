@@ -1,0 +1,31 @@
+# Suveoo
+
+> Suveoo（suveoo.com）是一个 **Agentic Banking Control Plane**（银行智能体控制平面）：大模型只能"提议"，提议被编译为结构化 BankAction IR，并通过五道确定性验证（策略分级、同意绑定、来源污染追踪、金融不变量、幂等重放）后才允许执行。**这是金融科技竞赛的演示作品（模拟银行系统）：全部账户、卡片、交易、理财产品与汇率均为模拟数据，不涉及任何真实资金行为，不构成任何真实金融产品或要约。**
+
+站点为无构建多页应用（PWA），界面语言支持简体中文/繁体中文/English（前端运行时切换，同一 URL）。
+
+## 主要页面
+
+- /home：主页——AI 对话入口、资产总览、贴心服务宫格
+- /ai：Suveoo AI 对话（转账、查账、理财对比、账单分析等，含确认卡与 Trust Console）
+- /ai/proposals：AI 提议（主动银行：省钱/避险/自动化提议与月度战报）
+- /ai/tasks：长程任务中心（预约任务与 Saga 补偿演示）
+- /ai/benchmark：SuveooBench 评测看板
+- /pay：收付总览；/pay/bills 账单；/pay/subscriptions 订阅管理
+- /transfer/intrabank 行内转账；/transfer/intrabank-scheduled 预约转账；/transfer/history 转账记录；/transfer/payees 收款人；/transfer/limits 转账限额
+- /wealth：财富总览；/wealth/funds 精选基金（16 只，净值由底层资产实时聚合）；/wealth/deposits 存款方案（6 档）；/wealth/fx 外汇牌价；/wealth/my 我的持仓
+- /wealth/tools：金融计算工具（复利/退休/预算/贷款对比等 10 款）
+- /account：账户中心；/account/transactions 交易记录；/account/cards 我的卡片；/account/security 安全中心；/account/downloads 月度报告
+- /about 关于 Suveoo（架构与验证运行时详述）；/help 帮助中心（含 FAQ）；/contact 联系我们
+- /terms 服务条款；/privacy-policy 隐私政策；/cookie-privacy Cookie 政策
+
+## 核心概念
+
+- **三色权限**：绿色（只读）自动执行；黄色（小额变更）需确认卡明确确认；红色（大额/敏感）需邮箱验证码强验证。
+- **BankAction IR**：intent/facts（字段级 provenance）/risk/preconditions/compensation 的中间表示，trace_id 与 nonce 幂等。
+- **Saga 长程任务**：T1 资金锁定 → T2 履约 →（失败时）C1 自动补偿解锁。
+
+## 联系
+
+- 客户支持：support@suveoo.com
+- 安全事务：security@suveoo.com

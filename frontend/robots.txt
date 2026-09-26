@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /demo-lab
 
 Sitemap: https://suveoo.com/sitemap.xml
