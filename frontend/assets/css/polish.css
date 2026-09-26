@@ -402,6 +402,13 @@ body.tc-open { overflow: hidden; }
 .tl-head .ctl-select { width: auto; min-width: 150px; }
 /* 智能分析缩小（第十四轮）+ 移到柱状图之下 */
 #tx-summary { margin-top: 14px; } /* 第十六轮：离页面大标题稍远 */
+/* ===== /wealth 手机端：总市值与管理按钮同行（第十八轮）——数字 32→21px、按钮紧凑，桌面不变 ===== */
+.wh-total { font-size: 32px; font-weight: 700; white-space: nowrap; }
+.wh-total-row { gap: 10px; align-items: center; }
+@media (max-width: 600px) {
+  .wh-total { font-size: 21px; }
+  .wh-total-row .wh-manage { font-size: 13px; padding: 8px 12px; flex: none; }
+}
 .tx-main-change { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--color-navy); background: var(--color-primary-tint); border-radius: 999px; padding: 4px 12px; }
 .tx-main-change svg { color: var(--color-navy); width: 12px; height: 12px; }
 /* 分类环比标题行：左标题右图例（横向对齐） */

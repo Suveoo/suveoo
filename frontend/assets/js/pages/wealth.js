@@ -34,9 +34,9 @@ S.router.register("wealth", async () => {
     const HOLDING_PREVIEW = 3;
     const renderHoldings = (expanded) => {
       const shown = expanded ? list : list.slice(0, HOLDING_PREVIEW);
-      hc.innerHTML = `<div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("wealth.holdings"))}</div>
-      <div class="total mono" style="font-size:32px;font-weight:700">¥ ${S.fmt.moneyPlain(total)}</div></div>
-      <a class="btn btn-light" href="/wealth/my">${S.fmt.escape(S.t("wealth.manage"))} →</a></div>
+      hc.innerHTML = `<div class="row between wh-total-row"><div><div class="muted small">${S.fmt.escape(S.t("wealth.holdings"))}</div>
+      <div class="total mono wh-total">¥ ${S.fmt.moneyPlain(total)}</div></div>
+      <a class="btn btn-light wh-manage" href="/wealth/my">${S.fmt.escape(S.t("wealth.manage"))} →</a></div>
       ${shown.map((x) => `<div class="list-row"><div class="grow"><b>${S.fmt.escape(x.name ?? x.fund)}</b>
         <div class="muted small">${S.ui.badge("R" + (x.risk_level ?? "?"), "risk-R" + (x.risk_level ?? 1))} NAV ${x.nav ?? "—"} · ${S.fmt.escape(S.t("wealth.cost"))} ¥${S.fmt.moneyPlain(x.amount ?? 0)}</div></div>
         <div class="amt mono">¥${S.fmt.moneyPlain(x.value ?? x.amount ?? 0)}</div></div>`).join("") || `<div class="muted small">${S.fmt.escape(S.t("common.noData"))}</div>`}
