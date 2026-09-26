@@ -47,7 +47,25 @@ S.router.register("home", async ({ user }) => {
   const art = (p) => p ? `<img class="pc-art" src="${p}?v=${S.ui.v()}" alt="" loading="lazy">` : "";
   /* promo 无插画时的彩色图标回退：规则引擎 icon 名 → ic-* 彩族（navy 徽标压住彩色渐变卡最稳） */
   const promoIc = { trend: "ic-trend-teal", card: "ic-card-rose", doc: "ic-doc-sky", ai: "ic-ai-navy", star: "ic-star-gold" };
-  const iconArt = (ic) => `<span class="pc-ico">${S.ui.icon(promoIc[ic] ?? "ic-ai-navy", 40)}</span>`;
+  /* navy 徽标定制版（队长提供图案）：保留渐变 navy squircle 底，内部换 3D 路线导航图案（深色渐变描边+高光+磨砂）。
+     独立内联而非 iconC 新字形——defs id 全前缀 pcr- 防页面冲突；内容以画布中心 0.75 缩进留白。仅 ai 位使用，其余彩族不受影响。 */
+  const NAVY_ROUTE_SVG = `<svg width="40" height="40" viewBox="0 0 1024 1024" aria-hidden="true"><defs>
+    <linearGradient id="pcr-base" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1E2A78"/><stop offset="1" stop-color="#35479E"/></linearGradient>
+    <linearGradient id="pcr-c" x1="10%" y1="0%" x2="90%" y2="100%"><stop offset="0%" stop-color="#3c3d42"/><stop offset="30%" stop-color="#28292c"/><stop offset="65%" stop-color="#18191b"/><stop offset="100%" stop-color="#0a0b0d"/></linearGradient>
+    <linearGradient id="pcr-d" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fff" stop-opacity=".45"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="pcr-f" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="75%" stop-opacity="0"/><stop offset="100%" stop-opacity=".3"/></linearGradient>
+    <filter id="pcr-a" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation=".84"/></filter>
+    <filter id="pcr-b" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur in="SourceAlpha" stdDeviation=".47" result="blur"/><feSpecularLighting in="blur" surfaceScale=".55" specularConstant=".8" specularExponent="18" lighting-color="#fff" result="spec"><fePointLight x="22.1" y="10.6" z="26.3"/></feSpecularLighting><feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip"/><feComposite in="SourceGraphic" in2="specClip" operator="arithmetic" k2="1" k3=".85"/></filter>
+    <mask id="pcr-e"><path d="M30 24H13c-4 0-7-3-7-7s3-7 7-7h19M8 38h27c4 0 7-3 7-7s-3-7-7-7h-5M13 43l-5-5 5-5m29.176-23a5 5 0 1 0-10 0 5 5 0 1 0 10 0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></mask>
+    </defs>
+    <rect width="1024" height="1024" rx="320" fill="url(#pcr-base)"/>
+    <g transform="translate(512 512) scale(.75) translate(-512 -512)">
+    <path d="M30 24H13c-4 0-7-3-7-7s3-7 7-7h19M8 38h27c4 0 7-3 7-7s-3-7-7-7h-5M13 43l-5-5 5-5m29.176-23a5 5 0 1 0-10 0 5 5 0 1 0 10 0" fill="none" stroke="#000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".28" filter="url(#pcr-a)" transform="matrix(22 0 0 22 -18 -6)"/>
+    <g filter="url(#pcr-b)" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="matrix(22 0 0 22 -18 -30.2)"><path d="M30 24H13c-4 0-7-3-7-7s3-7 7-7h19M8 38h27c4 0 7-3 7-7s-3-7-7-7h-5M13 43l-5-5 5-5m29.176-23a5 5 0 1 0-10 0 5 5 0 1 0 10 0" stroke="#101114" stroke-width="5.8" stroke-opacity=".6"/><path d="M30 24H13c-4 0-7-3-7-7s3-7 7-7h19M8 38h27c4 0 7-3 7-7s-3-7-7-7h-5M13 43l-5-5 5-5m29.176-23a5 5 0 1 0-10 0 5 5 0 1 0 10 0" stroke="url(#pcr-c)" stroke-width="5"/></g>
+    <path fill="url(#pcr-d)" opacity=".85" mask="url(#pcr-e)" d="M-6-6h60v30H-6z" transform="matrix(22 0 0 22 -18 -30.2)"/>
+    <path fill="url(#pcr-f)" mask="url(#pcr-e)" d="M-6-6h60v60H-6z" transform="matrix(22 0 0 22 -18 -30.2)"/>
+    </g></svg>`;
+  const iconArt = (ic) => `<span class="pc-ico">${(promoIc[ic] ?? "ic-ai-navy") === "ic-ai-navy" ? NAVY_ROUTE_SVG : S.ui.icon(promoIc[ic] ?? "ic-ai-navy", 40)}</span>`;
   const renderPromo = (it) => {
     const grad = { orange: "bg-grad-orange", gold: "bg-grad-gold", violet: "bg-grad-violet", teal: "bg-grad-teal", rose: "bg-grad-rose", sky: "bg-grad-sky" }[it.tone] ?? "bg-grad-navy";
     promoEl.innerHTML = `<div class="promo-card ${grad}" id="pc-${it.id}">
