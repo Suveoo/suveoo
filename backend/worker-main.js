@@ -305,6 +305,13 @@ export const TOOL_REGISTRY = {
   task_cancel:            { tier: RISK.YELLOW },
   task_list:              { tier: RISK.GREEN },
   proposal_list:          { tier: RISK.GREEN },
+  site_guide:             { tier: RISK.GREEN },
+  notification_list:      { tier: RISK.GREEN },
+  transfer_limit_query:   { tier: RISK.GREEN },
+  bill_list:              { tier: RISK.GREEN },
+  report_status:          { tier: RISK.GREEN },
+  subscription_reminder_toggle: { tier: RISK.YELLOW },
+  deposit_open:           { tier: RISK.RED, amountArg: "amount" },
   ecommerce_order_mock:   { tier: RISK.RED, amountArg: "amount" },
 };
 /* 提醒类长程任务不涉及资金（到期仅站内通知），金额可缺省；预约转账/订花等其余 amountArg 工具仍须正金额。
@@ -392,6 +399,8 @@ export const TOOL_SCHEMA = {
   card_freeze:            { authFields: ["card_id"], preconditions: [], compensation: ["card_unfreeze"] },
   card_unfreeze:          { authFields: ["card_id"], preconditions: ["card.status == FROZEN"], compensation: [] },
   task_cancel:            { authFields: ["task_id"], preconditions: ["task.status == PENDING"], compensation: [] },
+  subscription_reminder_toggle: { authFields: ["subscription_id", "enabled"], preconditions: ["subscription.status == ACTIVE"], compensation: [] },
+  deposit_open:           { authFields: ["product_id", "amount"], preconditions: [], compensation: [] },
   ecommerce_order_mock:   { authFields: ["item", "amount"], preconditions: ["locked_funds >= amount"], compensation: ["cancel_order"] },
 };
 export function compileToIR(toolName, args = {}, ctx = {}) {
@@ -1273,6 +1282,8 @@ function tgActionLines(ir, ex) {
     case "bill_pay": title = "🧾 账单已缴费"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
     case "autopay_manage": title = "🔁 自动扣款开关变更"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
     case "subscription_cancel": title = "❌ 订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
+    case "subscription_reminder_toggle": title = "⏰ 续费提醒开关变更"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
+    case "deposit_open": title = "🏦 存款已开立"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"]; break;
     case "payee_manage": title = "👥 收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
     case "funds_lock": title = "🔒 资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
     case "scheduled_task_create":
@@ -1540,6 +1551,19 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     if (!cur) return reject("TASK_NOT_FOUND");
     if (cur.status !== "PENDING") return { ...reject("TASK_NOT_PENDING"), message: `任务当前状态为 ${cur.status}，仅待执行（PENDING）的任务可取消。` };
   }
+  if (intent === "subscription_reminder_toggle") {
+    const subs = (await U(env, ctxInfo.userId)({ op: "subs" })).subscriptions ?? [];
+    const cur = subs.find((x) => String(x.id) === String(args.subscription_id));
+    if (!cur) return { ...reject("SUBSCRIPTION_NOT_FOUND"), message: `订阅 ${args.subscription_id} 不存在。subscription_id 请用 subscription_scan 查询后回传。` };
+    if (typeof args.enabled !== "boolean") return { ...reject("INVALID_ARGS"), message: "enabled 必须为布尔值（true 开启提醒 / false 关闭提醒）。" };
+  }
+  if (intent === "deposit_open") {
+    const minCents = DEPOSIT_MIN_CENTS[args.product_id];
+    if (minCents == null) return { ...reject("INVALID_PRODUCT"), message: `product_id 须为六档存款 slug（demand/notice-7d/term-3m/term-6m/term-1y/term-3y），收到 ${args.product_id}。利率与起存可用 deposit_product_query 查询。` };
+    let cents;
+    try { cents = toCents(String(args.amount ?? "0")); } catch { cents = null; }
+    if (cents == null || cents < minCents) return { ...reject("INVALID_AMOUNT"), message: `该存款起存金额为 ¥${centsToStr(minCents)}，收到 ${args.amount}。` };
+  }
   if (intent === "payee_manage" && args.action === "add") {
     const account = args.payee?.account, name = args.payee?.name;
     if (account == null) return reject("INVALID_CARD_FORMAT");
@@ -1635,7 +1659,7 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
   const userPrLevel = prof.ok ? prof.profile.pr_level : null;
 
   const ir = compileToIR(intent, { ...args, grant_hash: grantHash }, {
-    userId, channel, provenance, dailyAccumulatedCents: daily, model: channel === "ai" ? env.LLM_PROVIDER : null,
+    userId, channel, provenance, dailyAccumulatedCents: daily, model: channel === "ai" ? (resolveLlmProfile(env).provider ?? null) : null,
   });
   const tier = ir.risk.tier;
 
@@ -1820,6 +1844,22 @@ async function executeIntent(env, ir) {
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "赎回成功", body: `${fund?.name ?? p.product_id} 赎回完成，按市值结算回款 ¥${r.amount ?? "—"}，资金已回到默认卡。` });
       await U(env, uid)({ op: "audit", action: "wealth_product_redeem", detail: { ...p, proceeds: r.amount ?? null }, channel: ir.channel, trace_id: ir.trace_id });
       return { ok: r.ok, ...r };
+    }
+    case "deposit_open": {
+      /* 存款开立：与 /wealth/deposits/{slug}「开立定期」同通道（DO wealthPurchase、nav 固定 1.00——存款无净值概念），
+         独立 intent 使 AI 语义准确（存款≠理财申购，无 PR 适当性约束；起存金额前置校验在 preValidate） */
+      const obj = await env.ASSETS.get(`assets/data/deposits/${p.product_id}.json`).catch(() => null);
+      const name = obj ? (await new Response(obj.body).json()).name : p.product_id;
+      const r = await U(env, uid)({ op: "wealthPurchase", fund: p.product_id, amount_cents: String(toCents(p.amount)), nav: "1.00", risk_level: 1 });
+      await U(env, uid)({ op: "notify", type: "WEALTH", title: "存款开立成功", body: `${name} 开立 ¥${p.amount}，到期本息以产品条款为准（定期提前支取按活期计息）。这是模拟数据。` });
+      await U(env, uid)({ op: "audit", action: "deposit_open", detail: p, channel: ir.channel, trace_id: ir.trace_id });
+      return { ok: r.ok, ...r };
+    }
+    case "subscription_reminder_toggle": {
+      const r = await U(env, uid)({ op: "subReminders", id: p.subscription_id, enabled: p.enabled });
+      await U(env, uid)({ op: "audit", action: "subscription_reminder_toggle", detail: p, channel: ir.channel, trace_id: ir.trace_id });
+      await U(env, uid)({ op: "notify", type: "SYSTEM", title: p.enabled ? "续费提醒已开启" : "续费提醒已关闭", body: `订阅 ${p.subscription_id} 的扣费前 48 小时提醒已${p.enabled ? "开启" : "关闭"}。` });
+      return r;
     }
     case "fx_exchange": {
       const r = await U(env, uid)({ op: "fxExchange", direction: p.direction, currency: p.currency, amount_cents: String(toCents(p.amount_cny)), foreign_cents: String(toCents(p.amount_foreign)), from_card: p.from_card ?? null, price: p.rate_used ?? null });
@@ -3002,6 +3042,13 @@ export const MCP_TOOLS = [
   { name: "task_cancel", desc: "取消长程任务（预约转账/提醒/订花）。task_id 用 task_list 查询；仅 PENDING 可取消，取消即生效；生日订花类取消会同步解锁已锁资金（补偿）。黄级：确认卡等待用户点击", args: { task_id: { type: "number" } } },
   { name: "proposal_list", desc: "查询 AI 主动提议（本地规则引擎扫描账户产出的可执行建议：沉睡订阅退订/周期转账自动化/账单自动扣款/信用卡还款/闲钱理财）。返回待办提议的 id、类型、摘要与金额。用户问“最近有什么提议/AI 有什么建议/能帮我省什么”时先查此工具并如实转述（含金额，不夸大）；执行必须引导用户到 https://suveoo.com/ai/proposals 页面点击「让 AI 办」走确认卡，不得代为执行", args: {} },
   { name: "card_unfreeze", desc: "解冻卡片（红级）", args: { card_id: { type: "string" } } },
+  { name: "site_guide", desc: "全站页面使用指南（74 页全覆盖）。用户问站点用法/导航类问题（某功能在哪、怎么操作、这页有什么用、在哪导出 CSV、怎么解冻卡片、怎么退订、在哪看限额等）时调用。query 传用户原话关键词，返回最相关页面的入口/按钮/流程/确认卡与 OTP 场景；不传 query 返回全站分区概览。回答中的页面链接只能引用本工具返回的 route", args: { query: { type: "string" } } },
+  { name: "notification_list", desc: "查询站内通知（最近条目：类型/标题/摘要/时间/已读态与未读数）。用户问“我有什么通知/未读消息”时调用", args: { unread_only: { type: "boolean" } } },
+  { name: "transfer_limit_query", desc: "查询转账限额：各卡单笔/日限额 + AI 通道限额（单笔 ¥5,000/日 ¥10,000）+ 经典通道默认与三色阈值。用户问“我的转账限额是多少”时调用", args: { card_id: { type: "string" } } },
+  { name: "bill_list", desc: "查询账单列表（商户/金额/出账日/自动扣款状态，含信用卡当前欠款动态金额）。用户问“我有什么账单要交”时调用；缴费本身走 bill_pay", args: {} },
+  { name: "report_status", desc: "查询月度报告状态（可生成报告的月份列表与下载入口）。用户问“月报出了吗/在哪下载报告”时调用", args: {} },
+  { name: "subscription_reminder_toggle", desc: "订阅续费提醒开关（开启后扣费前 48 小时站内+邮件提醒）。subscription_id 用 subscription_scan 查；enabled=true 开 / false 关。黄级：确认卡等待用户点击", args: { subscription_id: { type: "string" }, enabled: { type: "boolean" } } },
+  { name: "deposit_open", desc: "开立存款（红级）。product_id 为六档存款 slug：demand/notice-7d/term-3m/term-6m/term-1y/term-3y（利率与起存以 deposit_product_query 为准：通知存款起存 ¥50,000、定期 ¥50、活期 ¥0.01）。amount 不得低于起存金额。开立后计入持仓，定期提前支取按活期计息", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "ecommerce_order_mock", desc: "演示商户下单（红级，仅 DEMO_MODE 场景 6）", args: { item: { type: "string" }, amount: { type: "string" }, task_id: { type: "number" } } },
 ];
 
@@ -3167,7 +3214,9 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     return { text: JSON.stringify({ status: "OTP_REQUIRED", grant: { grant_prefix: grant.grant_hash.slice(0, 8), expires_at: grant.expires_at }, message: "红级操作需要强验证：验证码由用户在确认卡界面获取并填写，确认由用户界面完成，不要携带 otp 重试" }), isError: false };
   }
   push({ kind: "genui", type: "genui_event", card: { component: "blocked_notice", reason: g.blockReason ?? g.reason ?? "BLOCKED" } });
-  return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, stages: g.stages }), isError: true };
+  /* BIZ_REJECT（preValidate 前置拒绝）携带 message：拒绝原因供模型自纠（如存款起存金额、任务非 PENDING），
+     既有先例 INVALID_SCHEDULE_TIME 的双端时刻提示同设计意图 */
+  return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, ...(g.message ? { message: g.message } : {}), stages: g.stages }), isError: true };
 }
 
 export async function handleMcp(request, env, url, ctx) {
@@ -3234,6 +3283,21 @@ async function genuiCardFor(env, ctxInfo, g) {
       const subs = (await U(env, ctxInfo.userId)({ op: "subs" })).subscriptions ?? [];
       const s = subs.find((x) => String(x.id) === String(p.subscription_id));
       if (s) { p.subscription_merchant = s.merchant; p.subscription_amount = s.amount; p.subscription_cycle = s.cycle; p.subscription_next = s.next_charge_date ?? null; }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
+  /* 续费提醒开关卡：附商户名（对得上"改的是哪个订阅"） */
+  if (g.ir.intent === "subscription_reminder_toggle" && p.subscription_id != null) {
+    try {
+      const subs = (await U(env, ctxInfo.userId)({ op: "subs" })).subscriptions ?? [];
+      const s = subs.find((x) => String(x.id) === String(p.subscription_id));
+      if (s) p.subscription_merchant = s.merchant;
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
+  /* 存款开立卡：产品名（slug → 中文名） */
+  if (g.ir.intent === "deposit_open" && p.product_id != null) {
+    try {
+      const obj = await env.ASSETS.get(`assets/data/deposits/${p.product_id}.json`);
+      if (obj) p.product_display = (await new Response(obj.body).json()).name;
     } catch { /* 查询失败不阻塞出卡 */ }
   }
   /* 任务取消卡展开：附任务标题与下次执行时间（确认卡能对上"取消的是哪个任务"） */
@@ -3382,8 +3446,196 @@ async function mcpGreen(env, ctxInfo, name, args) {
       return calcFxConvert(args, fx.quotes ?? []);
     }
     case "calc_budget_allocator": return calcBudgetAllocator(args);
+    case "site_guide": return siteGuideLookup(args?.query);
+    case "notification_list": {
+      const r = await UU({ op: "notifications", cursor: "0" });
+      const list = (r.notifications ?? []).slice(0, 20)
+        .map((n) => ({ id: n.id, type: n.type, title: n.title, body: String(n.body ?? "").slice(0, 120), ts: n.ts, read: Number(n.read) === 1 }));
+      return { notifications: args.unread_only ? list.filter((n) => !n.read) : list, unread: r.unread ?? null, note: "全部通知页：https://suveoo.com/notifications" };
+    }
+    case "transfer_limit_query": {
+      const r = await UU({ op: "getCards" });
+      const cards = (r.cards ?? []).filter((c) => !args.card_id || c.slug === args.card_id);
+      return {
+        cards: cards.map((c) => ({ card_id: c.slug, kind: c.kind, tail: String(c.number ?? "").slice(-4), limit_single: c.limit_single ?? null, limit_daily: c.limit_daily ?? null })),
+        ai_channel: { single: "5000.00", daily: "10000.00", note: "AI 发起转账/换汇/预约的硬上限，不可通过页面调高" },
+        form_channel: { single: "50000.00", daily: "100000.00", note: "经典表单通道默认值，可在 https://suveoo.com/transfer/limits 调整（下调黄级/上调红级）" },
+        tiers: { green: "只读自动执行", yellow: "日累计 ≤ ¥1,000 出确认卡", red: "日累计 > ¥1,000 需邮箱 OTP 强验证" },
+        note: "limit_single/limit_daily 为该卡当前单笔/日转账限额（null=未单独设置，按渠道默认）；调整走 card_limit_adjust。",
+      };
+    }
+    case "bill_list": {
+      const r = await UU({ op: "bills" });
+      const cred = ((await UU({ op: "getCards" })).cards ?? []).find((c) => c.kind === "credit");
+      const debt = BigInt(cred?.balance_cents ?? "0");
+      const bills = (r.bills ?? []).map((b) => {
+        const isCredit = b.id === "credit-repay";
+        return {
+          bill_id: b.id, merchant: b.name ?? b.id, category: b.category ?? null,
+          amount: isCredit ? centsToStr(debt) : centsToStr(BigInt(b.amount_cents ?? "0")),
+          due_day: b.due_day ?? null, autopay: Number(b.autopay) === 1,
+          ...(isCredit ? { note: debt === 0n ? "当前无欠款（NO_DEBT，无需还款）" : "金额=当前信用卡欠款（动态）" } : {}),
+        };
+      });
+      return { bills, note: "待缴账单用 bill_pay 缴费（金额由服务端按账单补齐）；自动扣款开关 autopay_manage；账单页：https://suveoo.com/pay/bills" };
+    }
+    case "report_status": {
+      const r = await UU({ op: "reportList" });
+      return { months: r.months ?? [], note: "months=有流水的月份（均可生成月度报告）；生成与下载 PDF 在月度报告页：https://suveoo.com/account/downloads" };
+    }
     default: return { ok: false };
   }
+}
+
+/* ================================================================
+ * ④.7 site_guide —— 全站页面知识库（第十一期：教会 Suveoo AI 本站所有页面）
+ *    源：for-claude-code/pages.md 契约 + 逐页核对 frontend/assets/js/pages/*.js 头注与实现
+ *    覆盖度由 tests/unit/site-guide.test.js 锁定：知识路由集 vs 前端 74 页路由集差集恒为 0
+ * ================================================================ */
+export const SITE_GUIDE_PAGES = [
+  { route: "/", aliases: ["根路径", "首页跳转", "官网首页"], section: "system", purpose: "根路径入口：meta-refresh + location.replace 跳转 /home（R2 静态约束不做服务端重定向）。", entry: "浏览器直接访问 suveoo.com", actions: ["自动跳转到 /home（无任何可交互控件）"], flow: "访问 / → 立即跳 /home。", notes: "noindex（meta-refresh 跳转页）。" },
+  { route: "/home", aliases: ["主页", "首页", "总资产", "资产总估值", "本月收支", "洞察", "核心服务"], section: "portal", purpose: "主页：登录后为个人金融总览 + AI 第一入口；未登录为产品展示 + 登录引导。", entry: "侧栏「主页」/ 底部导航 Home / 根路径跳转", actions: ["AI 胶囊输入条（回车跳 /ai?q=；未登录跳登录）", "语音按钮（Web Speech 识别填框）", "眼睛按钮（全量掩码总资产/今日收益/本月收支）", "核心服务宫格 8 项：行内转账/账单支付/我的卡片/理财/外汇/月度报告可点，跨行转账与跨境汇款灰置（点击弹模态说明仅支持行内）", "AI 洞察行（整行可点击，第一人称指令跳 /ai）", "品牌横幅「查看完整介绍」→ /about"], flow: "登录后首屏即总览；点宫格进对应功能页；点洞察行直接问 AI。", notes: "数据 /api/overview + 洞察 /api/dashboard/insight；模拟声明由顶栏徽标承担。" },
+  { route: "/pay", aliases: ["收付", "收付总览", "转账入口", "常用收款人", "最近转账"], section: "pay", purpose: "收付总览：转账三入口 + 次级功能 + 常用收款人 + 最近转账。", entry: "侧栏「收付」/ 底部导航 / home 宫格", actions: ["三大转账卡：行内转账可点；跨行/跨境灰置弹模态", "次级功能行：预约转账/转账记录/转账限额/账单与订阅", "AI 快捷条（收款人驱动建议句按日轮换）", "常用收款人横滑卡（每卡「转账」按钮带 ?payee= 预填 /transfer/intrabank）", "最近转账列表（查看全部 → /transfer/history）"], flow: "选收款人「转账」→ 预填转账页 → 黄/红确认。", notes: "跨行与跨境仅架构演示未开放。" },
+  { route: "/pay/bills", aliases: ["账单", "缴费", "账单支付", "水电费", "自动扣款", "贷款还款", "信用卡还款"], section: "pay", purpose: "账单支付：缴费账单列表 + 贷款/信用卡还款 + 自动扣款开关。", entry: "/pay 次级功能「账单与订阅」/ home 宫格「账单支付」", actions: ["「立即缴费」按钮（黄级确认弹窗）", "「自动扣款」开关（黄级确认：商户+金额上限+扣款日）", "车贷还款卡 / 信用卡还款卡（账单金额/最低还款/还款日）", "订阅扣款预览 → /pay/subscriptions", "账单洞察卡"], flow: "立即缴费 → 黄确认卡 → 执行扣款；信用卡全额还款也可走 /account/card/{slug}/settings「立即还款」。", notes: "SimNotice banner；账单金额为模拟定价。" },
+  { route: "/pay/subscriptions", aliases: ["订阅", "订阅管理", "退订", "取消订阅", "续费提醒", "暗黑模式"], section: "pay", purpose: "订阅管理（赛题场景 5）：订阅卡列表 + 使用频率 + Dark Pattern 预警 + 退订。", entry: "/pay「账单与订阅」/ /pay/bills「管理订阅」", actions: ["「取消订阅」（黄级确认：提示下次扣费前是否仍扣款）——AI 通道同义工具 subscription_cancel", "「续费提醒」开关（扣费前 48h 站内+邮件提醒，反 Dark Pattern）", "使用频率条（0-100%，subscription_scan 评分）", "Dark Pattern 预警角标（如首月特惠恢复原价）", "沉睡订阅预警洞察卡"], flow: "取消订阅 → 黄确认 → 生效；AI 说「退订 Netflix」会先 subscription_scan 再出确认卡。", notes: "SimNotice banner；订阅数据为模拟。" },
+  { route: "/transfer/intrabank", aliases: ["转账", "行内转账", "汇款", "转钱", "付款", "问问 AI", "AI 帮我核对"], section: "pay", purpose: "行内转账（核心写操作页）：向真实 Suveoo 用户转账。", entry: "/pay 三大卡 / home 宫格 / 收款人卡「转账」(?payee= 预填) / 卡片页「转账汇款」(?from=)", actions: ["收款人输入（姓名/卡号；「常用收款人」抽屉回填；仅支持 Suveoo 16 位卡号，姓名须与户名匹配）", "「问问 AI / AI 帮我核对」chip（随表单双态切换）", "金额输入（免手续费；实时联动付款卡余额）", "付款卡选择（借记+信用卡信用支付 badge；「全部转出」二次确认）", "备注（选填，含在双方邮件通知中）", "提交 → 黄级确认卡（≤¥1,000 日累计；120s 倒计时+grant 前 12 位）→ 确认执行；红级（>¥1,000 日累计）确认卡内嵌邮箱 OTP"], flow: "填收款人+金额+选卡 → 提交 → 确认卡 →（红级填 OTP）→ 成功回执（流水号/双方/金额/Merkle 存证 ID/邮件状态）；AI 通道由 transfer_execute 出同款确认卡。", notes: "SimNotice banner；非 Suveoo 账号行内红条拦截；收款人三重校验（格式/存在/户名）。" },
+  { route: "/transfer/intrabank-scheduled", aliases: ["预约转账", "定时转账", "未来转账", "周期转账"], section: "pay", purpose: "预约转账：指定未来时刻自动执行的行内转账。", entry: "/pay 次级功能「预约转账」", actions: ["转账表单（同 P08：收款人/金额/付款卡[仅借记]/备注）", "日期选择器 + 时间选择（5 分钟粒度）", "重复规则：单次 once / 每月 monthly / 每年 yearly", "双时区显示（您的时区 + 北京时间 UTC+8）", "提交 → 黄级确认卡"], flow: "建单 → 黄确认 → 任务进 /ai/tasks（PENDING）→ 到期 saga 闹钟唤醒执行 → 可在任务中心取消（补偿=删除预约不动账）；AI 通道 scheduled_task_create（execute_at 须 ISO 8601 带 +08:00）。", notes: "执行以服务端 UTC 存储定时器为准；SimNotice footnote。" },
+  { route: "/transfer/history", aliases: ["转账记录", "交易记录", "流水", "导出 CSV", "导出", "明细"], section: "pay", purpose: "转账记录：纯转账口径的流水查询、筛选、详情与导出。", entry: "/pay「最近转账·查看全部」/ 侧栏「转账记录」", actions: ["筛选条：时间范围（近 7 天/1 月/3 月）+ 方向（支出/收入）+ 状态 + 卡", "统计条与搜索", "行点击展开详情（流水号/双方掩码卡号/备注/手续费/Merkle 存证 ID/经手渠道=AI trace 或经典表单）", "游标分页（每页 20，「加载更多」）", "「导出 CSV」按钮（本地生成，BOM 保 Excel 中文，文件名 suveoo-transfers-日期.csv）"], flow: "筛选 → 查看列表 → 展开详情 → 可导出 CSV。全量收支口径请用 /account/transactions。", notes: "只读无写操作；AI 回答「转账记录在哪导出」应引用本页链接。" },
+  { route: "/transfer/limits", aliases: ["转账限额", "限额", "额度调整", "单笔限额", "日累计"], section: "pay", purpose: "转账限额：按渠道×卡展示限额矩阵并支持调整。", entry: "/pay 次级功能「转账限额」/ /account 宫格 / 单卡设置跳转", actions: ["限额矩阵：行内转账（默认单笔 ¥50,000/日 ¥100,000）、AI 通道（单笔 ¥5,000/日 ¥10,000，独立且更低）", "每行「调整」按钮 → 弹窗（滑杆+数字输入）：下调至 ≥¥100 黄级确认；上调需红级", "页面底部三色分级与 ¥1,000 黄红阈值说明"], flow: "调整 → 黄（或红 OTP）确认卡 → 生效。AI 通道同义工具 card_limit_adjust。", notes: "AI 通道限额是硬上限（AI_CAP_TOOLS 限制），页面调整不能突破。" },
+  { route: "/transfer/payees", aliases: ["常用收款人", "收款人管理", "添加收款人", "删除收款人", "收款人分组"], section: "pay", purpose: "常用收款人管理：分组列表 + 增删改。", entry: "/pay「查看全部及管理」/ 侧栏", actions: ["「添加」表单（姓名 + Suveoo 16 位卡号 + 手机号可选[1 开头 11 位] + 分组）", "「编辑」「删除」（删除黄级确认）", "每卡「转账」按钮（跳 /transfer/intrabank?payee= 预填）", "分组：家人/朋友/同事/生活缴费/其他+自定义"], flow: "添加 → 可校验真实户名 → 转账时可从抽屉选择；AI 通道 payee_manage（黄）同口径，带手机号后 contacts_search 可按全号/尾号命中。", notes: "姓名为脱敏模拟数据；未验证收款人转账被拦截。" },
+  { route: "/ai", aliases: ["Suveoo AI", "AI 对话", "AI 助手", "智能助理", "Trust Console", "信任控制台", "历史对话"], section: "ai", purpose: "Suveoo AI 对话页（全站核心）：自然语言办理一切业务 + Trust Console 验证可视化。", entry: "侧栏 Suveoo AI 大卡 / 底部导航中央 AI 圆钮 / 各页 AI 组件 / home 输入条", actions: ["对话输入（?q= 预填自动发送；?ctx= 页面上下文条）", "真流式输出 + 思考提示（思考型模型长思考期显示「正在深度分析您的指令…」）", "GenUI 确认卡（黄：确认/取消+120s 倒计时；红：内嵌邮箱 OTP 输入）", "Trust Console 右栏：五道验证器状态灯 + 实时事件流 + IR 查看器 + trace_id", "历史对话下拉（今天/昨天/7 天分组、重命名、删除、续聊）+「+ 新对话」", "三点菜单：长程任务中心/AI 提议/SuveooBench 看板", "流式中「停止」按钮"], flow: "绿色问题自动执行查询；黄/红写操作出确认卡等待用户点击——AI 绝不代用户确认；BLOCKED 以红卡呈现并可查 trace_id。", notes: "输入框下方固定风险提示「绿色操作自动执行 · 黄色需确认 · 红色需强验证」；欢迎区有本地洞察卡（零模型调用）。" },
+  { route: "/ai/tasks", aliases: ["任务中心", "长程任务", "预约任务", "订花任务", "任务列表", "取消任务", "故障注入"], section: "ai", purpose: "长程任务中心：预约转账/提醒/生日订花等任务的 Saga 时间线管理。", entry: "/ai 三点菜单「长程任务中心」/ 侧栏 AI 组", actions: ["任务卡：状态机时间线（计划→已锁定→等待唤醒→履约→完成/已补偿）+ 检查点 + 下次唤醒时间（双时区）", "「取消」按钮（黄确认 → saga 补偿链；订花类取消同步解锁资金）", "生日任务「立即演示执行」按钮（DEMO_MODE）", "「Inject Merchant Failure」故障注入按钮（DEMO_MODE：T1 ✓ → T2 ✗ → C1 ✓ 补偿演示）"], flow: "AI 建 scheduled_task → 任务卡出现 → 到期自动执行或手动取消（补偿）；AI 通道取消走 task_cancel（黄，仅 PENDING 可取消）。", notes: "AI 查任务用 task_list 工具；建单即锁资金的是生日订花类。" },
+  { route: "/ai/proposals", aliases: ["AI 提议", "提议", "主动银行", "让 AI 办", "省下多少", "战报"], section: "ai", purpose: "AI 提议（AI 主动银行）：本地规则引擎主动扫描账户产出可执行建议 + 月度战报。", entry: "侧栏 AI 组「AI 提议」（有新提议时带徽标+气泡）/ /ai 三点菜单 / home 洞察置顶行", actions: ["战报 hero：本月已为你省下 ¥X / 已办妥 N 件事 / 自动打理 N 笔惯例", "提议卡四族（SAVE 省/ROUTINE 惯例/GUARD 守护/WEALTH 理财）+ 黄/红徽标", "「让 AI 办」按钮 → 复用既有 intent 走黄/红确认卡（服务端 settle 事实核验成功才记 impact）", "「知道了」忽略"], flow: "看提议 → 点「让 AI 办」→ 确认卡（黄/红+OTP）→ 执行 → 战报数字更新；AI 对话可 proposal_list 只读查询，执行必须引导到本页点确认卡。", notes: "规则引擎本地确定性生成、零模型调用；这是模拟银行系统。" },
+  { route: "/ai/benchmark", aliases: ["评测看板", "SuveooBench", "基准测试", "指标", "消融"], section: "ai", purpose: "SuveooBench 评测看板（免登录）：安全指标 Baseline vs Ours 对比与评测方法说明。", entry: "/ai 欢迎区「查看评测看板」链接 / 侧栏", actions: ["12 项指标卡网格（Task Success/Unsafe Action Rate/Injection Attack 成功率等）", "Ablation 消融柱状图（Claude/Qwen/GPT 三组历史对照）", "当前生产模型徽标（读 /api/version 动态渲染）+ 生产模型实测基线", "测试集规模与评测方法条目卡"], flow: "只读浏览；数据来自仓库自动化测试产物 benchmark.json。", notes: "不编造裸模型数字，未跑的对照注记「待跑」。" },
+  { route: "/wealth", aliases: ["财富", "财富总览", "理财", "持仓", "精选基金", "存款方案", "外汇快览"], section: "wealth", purpose: "财富总览：持仓总览 + 精选基金/存款/外汇快览入口。", entry: "侧栏「财富」/ 底部导航 / home 宫格「理财」", actions: ["持仓总览卡（投资总市值+累计收益+「查看持仓明细」展开+「赎回」红级）", "AI 快捷条（有持仓时「分析持仓配置」）", "精选基金横滑卡（风险 chip/近 6-12 月回报/「详情」）", "存款方案横滑卡（期限+年利率+起存）", "外汇快览 4 货币对 + 「全部牌价」", "NAV 实时/闭市徽标与「更新于 X 分钟前」"], flow: "从总览进基金/存款/外汇子页；赎回跳 /wealth/my 逐项操作或本页展开表。", notes: "SimNotice banner：理财产品数据为模拟数据，不构成投资建议。" },
+  { route: "/wealth/my", aliases: ["我的持仓", "持仓明细", "逐项赎回", "赎回", "外币资产"], section: "wealth", purpose: "我的持仓：基金逐项市值/成本/涨跌 + 逐项赎回 + 外币资产 + 存款入口。", entry: "/wealth「查看持仓明细」/ 财富分区子页", actions: ["基金持仓列表（逐项市值=本金×当前净值÷成本、成本、浮动盈亏、涨跌）+「详情」直达基金页", "逐项「赎回」按钮（红级两段式：OTP+确认卡；全额赎回 amount=ALL 按市值公式回款，0 值不发起）", "外币资产卡（折 CNY 参考值，直达 /wealth/fx）", "存款方案入口"], flow: "赎回 → 红 OTP → 确认卡 → 回款入默认借记卡（按当前净值对成本比例结算，浮盈亏实时兑现）；AI 通道 wealth_product_redeem 同口径，预计回款先查 wealth_holdings_query 的 redeem_value。", notes: "红级操作；净值实时化后市值与 AI 报价同源。" },
+  { route: "/wealth/funds", aliases: ["全部基金", "基金列表", "选基金", "基金搜索", "风险等级"], section: "wealth", purpose: "全部基金：16 只基金（R1-R5）搜索、排序与筛选。", entry: "/wealth「查看全部基金」/ home 宫格「理财」", actions: ["搜索框实时过滤", "排序：默认/近 6 月/风险", "R1-R5 风险 tab", "基金卡：近 12 月收益率大数字 + 资产类别徽章 + NAV 实时/闭市徽标", "卡点击进详情页"], flow: "筛选 → 对比 → 进详情申购；AI 选基金推荐先 wealth_product_query（适当性：仅推荐 ≤ 用户 PR 等级）。", notes: "SimNotice banner；历史业绩不代表未来。" },
+  { route: "/wealth/fx", aliases: ["外汇", "外汇牌价", "汇率", "购汇", "结汇", "换汇", "美元", "外币余额", "年度额度"], section: "wealth", purpose: "外汇牌价与兑换：10 币种实时牌价 + 兑换计算器 + 结汇购汇交易。", entry: "/wealth 外汇快览 / home 宫格「外汇」", actions: ["牌价表（USD/EUR/JPY/GBP/HKD/SGD/AUD/CAD/CHF/NZD：现汇买入/卖出/中间价 + 7 日 sparkline 按自然日逐日积累）+ 刷新按钮 + 实时徽章", "兑换计算器（购汇/结汇方向切换 + 币种 + 金额实时换算含点差说明；JPY 为每 100 日元口径）", "「结汇/购汇」按钮（黄级；折算 CNY > ¥1,000 红级 OTP）+ 结算卡选择（购汇可选信用卡信用支付）", "年度便利化额度条（模拟 $50,000/年）", "「我的外币余额」卡（空态引导）", "「现在换 USD 划算吗」AI chip"], flow: "查牌价 → 计算器试算（与成交同源同数）→ 结汇/购汇确认卡 → 成交更新外币余额；AI 通道 fx_exchange（黄/红）+ calc_fx_convert 试算 + fx_balance_query 查余额。", notes: "牌价真实市场汇率日更+15 分钟缓存，失败回退静态快照；INSUFFICIENT_FX/INSUFFICIENT_CREDIT 行内拦截。" },
+  { route: "/wealth/tools", aliases: ["金融计算工具", "计算器", "理财工具", "工具集"], section: "wealth", purpose: "金融计算工具集（免登录）：10 个计算工具的导航页，支持 URL 参数直达。", entry: "/wealth 分区子页 / footer", actions: ["10 工具卡网格（每卡进独立工具页）", "URL 参数直达（如 /wealth/tools?tool=deposit&amount=50000&term=1y 自动预填计算）"], flow: "选工具 → 进子页输入参数 → 即时计算；/ai 与 GenUI 卡可生成这些深链。", notes: "免登录；纯客户端计算无 API。" },
+  { route: "/account", aliases: ["账户中心", "我的账户", "个人资料", "退出登录", "资产概要"], section: "account", purpose: "账户中心首页：个人卡 + 资产概要 + 功能宫格 + 偏好区。", entry: "header 头像 / 底部导航 Account / 侧栏", actions: ["个人卡（头像/姓名/客户等级/掩码 Email/开户日期）", "资产概要（总资产/今日收益/余额/持仓 + 外币资产折 CNY 行 + 最近 5 笔流水）", "功能宫格：我的卡片/仪表盘/安全中心/月度报告/通知/转账限额", "偏好区：语言切换/Cookie Preferences/时区（只读）", "「退出登录」（黄确认）"], flow: "总览跳转各功能；退出登录黄确认后回登录页。", notes: "SimNotice footnote。" },
+  { route: "/account/login", aliases: ["登录", "登录页", "Sign in", "2FA", "两步验证登录"], section: "account", purpose: "登录页：账户/卡号/Email 三合一登录，支持 2FA 第二步。", entry: "未登录访问受限页自动跳转（?next= 回跳）/ header「登录 / 注册」", actions: ["三合一账户输入框 + 密码框（眼睛显示/隐藏）", "「登录」按钮", "「忘记密码？」→ /account/recovery", "「注册与开户」→ /account/register"], flow: "输凭证 → 登录；开了 2FA 的账户第二步输邮箱验证码（60s 重发、5 次/小时上限）。", notes: "SimNotice footnote；连续失败触发限流与熔断保护。" },
+  { route: "/account/register", aliases: ["注册", "开户", "注册与开户", "风险测评问卷", "新账户"], section: "account", purpose: "注册与开户：四步流程开立模拟账户并随机发卡。", entry: "/account/login「注册与开户」", actions: ["步骤 1 身份信息：Email+验证码（scene=register）+姓名（可虚构）+护照正反面（点击即「已跳过（模拟）」）", "步骤 2 合规意愿：风险承受能力问卷（算出 PR1-PR5）+ AML 声明勾选 + 风险揭示书（不勾不可下一步）", "步骤 3 设置密码：8-32 位强度条 + 确认密码 + 眼睛切换", "步骤 4 开户执行：全屏进度动画（系统随机生成 4 张借记卡[合计余额约 ¥99.9 万-112.5 万]+1 张信用卡[额度 ¥320,000]，其中一张设默认卡）→ 卡片墙预览"], flow: "四步走完 → 「进入我的账户」；PR 等级影响后续理财适当性匹配（可在 /account/security 重测）。", notes: "每步 SimNotice footnote；16 位卡号全局唯一。" },
+  { route: "/account/recovery", aliases: ["忘记密码", "找回密码", "重置密码", "密码找回"], section: "account", purpose: "忘记密码：邮箱验证码重置密码（全程无需旧密码）。", entry: "/account/login「忘记密码？」", actions: ["预留 Email + 验证码发送（护照号可留空跳过校验——演示系统刻意简化）", "新密码 + 确认密码双框（不一致本地拦截）", "提交重置"], flow: "收码 → 填新密码 → 重置成功后 bumpEpoch 全设备下线（其他会话全部失效）。", notes: "SimNotice footnote；AI 不代办改密找回（规则 6 引导到本页）。" },
+  { route: "/account/cards", aliases: ["卡片管理", "我的卡片", "我的卡", "银行卡", "借记卡", "信用卡", "冻结", "解冻", "卡列表"], section: "account", purpose: "卡片管理：名下 5 张卡（4 借记+1 信用）的状态与操作入口。", entry: "/account 宫格「我的卡片」/ home 宫格「我的卡片」", actions: ["顶部眼睛按钮（全局掩码本页所有卡余额）", "每卡大白卡：卡号尾号+类别（借记 I/II 类/信用卡/网络 chip）+默认卡 chip + 正面图（点进设置页）+ 余额或剩余额度大字 + 当前欠款行（信用卡）", "四按钮：交易明细 → /account/card/{slug}/history；转账汇款 → /transfer/intrabank?from=；冻结/解冻（红级，文案随状态切换，冻结显示灰罩+冰晶角标）；更多 → 设置页", "「AI 管理这张卡」chip（尾号驱动只读引导）"], flow: "冻结 → 红 OTP 强验证 → 生效；解冻同红级。AI 通道 card_freeze/card_unfreeze（红级）同口径。", notes: "SimNotice banner；完整卡号只在设置页 reveal。" },
+  { route: "/account/card/{slug}/history", aliases: ["单卡明细", "单卡交易", "卡的流水", "卡片交易记录"], section: "account", purpose: "单卡交易明细（动态路由：slug=debit-card-1..4 / credit-card-1）：该卡真过滤流水。", entry: "/account/cards「交易明细」", actions: ["该卡流水列表（tx.card 匹配，真过滤真分页 20 条/页，「加载更多」服务端追加）", "消费分类月度小结条与 chips", "日期分组展示"], flow: "浏览 → 加载更多；无写操作。", notes: "迁移前 card=NULL 的历史行不出现；全量收支用 /account/transactions。" },
+  { route: "/account/card/{slug}/settings", aliases: ["单卡设置", "卡片设置", "卡号查询", "完整卡号", "默认卡", "消费开关", "地理围栏", "预借现金", "立即还款", "卡别名"], section: "account", purpose: "单卡设置（动态路由）：别名/默认卡/限额/开关/冻结与信用卡专属设置。", entry: "/account/cards「更多」/ 卡正面图点击", actions: ["通用：卡别名编辑、设为默认卡（黄）", "借记卡：转账限额三项（跳 /transfer/limits 语境化）、消费开关（境内/境外/无卡交易，黄）、冻结（红）", "信用卡：额度信息（只读 ¥320,000+已用）、还款日/账单日、预借现金开关（黄）、境外交易地理围栏（区域多选+每日限额+TTL 天数到期自动回收，黄确认卡）、「立即还款」（黄级，金额=当前欠款全额，无欠款 409 NO_DEBT）", "卡号行：掩码 + 眼睛 reveal（四位分组展示）+ 复制按钮"], flow: "改设置 → 黄确认卡 → 生效；红级（冻结）走 OTP。完整卡号 reveal 仅本页。", notes: "AI 不搬运完整卡号（card_status_query 只回 full_number_hint 链接到本页）。" },
+  { route: "/account/dashboard", aliases: ["仪表盘", "dashboard", "资产趋势", "支出分类", "月度收支", "异常交易", "月度解读"], section: "account", purpose: "仪表盘：自研 SVG 图表的收支资产分析与 AI 月度解读。", entry: "/account 宫格「仪表盘」", actions: ["AI 快捷条", "AI 月度解读卡（bill_analysis 叙事化摘要 +「为什么」展开归因）", "资产趋势 12 个月折线（hover tooltip）", "支出分类环形图 + 图例金额", "月度收支 6 个月双柱", "异常交易离群点卡片（点击查看交易）"], flow: "只读分析；点击异常卡查看交易明细。", notes: "免登录时数据不可见；桑基图异常节点红色标记。" },
+  { route: "/account/downloads", aliases: ["月度报告", "报告下载", "PDF", "生成报告", "对账单"], section: "account", purpose: "月度报告下载：按月生成 PDF 报告。", entry: "/account 宫格「月度报告」/ home 宫格「月度报告」/ GenUI report_download 卡", actions: ["自开户月以来每月一行 + 「生成 PDF」按钮（服务端 pdf-lib 渲染：资产快照/流水/分类统计/持仓/风险提示页）", "已生成行显示「下载」+ 文件大小（R2 缓存复用）"], flow: "选月份 → 生成 → 下载；AI 通道本页状态可查（新工具 report_status）。", notes: "每页页脚「模拟数据」水印；GA4 report_download。" },
+  { route: "/account/security", aliases: ["安全中心", "改密码", "修改密码", "两步验证", "2FA", "Passkey", "登录设备", "操作审计", "熔断", "风险承受", "重新评估"], section: "account", purpose: "安全中心：密码/2FA/Passkey/设备会话/审计流/熔断状态的统一管理。", entry: "/account 宫格「安全中心」", actions: ["改密弹窗（红级：当前密码+邮箱 OTP+新密码+确认；成功后就地换新纪元 token，其他设备全下线）", "两步验证 2FA 开关（关闭须当前密码；开启仅 OTP）", "Passkey 注册/管理（WebAuthn，红级验证可替代 OTP）", "风险承受能力：当前 PR 等级 chip + 「重新评估」→ /account/risk-assessment", "登录设备与会话列表（「下线」其他会话）", "操作审计流（时间/动作/渠道/trace_id/grant 前 12 位——Merkle 审计链用户可读透出）", "异常熔断卡（正常绿态三计数 / 锁定红条剩余分钟 + 邮箱验证码提前解锁）"], flow: "改密 → 红 OTP → 完成；AI 不代办任何密码类操作（规则 6 引导到本页）。", notes: "熔断触发口径：OTP 连错 5/注入拦截 2/grant 篡改 3；锁定期写全拒、GREEN 查询不受影响。" },
+  { route: "/account/risk-assessment", aliases: ["风险测评", "风险评估", "风险承受能力", "PR 等级", "重新评估", "适当性"], section: "account", purpose: "风险承受能力重评估（独立页）：8 题问卷更新 PR1-PR5 等级。", entry: "/account/security「重新评估」", actions: ["8 题单选表单（三语题库）", "提交 → 红级 OTP 强验证 → 更新 PR 等级"], flow: "答题 → 红 OTP → 等级生效（影响理财适当性：只能推荐 ≤ PR 等级的产品）。", notes: "PR 等级与 wealth_product_query 返回的 user_pr_level 同源。" },
+  { route: "/account/transactions", aliases: ["交易记录", "全部交易", "收支记录", "全量流水", "导出交易"], section: "account", purpose: "交易记录：全量收支口径（含消费/转账/理财）的查询与导出。", entry: "/account「最近交易·查看全部」/ /pay「交易记录」", actions: ["结论区（本月收/支/结余大数字 + 环比胶囊 + 分类归因 + 分类环比柱图）", "搜索 + 方向/时间/分类筛选 chips", "流水列表（分类图标、日期分组）", "「导出 CSV」（本地生成）"], flow: "筛选 → 浏览 → 导出；转账纯口径请用 /transfer/history。", notes: "只读；与 /transfer/history 的区别是包含全部收支类型。" },
+  { route: "/notifications", aliases: ["通知", "全部通知", "站内通知", "未读", "已读"], section: "portal", purpose: "全部通知中心：站内通知的未读/已读管理。", entry: "header 铃铛「查看全部通知」/ footer「通知中心」/ /account 宫格", actions: ["未读/已读筛选", "「全部已读」按钮", "通知列表（类型图标：交易/安全/理财/系统/任务；站内 URL 可点击跳转）"], flow: "查收 → 标记已读；红级 OTP 邮件与站内通知同步发送。", notes: "header 下拉为最近 8 条速览，本页为全量。" },
+  { route: "/about", aliases: ["关于", "关于 Suveoo", "公告", "存款利率", "利率表", "免责声明", "disclaimer", "公司介绍"], section: "portal", purpose: "关于 Suveoo：公司简介、官方公告、存款利率表与免责声明。", entry: "footer「关于 Suveoo」/ home 品牌横幅 / 顶栏 SIMULATED 徽标点击", actions: ["渐变 Hero + 4 亮点胶囊（说话就能办业务/三色权限分级/五道确定性验证/全线上模拟银行）", "粘性目录卡（滚动激活态）+ 九章节正文（公司/服务/安全/AI 能力等）", "官方公告手风琴（首条「最新」徽章）", "存款利率表（六档大数字）+ 利率变更时间线", "联系我们双卡（客户支持/安全事务 mailto）", "免责声明 tint 卡（#disclaimer 锚点：模拟银行系统声明全文）"], flow: "目录导航阅读；利率表与 /wealth/deposits 数据同源。", notes: "免登录；Organization JSON-LD 所在页。" },
+  { route: "/help", aliases: ["帮助", "帮助中心", "FAQ", "常见问题", "防诈骗", "反诈", "AI 安全", "怎么用"], section: "portal", purpose: "帮助中心：FAQ、防诈骗指南与 AI 安全说明。", entry: "header 问号按钮 / footer「帮助」", actions: ["FAQ 手风琴四类：账户与登录/转账/理财/AI 与安全（含「什么是三色权限」「为什么确认后修改金额会被拦截」「什么是 Trust Console」）", "#antifraud 防诈骗指南：六条守则 + 常见骗局示例（含「AI 也无法绕过你的确认」）", "AI 安全说明：五道验证器图解（静态 SVG 流程图）", "「联系我们」→ /contact"], flow: "按类查阅；FAQ 28 问与 /ai 的 FAQPage JSON-LD 同源。", notes: "免登录。" },
+  { route: "/contact", aliases: ["联系我们", "联系", "客服", "反馈", "投诉", "留言"], section: "portal", purpose: "联系我们：问题反馈表单与官方邮箱。", entry: "footer「联系我们」/ /help「联系我们」按钮", actions: ["表单（登录态 Email 自动预填；必填星标；字数计数 ≤2000；行内校验；提交三态：默认→发送中→成功面板翻转整卡）", "官方邮箱双卡：客户支持 support@suveoo.com（账户/交易咨询）/ 安全事务 security@suveoo.com（漏洞与隐私事件）mailto 直达", "FAQ 速查行（先看 /help 也许更快）"], flow: "填表 → 提交 → 转发 support 收件箱（1-3 个工作日回复）。", notes: "表单邮件为结构化 HTML 模板（Tuta 等客户端实测可见）。" },
+  { route: "/privacy-policy", aliases: ["隐私政策", "privacy", "个人信息"], section: "legal", purpose: "隐私政策：个人信息处理说明（PIPL 口吻）。", entry: "footer「隐私政策」/ Cookie 弹窗链接", actions: ["目录侧栏（移动端折叠）+ 分节正文 + 最后更新日期", "模拟系统性质声明置顶加粗", "AI 决策与可解释性条款"], flow: "只读法律文档；目录侧栏定位章节，移动端目录折叠为顶部下拉。", notes: "三语随 i18n。" },
+  { route: "/cookie-privacy", aliases: ["Cookie 政策", "cookie", "Cookie Preferences", "GA4"], section: "legal", purpose: "Cookie 政策：必要/分析两类 cookie 说明与 GA4 上报口径。", entry: "footer「Cookie 政策」/ Cookie 弹窗链接 / footer「Cookie Preferences」按钮重开弹窗", actions: ["两类 cookie 明细表（名称/用途/时长）", "Consent Mode v2 说明（analytics_storage 默认 denied，同意后才上报）", "「Cookie Preferences」可随时重开选择弹窗（仅必要/接受全部）"], flow: "首次访问弹 Cookie Preference 模态（必选）；选择写 cookie 12 个月。", notes: "「仅必要」模式下 GA4 不上报 analytics 事件。" },
+  { route: "/terms", aliases: ["服务条款", "条款", "terms"], section: "legal", purpose: "服务条款：服务范围、账户规则与免责声明。", entry: "footer「服务条款」", actions: ["目录侧栏 + 分节正文 + 最后更新日期", "模拟系统性质声明置顶加粗"], flow: "只读法律文档；与隐私政策、Cookie 政策同构同源。", notes: "三语随 i18n。" },
+  { route: "/demo-lab", aliases: ["数据注入", "demo-lab", "演示数据", "注入工作台"], section: "system", purpose: "队员数据注入工作台（隐藏入口）：维度化拟真数据注入与核对。", entry: "无公开入口（noindex；直接输 URL）", actions: ["密码门", "四维选择器（财富三档/薪资形状/职业 90 项/企业四档）", "覆盖/合并/自定义三种模式 + 预检 dry-run + 运行（15-25s）+ 核对面板（不变量校验）"], flow: "选维度 → 预检 → 运行 → 核对。", notes: "仅团队成员使用；noindex 不入 sitemap。" },
+  { route: "/offline", aliases: ["离线", "offline", "无网络"], section: "system", purpose: "PWA 离线兜底页：无网络时导航请求的兜底展示。", entry: "离线时 service worker 自动呈现", actions: ["离线插画 + 「您已离线」提示 + 重试按钮"], flow: "恢复网络后重试或刷新。", notes: "noindex。" },
+  { route: "/404", aliases: ["404", "页面不存在", "找不到页面"], section: "system", purpose: "404 页：任意未知路径的兜底。", entry: "访问不存在的路径自动呈现（HTTP 404）", actions: ["404 插画 + 「页面不存在」文案 + 返回主页按钮"], flow: "点按钮回 /home。", notes: "noindex。" },
+];
+
+/* 16 只基金详情页（同模板，per-slug 具体化；数据与 R2 assets/data/funds/*.json 同源） */
+const SITE_FUND_META = {
+  "global-money-1": ["Suveoo 环球货币基金 1", "R1", "¥0.01"], "global-short-bond": ["Suveoo 环球短债基金", "R1", "¥10"],
+  "esg-bond": ["Suveoo 环球 ESG 债券基金", "R2", "¥100"], "cn-dividend": ["Suveoo 红利低波精选", "R2", "¥100"],
+  "consumer-staples": ["Suveoo 全球必需消费指数", "R2", "¥100"], "quant-neutral": ["Suveoo 量化市场中性", "R2", "¥1,000"],
+  "em-gov-bond": ["Suveoo 环球新兴市场政府债券指数基金", "R3", "¥10"], "global-mixed-1": ["Suveoo 环球多元资产组合 1", "R3", "¥1,000"],
+  "reit-global": ["Suveoo 环球 REITs 指数基金", "R3", "¥100"], "global-mixed-2": ["Suveoo 环球多元资产组合 2", "R4", "¥1,000"],
+  "global-equity-index": ["Suveoo 环球股票指数基金", "R4", "¥100"], "gold-index": ["Suveoo 环球黄金指数基金", "R4", "¥10"],
+  "healthcare-bio": ["Suveoo 全球医疗健康混合", "R4", "¥1,000"], "new-energy": ["Suveoo 新能源产业精选", "R4", "¥1,000"],
+  "apac-tech": ["Suveoo 亚太科技创新混合", "R5", "¥1,000"], "ai-semi": ["Suveoo 全球半导体 AI 精选", "R5", "¥1,000"],
+};
+for (const [slug, [name, risk, min]] of Object.entries(SITE_FUND_META)) {
+  SITE_GUIDE_PAGES.push({
+    route: `/wealth/funds/${slug}`, aliases: [name, slug, `${risk}基金`, "基金详情"], section: "wealth",
+    purpose: `${name}（${risk}，起购 ${min}）基金详情页：实时净值、业绩与风险全貌、申购入口。`,
+    entry: `/wealth/funds 列表点击 / /wealth 精选卡「详情」/ /wealth/my 持仓「详情」`,
+    actions: ["头部：全名+代码+风险 chip+起购+费率；NAV 大数字与日涨跌为实时值（绿点实时/灰闭市徽标+更新时间）", "业绩图：区间切换（6M/1Y/3Y/5Y/成立以来）归一化基准对比双折线（月度模拟数据，当前净值由底层资产实时聚合）", "风险指标网格（年化/波动/夏普/最大回撤/最好最差月）+ 10 年蒙特卡洛扇形图（p10-p90 带+p50 线）", "业绩表（近 1M/3M/6M/1Y/成立以来）", "持仓构成饼图（top10 标的）+ 基金经理卡", "「申购」按钮（红级：邮箱 OTP → 确认卡含风险匹配检查——用户 PR 等级低于产品风险时前端红字警示且服务端 Policy 直接拒绝）", "「这只基金适合我吗」AI chip"],
+    flow: `浏览业绩 → 申购 → 红 OTP → 确认卡（适当性检查）→ 成交计入持仓；AI 通道 wealth_product_purchase（红级）同口径，产品对比先 wealth_product_query。`,
+    notes: "SimNotice banner + 免责声明；历史业绩不代表未来。",
+  });
+}
+
+/* 6 档存款详情页 */
+const SITE_DEPOSIT_META = {
+  demand: ["活期存款", "0.20%", "¥0.01"], "notice-7d": ["7 天通知存款", "0.45%", "¥50,000"],
+  "term-3m": ["3 个月定期", "1.05%", "¥50"], "term-6m": ["6 个月定期", "1.25%", "¥50"],
+  "term-1y": ["1 年定期", "1.45%", "¥50"], "term-3y": ["3 年定期", "1.85%", "¥50"],
+};
+/* 存款起存金额（cents）——deposit_open 前置校验与知识库同源（notice-7d ¥50,000 / 定期 ¥50 / 活期 ¥0.01） */
+const DEPOSIT_MIN_CENTS = { demand: 1n, "notice-7d": 5_000_000n, "term-3m": 5_000n, "term-6m": 5_000n, "term-1y": 5_000n, "term-3y": 5_000n };
+for (const [slug, [name, rate, min]] of Object.entries(SITE_DEPOSIT_META)) {
+  SITE_GUIDE_PAGES.push({
+    route: `/wealth/deposits/${slug}`, aliases: [name, slug, "存款详情", "定期存款"], section: "wealth",
+    purpose: `${name}（年利率 ${rate}，起存 ${min}）存款方案详情：利率条款与利息试算。`,
+    entry: "/wealth/deposits 列表点击",
+    actions: ["利率表与计息方式（定期为单利；提前支取按活期计息）", "支取规则与自动续存说明", "利息试算器（本金 × 期限 → 到期本息，与服务端同一数学模块的客户端镜像）", "「开立定期」按钮（红级：OTP → 确认卡；开立后计入持仓）", "「存哪家更划算」AI chip"],
+    flow: `试算 → 开立 → 红 OTP → 确认卡 → 计入 /wealth/my 持仓；对比六档方案用 /wealth/tools/deposit-compare 或 AI 的 calc_deposit_compare。`,
+    notes: "存款保险说明为模拟条款；SimNotice banner。",
+  });
+}
+SITE_GUIDE_PAGES.push({
+  route: "/wealth/deposits", aliases: ["全部存款", "存款方案", "存款列表", "定期", "活期", "通知存款"], section: "wealth",
+  purpose: "全部存款方案：六档存款（活期/7 天通知/3M/6M/1Y/3Y）对比列表。",
+  entry: "/wealth「查看全部存款方案」",
+  actions: ["六方案卡（利率大数字主视觉 + 起存金额 + 支取规则）", "卡点击进对应详情页", "对比表与 deposit-compare 工具同口径"],
+  flow: "对比 → 进详情试算 → 开立；AI 查存款利率用 deposit_product_query。", notes: "SimNotice banner；利率为模拟定价。",
+});
+
+/* 10 个计算工具子页（同一形态：输入参数即时计算，URL 参数可直达） */
+const SITE_TOOL_META = {
+  "savings-compound": ["复利储蓄计算", "本金+每月追加存 N 年后的本息（复利频率可选）"],
+  "budget-allocator": ["预算分配器", "月收入按 50/30/20 法则分配必要/弹性/储蓄比例"],
+  "credit-payoff": ["信用卡还款测算", "欠款+APR+月还 → 还清时间与总利息；或目标月数反推月还"],
+  "deposit-compare": ["存款方案对比", "一笔钱存六档存款（活期至 3 年定期）的到期收益对比与推荐"],
+  "fx-convert": ["汇率换算", "按实时牌价 CNY↔外币双向换算（JPY 每 100 口径）"],
+  "goal-planner": ["储蓄目标规划", "目标金额+现有储蓄+年限 → 每月需存多少"],
+  "inflation-calculator": ["通胀购买力测算", "今日金额 N 年后的实际购买力"],
+  "loan-compare": ["贷款月供对比", "等额本息 vs 等额本金月供与总利息对比"],
+  retirement: ["退休规划", "当前年龄/退休年龄/月支出 → 退休需攒金额与月储蓄"],
+  "split-bill-plus": ["AA 分账增强", "总额按人分摊+按人调整（某人多付/少付），合计守恒"],
+};
+for (const [slug, [name, desc]] of Object.entries(SITE_TOOL_META)) {
+  SITE_GUIDE_PAGES.push({
+    route: `/wealth/tools/${slug}`, aliases: [name, slug, "计算器"], section: "wealth",
+    purpose: `${name}（免登录）：${desc}。`,
+    entry: "/wealth/tools 工具卡 / URL 参数直达（?amount= 等预填自动计算）",
+    actions: ["参数输入（滑杆/数字框）→ 即时计算结果", "结果与对应 AI calc_* 工具同一数学（AI 报数与页面一致）"],
+    flow: "输参数 → 即时出结果；可分享带参数的深链。", notes: "纯客户端计算，无 API 调用。",
+  });
+}
+
+/** site_guide 查询：带 query 模糊匹配最相关 ≤3 页详情；不带返回全站分区概览 */
+export function siteGuideLookup(query) {
+  const q = String(query ?? "").trim().toLowerCase();
+  if (!q) {
+    const sections = {};
+    for (const p of SITE_GUIDE_PAGES) (sections[p.section] ??= []).push(p);
+    const label = { pay: "收付与转账", wealth: "财富（基金/存款/外汇/工具）", account: "账户与安全", ai: "Suveoo AI", portal: "门户与支持", legal: "法律", system: "系统页" };
+    return {
+      total_pages: SITE_GUIDE_PAGES.length,
+      sections: Object.entries(sections).map(([k, arr]) => ({ section: k, label: label[k] ?? k, pages: arr.map((p) => ({ route: p.route, purpose: p.purpose.split("：")[0].split("（")[0] })) })),
+      note: "全站 74 页已收录。带 query 可查具体页面详情（入口/按钮/流程/确认卡与 OTP 场景/注意事项）。回答中的页面链接只能引用返回的 route（格式「图形化页面：https://suveoo.com{route}」）。这是模拟银行系统。",
+    };
+  }
+  const scored = SITE_GUIDE_PAGES.map((p) => {
+    const hay = [p.route, ...(p.aliases ?? []), p.purpose, ...(Array.isArray(p.actions) ? p.actions : []), p.notes ?? ""].join("\n").toLowerCase();
+    let s = 0;
+    if ((p.aliases ?? []).some((a) => a.toLowerCase() === q)) s += 100;
+    if (hay.includes(q)) s += 40;
+    for (const t of q.split(/[\s,，。？?/、；;·]+/).filter((x) => x.length >= 2)) if (hay.includes(t)) s += 12;
+    /* 中文无空格整句：滑窗 bigram 兜底（"怎么给卡片解冻"→"卡片/解冻"命中卡管理页） */
+    for (let i = 0; i + 2 <= q.length; i++) if (hay.includes(q.slice(i, i + 2))) s += 4;
+    return { p, s };
+  }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 3);
+  return {
+    query,
+    matches: scored.map(({ p, s }) => ({ relevance: s, route: p.route, name: p.aliases?.[0] ?? p.route, purpose: p.purpose, entry: p.entry, actions: p.actions, flow: p.flow, notes: p.notes })),
+    ...(scored.length ? {} : { matches_none: "无匹配页面。可换关键词（如「转账/冻结/订阅/外汇/报告」），或不带 query 取全站概览。" }),
+    note: "回答时如实转述上述内容；链接只引用返回的 route，格式「图形化页面：https://suveoo.com{route}」独占一行置于回答最后。写操作引导用户到页面或确认卡完成，不代为执行。",
+  };
 }
 
 /* ================================================================
@@ -3487,22 +3739,51 @@ export async function consumeLlmSse(res, onText, onThinking) {
   return { content: content.filter(Boolean), stop_reason: stopReason ?? "end_turn" };
 }
 
+/* ---- 可扩展模型档位（第十一期）----
+ * MODEL_PROFILE（wrangler.toml [vars]）命中注册表键 → baseUrl/model/超时/思考提示/key 全由档位决定；
+ * 未设置 → 沿用 LLM_BASE_URL/LLM_MODEL/LLM_API_KEY 直读（与切换架构上线前行为逐字节一致，测试裸 ENV 同此路径）；
+ * 设置了但拼错键名 → 显式报错拒绝起服务侧静默回落（否则 typo 会悄悄继续用旧模型）。
+ * Key 按 provider 分离：glm 档先读 LLM_API_KEY_GLM 再回落 LLM_API_KEY（现有 GLM secret 原地保留，回切零重配）；
+ * qwen 档只读 LLM_API_KEY_QWEN。思考提示 thinking:"adaptive"=收到 thinking_delta 即通知前端（现状），
+ * "off"=不下发思考提示（非思考型模型避免误导文案）。教程见 for_developer/switch_models.md。 */
+export const MODEL_PROFILES = {
+  "glm-5.3-flash": { provider: "glm", baseUrl: "https://open.bigmodel.cn/api/anthropic", model: "glm-5.3-flash", apiKeyEnvs: ["LLM_API_KEY_GLM", "LLM_API_KEY"], timeoutMs: 75_000, thinking: "adaptive" },
+  "glm-5.3-max":   { provider: "glm", baseUrl: "https://open.bigmodel.cn/api/anthropic", model: "glm-5.3-max",   apiKeyEnvs: ["LLM_API_KEY_GLM", "LLM_API_KEY"], timeoutMs: 75_000, thinking: "adaptive" },
+  "qwen3.7-flash": { provider: "qwen", baseUrl: "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic", model: "qwen3.7-flash", apiKeyEnvs: ["LLM_API_KEY_QWEN"], timeoutMs: 75_000, thinking: "adaptive" },
+};
+export function resolveLlmProfile(env) {
+  const name = typeof env.MODEL_PROFILE === "string" ? env.MODEL_PROFILE.trim() : "";
+  if (name) {
+    const p = MODEL_PROFILES[name];
+    if (!p) return { err: `MODEL_PROFILE "${name}" 未注册（可用档位：${Object.keys(MODEL_PROFILES).join(" / ")}）` };
+    let key = null;
+    for (const k of p.apiKeyEnvs) if (typeof env[k] === "string" && env[k]) { key = env[k]; break; }
+    return { name, provider: p.provider, baseUrl: p.baseUrl, model: p.model, timeoutMs: p.timeoutMs, thinking: p.thinking, key };
+  }
+  /* 旧路径：MODEL_PROFILE 未设置时与历史行为逐字节一致 */
+  const base = (env.LLM_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "");
+  return { name: null, provider: env.LLM_PROVIDER ?? null, baseUrl: base, model: env.LLM_MODEL ?? "claude-haiku-4.5", timeoutMs: 75_000, thinking: "adaptive", key: env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY ?? null };
+}
+
 /** 调用 Messages API（Anthropic 兼容）。流式优先：提供 onText 时加 stream:true，边收 content_block_delta
  *  边回调下发（worker 转发、浏览器打字机平滑只是观感层）；工具轮次由 consumeLlmSse 聚合完整 JSON 后才执行。
  *  上游不支持流式（非 SSE 响应/请求被拒）自动回退非流式；流中途 error 且已有部分文本时返回部分结果不重放。 */
 export async function llmMessages(env, messages, tools, onText, onThinking) {
-  const base = (env.LLM_BASE_URL ?? "https://api.anthropic.com").replace(/\/+$/, "");
-  const model = env.LLM_MODEL ?? "claude-haiku-4.5";
-  const key = env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY;
-  if (!key) return { err: "LLM_API_KEY not configured" };
+  const prof = resolveLlmProfile(env);
+  if (prof.err) return { err: prof.err };
+  const base = prof.baseUrl;
+  const model = prof.model;
+  const key = prof.key;
+  if (!key) return { err: prof.name ? `LLM key not configured（档位 ${prof.name} 需要 secret：${MODEL_PROFILES[prof.name].apiKeyEnvs.join(" 或 ")}）` : "LLM_API_KEY not configured" };
   const headers = { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" };
   /* max_tokens 4096：glm-5.3-flash 为思考型（thinking 独立计输出 token），2048 下思考+长回复（对比表/月报）有截断风险 */
   const payload = { model, max_tokens: 4096, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}) };
   /* 请求体观测量：字符数按轮记录（性能轮基线——瘦身前后对比的硬数据） */
   logEvent("info", "ai.llm_payload", { chars: JSON.stringify(payload).length, msgs: messages.length, tools: tools?.length ?? 0 });
   /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中"；
-     glm-5.3-flash 为思考型（thinking 不受参数控制、实测 disabled/budget_tokens 均被忽略），慢轮 20-40s 常态——45s→75s 适配 */
-  const TIMEOUT_MS = 75_000;
+     glm-5.3-flash 为思考型（thinking 不受参数控制、实测 disabled/budget_tokens 均被忽略），慢轮 20-40s 常态——45s→75s 适配；
+     超时按档位参数化（MODEL_PROFILES.timeoutMs），非思考型/快模型档可调低 */
+  const TIMEOUT_MS = prof.timeoutMs;
 
   if (onText) {
     /* 连接层失败（DNS/拒绝/超时）也归一为 {err}：聊天循环按失败轮收场（user 侧落库），而不是异常冒泡丢整轮 */
@@ -3609,8 +3890,9 @@ export async function handleAiChat(request, env, ctx) {
       send({ type: "session", sid });
       try {
         if (!text) { send({ type: "error", code: "EMPTY_INPUT" }); send({ type: "done" }); controller.close(); return; }
-        if (!(env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY)) {
-          send({ type: "error", code: "LLM_NOT_CONFIGURED", message: "尚未配置 LLM_API_KEY（npx wrangler secret put LLM_API_KEY）。Trust Console 与页面功能不受影响。" });
+        const llmProf = resolveLlmProfile(env);
+        if (llmProf.err || !llmProf.key) {
+          send({ type: "error", code: "LLM_NOT_CONFIGURED", message: llmProf.err ?? `尚未配置 LLM key（${llmProf.name ? `档位 ${llmProf.name} 需要 ${MODEL_PROFILES[llmProf.name].apiKeyEnvs.join("/")}` : "npx wrangler secret put LLM_API_KEY"}）。Trust Console 与页面功能不受影响。` });
           send({ type: "done" }); controller.close(); return;
         }
         const hkey = `aihist:${sid}`;
@@ -3633,7 +3915,7 @@ export async function handleAiChat(request, env, ctx) {
         let hadError = false;
         let pendingGrantTools = new Set(); /* 已产出确认卡/OTP 门工具：防模型无视规则 4 重复发起同一笔 */
         for (let round = 0; round < 8; round++) {
-          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }), () => send({ type: "thinking" }));
+          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }), llmProf.thinking === "off" ? null : () => send({ type: "thinking" }));
           if (err) { hadError = true; await flushAiring(); send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
           const content = out.content ?? [];
           const textPart = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
@@ -5326,7 +5608,10 @@ export default {
       return new Response(null, { status, headers: { location } });
     }
     if (url.pathname === "/api/health") return json({ status: "ok", version: VERSION });
-    if (url.pathname === "/api/version") return json({ version: VERSION, provider: env.LLM_PROVIDER ?? null, demo_mode: env.DEMO_MODE ?? null });
+    if (url.pathname === "/api/version") {
+      const lp = resolveLlmProfile(env);
+      return json({ version: VERSION, provider: lp.provider ?? null, model: lp.model ?? null, profile: lp.name ?? null, ...(lp.err ? { profile_error: lp.err } : {}), demo_mode: env.DEMO_MODE ?? null });
+    }
     if (url.pathname.startsWith("/api/auth/")) return handleAuthApi(request, env, url, ctx);
     if (url.pathname === "/api/session") return handleSession(request, env);
     if (url.pathname === "/api/ai/chat") return handleAiChat(request, env, ctx);

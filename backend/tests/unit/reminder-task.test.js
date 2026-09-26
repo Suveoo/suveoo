@@ -67,8 +67,8 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
   it("提示词瘦身达标（≤1600 字符；第二十七轮自 1500 上调：新增领域边界/危机应对/专业语气是银行 AI 必需项，非瘦身回退，并同步精简既有措辞 -51 字符）", () => {
     expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
   });
-  it("工具 desc 总量预算（≤5600 字符；第六期 idle +proposal_list，39→40，当前总量仍远低于上限）", () => {
-    expect(MCP_TOOLS).toHaveLength(40);
+  it("工具 desc 总量预算（≤5600 字符；第十一期 +site_guide/notification_list/transfer_limit_query/bill_list/report_status/subscription_reminder_toggle/deposit_open，40→47）", () => {
+    expect(MCP_TOOLS).toHaveLength(47);
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
     expect(total).toBeLessThanOrEqual(5600);
   });

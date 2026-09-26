@@ -17,6 +17,8 @@ S.genuiCards = {
     card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
     card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
     subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: "genui.merchant",  fee: false },
+    subscription_reminder_toggle: { title: "genui.confirmSubReminder", icon: "clock", field: "genui.merchant", fee: false },
+    deposit_open:        { title: "genui.confirmDeposit",  icon: "bank",     field: "genui.product",   fee: false },
     task_cancel:         { title: "genui.confirmTaskCancel", icon: "clock",  field: null,             fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
@@ -39,6 +41,8 @@ S.genuiCards = {
       if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
       else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze") subject = p.card_id ?? null;
       else if (c.action === "subscription_cancel") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
+      else if (c.action === "subscription_reminder_toggle") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
+      else if (c.action === "deposit_open") subject = p.product_display ?? p.product_id ?? null;
       else if (c.action === "task_cancel") subject = p.task_title ?? ("#" + (p.task_id ?? "—"));
       else if (c.action === "fx_exchange") subject = null;
       else if (isBd) subject = p.item ?? p.title ?? null;
@@ -66,6 +70,9 @@ S.genuiCards = {
         ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
         ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : p.repeat === "yearly" ? S.t("sch.yearly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
+        ...(c.action === "subscription_reminder_toggle" ? [
+          [S.t("genui.reminderState"), p.enabled ? S.t("genui.stateOn") : S.t("genui.stateOff")],
+        ] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
         ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],

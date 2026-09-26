@@ -15,9 +15,12 @@ S.router.register("ai-benchmark", async () => {
   const d = await S.api.json("/assets/data/benchmark.json");
   if (!d) { c.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
   document.getElementById("gen-at").textContent = d.generated_at;
-  /* 当前生产模型徽标（数据源 production 字段——与消融三组历史对照区分，不编造 GLM 裸模型数字） */
-  if (d.production) document.getElementById("gen-at").insertAdjacentHTML("beforebegin",
-    `<span class="prod-badge">${S.fmt.escape(d.production.model)}<span class="muted" style="font-weight:400">· ${S.fmt.escape(d.production.since)} 接入</span></span>`);
+  /* 当前生产模型徽标：以 /api/version 实时为准（第十一期模型档位切换后静态 benchmark.json 的 production 字段会滞后）；
+     历史接入日期仍取 production.since；version 拉取失败回落静态字段（随机参数防 HTTP 启发式缓存） */
+  const v = await S.api.json(`/api/version?r=${Date.now()}`);
+  const liveModel = v?.model ?? d.production?.model ?? null;
+  if (liveModel) document.getElementById("gen-at").insertAdjacentHTML("beforebegin",
+    `<span class="prod-badge">${S.fmt.escape(liveModel)}<span class="muted" style="font-weight:400"> · ${S.fmt.escape(S.t("bench.prodNow"))}${d.production?.since ? `（${S.fmt.escape(d.production.since)} 接入）` : ""}</span></span>`);
   c.querySelectorAll(".card")[0].innerHTML = `<div class="table-wrap"><table class="table"><thead><tr>
     <th>${S.fmt.escape(S.t("bench.metric"))}</th><th>${S.fmt.escape(S.t("bench.baseline"))}</th><th>${S.fmt.escape(S.t("bench.ours"))}</th></tr></thead><tbody>
     ${d.metrics.map((m) => `<tr><td>${S.fmt.escape(m.name)}</td>

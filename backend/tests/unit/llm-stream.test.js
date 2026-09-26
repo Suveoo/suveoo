@@ -130,3 +130,49 @@ describe("⑥-3 llmMessages 真流式", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).stream).toBeUndefined();
   });
 });
+
+/* 第十一期：MODEL_PROFILES 档位切换——resolveLlmProfile 五条路径 + llmMessages 按档位取 base/model */
+describe("⑥-4 模型档位（MODEL_PROFILE）", () => {
+  it("MODEL_PROFILE 未设置 → 旧路径逐字节等价（直读 LLM_* env、75s 超时）", async () => {
+    const { resolveLlmProfile } = await import("../../worker-main.js");
+    const p = resolveLlmProfile({ LLM_PROVIDER: "glm", LLM_BASE_URL: "https://open.bigmodel.cn/api/anthropic/", LLM_MODEL: "glm-5.3-flash", LLM_API_KEY: "K" });
+    expect(p).toEqual({ name: null, provider: "glm", baseUrl: "https://open.bigmodel.cn/api/anthropic", model: "glm-5.3-flash", timeoutMs: 75_000, thinking: "adaptive", key: "K" });
+  });
+
+  it("档位命中：glm 档 key 优先 LLM_API_KEY_GLM、缺省回落 LLM_API_KEY（回切零重配）", async () => {
+    const { resolveLlmProfile } = await import("../../worker-main.js");
+    expect(resolveLlmProfile({ MODEL_PROFILE: "glm-5.3-flash", LLM_API_KEY: "OLD", LLM_API_KEY_GLM: "NEW" })).toMatchObject({ provider: "glm", model: "glm-5.3-flash", key: "NEW" });
+    expect(resolveLlmProfile({ MODEL_PROFILE: "glm-5.3-max", LLM_API_KEY: "OLD" })).toMatchObject({ provider: "glm", model: "glm-5.3-max", key: "OLD" });
+  });
+
+  it("qwen 档：独立端点与 secret 名；key 缺失返回 null（不回落 GLM key）", async () => {
+    const { resolveLlmProfile } = await import("../../worker-main.js");
+    expect(resolveLlmProfile({ MODEL_PROFILE: "qwen3.7-flash", LLM_API_KEY_QWEN: "Q", LLM_API_KEY: "G" })).toMatchObject({ provider: "qwen", baseUrl: "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic", model: "qwen3.7-flash", key: "Q" });
+    expect(resolveLlmProfile({ MODEL_PROFILE: "qwen3.7-flash", LLM_API_KEY: "G" }).key).toBeNull();
+  });
+
+  it("档位键拼错 → 显式 err（防静默回落旧模型）", async () => {
+    const { resolveLlmProfile } = await import("../../worker-main.js");
+    const p = resolveLlmProfile({ MODEL_PROFILE: "qwen3.7-flsh", LLM_API_KEY: "K" });
+    expect(p.err).toContain("未注册");
+  });
+
+  it("llmMessages 按档位起请求（URL/model 来自 profile 而非 LLM_* vars）", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ content: [{ type: "text", text: "ok" }], stop_reason: "end_turn" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const env = { MODEL_PROFILE: "qwen3.7-flash", LLM_API_KEY_QWEN: "Q", LLM_PROVIDER: "glm", LLM_BASE_URL: "https://legacy.example", LLM_MODEL: "glm-5.3-flash" };
+    await llmMessages(env, [{ role: "user", content: "hi" }], []);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic/v1/messages");
+    expect(JSON.parse(init.body).model).toBe("qwen3.7-flash");
+    expect(init.headers["x-api-key"]).toBe("Q");
+  });
+
+  it("档位 secret 未注入 → llmMessages 返回 err（含 secret 名提示），不起请求", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { err } = await llmMessages({ MODEL_PROFILE: "qwen3.7-flash" }, [{ role: "user", content: "hi" }], []);
+    expect(err).toContain("LLM_API_KEY_QWEN");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
