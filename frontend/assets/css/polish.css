@@ -77,6 +77,10 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
   backdrop-filter: blur(10px) saturate(1.15);
   -webkit-backdrop-filter: blur(10px) saturate(1.15);
 }
+/* 第二十一轮（队长）：桌面端顶栏高度减至 64px 的 ~72%（46px）；logo 见 §26（24px）；手机 56px 不变 */
+@media (min-width: 768px) {
+  .app-header { height: 46px; }
+}
 
 /* ===== 5. 表格与横向溢出：显式包裹层滚动（不依赖 :has；:has 仅作兜底） ===== */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -431,8 +435,8 @@ body.tc-open { overflow: hidden; }
   .hscroll { margin: 0 -16px; padding: 0 16px var(--sp-2); }
 }
 
-/* ===== 26. Header logo 适度放大（全端；移动端尤甚） ===== */
-.app-header .logo-link img { height: 31px; transition: height .2s ease; }
+/* ===== 26. Header logo（第二十一轮：桌面 31→24px 随顶栏缩高 46px；手机 56px 顶栏维持 26/24） ===== */
+.app-header .logo-link img { height: 24px; transition: height .2s ease; }
 @media (max-width: 767px) { .app-header .logo-link img { height: 26px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 24px; } }
 
