@@ -10,7 +10,7 @@ S.chrome = {
   SUB_STATIC: {
     home: [["/notifications", "bell", "nav.notifications"], ["/about", "doc", "about.title"], ["/help", "help", "help.title"], ["/contact", "doc", "footer.contact"]],
     pay: [["/transfer/intrabank", "bank", "pay.intrabank"], ["/transfer/intrabank-scheduled", "clock", "pay.scheduled"], ["/transfer/history", "list", "pay.history"], ["/account/transactions", "list", "pay.txHistory"], ["/transfer/payees", "account", "payees.title"], ["/transfer/limits", "lock", "pay.limits"], ["/pay/bills", "doc", "pay.billsEntry"], ["/pay/subscriptions", "star", "subs.title"]],
-    wealth: [["/wealth/my", "chart", "wealth.my"], ["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
+    wealth: [["/wealth/my", "chart", "wealth.my"], ["/wealth/goals", "star", "wealth.goals"], ["/wealth/funds", "wealth", "wealth.funds"], ["/wealth/deposits", "doc", "wealth.deposits"], ["/wealth/fx", "exchange", "wealth.allFx"], ["/wealth/tools", "calc", "tc.navTitle"]],
   },
   active() {
     const p = location.pathname;
@@ -366,6 +366,8 @@ S.pp = {
       case "bill_autopay": return S.t("prop.rBillT", q.billName ?? "");
       case "credit_debt": return S.t("prop.rDebtT");
       case "idle_cash": return S.t("prop.rIdleT");
+      case "goal_offtrack": return S.t("prop.rOfftrackT");
+      case "goal_payday": return S.t("prop.rPaydayT", q.day ?? "", q.amount ?? "0", q.name ?? "");
       default: return "";
     }
   },

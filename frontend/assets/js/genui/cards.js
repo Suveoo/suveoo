@@ -20,6 +20,11 @@ S.genuiCards = {
     subscription_reminder_toggle: { title: "genui.confirmSubReminder", icon: "clock", field: "genui.merchant", fee: false },
     deposit_open:        { title: "genui.confirmDeposit",  icon: "bank",     field: "genui.product",   fee: false },
     task_cancel:         { title: "genui.confirmTaskCancel", icon: "clock",  field: null,             fee: false },
+    /* 第二十二期：目标系确认卡（存入/调整/放弃；月度自动存入走 scheduled_task_create 分型） */
+    goal_create:         { title: "genui.confirmGoalCreate", icon: "star",   field: "genui.goalName", fee: false },
+    goal_contribute:     { title: "genui.confirmGoalContribute", icon: "wealth", field: "genui.goalName", fee: false },
+    goal_adjust:         { title: "genui.confirmGoalAdjust", icon: "gear",   field: "genui.goalName", fee: false },
+    goal_abandon:        { title: "genui.confirmGoalAbandon", icon: "lock",  field: "genui.goalName", fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
@@ -28,12 +33,13 @@ S.genuiCards = {
        display/memo/execute_at 等非授权字段一律以服务端展开的外层为准 */
     const p = { ...(c.snapshot?.params ?? {}), ...(c.params ?? {}) };
     const meta = c.action == null ? this.confirmMeta.transfer_execute : (this.confirmMeta[c.action] ?? this.confirmMeta.generic);
-    /* 修复 5：长程任务确认卡按 task_type 分型——birthday/reminder 不再套"预约转账确认"（前缀兼容口径同后端） */
+    /* 修复 5：长程任务确认卡按 task_type 分型——birthday/reminder/goal_contribution 不再套"预约转账确认"（前缀兼容口径同后端） */
     const tt = c.action === "scheduled_task_create" ? String(p.task_type ?? "") : "";
     const isBd = tt.startsWith("birthday_flower");
     const isRem = tt === "reminder";
-    const titleKey = isBd ? "genui.confirmBirthday" : isRem ? "genui.confirmReminder" : meta.title;
-    const fieldKey = isBd ? "genui.taskItem" : isRem ? "genui.remindItem" : meta.field;
+    const isGoalTask = tt === "goal_contribution";
+    const titleKey = isBd ? "genui.confirmBirthday" : isRem ? "genui.confirmReminder" : isGoalTask ? "genui.confirmGoalTask" : meta.title;
+    const fieldKey = isBd ? "genui.taskItem" : isRem ? "genui.remindItem" : isGoalTask ? "genui.goalName" : meta.field;
     /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号；
        birthday 收预订内容（缺 item 回落任务标题）、reminder 收任务标题 */
     let subject = c.subject ?? null;
@@ -47,6 +53,9 @@ S.genuiCards = {
       else if (c.action === "fx_exchange") subject = null;
       else if (isBd) subject = p.item ?? p.title ?? null;
       else if (isRem) subject = p.title ?? null;
+      else if (isGoalTask) subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
+      else if (c.action === "goal_create") subject = p.name ?? null;
+      else if (c.action === "goal_contribute" || c.action === "goal_adjust" || c.action === "goal_abandon") subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
       else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
     }
     const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
@@ -73,6 +82,16 @@ S.genuiCards = {
         ...(c.action === "subscription_reminder_toggle" ? [
           [S.t("genui.reminderState"), p.enabled ? S.t("genui.stateOn") : S.t("genui.stateOff")],
         ] : []),
+        ...(c.action === "goal_create" && p.monthly_plan != null ? [
+          [S.t("genui.goalMonthly"), "¥" + S.fmt.moneyPlain(p.monthly_plan)],
+          [S.t("genui.deadline"), S.fmt.escape(String(p.deadline ?? "—"))],
+        ] : []),
+        ...((c.action === "goal_contribute" || c.action === "goal_adjust" || c.action === "goal_abandon") && p.goal_progress != null ? [
+          [S.t("genui.goalProgress"), S.fmt.escape(String(p.goal_progress))],
+        ] : []),
+        ...(c.action === "goal_adjust" && p.monthly_plan != null ? [
+          [S.t("genui.goalMonthlyNew"), "¥" + S.fmt.moneyPlain(p.monthly_plan)],
+        ] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
         ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
@@ -80,6 +99,9 @@ S.genuiCards = {
       ${isBd && amtText ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.lockNote", S.fmt.moneyPlain(rawAmt)))}</p>` : ""}
       ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
       ${c.action === "task_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.taskCancelNote"))}</p>` : ""}
+      ${c.action === "goal_contribute" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.goalNote"))}</p>` : ""}
+      ${c.action === "goal_abandon" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.goalAbandonNote"))}</p>` : ""}
+      ${isGoalTask ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.goalTaskNote"))}</p>` : ""}
       <div class="gc-grant">grant ${String(c.grant_hash ?? "").slice(0, 12)}…</div>
     </div>`;
   },

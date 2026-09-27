@@ -25,8 +25,7 @@ S.router.register("wealth", async () => {
   /* 持仓 */
   const h = await S.api.get("/api/wealth/holdings");
   if (h.ok && (h.data.holdings ?? []).length) setAsk(S.t("wealth.askHold"));
-  const hc = c.querySelector(".card");
-  if (h.ok) {
+  const hc = c.querySelector(".card");  if (h.ok) {
     const list = h.data.holdings ?? [];
     const total = list.reduce((a, x) => a + Number(x.value ?? x.amount ?? 0), 0);
     /* 持仓折叠（第四十二轮）：>3 项先收 3 行 + 展开钮——多持仓用户不必长滚才见产品区；
@@ -45,6 +44,30 @@ S.router.register("wealth", async () => {
       if (ex) ex.onclick = () => renderHoldings(!expanded);
     };
     renderHoldings(false);
+  }
+  /* 目标陪伴入口（第二十二期）：ACTIVE 目标迷你进度条汇总卡；无目标出引导行 */
+  {
+    const gr = await S.api.get("/api/goals").catch(() => null);
+    if (gr?.ok) {
+      const act = (gr.data.goals ?? []).filter((g) => g.status === "ACTIVE");
+      const el = document.createElement("div");
+      el.className = "section-title";
+      el.style.marginTop = "18px";
+      el.innerHTML = `<h2>${S.fmt.escape(S.t("wealth.goals"))}</h2><a class="more" href="/wealth/goals">${S.fmt.escape(S.t("goals.viewAll"))} →</a>`;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.marginTop = "10px";
+      card.innerHTML = act.length ? act.slice(0, 3).map((g) => `
+        <div class="list-row"><div class="grow" style="min-width:0">
+          <b>${S.fmt.escape(g.name)}</b> ${g.on_track ? S.ui.badge(S.t("goals.onTrack"), "badge-green") : S.ui.badge(S.t("goals.offTrack"), "badge-yellow")}
+          <div class="gl-mini-bar"><i style="width:${Math.min(100, Number(g.pct ?? 0)).toFixed(1)}%"></i></div>
+        </div>
+        <div style="text-align:right"><span class="mono small">¥${S.fmt.moneyPlain(g.saved)} / ¥${S.fmt.moneyPlain(g.target)}</span>
+        <div class="muted small">${Math.round(Number(g.pct ?? 0))}%</div></div></div>`).join("")
+        : `<div class="row between"><span class="muted small">${S.fmt.escape(S.t("goals.emptyTitle"))} · ${S.fmt.escape(S.t("goals.emptyTip"))}</span></div>`;
+      hc.insertAdjacentElement("afterend", card);
+      hc.insertAdjacentElement("afterend", el);
+    }
   }
   /* 基金 / 存款 / 外汇（设计语言现代化：品类插画 + 大数字主视觉，字段零删减）
      第九期 NAV 实时化：热门条 NAV 叠加实时值（实时/闭市徽标随行） */

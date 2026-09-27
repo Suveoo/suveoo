@@ -38,6 +38,8 @@ S.router.register("ai-proposals", async ({ user }) => {
       case "bill_autopay": return [S.t("prop.rBillT", q.billName ?? ""), S.t("prop.rBillB", q.amount ?? "0", q.dueDay ?? "")];
       case "credit_debt": return [S.t("prop.rDebtT"), S.t("prop.rDebtB", q.debt ?? "0")];
       case "idle_cash": return [S.t("prop.rIdleT"), S.t("prop.rIdleB", q.balance ?? "0", q.suggest ?? "0")];
+      case "goal_offtrack": return [S.t("prop.rOfftrackT", q.name ?? ""), S.t("prop.rOfftrackB", q.name ?? "", q.saved ?? "0", q.target ?? "0", q.pct ?? "0", q.catchup ?? "0")];
+      case "goal_payday": return [S.t("prop.rPaydayT"), S.t("prop.rPaydayB", q.day ?? "", q.amount ?? "0", q.name ?? "")];
       default: return [q.summary ?? p.rule, ""];
     }
   };
@@ -49,6 +51,8 @@ S.router.register("ai-proposals", async ({ user }) => {
       case "bill_autopay": return S.t("prop.dBill");
       case "credit_debt": return S.t("prop.dDebt");
       case "idle_cash": return S.t("prop.dIdle", q.suggest ?? "0");
+      case "goal_offtrack": return S.t("prop.dOfftrack");
+      case "goal_payday": return S.t("prop.dPayday");
       default: return S.t("prop.needVerify");
     }
   };

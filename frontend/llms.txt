@@ -13,7 +13,7 @@
 - /ai/benchmark：SuveooBench 评测看板
 - /pay：收付总览；/pay/bills 账单；/pay/subscriptions 订阅管理
 - /transfer/intrabank 行内转账；/transfer/intrabank-scheduled 预约转账；/transfer/history 转账记录；/transfer/payees 收款人；/transfer/limits 转账限额
-- /wealth：财富总览；/wealth/funds 精选基金（16 只，净值由底层资产实时聚合）；/wealth/deposits 存款方案（6 档）；/wealth/fx 外汇牌价；/wealth/my 我的持仓
+- /wealth：财富总览；/wealth/funds 精选基金（16 只，净值由底层资产实时聚合）；/wealth/deposits 存款方案（6 档）；/wealth/fx 外汇牌价；/wealth/my 我的持仓；/wealth/goals 攒钱目标（AI Savings Coach：进度环/月存计划/月度自动存入，达成或放弃解锁退回）
 - /wealth/tools：金融计算工具（复利/退休/预算/贷款对比等 10 款）
 - /account：账户中心；/account/transactions 交易记录；/account/cards 我的卡片；/account/security 安全中心；/account/downloads 月度报告
 - /about 关于 Suveoo（架构与验证运行时详述）；/help 帮助中心（含 FAQ）；/contact 联系我们

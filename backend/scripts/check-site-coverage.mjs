@@ -1,7 +1,7 @@
 /* 第十一期 site_guide 覆盖度自检（node 直跑，不进 vitest——workerd 池无宿主文件系统）：
  *   node scripts/check-site-coverage.mjs
  * 知识路由集 vs 前端真实页面路由集（frontend 各目录 index.html + 根 + 404，动态卡路由折叠为模板）
- * 双向差集为 0 且总数 74 才算知识注入完成；退出码非 0 = 覆盖不全。 */
+ * 双向差集为 0 且总数 75 才算知识注入完成；退出码非 0 = 覆盖不全。 */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -34,8 +34,8 @@ const extra = [...kb].filter((r) => !routes.has(r));
 console.log(`前端页面路由: ${routes.size} | 知识库路由: ${SITE_GUIDE_PAGES.length}`);
 if (missing.length) console.log("MISSING（前端有、知识库无）:", missing);
 if (extra.length) console.log("EXTRA（知识库有、前端无）:", extra);
-if (routes.size !== 74 || missing.length || extra.length || kb.size !== 74) {
-  console.error("覆盖度不达标（须 74/74、差集为 0）");
+if (routes.size !== 75 || missing.length || extra.length || kb.size !== 75) {
+  console.error("覆盖度不达标（须 75/75、差集为 0）");
   process.exit(1);
 }
-console.log("覆盖度 74/74，双向差集为 0 ✓");
+console.log("覆盖度 75/75，双向差集为 0 ✓");

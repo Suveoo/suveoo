@@ -507,3 +507,40 @@
   .pp-nums .num-xl .n { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .pp-hero { animation: none; } }
+
+/* ===== P41 /wealth/goals 攒钱目标（第二十二期：目标陪伴）——进度环主视觉，克制版工具页 ===== */
+.gl-sub { margin: -6px 0 16px; }
+.gl-new-card { padding: 14px 16px; }
+.gl-form { display: none; }
+.gl-form.open { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 12px; }
+.gl-form .field { flex: 1 1 150px; margin: 0; }
+.gl-form .field .input { font-size: 16px; } /* iOS 聚焦放大根治：输入一律 ≥16px */
+.gl-card { padding: 16px; margin-top: 14px; }
+.gl-card.ended { opacity: .72; }
+.gl-head { display: flex; gap: 16px; align-items: center; }
+.gl-info { min-width: 0; flex: 1; }
+.gl-name { font-size: 16px; }
+.gl-nums { margin: 2px 0; }
+.gl-saved { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.gl-saved + .muted { font-size: 13px; margin-left: 6px; }
+.gl-task-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 3px 10px; border-radius: 24px; background: var(--c-teal-tint); color: var(--c-teal-deep); font-size: 12px; white-space: nowrap; }
+.gl-ring { width: 96px; height: 96px; flex: none; transform: rotate(-90deg); }
+.gl-ring .tr { fill: none; stroke: var(--color-primary-tint); stroke-width: 10; }
+.gl-ring .pr { fill: none; stroke: var(--color-primary); stroke-width: 10; stroke-linecap: round; transition: stroke-dasharray .8s ease; }
+.gl-ring.done .pr { stroke: var(--color-green); }
+.gl-ring text { transform: rotate(90deg); transform-origin: 50px 50px; text-anchor: middle; }
+.gl-ring text .n { font-size: 24px; font-weight: 700; fill: var(--color-ink); font-variant-numeric: tabular-nums; }
+.gl-ring text .u { font-size: 11px; fill: var(--color-ink-2); }
+.gl-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.gl-inline { margin-top: 10px; }
+.gl-note { margin-top: 14px; }
+.gl-empty-tip { text-align: center; }
+@media (prefers-reduced-motion: reduce) { .gl-ring .pr { transition: none; } }
+@media (max-width: 600px) {
+  .gl-head { gap: 12px; }
+  .gl-ring { width: 84px; height: 84px; }
+  .gl-ring text .n { font-size: 20px; }
+  .gl-saved { font-size: 19px; }
+}
+.gl-mini-bar { height: 6px; border-radius: 6px; background: var(--color-primary-tint); margin-top: 6px; overflow: hidden; }
+.gl-mini-bar i { display: block; height: 100%; background: var(--color-primary); border-radius: 6px; }

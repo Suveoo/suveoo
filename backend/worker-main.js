@@ -313,6 +313,13 @@ export const TOOL_REGISTRY = {
   subscription_reminder_toggle: { tier: RISK.YELLOW },
   deposit_open:           { tier: RISK.RED, amountArg: "amount" },
   ecommerce_order_mock:   { tier: RISK.RED, amountArg: "amount" },
+  /* 第二十二期：目标陪伴（AI Savings Coach）——query 只读；create/adjust/abandon 状态变更不动钱；
+     contribute 金额工具三件套 + dynamic（日累计>¥1000 升红，todayOutCents 已计入当日 goal_events） */
+  goal_query:             { tier: RISK.GREEN },
+  goal_create:            { tier: RISK.YELLOW },
+  goal_adjust:            { tier: RISK.YELLOW },
+  goal_contribute:        { tier: RISK.YELLOW, amountArg: "amount", dynamic: true },
+  goal_abandon:           { tier: RISK.YELLOW },
 };
 /* 提醒类长程任务不涉及资金（到期仅站内通知），金额可缺省；预约转账/订花等其余 amountArg 工具仍须正金额。
  * task_type 缺省按 scheduled_transfer 语义处理（与 preValidate/归一逻辑同口径），须显式 "reminder" 才豁免。 */
@@ -349,7 +356,7 @@ export function classifyRisk(toolName, args = {}, ctx = {}) {
   }
   return { tier, reasons };
 }
-const AI_CAP_TOOLS = new Set(["transfer_execute", "fx_exchange", "scheduled_task_create"]);
+const AI_CAP_TOOLS = new Set(["transfer_execute", "fx_exchange", "scheduled_task_create", "goal_contribute"]);
 export function hardPolicyDenials(toolName, args = {}, ctx = {}) {
   const denials = [];
   const reg = TOOL_REGISTRY[toolName];
@@ -402,6 +409,10 @@ export const TOOL_SCHEMA = {
   subscription_reminder_toggle: { authFields: ["subscription_id", "enabled"], preconditions: ["subscription.status == ACTIVE"], compensation: [] },
   deposit_open:           { authFields: ["product_id", "amount"], preconditions: [], compensation: [] },
   ecommerce_order_mock:   { authFields: ["item", "amount"], preconditions: ["locked_funds >= amount"], compensation: ["cancel_order"] },
+  goal_create:            { authFields: ["name", "target_amount", "deadline"], preconditions: [], compensation: [] },
+  goal_adjust:            { authFields: ["goal_id"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
+  goal_contribute:        { authFields: ["goal_id", "amount"], preconditions: ["balance >= amount", "goal.status == ACTIVE"], compensation: [] },
+  goal_abandon:           { authFields: ["goal_id"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
 };
 export function compileToIR(toolName, args = {}, ctx = {}) {
   const now = ctx.now ?? Date.now();
@@ -494,6 +505,7 @@ export function checkInvariants(ir, ctx = {}) {
   switch (ir.intent) {
     case "transfer_execute":
     case "funds_lock":
+    case "goal_contribute":
       if (ctx.ledgerBalanceCents != null) {
         const cents = toCents(params.amount ?? "0");
         if (cents > ctx.ledgerBalanceCents) violations.push({ code: "INVARIANT_BALANCE", detail: `amount=${centsToStr(cents)} > balance=${centsToStr(ctx.ledgerBalanceCents)}` });
@@ -708,6 +720,34 @@ function taskCompensatedMail({ title, amount, reason }) {
   const text = `生日预订履约失败，已自动执行补偿。\n\n任务：${title}\n锁定金额：¥${amount} 已全额解锁退回（余额未受影响）\n原因：${reason}\n\n可重新建立任务或联系支持。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">生日预订失败已自动补偿</h2><p>任务：${escHtml(title)}</p><p>锁定金额：<b>¥${escHtml(amount)}</b> 已全额解锁退回（余额未受影响）</p><p>原因：${escHtml(reason)}</p><p>可重新建立任务或联系支持。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】生日预订失败已补偿，解锁 ¥${amount}`, text, html };
+}
+/* ===== 目标陪伴触点邮件（第二十二期：建目标/里程碑/达成/放弃——金额与进度全系统侧给出） ===== */
+function goalCreatedMail({ name, target, deadline, monthly, months }) {
+  const text = `攒钱目标已建立。\n\n目标：${name} · 攒到 ¥${target}\n截止：${deadline}（约 ${months} 个月）\n建议每月存：¥${monthly}\n\n存入即锁定进目标桶（可用余额减少、进度增加），达成或放弃时解锁退回；不产生利息。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">攒钱目标已建立 🎯</h2><p>目标：<b>${escHtml(name)}</b> · 攒到 <b>¥${escHtml(target)}</b></p><p>截止：${escHtml(deadline)}（约 ${escHtml(String(months))} 个月）</p><p>建议每月存：<b>¥${escHtml(monthly)}</b></p><p style="color:#666">存入即锁定进目标桶（可用余额减少、进度增加），达成或放弃时解锁退回；不产生利息。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】目标已建立：${name}（¥${target}）`, text, html };
+}
+function goalMilestoneMail({ name, pct, saved, target, auto }) {
+  const text = `目标里程碑达成 ${pct}%。\n\n目标：${name}\n已存：¥${saved} / ¥${target}（${pct}%）${auto ? "\n本笔来自月度自动存入。" : ""}\n继续加油，达成后资金将解锁回可用余额。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标进度 ${escHtml(String(pct))}% 🎉</h2><p>目标：<b>${escHtml(name)}</b></p><p>已存：<b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}（${escHtml(String(pct))}%）</p>${auto ? "<p>本笔来自月度自动存入。</p>" : ""}<p>继续加油，达成后资金将解锁回可用余额。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】「${name}」进度 ${pct}%`, text, html };
+}
+function goalAchievedMail({ name, target, saved }) {
+  const text = `恭喜，攒钱目标已达成！\n\n目标：${name}\n累计存入：¥${saved} / 目标 ¥${target}\n全部锁定资金已解锁退回可用余额，可随时支取使用（模拟银行不计利息）。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标达成，为你鼓掌 🏆</h2><p>目标：<b>${escHtml(name)}</b></p><p>累计存入：<b>¥${escHtml(saved)}</b> / 目标 ¥${escHtml(target)}</p><p>全部锁定资金<b>已解锁退回可用余额</b>，可随时支取使用（模拟银行不计利息）。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】目标达成：${name}（¥${target}）`, text, html };
+}
+function goalAbandonedMail({ name, saved }) {
+  const text = `攒钱目标已放弃。\n\n目标：${name}\n已存入的 ¥${saved} 已全额解锁退回可用余额。\n\n随时可以在目标页或让 Suveoo AI 重新建立一个。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">攒钱目标已放弃</h2><p>目标：${escHtml(name)}</p><p>已存入的 <b>¥${escHtml(saved)}</b> 已全额解锁退回可用余额。</p><p>随时可以在<a href="https://suveoo.com/wealth/goals">目标页</a>或让 Suveoo AI 重新建立一个。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】目标已放弃：${name}（解锁 ¥${saved}）`, text, html };
+}
+/* 长程任务取消邮件（遗留②补齐：REST 直调与 AI 通道同口径；生日类含补偿说明） */
+function taskCancelledMail({ title, compensated, unlocked }) {
+  const comp = compensated ? `\n已执行补偿：解锁 ¥${unlocked} 退回可用余额。` : "\n本任务无资金动作。";
+  const text = `长程任务已取消。\n\n任务：${title}${comp}\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">长程任务已取消</h2><p>任务：${escHtml(title)}</p>${compensated ? `<p>已执行补偿：解锁 <b>¥${escHtml(unlocked)}</b> 退回可用余额。</p>` : "<p>本任务无资金动作。</p>"}<p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】任务已取消：${title}`, text, html };
 }
 
 /* ===== 收款方真实性校验（单一真相源）：格式 → 存在性 → 户名匹配。转账/收款人三处接入同此。 ===== */
@@ -1299,6 +1339,22 @@ function tgActionLines(ir, ex) {
       title = "↩️ 长程任务已取消";
       facts = ["任务 " + escHtml(p.task_title ?? ("#" + String(p.task_id ?? "—"))), ex?.compensated ? "补偿 C1 ✓ 已解锁锁定资金" : "无资金动作"];
       break;
+    case "goal_create":
+      title = "🎯 攒钱目标已建立";
+      facts = ["目标 " + escHtml(p.name ?? "—"), "攒到 <b>¥" + escHtml(p.target_amount ?? "—") + "</b> · 截止 " + escHtml(p.deadline ?? "—"), "月计划 ¥" + escHtml(ex?.monthly ?? "—")];
+      break;
+    case "goal_contribute":
+      title = "🐷 目标存入已执行";
+      facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "目标 " + escHtml(p.goal_name ?? p.goal_id), "进度 " + escHtml(String(ex?.pct ?? "—")) + "%" + (ex?.achieved ? " · 🏆 已达成并解锁" : "")];
+      break;
+    case "goal_adjust":
+      title = "🎚 攒钱目标已调整";
+      facts = ["目标 " + escHtml(p.goal_name ?? p.goal_id), "新目标 ¥" + escHtml(p.target_amount ?? "—") + " · 截止 " + escHtml(p.deadline ?? "—"), "月计划 ¥" + escHtml(ex?.monthly ?? "—")];
+      break;
+    case "goal_abandon":
+      title = "↩️ 攒钱目标已放弃";
+      facts = ["目标 " + escHtml(p.goal_name ?? p.goal_id), "解锁退回 <b>¥" + escHtml(ex?.unlocked ?? "—") + "</b> 至可用余额"];
+      break;
     case "ecommerce_order_mock": title = "🛍 演示商户订单已执行"; facts = ["商品 " + escHtml(p.item ?? "—"), "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
     default: facts = ["intent <code>" + escHtml(ir.intent) + "</code>"];
   }
@@ -1564,6 +1620,40 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     try { cents = toCents(String(args.amount ?? "0")); } catch { cents = null; }
     if (cents == null || cents < minCents) return { ...reject("INVALID_AMOUNT"), message: `该存款起存金额为 ¥${centsToStr(minCents)}，收到 ${args.amount}。` };
   }
+  /* 第二十二期：目标陪伴前置校验——目标存在性/ACTIVE 在出卡前拦（BIZ_REJECT message 供模型自纠） */
+  if (intent === "goal_create") {
+    const name = String(args.name ?? "").trim();
+    if (!name || name.length > 40) return { ...reject("GOAL_INVALID_NAME"), message: "目标名须为 1-40 字（如「日本旅行」）。" };
+    let cents;
+    try { cents = toCents(String(args.target_amount ?? "")); } catch { cents = null; }
+    if (cents == null || cents <= 0n) return { ...reject("INVALID_AMOUNT"), message: "target_amount 须为正金额（两位小数字符串）。" };
+    const dl = Date.parse(String(args.deadline ?? "") + (String(args.deadline ?? "").length === 10 ? "T00:00:00Z" : ""));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(args.deadline ?? "")) || !Number.isFinite(dl)) return { ...reject("GOAL_INVALID_DEADLINE"), message: "deadline 须为 YYYY-MM-DD（北京日历日）。" };
+    if (dl <= Date.now()) return { ...reject("GOAL_INVALID_DEADLINE"), message: `deadline 须在未来（收到 ${args.deadline}，今天 ${new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10)} 北京时间）。` };
+    if (dl > Date.now() + 10 * 365 * 86400000) return { ...reject("GOAL_INVALID_DEADLINE"), message: "deadline 距今不可超过 10 年。" };
+  }
+  if (intent === "goal_adjust" || intent === "goal_contribute" || intent === "goal_abandon") {
+    const goals = (await U(env, ctxInfo.userId)({ op: "goals" })).goals ?? [];
+    const g = goals.find((x) => String(x.id) === String(args.goal_id));
+    if (!g) return { ...reject("GOAL_NOT_FOUND"), message: `目标 ${args.goal_id} 不存在。goal_id 请用 goal_query 查询后回传。` };
+    if (g.status !== "ACTIVE") return { ...reject("GOAL_NOT_ACTIVE"), message: `目标「${g.name}」当前状态为 ${g.status}，仅进行中（ACTIVE）的目标可操作。` };
+    if (intent === "goal_adjust") {
+      if (args.target_amount != null) {
+        let cents;
+        try { cents = toCents(String(args.target_amount)); } catch { cents = null; }
+        if (cents == null || cents <= 0n) return { ...reject("INVALID_AMOUNT"), message: "target_amount 须为正金额。" };
+        if (BigInt(g.saved_cents ?? "0") > cents) return { ...reject("GOAL_TARGET_BELOW_SAVED"), message: `新目标 ¥${centsToStr(cents)} 低于已存入 ¥${centsToStr(BigInt(g.saved_cents ?? "0"))}（已存金额不可超目标）。` };
+      }
+      if (args.deadline != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(args.deadline))) return { ...reject("GOAL_INVALID_DEADLINE"), message: "deadline 须为 YYYY-MM-DD。" };
+    }
+  }
+  if (intent === "scheduled_task_create" && args.task_type === "goal_contribution") {
+    /* 月度自动存入：goal_id 必填且目标 ACTIVE；金额=每月存入额（执行时才锁定，不预锁） */
+    const goals = (await U(env, ctxInfo.userId)({ op: "goals" })).goals ?? [];
+    const g = goals.find((x) => String(x.id) === String(args.goal_id));
+    if (!g) return { ...reject("GOAL_NOT_FOUND"), message: `目标 ${args.goal_id} 不存在。goal_id 请用 goal_query 查询后回传。` };
+    if (g.status !== "ACTIVE") return { ...reject("GOAL_NOT_ACTIVE"), message: `目标「${g.name}」当前状态为 ${g.status}，仅进行中目标可挂自动存入。` };
+  }
   if (intent === "payee_manage" && args.action === "add") {
     const account = args.payee?.account, name = args.payee?.name;
     if (account == null) return reject("INVALID_CARD_FORMAT");
@@ -1782,6 +1872,9 @@ async function executeIntent(env, ir) {
           await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "cancel" }) });
         } catch { /* saga 侧取消失败不回滚账本（alarm 触发时任务已 CANCELLED 自然跳过） */ }
         await U(env, uid)({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? `「${cur.title ?? p.task_id}」已取消并执行补偿（解锁 ¥${r.unlocked ?? "0.00"} 退回）。` : `「${cur.title ?? p.task_id}」已取消。` });
+        /* 遗留②：取消触点补邮件（TG 已由 tgActionLines 收口），金额系统侧给出 */
+        const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (prof.email) await sendMail(env, { to: prof.email, ...taskCancelledMail({ title: cur.title ?? String(p.task_id), compensated: !!r.compensated, unlocked: r.unlocked ?? "0.00" }) });
       }
       await U(env, uid)({ op: "audit", action: "task_cancel", detail: { task_id: p.task_id, compensated: !!r.compensated }, channel: ir.channel, trace_id: ir.trace_id });
       return r;
@@ -1872,9 +1965,65 @@ async function executeIntent(env, ir) {
       await U(env, uid)({ op: "audit", action: "ecommerce_order_mock", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       return r;
     }
+    case "goal_create": {
+      const r = await U(env, uid)({ op: "goalCreate", name: p.name, target_cents: String(toCents(p.target_amount)), deadline: p.deadline });
+      if (!r.ok) return r;
+      await U(env, uid)({ op: "audit", action: "goal_create", detail: { goal_id: r.id, target: p.target_amount, deadline: p.deadline }, channel: ir.channel, trace_id: ir.trace_id });
+      await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已建立", body: `「${p.name}」目标 ¥${p.target_amount}，截止 ${p.deadline}。建议每月存 ¥${r.monthly}，对我说“每月自动存”即可挂月度任务。` });
+      const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+      if (prof.email) await sendMail(env, { to: prof.email, ...goalCreatedMail({ name: p.name, target: p.target_amount, deadline: p.deadline, monthly: r.monthly, months: r.months }) });
+      return { ok: true, goal_id: r.id, monthly: r.monthly, months: r.months, summary: `目标「${p.name}」已建立：攒到 ¥${p.target_amount}，截止 ${p.deadline}（约 ${r.months} 个月，每月约存 ¥${r.monthly}）。存入即锁定进目标桶，达成或放弃时解锁退回。` };
+    }
+    case "goal_contribute": {
+      const r = await U(env, uid)({ op: "goalContribute", goal_id: p.goal_id, amount_cents: String(toCents(p.amount)), source: ir.channel });
+      if (!r.ok) return r;
+      await U(env, uid)({ op: "audit", action: "goal_contribute", detail: { goal_id: p.goal_id, amount: p.amount, achieved: !!r.achieved }, channel: ir.channel, trace_id: ir.trace_id });
+      const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+      if (r.achieved) {
+        await U(env, uid)({ op: "notify", type: "WEALTH", title: "🎉 攒钱目标已达成", body: `「${r.name}」已存满 ¥${r.saved} / ¥${r.target}，全部锁定资金已解锁退回可用余额，可支取使用（不计利息）。` });
+        if (prof.email) await sendMail(env, { to: prof.email, ...goalAchievedMail({ name: r.name, target: r.target, saved: r.saved }) });
+      } else if (r.milestone_reached) {
+        await U(env, uid)({ op: "notify", type: "WEALTH", title: `目标进度 ${r.milestone_reached}%`, body: `「${r.name}」已存 ¥${r.saved} / ¥${r.target}（${r.pct}%），继续加油。` });
+        if (prof.email) await sendMail(env, { to: prof.email, ...goalMilestoneMail({ name: r.name, pct: r.milestone_reached, saved: r.saved, target: r.target, auto: false }) });
+      } else {
+        await U(env, uid)({ op: "notify", type: "WEALTH", title: "目标存入成功", body: `「${r.name}」存入 ¥${p.amount}，进度 ${r.pct}%（¥${r.saved} / ¥${r.target}）。` });
+      }
+      return { ok: true, goal_id: p.goal_id, pct: r.pct, saved: r.saved, target: r.target, achieved: !!r.achieved, milestone_reached: r.milestone_reached ?? null, summary: r.achieved ? `目标「${r.name}」已达成（¥${r.saved}/${r.target}），资金已解锁退回可用余额。` : `已存入 ¥${p.amount}，「${r.name}」进度 ${r.pct}%（¥${r.saved} / ¥${r.target}）。` };
+    }
+    case "goal_adjust": {
+      const r = await U(env, uid)({ op: "goalAdjust", goal_id: p.goal_id, target_cents: p.target_amount != null ? String(toCents(p.target_amount)) : null, deadline: p.deadline ?? null });
+      if (!r.ok) return r;
+      await U(env, uid)({ op: "audit", action: "goal_adjust", detail: p, channel: ir.channel, trace_id: ir.trace_id });
+      await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已调整", body: `「${r.name}」目标 ¥${r.target}，截止 ${r.deadline}，月计划调整为 ¥${r.monthly}。` });
+      return { ok: true, goal_id: p.goal_id, monthly: r.monthly, summary: `目标「${r.name}」已调整：目标 ¥${r.target}，截止 ${r.deadline}，每月约存 ¥${r.monthly}。` };
+    }
+    case "goal_abandon": {
+      const r = await U(env, uid)({ op: "goalAbandon", goal_id: p.goal_id });
+      if (!r.ok) return r;
+      await U(env, uid)({ op: "audit", action: "goal_abandon", detail: { goal_id: p.goal_id, unlocked: r.unlocked }, channel: ir.channel, trace_id: ir.trace_id });
+      await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已放弃", body: `「${r.name}」已放弃，已存入的 ¥${r.unlocked} 已全额解锁退回可用余额。` });
+      const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+      if (prof.email) await sendMail(env, { to: prof.email, ...goalAbandonedMail({ name: r.name, saved: r.unlocked }) });
+      return { ok: true, goal_id: p.goal_id, unlocked: r.unlocked, summary: `目标「${r.name}」已放弃，¥${r.unlocked} 已解锁退回可用余额。` };
+    }
     default:
       return { ok: false, error: "NO_EXECUTOR" };
   }
+}
+
+/** 扫描新增提议 → 站内+邮件+TG 三渠道一次（proposalPage / badge 两条 REST 路由共用，遗留①补 badge 口径）。 */
+async function notifyNewProposals(env, ctxInfo, userId, r) {
+  const pend = (r.proposals ?? []).filter((p) => p.status === "PENDING").slice(0, 3);
+  const lines = pend.map((p) => `· ${p.params?.summary ?? p.rule}`).join("\n");
+  await U(env, userId)({ op: "notify", type: "SYSTEM", title: `Suveoo AI 为你发现 ${r.added} 条可办提议`, body: `${lines}\n查看全部：https://suveoo.com/ai/proposals` });
+  await sendMail(env, { to: ctxInfo.email, ...proposalScanMail(r.added, lines) });
+  tgFire(env, ctxInfo.waitUntil, [
+    "🤖 <b>AI 提议已生成</b>", "",
+    "<b>User</b>: <code>" + escHtml(userId) + "</code>",
+    "新增 <b>" + r.added + "</b> 条：",
+    ...pend.map((p) => "· " + escHtml(String(p.params?.summary ?? p.rule))),
+    "<b>Time</b>: " + new Date().toISOString(),
+  ]);
 }
 
 /** REST 数据 API 路由。 */
@@ -1981,11 +2130,24 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     if (path === "/api/tasks" && method === "GET") { await UU({ op: "sweepDue" }); const r = await UU({ op: "tasks" }); return json({ tasks: r.tasks }); }
     mm = m(/^\/api\/tasks\/(\d+)(\/cancel)?$/);
     if (mm && method === "POST") {
+      /* 直调路径（不守卫）：取消前置状态校验 + 邮件/TG 同口径补齐（遗留②） */
+      const t = ((await UU({ op: "tasks" })).tasks ?? []).find((x) => String(x.id) === mm[1]);
       const r = await UU({ op: "taskCancel", id: Number(mm[1]) });
       if (r.ok) {
         const stub = env.SAGA.get(env.SAGA.idFromName(`task:${userId}:${mm[1]}`));
         await stub.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "cancel" }) });
         await UU({ op: "notify", type: "TASK", title: "任务已取消", body: r.compensated ? `任务取消并已执行补偿（解锁 ¥${r.unlocked ?? "0.00"} 退回）。` : "任务已取消。" });
+        if (t?.title) {
+          const prof = (await UU({ op: "getProfile" })).profile ?? {};
+          if (prof.email) await sendMail(env, { to: prof.email, ...taskCancelledMail({ title: t.title, compensated: !!r.compensated, unlocked: r.unlocked ?? "0.00" }) });
+          tgFire(env, ctxInfo.waitUntil, [
+            "↩️ <b>长程任务已取消</b>", "",
+            "任务 " + escHtml(t.title),
+            r.compensated ? "补偿 C1 ✓ 已解锁 <b>¥" + escHtml(r.unlocked ?? "0.00") + "</b>" : "无资金动作",
+            "<b>User</b>: <code>" + escHtml(userId) + "</code>",
+            "<b>Time</b>: " + new Date().toISOString(),
+          ]);
+        }
       }
       return json(r);
     }
@@ -1996,7 +2158,8 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       if (env.DEMO_MODE !== "true") return apiError("FORBIDDEN", "DEMO_MODE off", 403);
       const t = ((await UU({ op: "tasks" })).tasks ?? []).find((x) => String(x.id) === mm[1]);
       if (!t) return apiError("TASK_NOT_FOUND", "task not found", 404);
-      if (!isBirthdayTask(t.type)) return apiError("INVALID_TASK_TYPE", "demo-run supports birthday tasks only", 400);
+      /* 第二十二期：goal_contribution 月度任务同支持立即演示执行（决赛演示 30 秒讲完自动攒链） */
+      if (!isBirthdayTask(t.type) && t.type !== "goal_contribution") return apiError("INVALID_TASK_TYPE", "demo-run supports birthday/goal_contribution tasks only", 400);
       if (t.status !== "PENDING") return apiError("NOT_PENDING", `task status ${t.status}`, 409);
       await audit(env, { user_id: userId, action: "admin_demo_run", detail: { task_id: Number(mm[1]), type: t.type } });
       const r = await UU({ op: "taskDue", id: Number(mm[1]) });
@@ -2020,6 +2183,29 @@ export async function handleDataApi(request, env, url, ctxInfo) {
         detail: { email: typeof b.email === "string" && b.email ? b.email : "demo@suveoo.com", ip: clientIpOf(request), ua: (request.headers.get("user-agent") ?? "").slice(0, 120) },
       });
       return await seedDemo(env, typeof b.email === "string" && b.email ? b.email : null, { inspect: b.inspect === true });
+    }
+
+    /* ---- 目标陪伴（第二十二期）---- */
+    if (path === "/api/goals" && method === "GET") {
+      const r = await UU({ op: "goals" });
+      return json(r);
+    }
+    if (path === "/api/goals" && method === "POST") {
+      const b = await readJsonBody(request);
+      const g = await runGuarded(env, ctxInfo, { intent: "goal_create", args: { name: b.name, target_amount: String(b.target_amount ?? ""), deadline: b.deadline }, grantHash: b.grant_hash });
+      return guardResponse(g);
+    }
+    {
+      const rg = m(/\/api\/goals\/(\d+)(\/contribute|\/abandon)?/);
+      if (rg && ((method === "POST" && (rg[2] === "/contribute" || rg[2] === "/abandon" || rg[2] == null)) || (method === "PATCH" && rg[2] == null))) {
+        const b = await readJsonBody(request);
+        const intent = rg[2] === "/contribute" ? "goal_contribute" : rg[2] === "/abandon" ? "goal_abandon" : "goal_adjust";
+        const args = intent === "goal_contribute" ? { goal_id: Number(rg[1]), amount: String(b.amount ?? "") }
+          : intent === "goal_abandon" ? { goal_id: Number(rg[1]) }
+          : { goal_id: Number(rg[1]), ...(b.target_amount != null ? { target_amount: String(b.target_amount) } : {}), ...(b.deadline != null ? { deadline: b.deadline } : {}) };
+        const g = await runGuarded(env, ctxInfo, { intent, args, grantHash: b.grant_hash, otp: b.otp, balanceOf: intent === "goal_contribute" ? { op: "cardAvailable", slug: null } : null });
+        return guardResponse(g);
+      }
     }
 
     /* ---- 收款人 / 账单 / 订阅 ---- */
@@ -2171,26 +2357,16 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
 
     /* ---- AI 主动银行：提议（第六期 idle；扫描+列表单 DO 往返，新提议触发三渠道通知） ---- */
-    /* 徽标（第七期 idle）：轻量只读，供 Drawer/Footer 徽标与气泡、home 速览行判"新"；不触发扫描 */
+    /* 徽标（第七期 idle 凸显 + 第二十二期遗留①）：badge 拉取本身触发 6h 节流扫描——用户从不打开
+       /ai/proposals 提议也会更新（每登录页 chrome 都拉 badge）；扫描新增>0 时与 proposalPage 同口径三渠道通知 */
     if (path === "/api/proposals/badge" && method === "GET") {
       const r = await UU({ op: "proposalBadge", since: url.searchParams.get("since") ?? "" });
+      if ((r.added ?? 0) > 0) await notifyNewProposals(env, ctxInfo, userId, r);
       return json(r);
     }
     if (path === "/api/proposals" && method === "GET") {
       const r = await UU({ op: "proposalPage" });
-      if ((r.added ?? 0) > 0) {
-        const pend = (r.proposals ?? []).filter((p) => p.status === "PENDING").slice(0, 3);
-        const lines = pend.map((p) => `· ${p.params?.summary ?? p.rule}`).join("\n");
-        await UU({ op: "notify", type: "SYSTEM", title: `Suveoo AI 为你发现 ${r.added} 条可办提议`, body: `${lines}\n查看全部：https://suveoo.com/ai/proposals` });
-        await sendMail(env, { to: email, ...proposalScanMail(r.added, lines) });
-        tgFire(env, ctxInfo.waitUntil, [
-          "🤖 <b>AI 提议已生成</b>", "",
-          "<b>User</b>: <code>" + escHtml(userId) + "</code>",
-          "新增 <b>" + r.added + "</b> 条：",
-          ...pend.map((p) => "· " + escHtml(String(p.params?.summary ?? p.rule))),
-          "<b>Time</b>: " + new Date().toISOString(),
-        ]);
-      }
+      if ((r.added ?? 0) > 0) await notifyNewProposals(env, ctxInfo, userId, r);
       return json(r);
     }
     {
@@ -2857,11 +3033,35 @@ export function nextMonthlyRunIso(day, nowMs) {
 }
 /**
  * 提议生成（纯函数）：输入账本快照，输出建议数组（未持久化；由 DO proposalPage 落库）。
- * snap: { subs, bills, payees, tasks, routine_tx(近 120 天 OUT 流水), creditDebtCents, debitBalanceCents, gmHoldingCents }
+ * snap: { subs, bills, payees, tasks, routine_tx(近 120 天 OUT 流水), creditDebtCents, debitBalanceCents, gmHoldingCents,
+ *        goals(第二十二期：[{id,name,target_cents,saved_cents,created_at,deadline,monthly_plan_cents,has_monthly_task}]), paydayDay(可识别发薪日 1-28|null) }
  * opts: { monthKey: "YYYY-MM"（北京月）, nowMs }
- * 规则六条：dormant_sub / low_use_sub（SAVE）、routine_transfer（ROUTINE）、
+ * 规则八条：dormant_sub / low_use_sub（SAVE）、routine_transfer / goal_offtrack / goal_payday（ROUTINE）、
  *          bill_autopay / credit_debt（GUARD）、idle_cash（WEALTH）。
  */
+/* 目标进度数学（单一真相源，DO 富化与提议规则共用；单测锚点）：
+ * 30 天月制：monthsTotal = ceil((deadline−created)/30d)；elapsed 线性钳制；on-track = saved ≥ expected×0.8；
+ * 预测达成 = now + 剩余/(saved/elapsed) 个 30 天月（rate≤0 → null）。 */
+export function goalProgressMath(goal, savedCents, nowMs = Date.now()) {
+  const MONTH_MS = 30 * 86400000;
+  const createdMs = Date.parse(String(goal.created_at ?? "")); /* 完整时间戳（created_at 为 ISO 毫秒精度，勿截到日） */
+  const deadlineMs = Date.parse(String(goal.deadline ?? "") + "T00:00:00Z"); /* deadline 为北京日历日（YYYY-MM-DD，按 UTC 零点锚定做天数差） */
+  const target = BigInt(goal.target_cents ?? "0");
+  const plan = BigInt(goal.monthly_plan_cents ?? "0");
+  if (!Number.isFinite(createdMs) || !Number.isFinite(deadlineMs) || target <= 0n) {
+    return { monthsTotal: 0, elapsedMonths: 0, expectedCents: "0", pct: 0, onTrack: true, predictedAt: null };
+  }
+  const monthsTotal = Math.max(1, Math.ceil((deadlineMs - createdMs) / MONTH_MS));
+  const elapsed = Math.max(0, Math.min(monthsTotal, (nowMs - createdMs) / MONTH_MS));
+  const expected = plan * BigInt(Math.round(elapsed * 100)) / 100n;
+  const saved = BigInt(savedCents);
+  const pct = Number((saved * 10000n) / target) / 100;
+  const onTrack = saved >= (expected * 80n) / 100n;
+  let predictedAt = null;
+  const rate = elapsed >= 0.05 ? Number(saved) / elapsed : 0; /* 每 30 天月存入额（元级浮点仅用于外推日期，账目仍整数） */
+  if (rate > 0 && saved < target) predictedAt = new Date(nowMs + ((Number(target) - Number(saved)) / rate) * MONTH_MS).toISOString();
+  return { monthsTotal, elapsedMonths: Math.round(elapsed * 100) / 100, expectedCents: String(expected), pct, onTrack, predictedAt };  /* expectedCents 为原始分串（规则侧做分数学） */
+}
 export function generateProposals(snap, opts = {}) {
   const monthKey = opts.monthKey ?? new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 7);
   const nowMs = opts.nowMs ?? Date.now();
@@ -2944,6 +3144,45 @@ export function generateProposals(snap, opts = {}) {
         },
       },
     });
+  }
+
+  /* --- ROUTINE：目标提速（off-track 补存，第二十二期）——不把存入额当"省钱"（impact null） --- */
+  for (const g of snap.goals ?? []) {
+    const m = goalProgressMath(g, BigInt(g.saved_cents ?? "0"), nowMs);
+    if (m.monthsTotal === 0 || m.elapsedMonths < 0.5 || m.onTrack) continue;
+    const catchupCents = BigInt(m.expectedCents) - BigInt(g.saved_cents ?? "0");
+    if (catchupCents < 100n) continue; /* 差距不足 ¥1 不提议 */
+    out.push({
+      kind: "ROUTINE", rule: "goal_offtrack", target: String(g.id), tier: "YELLOW", priority: 55,
+      dedup_key: `goal_offtrack:${g.id}:${monthKey}`, impact_cents: null,
+      params: {
+        goalId: g.id, name: g.name, saved: centsToStr(BigInt(g.saved_cents ?? "0")), target: centsToStr(BigInt(g.target_cents ?? "0")),
+        pct: String(Math.round(m.pct)), catchup: centsToStr(catchupCents), monthly: centsToStr(BigInt(g.monthly_plan_cents ?? "0")),
+        summary: `目标「${g.name}」进度落后（${Math.round(m.pct)}%），按计划应存 ¥${centsToStr(BigInt(m.expectedCents))}——建议补存 ¥${centsToStr(catchupCents)} 赶回进度`,
+        exec: { intent: "goal_contribute", endpoint: `/api/goals/${g.id}/contribute`, method: "POST", args: { amount: centsToStr(catchupCents) } },
+      },
+    });
+  }
+
+  /* --- ROUTINE：发薪日钩子（有月计划但未挂自动存入的目标；发薪日由 DO 从入账流水众数识别） --- */
+  if (snap.paydayDay != null) {
+    for (const g of snap.goals ?? []) {
+      const planCents = BigInt(g.monthly_plan_cents ?? "0");
+      if (planCents <= 0n || g.has_monthly_task) continue;
+      const executeAt = nextMonthlyRunIso(snap.paydayDay, nowMs);
+      out.push({
+        kind: "ROUTINE", rule: "goal_payday", target: String(g.id), tier: planCents > POLICY_LIMITS.YELLOW_DAILY_CENTS ? "RED" : "YELLOW", priority: 58,
+        dedup_key: `goal_payday:${g.id}:${monthKey}`, impact_cents: null,
+        params: {
+          goalId: g.id, name: g.name, amount: centsToStr(planCents), day: snap.paydayDay,
+          summary: `发薪日自动攒：每月 ${snap.paydayDay} 日自动存 ¥${centsToStr(planCents)} 入目标「${g.name}」——先存后花`,
+          exec: {
+            intent: "scheduled_task_create", endpoint: "/api/schedules", method: "POST",
+            args: { task_type: "goal_contribution", goal_id: g.id, amount: centsToStr(planCents), execute_at: executeAt, repeat: "monthly" },
+          },
+        },
+      });
+    }
   }
 
   /* --- GUARD：未开自动扣款的账单（按金额降序至多 2 条，防逾期）--- */
@@ -3034,7 +3273,7 @@ export const MCP_TOOLS = [
   { name: "fx_exchange", desc: "结汇/购汇。按服务端实时牌价结算（购汇卖出价/结汇买入价，JPY 每 100 日元口径），客户端传 rate 不参与结算。buy 需 amount_cny；sell 需 amount_foreign（只给 amount_cny 时按买入价反推）。from_card 可选结算卡（购汇可选信用卡=信用支付、计入欠款；结汇仅借记卡）。外币余额先查 fx_balance_query。", args: { direction: { type: "string" }, currency: { type: "string" }, amount_cny: { type: "string" }, amount_foreign: { type: "string" }, from_card: { type: "string" }, __provenance: { type: "object" } } },
   { name: "bill_pay", desc: "缴纳账单。通常只需 bill_id（金额由服务端按账单补齐）；credit-repay 为信用卡全额还款，金额动态取当前信用卡欠款（bill 静态金额仅供参考），无欠款时返回 NO_DEBT。还款从默认借记卡扣款并清零信用卡欠款", args: { bill_id: { type: "string" }, amount: { type: "string" } } },
   { name: "funds_lock", desc: "锁定资金（长程任务预授权）", args: { amount: { type: "string" }, reason: { type: "string" }, task_id: { type: "number" } } },
-  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 带 +08:00 时区偏移（如 2026-09-20T17:30:00+08:00；无偏移会被当 UTC 解析成过去时间而拒绝），repeat 取 \"once\"|\"monthly\"|\"yearly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日预订用 task_type=\"birthday_flowers\"+item+amount（建单即锁定该金额，执行后扣款，取消即解锁），每年生日场景 repeat 用 \"yearly\"（明年同期自动再锁定并预订）；用户要鲜花、蛋糕等多品种时按品种建多条任务（每条独立 item+amount，各出确认卡）；用户未给日期/预算时先问一句再建。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" } } },
+  { name: "scheduled_task_create", desc: "建立定时/长程任务。预约转账：task_type=\"scheduled_transfer\"，收款信息放 transfer={recipient_name, recipient_account(16位卡号), amount(两位小数如 66.60), memo?, from_card?}（顶层同名字段会被归一）；收款人须为真实 Suveoo 用户且姓名卡号匹配（同 transfer_execute 口径，ACCOUNT_NOT_FOUND/NAME_MISMATCH 如实告知）。execute_at 用 ISO 8601 带 +08:00 时区偏移（如 2026-09-20T17:30:00+08:00；无偏移会被当 UTC 解析成过去时间而拒绝），repeat 取 \"once\"|\"monthly\"|\"yearly\"。提醒类任务用 task_type=\"reminder\"+title（无需金额，到期站内通知）；生日预订用 task_type=\"birthday_flowers\"+item+amount（建单即锁定该金额，执行后扣款，取消即解锁），每年生日场景 repeat 用 \"yearly\"（明年同期自动再锁定并预订）；用户要鲜花、蛋糕等多品种时按品种建多条任务（每条独立 item+amount，各出确认卡）；用户未给日期/预算时先问一句再建。月度自动攒目标：task_type=\"goal_contribution\"+goal_id+amount+repeat=\"monthly\"（每月到期自动锁定存入该目标，执行时才锁不预锁；goal_id 用 goal_query 查）。黄级：确认卡等待用户在界面点击确认，勿携带 grant_hash/otp 重试。", args: { task_type: { type: "string" }, title: { type: "string" }, amount: { type: "string" }, execute_at: { type: "string" }, repeat: { type: "string" }, transfer: { type: "object" }, goal_id: { type: "number" } } },
   { name: "wealth_product_purchase", desc: "申购理财（红级）", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "wealth_product_redeem", desc: "赎回理财（红级）。赎回按当前净值对成本净值比例结算（浮盈浮亏实时兑现，整数运算），回款入默认借记卡；预计回款额可先查 wealth_holdings_query 的 redeem_value", args: { product_id: { type: "string" }, amount: { type: "string" } } },
   { name: "card_freeze", desc: "冻结卡片（红级）", args: { card_id: { type: "string" } } },
@@ -3042,13 +3281,18 @@ export const MCP_TOOLS = [
   { name: "task_cancel", desc: "取消长程任务（预约转账/提醒/订花）。task_id 用 task_list 查询；仅 PENDING 可取消，取消即生效；生日订花类取消会同步解锁已锁资金（补偿）。黄级：确认卡等待用户点击", args: { task_id: { type: "number" } } },
   { name: "proposal_list", desc: "查询 AI 主动提议（本地规则引擎扫描账户产出的可执行建议：沉睡订阅退订/周期转账自动化/账单自动扣款/信用卡还款/闲钱理财）。返回待办提议的 id、类型、摘要与金额。用户问“最近有什么提议/AI 有什么建议/能帮我省什么”时先查此工具并如实转述（含金额，不夸大）；执行必须引导用户到 https://suveoo.com/ai/proposals 页面点击「让 AI 办」走确认卡，不得代为执行", args: {} },
   { name: "card_unfreeze", desc: "解冻卡片（红级）", args: { card_id: { type: "string" } } },
-  { name: "site_guide", desc: "全站页面使用指南（74 页全覆盖）。用户问站点用法/导航类问题（某功能在哪、怎么操作、这页有什么用、在哪导出 CSV、怎么解冻卡片、怎么退订、在哪看限额等）时调用。query 传用户原话关键词，返回最相关页面的入口/按钮/流程/确认卡与 OTP 场景；不传 query 返回全站分区概览。回答中的页面链接只能引用本工具返回的 route", args: { query: { type: "string" } } },
+  { name: "site_guide", desc: "全站页面使用指南（75 页全覆盖）。用户问站点用法/导航类问题（某功能在哪、怎么操作、这页有什么用、在哪导出 CSV、怎么解冻卡片、怎么退订、在哪看限额、在哪攒钱等）时调用。query 传用户原话关键词，返回最相关页面的入口/按钮/流程/确认卡与 OTP 场景；不传 query 返回全站分区概览。回答中的页面链接只能引用本工具返回的 route", args: { query: { type: "string" } } },
   { name: "notification_list", desc: "查询站内通知（最近条目：类型/标题/摘要/时间/已读态与未读数）。用户问“我有什么通知/未读消息”时调用", args: { unread_only: { type: "boolean" } } },
   { name: "transfer_limit_query", desc: "查询转账限额：各卡单笔/日限额 + AI 通道限额（单笔 ¥5,000/日 ¥10,000）+ 经典通道默认与三色阈值。用户问“我的转账限额是多少”时调用", args: { card_id: { type: "string" } } },
   { name: "bill_list", desc: "查询账单列表（商户/金额/出账日/自动扣款状态，含信用卡当前欠款动态金额）。用户问“我有什么账单要交”时调用；缴费本身走 bill_pay", args: {} },
   { name: "report_status", desc: "查询月度报告状态（可生成报告的月份列表与下载入口）。用户问“月报出了吗/在哪下载报告”时调用", args: {} },
   { name: "subscription_reminder_toggle", desc: "订阅续费提醒开关（开启后扣费前 48 小时站内+邮件提醒）。subscription_id 用 subscription_scan 查；enabled=true 开 / false 关。黄级：确认卡等待用户点击", args: { subscription_id: { type: "string" }, enabled: { type: "boolean" } } },
   { name: "deposit_open", desc: "开立存款（红级）。product_id 为六档存款 slug：demand/notice-7d/term-3m/term-6m/term-1y/term-3y（利率与起存以 deposit_product_query 为准：通知存款起存 ¥50,000、定期 ¥50、活期 ¥0.01）。amount 不得低于起存金额。开立后计入持仓，定期提前支取按活期计息", args: { product_id: { type: "string" }, amount: { type: "string" } } },
+  { name: "goal_query", desc: "查询攒钱目标：进度百分比、已存/目标、月计划、on_track 是否符合进度、预测达成时间、关联月度任务。用户问目标进度/还差多少/攒得怎样时调用", args: {} },
+  { name: "goal_create", desc: "建立攒钱目标（黄级）。name=目标名，target_amount=目标金额，deadline=截止日 YYYY-MM-DD（北京日历日，须未来）。服务端按剩余月数自动算月存计划。用户说\"我想 X 月前攒 Y 去 Z\"且要素齐时调用；缺金额/日期先问一句", args: { name: { type: "string" }, target_amount: { type: "string" }, deadline: { type: "string" } } },
+  { name: "goal_adjust", desc: "调整目标金额或截止日（黄级，重算月存计划，锚定原起止时间线）。goal_id 用 goal_query 查；仅进行中目标可调", args: { goal_id: { type: "number" }, target_amount: { type: "string" }, deadline: { type: "string" } } },
+  { name: "goal_contribute", desc: "向目标一次性存入（黄级；日累计>¥1,000 自动红级）。存入=锁定进目标桶：可用余额减少、进度增加，达成或放弃时解锁退回，不产生利息。goal_id 用 goal_query 查；用户要\"每月自动存\"改用 scheduled_task_create", args: { goal_id: { type: "number" }, amount: { type: "string" } } },
+  { name: "goal_abandon", desc: "放弃目标（黄级）：全部已存金额解锁退回可用余额，进度作废不可恢复。调用前必须向用户说明该后果并等待确认卡点击", args: { goal_id: { type: "number" } } },
   { name: "ecommerce_order_mock", desc: "演示商户下单（红级，仅 DEMO_MODE 场景 6）", args: { item: { type: "string" }, amount: { type: "string" }, task_id: { type: "number" } } },
 ];
 
@@ -3171,7 +3415,7 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     return { text: JSON.stringify(out), isError: false };
   }
 
-  const balanceIntent = ["transfer_execute", "funds_lock", "wealth_product_purchase", "fx_exchange", "bill_pay", "scheduled_task_create", "ecommerce_order_mock"].includes(name);
+  const balanceIntent = ["transfer_execute", "funds_lock", "wealth_product_purchase", "fx_exchange", "bill_pay", "scheduled_task_create", "ecommerce_order_mock", "goal_contribute"].includes(name);
   const g = await runGuarded(env, ctxInfo, {
     intent: name, args, provenance, channel: "ai",
     grantHash: args.grant_hash, otp: args.otp,
@@ -3305,6 +3549,44 @@ async function genuiCardFor(env, ctxInfo, g) {
     try {
       const t = (await U(env, ctxInfo.userId)({ op: "tasks" })).tasks?.find((x) => String(x.id) === String(p.task_id));
       if (t) { p.task_title = t.title; p.task_next = t.next_run_at ?? null; }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
+  /* 目标系卡展开（第二十二期）：goal_id → 名称/进度，确认卡能对上"存的是哪个目标" */
+  if (["goal_contribute", "goal_adjust", "goal_abandon"].includes(g.ir.intent) && p.goal_id != null) {
+    try {
+      const g2 = (await U(env, ctxInfo.userId)({ op: "goals" })).goals?.find((x) => String(x.id) === String(p.goal_id));
+      if (g2) {
+        p.goal_name = g2.name;
+        p.goal_progress = `${g2.saved} / ${g2.target}（${g2.pct}%）`;
+        if (g.ir.intent === "goal_adjust" && p.target_amount == null) p.target_amount = g2.target;
+      }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
+  /* 建目标/调整卡：展示服务端口径的月存计划（create 锚 now；adjust 锚目标原 created_at，与 DO 重算同式） */
+  if (g.ir.intent === "goal_create" && p.deadline != null && p.target_amount != null) {
+    try {
+      const t = toCents(String(p.target_amount));
+      const months = Math.max(1, Math.ceil((Date.parse(String(p.deadline) + "T00:00:00Z") - Date.now()) / (30 * 86400000)));
+      p.monthly_plan = centsToStr((t + BigInt(months) - 1n) / BigInt(months));
+      p.months = months;
+    } catch { /* 非法金额不阻塞出卡 */ }
+  }
+  if (g.ir.intent === "goal_adjust" && p.deadline != null && p.target_amount != null) {
+    try {
+      const g2 = (await U(env, ctxInfo.userId)({ op: "goals" })).goals?.find((x) => String(x.id) === String(p.goal_id));
+      if (g2) {
+        const anchorMs = Date.parse(String(g2.created_at ?? ""));
+        const months = Math.max(1, Math.ceil((Date.parse(String(p.deadline) + "T00:00:00Z") - anchorMs) / (30 * 86400000)));
+        p.monthly_plan = centsToStr((toCents(String(p.target_amount)) + BigInt(months) - 1n) / BigInt(months));
+      }
+    } catch { /* 查询失败不阻塞出卡 */ }
+  }
+  /* 月度自动存入建单卡：goal_id → 目标名（scheduled_task_create 的 goal_contribution 分型） */
+  if (g.ir.intent === "scheduled_task_create" && p.task_type === "goal_contribution" && p.goal_id != null) {
+    try {
+      const g2 = (await U(env, ctxInfo.userId)({ op: "goals" })).goals?.find((x) => String(x.id) === String(p.goal_id));
+      if (g2) p.goal_name = g2.name;
+      p.title = p.title ?? `每月自动存入「${p.goal_name ?? p.goal_id}」`;
     } catch { /* 查询失败不阻塞出卡 */ }
   }
   /* INPUT_REQUIRED 一律走 transfer_confirmation 确认卡（前端 attachConfirm 仅为此组件挂确认条）：
@@ -3483,6 +3765,19 @@ async function mcpGreen(env, ctxInfo, name, args) {
       const r = await UU({ op: "reportList" });
       return { months: r.months ?? [], note: "months=有流水的月份（均可生成月度报告）；生成与下载 PDF 在月度报告页：https://suveoo.com/account/downloads" };
     }
+    case "goal_query": {
+      const r = await UU({ op: "goals" });
+      const goals = (r.goals ?? []).map((g) => ({
+        goal_id: g.id, name: g.name, status: g.status,
+        saved: g.saved, target: g.target, pct: g.pct, monthly_plan: g.monthly_plan,
+        deadline: g.deadline, on_track: g.on_track, predicted_at: g.predicted_at,
+        expected_now: g.expected, linked_monthly_task: g.has_monthly_task,
+      }));
+      return {
+        goals,
+        note: "进度=已存/目标；on_track=saved≥按月计划线性推算的80%；predicted_at=按当前速率外推的达成时间（null=暂无法预测）。存入用 goal_contribute（黄级）；月度自动存入用 scheduled_task_create 的 task_type=\"goal_contribution\"。目标页：https://suveoo.com/wealth/goals",
+      };
+    }
     default: return { ok: false };
   }
 }
@@ -3490,7 +3785,7 @@ async function mcpGreen(env, ctxInfo, name, args) {
 /* ================================================================
  * ④.7 site_guide —— 全站页面知识库（第十一期：教会 Suveoo AI 本站所有页面）
  *    源：for-claude-code/pages.md 契约 + 逐页核对 frontend/assets/js/pages/*.js 头注与实现
- *    覆盖度由 tests/unit/site-guide.test.js 锁定：知识路由集 vs 前端 74 页路由集差集恒为 0
+ *    覆盖度由 tests/unit/site-guide.test.js 锁定：知识路由集 vs 前端 75 页路由集差集恒为 0
  * ================================================================ */
 export const SITE_GUIDE_PAGES = [
   { route: "/", aliases: ["根路径", "首页跳转", "官网首页"], section: "system", purpose: "根路径入口：meta-refresh + location.replace 跳转 /home（R2 静态约束不做服务端重定向）。", entry: "浏览器直接访问 suveoo.com", actions: ["自动跳转到 /home（无任何可交互控件）"], flow: "访问 / → 立即跳 /home。", notes: "noindex（meta-refresh 跳转页）。" },
@@ -3509,6 +3804,7 @@ export const SITE_GUIDE_PAGES = [
   { route: "/ai/benchmark", aliases: ["评测看板", "SuveooBench", "基准测试", "指标", "消融"], section: "ai", purpose: "SuveooBench 评测看板（免登录）：安全指标 Baseline vs Ours 对比与评测方法说明。", entry: "/ai 欢迎区「查看评测看板」链接 / 侧栏", actions: ["12 项指标卡网格（Task Success/Unsafe Action Rate/Injection Attack 成功率等）", "Ablation 消融柱状图（Claude/Qwen/GPT 三组历史对照）", "当前生产模型徽标（读 /api/version 动态渲染）+ 生产模型实测基线", "测试集规模与评测方法条目卡"], flow: "只读浏览；数据来自仓库自动化测试产物 benchmark.json。", notes: "不编造裸模型数字，未跑的对照注记「待跑」。" },
   { route: "/wealth", aliases: ["财富", "财富总览", "理财", "持仓", "精选基金", "存款方案", "外汇快览"], section: "wealth", purpose: "财富总览：持仓总览 + 精选基金/存款/外汇快览入口。", entry: "侧栏「财富」/ 底部导航 / home 宫格「理财」", actions: ["持仓总览卡（投资总市值+累计收益+「查看持仓明细」展开+「赎回」红级）", "AI 快捷条（有持仓时「分析持仓配置」）", "精选基金横滑卡（风险 chip/近 6-12 月回报/「详情」）", "存款方案横滑卡（期限+年利率+起存）", "外汇快览 4 货币对 + 「全部牌价」", "NAV 实时/闭市徽标与「更新于 X 分钟前」"], flow: "从总览进基金/存款/外汇子页；赎回跳 /wealth/my 逐项操作或本页展开表。", notes: "SimNotice banner：理财产品数据为模拟数据，不构成投资建议。" },
   { route: "/wealth/my", aliases: ["我的持仓", "持仓明细", "逐项赎回", "赎回", "外币资产"], section: "wealth", purpose: "我的持仓：基金逐项市值/成本/涨跌 + 逐项赎回 + 外币资产 + 存款入口。", entry: "/wealth「查看持仓明细」/ 财富分区子页", actions: ["基金持仓列表（逐项市值=本金×当前净值÷成本、成本、浮动盈亏、涨跌）+「详情」直达基金页", "逐项「赎回」按钮（红级两段式：OTP+确认卡；全额赎回 amount=ALL 按市值公式回款，0 值不发起）", "外币资产卡（折 CNY 参考值，直达 /wealth/fx）", "存款方案入口"], flow: "赎回 → 红 OTP → 确认卡 → 回款入默认借记卡（按当前净值对成本比例结算，浮盈亏实时兑现）；AI 通道 wealth_product_redeem 同口径，预计回款先查 wealth_holdings_query 的 redeem_value。", notes: "红级操作；净值实时化后市值与 AI 报价同源。" },
+  { route: "/wealth/goals", aliases: ["攒钱目标", "目标", "存钱目标", "储蓄目标", "目标陪伴", "攒钱", "进度环", "月度自动存入", "Savings Coach"], section: "wealth", purpose: "攒钱目标（目标陪伴/AI Savings Coach）：进度环 + 月存计划 + 一次性/月度自动存入 + 里程碑与达成解锁。", entry: "侧栏财富组「攒钱目标」/ /wealth 分区「攒钱目标」卡", actions: ["目标卡：进度环+百分比+已存/目标+截止日+月计划+on-track 徽标（正常/落后）+预测达成时间", "「存入」按钮（黄级确认卡：存入=锁定进目标桶，可用减少、达成或放弃时解锁退回）", "「调整」按钮（黄级：改目标金额/截止日，重算月计划）", "「放弃」按钮（黄级：全部已存解锁退回可用余额）", "新建目标表单（名称/目标金额/截止日 → 黄级确认）", "「问 AI」chip（带目标上下文跳 /ai）"], flow: "对 AI 说「我想 X 前攒 Y」→ goal_create 黄卡确认 → 目标页进度 0% → 存入/挂每月自动存入（scheduled_task_create 黄卡）→ 里程碑 25/50/75/100% 通知（站内+邮件）→ 达成解锁退回。AI 工具：goal_query 查 / goal_contribute 存 / goal_adjust 调 / goal_abandon 弃。", notes: "进度落后时提议引擎出「补存提速」提议（/ai/proposals）；模拟银行不计利息。" },
   { route: "/wealth/funds", aliases: ["全部基金", "基金列表", "选基金", "基金搜索", "风险等级"], section: "wealth", purpose: "全部基金：16 只基金（R1-R5）搜索、排序与筛选。", entry: "/wealth「查看全部基金」/ home 宫格「理财」", actions: ["搜索框实时过滤", "排序：默认/近 6 月/风险", "R1-R5 风险 tab", "基金卡：近 12 月收益率大数字 + 资产类别徽章 + NAV 实时/闭市徽标", "卡点击进详情页"], flow: "筛选 → 对比 → 进详情申购；AI 选基金推荐先 wealth_product_query（适当性：仅推荐 ≤ 用户 PR 等级）。", notes: "SimNotice banner；历史业绩不代表未来。" },
   { route: "/wealth/fx", aliases: ["外汇", "外汇牌价", "汇率", "购汇", "结汇", "换汇", "美元", "外币余额", "年度额度"], section: "wealth", purpose: "外汇牌价与兑换：10 币种实时牌价 + 兑换计算器 + 结汇购汇交易。", entry: "/wealth 外汇快览 / home 宫格「外汇」", actions: ["牌价表（USD/EUR/JPY/GBP/HKD/SGD/AUD/CAD/CHF/NZD：现汇买入/卖出/中间价 + 7 日 sparkline 按自然日逐日积累）+ 刷新按钮 + 实时徽章", "兑换计算器（购汇/结汇方向切换 + 币种 + 金额实时换算含点差说明；JPY 为每 100 日元口径）", "「结汇/购汇」按钮（黄级；折算 CNY > ¥1,000 红级 OTP）+ 结算卡选择（购汇可选信用卡信用支付）", "年度便利化额度条（模拟 $50,000/年）", "「我的外币余额」卡（空态引导）", "「现在换 USD 划算吗」AI chip"], flow: "查牌价 → 计算器试算（与成交同源同数）→ 结汇/购汇确认卡 → 成交更新外币余额；AI 通道 fx_exchange（黄/红）+ calc_fx_convert 试算 + fx_balance_query 查余额。", notes: "牌价真实市场汇率日更+15 分钟缓存，失败回退静态快照；INSUFFICIENT_FX/INSUFFICIENT_CREDIT 行内拦截。" },
   { route: "/wealth/tools", aliases: ["金融计算工具", "计算器", "理财工具", "工具集"], section: "wealth", purpose: "金融计算工具集（免登录）：10 个计算工具的导航页，支持 URL 参数直达。", entry: "/wealth 分区子页 / footer", actions: ["10 工具卡网格（每卡进独立工具页）", "URL 参数直达（如 /wealth/tools?tool=deposit&amount=50000&term=1y 自动预填计算）"], flow: "选工具 → 进子页输入参数 → 即时计算；/ai 与 GenUI 卡可生成这些深链。", notes: "免登录；纯客户端计算无 API。" },
@@ -3617,7 +3913,7 @@ export function siteGuideLookup(query) {
     return {
       total_pages: SITE_GUIDE_PAGES.length,
       sections: Object.entries(sections).map(([k, arr]) => ({ section: k, label: label[k] ?? k, pages: arr.map((p) => ({ route: p.route, purpose: p.purpose.split("：")[0].split("（")[0] })) })),
-      note: "全站 74 页已收录。带 query 可查具体页面详情（入口/按钮/流程/确认卡与 OTP 场景/注意事项）。回答中的页面链接只能引用返回的 route（格式「图形化页面：https://suveoo.com{route}」）。这是模拟银行系统。",
+      note: "全站 75 页已收录。带 query 可查具体页面详情（入口/按钮/流程/确认卡与 OTP 场景/注意事项）。回答中的页面链接只能引用返回的 route（格式「图形化页面：https://suveoo.com{route}」）。这是模拟银行系统。",
     };
   }
   const scored = SITE_GUIDE_PAGES.map((p) => {
@@ -4410,6 +4706,16 @@ export function demoProposalSeed(nowMs = Date.now()) {
       params: { billId: "property", billName: "物业费（西湖文三公寓）", amount: "412.70", dueDay: 25, tier: "YELLOW", summary: "为「物业费（西湖文三公寓）」开启自动扣款（¥412.70/期，每月 25 日）" },
       apply: { bill_autopay: "property" } },
   ];
+}
+/* demo 目标种子（第二十二期）：1 个进行中目标——¥30,000 / created −60d / deadline +120d（恰 6 个 30 天月 →
+ * 月计划 ¥5,000）已存 2×¥5,000（33%，on-track）+ linked 每月 3 日自动存入任务。零 rng 纯静态行（日期相对 now）。 */
+export function demoGoalSeed() {
+  return [{
+    name: "日本旅行基金", purpose: "明年去日本旅行", target_cents: "3000000",
+    created_days_ago: 60, deadline_days: 120,
+    contributions: ["500000", "500000"],
+    task: { day_of_month: 3, amount_cents: "500000" },
+  }];
 }
 /* ===== 维度化拟真种子体系（第三十五轮 /demo-lab）：财富水平 × 薪资来源 × 职业档案 × 企业数据 =====
  * 职业清单 = 任务书列举的 70 个职业全量 + 20 个同类目相邻扩充（凑足 90；扩充清单见 notes/idle-quad.md 第三十五轮）。
@@ -5496,7 +5802,7 @@ async function seedDemo(env, targetEmail, opts = {}) {
     var personasCount = Object.keys(personas).length;
   }
   const r = await ledgerOp(env, userInstance(userId), { op: "seedDemo", txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt,
-    ...(isDemo && !opts.preset ? { proposals_seed: demoProposalSeed() } : {}),
+    ...(isDemo && !opts.preset ? { proposals_seed: demoProposalSeed(), goals_seed: demoGoalSeed() } : {}),
     ...(preset ? { mode: preset.mode, blocks: preset.blocks, card_updates: cardUpdates } : {}) });
   if (isDemo) await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读；真实账户 2FA 状态不动
   if (r.ok) {
@@ -5740,6 +6046,10 @@ const DDL = [
   "CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0, ts TEXT)",
   "CREATE TABLE IF NOT EXISTS user_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, detail TEXT, channel TEXT, trace_id TEXT, ts TEXT)",
   "CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, payload TEXT, status TEXT DEFAULT 'PENDING', next_run_at TEXT, repeat TEXT DEFAULT 'once', fail_next INTEGER DEFAULT 0, created_at TEXT)",
+  /* 第二十二期：目标陪伴——goals 主表（ACTIVE→ACHIEVED/ABANDONED）+ goal_events 账本（进度唯一事实源） */
+  "CREATE TABLE IF NOT EXISTS goals(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, purpose TEXT, target_cents TEXT, deadline TEXT, monthly_plan_cents TEXT, status TEXT DEFAULT 'ACTIVE', created_at TEXT, achieved_at TEXT, abandoned_at TEXT, milestone INTEGER DEFAULT 0)",
+  "CREATE TABLE IF NOT EXISTS goal_events(id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER, kind TEXT, amount_cents TEXT, note TEXT, created_at TEXT)",
+  "CREATE INDEX IF NOT EXISTS idx_goal_events_goal ON goal_events(goal_id, id)",
   "CREATE TABLE IF NOT EXISTS nonces(nonce TEXT PRIMARY KEY, ts TEXT)",
   /* 第六期 idle：AI 主动银行——提议状态机（PENDING → EXECUTED / DISMISSED；dedup_key 月度幂等） */
   `CREATE TABLE IF NOT EXISTS proposals(
@@ -5754,12 +6064,14 @@ const DDL = [
 
 /* ---- 幂等列迁移（PRAGMA table_info 检测 → ALTER 补列；DDL 保持老表结构，新旧实例走同一条迁移路径） ---- */
 /** 输入各表现有列名（来自 PRAGMA table_info 的 name 列），返回待执行的 ALTER 语句。纯函数，供单测。 */
-export function columnMigrations({ profile = [], tx = [], chats = [], payees = [] } = {}) {
+export function columnMigrations({ profile = [], tx = [], chats = [], payees = [], tasks = [] } = {}) {
   const out = [];
   if (!profile.includes("session_epoch")) out.push("ALTER TABLE profile ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0");
   if (!tx.includes("card")) out.push("ALTER TABLE tx ADD COLUMN card TEXT");
   /* 第三十轮：payees 加手机号——官方六场景"按手机号转账"的数据支撑 */
   if (!payees.includes("phone")) out.push("ALTER TABLE payees ADD COLUMN phone TEXT");
+  /* 第二十二期：任务完成时间戳——战报"自动打理"按北京月计数 goal_contribution 执行 */
+  if (tasks.length && !tasks.includes("completed_at")) out.push("ALTER TABLE tasks ADD COLUMN completed_at TEXT");
   /* 第二十六轮：chats 扩列（会话持久化）——活跃时间/消息数/末句预览/归档 */
   if (!chats.includes("created_at")) out.push("ALTER TABLE chats ADD COLUMN created_at TEXT");
   if (!chats.includes("updated_at")) out.push("ALTER TABLE chats ADD COLUMN updated_at TEXT");
@@ -5775,7 +6087,7 @@ export class LedgerDO {
     if (this.ready) return;
     for (const q of DDL) this.state.storage.sql.exec(q);
     const cols = (t) => this.#rows(this.state.storage.sql.exec(`PRAGMA table_info(${t})`)).map((r) => String(r.name));
-    for (const q of columnMigrations({ profile: cols("profile"), tx: cols("tx"), chats: cols("chats"), payees: cols("payees") })) this.state.storage.sql.exec(q);
+    for (const q of columnMigrations({ profile: cols("profile"), tx: cols("tx"), chats: cols("chats"), payees: cols("payees"), tasks: cols("tasks") })) this.state.storage.sql.exec(q);
     this.ready = true;
   }
   #rows(c) { return c.toArray(); }
@@ -5977,7 +6289,12 @@ export class LedgerDO {
         }
         case "todayOutCents": {
           const day = NOW.slice(0, 10);
-          const r = this.#rows(sql.exec(`SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) AS s FROM tx WHERE direction='OUT' AND ts LIKE ?`, `${day}%`))[0];
+          /* 第二十二期：日累计口径纳入目标存入（goal_contribute 是 dynamic 工具——锁定同样占用当日
+             资金额度，与转账同口径；生日 funds_lock 非 dynamic 不计，维持既有语义） */
+          const r = this.#rows(sql.exec(
+            `SELECT (SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) FROM tx WHERE direction='OUT' AND ts LIKE ?)
+                   + (SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) FROM goal_events WHERE kind='contribute' AND created_at LIKE ?) AS s`,
+            `${day}%`, `${day}%`))[0];
           return json({ cents: String(r?.s ?? 0) });
         }
         case "hasNonce": { return json({ has: !!this.#rows(sql.exec("SELECT nonce FROM nonces WHERE nonce = ?", input.nonce))[0] }); }
@@ -6172,6 +6489,113 @@ export class LedgerDO {
           sql.exec("UPDATE cards SET held_cents = ? WHERE slug = ?", String(BigInt(card.held_cents ?? "0") - amt), card.slug);
           return json({ ok: true, unlocked: centsToStr(amt) });
         }
+        /* ---- 目标陪伴（第二十二期）：资金语义复用 held——存入=锁、达成/放弃=精确解锁 ---- */
+        case "goalCreate": {
+          const target = BigInt(input.target_cents);
+          if (target <= 0n) return json({ ok: false, error: "INVALID_AMOUNT" });
+          const createdMs = Date.parse(NOW), deadlineMs = Date.parse(String(input.deadline) + "T00:00:00Z");
+          if (!Number.isFinite(deadlineMs)) return json({ ok: false, error: "GOAL_INVALID_DEADLINE" });
+          const monthsTotal = Math.max(1, Math.ceil((deadlineMs - createdMs) / (30 * 86400000)));
+          const monthly = (target + BigInt(monthsTotal) - 1n) / BigInt(monthsTotal); /* 向上取整（cents 整数运算） */
+          sql.exec("INSERT INTO goals(name, purpose, target_cents, deadline, monthly_plan_cents, status, created_at) VALUES(?,?,?,?,?,'ACTIVE',?)",
+            String(input.name ?? "攒钱目标"), input.purpose ?? null, input.target_cents, input.deadline, String(monthly), NOW);
+          const id = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;
+          sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'create', NULL, ?, ?)", id, `目标 ¥${centsToStr(target)} · 截止 ${input.deadline}`, NOW);
+          return json({ ok: true, id, monthly: centsToStr(monthly), months: monthsTotal });
+        }
+        case "goals": {
+          const rows = this.#rows(sql.exec("SELECT * FROM goals ORDER BY status = 'ACTIVE' DESC, id DESC"));
+          const savedBy = {};
+          for (const r of this.#rows(sql.exec("SELECT goal_id, SUM(CAST(amount_cents AS INTEGER)) AS s FROM goal_events WHERE kind = 'contribute' GROUP BY goal_id"))) savedBy[r.goal_id] = BigInt(r.s ?? 0);
+          const tasked = new Set();
+          for (const t of this.#rows(sql.exec("SELECT payload FROM tasks WHERE type = 'goal_contribution' AND status = 'PENDING'"))) {
+            try { tasked.add(Number(JSON.parse(t.payload ?? "{}").goal_id)); } catch { /* 脏 payload 忽略 */ }
+          }
+          const goals = rows.map((g) => {
+            const saved = savedBy[g.id] ?? 0n;
+            const m = goalProgressMath(g, saved);
+            return {
+              id: g.id, name: g.name, purpose: g.purpose, status: g.status, deadline: g.deadline,
+              created_at: g.created_at, achieved_at: g.achieved_at, abandoned_at: g.abandoned_at,
+              saved: centsToStr(saved), target: centsToStr(BigInt(g.target_cents)), monthly_plan: centsToStr(BigInt(g.monthly_plan_cents ?? "0")),
+              pct: m.pct, on_track: m.onTrack, predicted_at: m.predictedAt, expected: m.expectedCents,
+              months_total: m.monthsTotal, milestone: Number(g.milestone ?? 0), has_monthly_task: tasked.has(Number(g.id)),
+            };
+          });
+          return json({ ok: true, goals });
+        }
+        case "goalContribute": {
+          const g = this.#rows(sql.exec("SELECT * FROM goals WHERE id = ?", input.goal_id))[0];
+          if (!g) return json({ ok: false, error: "GOAL_NOT_FOUND" });
+          if (g.status !== "ACTIVE") return json({ ok: false, error: "GOAL_NOT_ACTIVE" });
+          const amt = BigInt(input.amount_cents);
+          if (amt <= 0n) return json({ ok: false, error: "INVALID_AMOUNT" });
+          const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
+          if (amt > BigInt(card.balance_cents) - BigInt(card.held_cents ?? "0")) return json({ ok: false, error: "INSUFFICIENT_BALANCE" });
+          sql.exec("UPDATE cards SET held_cents = ? WHERE slug = ?", String(BigInt(card.held_cents ?? "0") + amt), card.slug);
+          sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'contribute', ?, ?, ?)",
+            g.id, input.amount_cents, input.source === "task" ? "月度自动存入" : (input.source === "ai" ? "AI 会话存入" : "手动存入"), NOW);
+          const target = BigInt(g.target_cents);
+          const saved = this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) AS s FROM goal_events WHERE goal_id = ? AND kind = 'contribute'", g.id))[0];
+          const savedCents = BigInt(saved.s ?? 0);
+          if (savedCents >= target) {
+            /* 达成：解锁全部目标锁定退回（夹持 held≥0——其他锁定不受影响），状态 ACHIEVED */
+            const heldNow = BigInt(this.#rows(sql.exec("SELECT held_cents FROM cards WHERE is_default = 1"))[0]?.held_cents ?? "0");
+            const unlock = savedCents > heldNow ? heldNow : savedCents;
+            sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(heldNow - unlock));
+            sql.exec("UPDATE goals SET status = 'ACHIEVED', achieved_at = ?, milestone = 100 WHERE id = ?", NOW, g.id);
+            sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'achieve', NULL, ?, ?)", g.id, `达成 · 解锁退回 ¥${centsToStr(unlock)}`, NOW);
+            return json({ ok: true, name: g.name, saved: centsToStr(savedCents), target: centsToStr(target), pct: 100, achieved: true, unlocked: centsToStr(unlock) });
+          }
+          const pct = Number((savedCents * 10000n) / target) / 100;
+          const ms = Math.floor(pct / 25) * 25;
+          let milestoneReached = null;
+          if (ms > Number(g.milestone ?? 0)) {
+            sql.exec("UPDATE goals SET milestone = ? WHERE id = ?", ms, g.id);
+            milestoneReached = ms;
+          }
+          return json({ ok: true, name: g.name, saved: centsToStr(savedCents), target: centsToStr(target), pct, milestone_reached: milestoneReached, achieved: false });
+        }
+        case "goalAdjust": {
+          const g = this.#rows(sql.exec("SELECT * FROM goals WHERE id = ?", input.goal_id))[0];
+          if (!g) return json({ ok: false, error: "GOAL_NOT_FOUND" });
+          if (g.status !== "ACTIVE") return json({ ok: false, error: "GOAL_NOT_ACTIVE" });
+          const newTarget = input.target_cents != null ? BigInt(input.target_cents) : BigInt(g.target_cents);
+          const newDeadline = input.deadline ?? g.deadline;
+          if (newTarget <= 0n) return json({ ok: false, error: "INVALID_AMOUNT" });
+          const saved = BigInt(this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) AS s FROM goal_events WHERE goal_id = ? AND kind = 'contribute'", g.id))[0]?.s ?? 0);
+          if (saved > newTarget) return json({ ok: false, error: "GOAL_TARGET_BELOW_SAVED" });
+          /* 月计划重算锚定原 created_at 时间线（调大目标即变相"提速"——off-track 判定随行） */
+          const monthsTotal = Math.max(1, Math.ceil((Date.parse(String(newDeadline) + "T00:00:00Z") - Date.parse(String(g.created_at))) / (30 * 86400000)));
+          const monthly = (newTarget + BigInt(monthsTotal) - 1n) / BigInt(monthsTotal);
+          sql.exec("UPDATE goals SET target_cents = ?, deadline = ?, monthly_plan_cents = ? WHERE id = ?",
+            String(newTarget), newDeadline, String(monthly), g.id);
+          sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'adjust', NULL, ?, ?)", g.id, `调整为 ¥${centsToStr(newTarget)} · 截止 ${newDeadline}`, NOW);
+          return json({ ok: true, name: g.name, target: centsToStr(newTarget), deadline: newDeadline, monthly: centsToStr(monthly) });
+        }
+        case "goalAbandon": {
+          const g = this.#rows(sql.exec("SELECT * FROM goals WHERE id = ?", input.goal_id))[0];
+          if (!g) return json({ ok: false, error: "GOAL_NOT_FOUND" });
+          if (g.status !== "ACTIVE") return json({ ok: false, error: "GOAL_NOT_ACTIVE" });
+          const saved = BigInt(this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) AS s FROM goal_events WHERE goal_id = ? AND kind = 'contribute'", g.id))[0]?.s ?? 0);
+          const heldNow = BigInt(this.#rows(sql.exec("SELECT held_cents FROM cards WHERE is_default = 1"))[0]?.held_cents ?? 0);
+          const unlock = saved > heldNow ? heldNow : saved; /* 精确解锁（夹持，不误清其他目标/生日锁定） */
+          sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(heldNow - unlock));
+          sql.exec("UPDATE goals SET status = 'ABANDONED', abandoned_at = ? WHERE id = ?", NOW, g.id);
+          sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'abandon', NULL, ?, ?)", g.id, `放弃 · 解锁退回 ¥${centsToStr(unlock)}`, NOW);
+          return json({ ok: true, name: g.name, unlocked: centsToStr(unlock) });
+        }
+        /* ---- 测试/演示亲和（DEMO_MODE 门，同 taskInjectFailure 先例）：构造 off-track 目标与老化扫描戳 ---- */
+        case "goalBackdate": {
+          if (this.env.DEMO_MODE !== "true") return json({ ok: false, error: "FORBIDDEN" }, 403);
+          sql.exec("UPDATE goals SET created_at = ? WHERE id = ?", new Date(Date.now() - Number(input.days ?? 0) * 86400000).toISOString(), Number(input.id));
+          return json({ ok: true });
+        }
+        case "propScanAge": {
+          if (this.env.DEMO_MODE !== "true") return json({ ok: false, error: "FORBIDDEN" }, 403);
+          sql.exec("INSERT OR REPLACE INTO meta(k, v) VALUES('prop_scan_at', ?)", new Date(Date.now() - Number(input.hours ?? 0) * 3600_000).toISOString());
+          return json({ ok: true });
+        }
         case "ecommerceOrder": {
           const amt = BigInt(input.amount_cents);
           const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
@@ -6249,6 +6673,46 @@ export class LedgerDO {
               this.#notify(sql, "TASK", "任务失败已自动补偿", `「${t.title}」履约失败，已执行逆向补偿（资金解锁），余额未受影响。`);
             }
             return json({ ok: true, outcome: "COMPENSATED", steps: ["T1 ✓ LockFunds", "T2 ✗ MerchantOrder", "C1 ✓ UnlockFunds"] });
+          }
+          if (t.type === "goal_contribution") {
+            /* 月度自动存入（第二十二期）：执行时才锁定（不预锁——逐月占用可用，防整期过度锁定）。
+               目标已结束（达成/放弃）→ 任务自然退役标 DONE；余额不足 → FAILED+通知（与预约转账同口径）。 */
+            const p2 = p.goal_id != null ? p : (() => { try { return JSON.parse(t.payload ?? "{}"); } catch { return {}; } })();
+            const g = this.#rows(sql.exec("SELECT * FROM goals WHERE id = ?", Number(p2.goal_id)))[0];
+            if (!g || g.status !== "ACTIVE") {
+              sql.exec("UPDATE tasks SET status = 'DONE' WHERE id = ?", input.id);
+              this.#notify(sql, "TASK", "月度自动存入已退役", `目标「${g?.name ?? p2.goal_id}」已${g?.status === "ACHIEVED" ? "达成" : "结束"}，「${t.title}」自动存入任务已自动结束。`);
+              return json({ ok: true, outcome: "DONE", retired: true });
+            }
+            const amt = BigInt(toCents(String(p2.amount ?? "0")));
+            const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
+            if (amt <= 0n || amt > BigInt(card.balance_cents) - BigInt(card.held_cents ?? "0")) {
+              this.#notify(sql, "TASK", "月度自动存入失败", `「${t.title}」执行时可用余额不足（需 ¥${centsToStr(amt)}），任务已标记失败；可重新建立或先补足余额。`);
+              sql.exec("UPDATE tasks SET status = 'FAILED' WHERE id = ?", input.id);
+              return json({ ok: false, error: "INSUFFICIENT_BALANCE" });
+            }
+            const c = await this.fetch(new Request("https://ledger.internal/", {
+              method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+              body: JSON.stringify({ op: "goalContribute", goal_id: g.id, amount_cents: String(amt), source: "task" }),
+            })).then((r) => r.json());
+            if (!c.ok) return json(c);
+            if (c.achieved) {
+              this.#notify(sql, "WEALTH", "🎉 月度自动存入达成目标", `「${g.name}」已存满 ¥${c.saved} / ¥${c.target}，全部锁定资金已解锁退回可用余额。`);
+              await this.#goalTouch("achieved", { name: g.name, saved: c.saved, target: c.target });
+            } else if (c.milestone_reached) {
+              this.#notify(sql, "WEALTH", `目标进度 ${c.milestone_reached}%`, `「${g.name}」月度自动存入 ¥${centsToStr(amt)}，已存 ¥${c.saved} / ¥${c.target}（${c.pct}%）。`);
+              await this.#goalTouch("milestone", { name: g.name, pct: c.milestone_reached, saved: c.saved, target: c.target, amount: centsToStr(amt) });
+            } else {
+              this.#notify(sql, "TASK", "月度自动存入已执行", `「${g.name}」存入 ¥${centsToStr(amt)}，进度 ${c.pct}%（¥${c.saved} / ¥${c.target}）。`);
+            }
+            if (t.repeat === "monthly") {
+              /* 月度轮转：completed_at 记本次执行（战报"自动打理"按北京月计数），下月再跑 */
+              const nextRun = new Date(Date.now() + 30 * 86400000).toISOString();
+              sql.exec("UPDATE tasks SET status = 'PENDING', next_run_at = ?, completed_at = ? WHERE id = ?", nextRun, NOW, input.id);
+              return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun });
+            }
+            sql.exec("UPDATE tasks SET status = 'DONE', completed_at = ? WHERE id = ?", NOW, input.id);
+            return json({ ok: true, outcome: "DONE" });
           }
           if (isBirthdayTask(t.type)) {
             const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1"))[0];
@@ -6409,12 +6873,12 @@ export class LedgerDO {
           const cntAll = () => {
             const c = (t) => this.#rows(sql.exec(`SELECT COUNT(*) AS n FROM ${t}`))[0]?.n ?? 0;
             const debt = this.#rows(sql.exec("SELECT SUM(CAST(amount_cents AS INTEGER)) AS s FROM tx WHERE card LIKE 'credit%' AND direction='OUT'"))[0]?.s ?? 0;
-            return { txs: c("tx"), payees: c("payees"), bills: c("bills"), subs: c("subscriptions"), holdings: c("holdings"), tasks: c("tasks"), notifications: c("notifications"), fx: c("fx_balances"), credit_debt: String(debt) };
+            return { txs: c("tx"), payees: c("payees"), bills: c("bills"), subs: c("subscriptions"), holdings: c("holdings"), tasks: c("tasks"), notifications: c("notifications"), fx: c("fx_balances"), goals: c("goals"), credit_debt: String(debt) };
           };
           const touched = (b) => !(input.blocks && input.blocks[b] === false);
           const mode = input.mode === "merge" || input.mode === "custom" ? input.mode : "overwrite";
           if (mode === "overwrite" && !input.blocks) {
-            for (const q of ["DELETE FROM tx", "DELETE FROM payees", "DELETE FROM bills", "DELETE FROM subscriptions", "DELETE FROM holdings", "DELETE FROM notifications", "DELETE FROM tasks", "DELETE FROM user_audit", "DELETE FROM chats", "DELETE FROM chat_msgs", "DELETE FROM fx_balances"]) sql.exec(q);
+            for (const q of ["DELETE FROM tx", "DELETE FROM payees", "DELETE FROM bills", "DELETE FROM subscriptions", "DELETE FROM holdings", "DELETE FROM notifications", "DELETE FROM tasks", "DELETE FROM user_audit", "DELETE FROM chats", "DELETE FROM chat_msgs", "DELETE FROM fx_balances", "DELETE FROM goal_events", "DELETE FROM goals"]) sql.exec(q);
             /* 卡归属：种子 tx 显式 card 原样写入（日常消费在借记卡间轮转），card 为 null 时挂默认借记卡（锚点/入账） */
             const defCard = (this.#rows(sql.exec("SELECT slug FROM cards WHERE is_default = 1 AND kind='debit'"))[0] ?? {}).slug ?? "debit-card-1";
             for (const t of input.txs) sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
@@ -6448,6 +6912,8 @@ export class LedgerDO {
                 sql.exec("UPDATE cards SET held_cents = '60000' WHERE is_default = 1");
               }
             }
+            /* 目标种子（第二十二期）：生日硬置 held 之后执行——目标 saved 增量叠加，账本自洽 */
+            taskIds.push(...this.#seedGoals(sql, input.goals_seed, { wipe: true }));
             const afterCounts = (input.card_updates?.length || input.mode) ? cntAll() : null;
             return json({ ok: true, task_ids: taskIds, ...(afterCounts ? { before: null, after: afterCounts, credit_debt_cents: afterCounts.credit_debt } : {}) });
           }
@@ -6510,6 +6976,7 @@ export class LedgerDO {
                 else { sql.exec("INSERT INTO fx_balances(currency, amount) VALUES(?,?)", fxb.currency, String(merged)); cur.set(fxb.currency, merged); }
               }
             }
+            taskIds.push(...this.#seedGoals(sql, input.goals_seed, { wipe: false }));
           } else {
             /* 自定义：块级整段替换（未勾选不动） */
             if (touched("txs")) {
@@ -6553,6 +7020,7 @@ export class LedgerDO {
               sql.exec("DELETE FROM fx_balances");
               for (const fxb of input.fx_balances ?? []) sql.exec("INSERT INTO fx_balances(currency, amount) VALUES(?,?)", fxb.currency, fxb.amount);
             }
+            taskIds.push(...this.#seedGoals(sql, input.goals_seed, { wipe: touched("goals") }));
           }
           /* 提议种子：合并模式按 dedup_key 幂等补齐（不清既有 EXECUTED 战报）；自定义模式勾选块整段替换 */
           if (mode === "merge") this.#seedProposals(sql, input.proposals_seed, { wipe: false });
@@ -6579,40 +7047,26 @@ export class LedgerDO {
           const scannedRaw = (this.#rows(sql.exec("SELECT v FROM meta WHERE k = 'prop_scan_at'"))[0] ?? {}).v ?? null;
           const stale = !scannedRaw || Date.now() - Date.parse(scannedRaw) > 6 * 3600_000;
           let added = 0;
-          if (stale || input.force) {
-            const subs = this.#rows(sql.exec("SELECT * FROM subscriptions"));
-            const bills = this.#rows(sql.exec("SELECT * FROM bills"));
-            const payees = this.#rows(sql.exec("SELECT * FROM payees"));
-            const tasks = this.#rows(sql.exec("SELECT * FROM tasks"));
-            const txs = this.#rows(sql.exec("SELECT counterparty, amount_cents, ts FROM tx WHERE direction='OUT' AND ts >= datetime('now','-120 days')"));
-            const cred = this.#rows(sql.exec("SELECT balance_cents FROM cards WHERE kind='credit' LIMIT 1"))[0];
-            const bal = this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(balance_cents AS INTEGER)),0) AS s FROM cards WHERE kind='debit'"))[0];
-            const gm = this.#rows(sql.exec("SELECT amount_cents FROM holdings WHERE fund = 'global-money-1'"))[0];
-            const bjNow = new Date(Date.now() + 8 * 3600_000);
-            const gen = generateProposals(
-              { subs, bills, payees, tasks, routine_tx: txs, creditDebtCents: BigInt(cred?.balance_cents ?? "0"), debitBalanceCents: BigInt(bal?.s ?? 0), gmHoldingCents: BigInt(gm?.amount_cents ?? "0") },
-              { monthKey: bjNow.toISOString().slice(0, 7), nowMs: Date.now() },
-            );
-            for (const p of gen) {
-              if (this.#rows(sql.exec("SELECT id FROM proposals WHERE dedup_key = ?", p.dedup_key))[0]) continue;
-              sql.exec("INSERT INTO proposals(kind, rule, target, dedup_key, params, impact_cents, status, created_at) VALUES(?,?,?,?,?,?, 'PENDING', ?)",
-                p.kind, p.rule, p.target, p.dedup_key, JSON.stringify({ ...p.params, tier: p.tier }), p.impact_cents, NOW);
-              added++;
-            }
-            sql.exec("INSERT OR REPLACE INTO meta(k, v) VALUES('prop_scan_at', ?)", NOW);
-          }
+          if (stale || input.force) added = this.#proposalScan(sql);
           const { list, report } = this.#proposalView(sql);
-          return json({ ok: true, added, proposals: list, report, scanned_at: scannedRaw ?? NOW });
+          return json({ ok: true, added, proposals: list, report, scanned_at: (this.#rows(sql.exec("SELECT v FROM meta WHERE k = 'prop_scan_at'"))[0] ?? {}).v ?? NOW });
         }
-        /* 只读轻量徽标（第七期 idle 凸显机制）：PENDING 计数 + since(上次查看时间戳 ISO，空=全部视为新)
-           之后新增数 + 首条 PENDING（速览行用）+ 北京月战报。绝不触发扫描（扫描仅 proposalPage/MCP）。 */
+        /* 只读轻量徽标（第七期 idle 凸显 + 第二十二期遗留①）：PENDING 计数 + since(上次查看时间戳 ISO，
+           空=全部视为新)之后新增数 + 首条 PENDING（速览行用）+ 北京月战报。
+           badge 由每个登录页 chrome 拉取——现在同样触发 6h 节流扫描（用户从不打开提议页，提议也会更新；
+           扫描新增>0 时三渠道通知由 REST 路由侧收口）。 */
         case "proposalBadge": {
           const since = String(input.since ?? "");
+          const scannedRaw = (this.#rows(sql.exec("SELECT v FROM meta WHERE k = 'prop_scan_at'"))[0] ?? {}).v ?? null;
+          const stale = !scannedRaw || Date.now() - Date.parse(scannedRaw) > 6 * 3600_000;
+          let added = 0;
+          if (stale || input.force) added = this.#proposalScan(sql);
+          const scannedAt = (this.#rows(sql.exec("SELECT v FROM meta WHERE k = 'prop_scan_at'"))[0] ?? {}).v ?? NOW;
           const { list, report } = this.#proposalView(sql);
           const pending = list.filter((p) => p.status === "PENDING");
           const fresh = since ? pending.filter((p) => String(p.created_at ?? "") > since).length : pending.length;
           const top = pending[0] ?? null;
-          return json({ ok: true, pending: pending.length, fresh, top: top ? { id: top.id, kind: top.kind, rule: top.rule, tier: top.tier, impact_cents: top.impact_cents, params: top.params } : null, report });
+          return json({ ok: true, pending: pending.length, fresh, added, scanned_at: scannedAt, top: top ? { id: top.id, kind: top.kind, rule: top.rule, tier: top.tier, impact_cents: top.impact_cents, params: top.params } : null, report });
         }
         case "proposalDismiss": {
           const r = this.#rows(sql.exec("SELECT * FROM proposals WHERE id = ?", input.id))[0];
@@ -6662,6 +7116,21 @@ export class LedgerDO {
               verified = BigInt(h?.amount_cents ?? "0") > BigInt(String(pr.prev_holding_cents ?? "0"));
               break;
             }
+            /* 第二十二期：目标提速=提议创建后目标确有新存入；发薪日钩子=确已挂上月度自动存入任务 */
+            case "goal_offtrack": {
+              verified = this.#rows(sql.exec(
+                "SELECT id FROM goal_events WHERE goal_id = ? AND kind = 'contribute' AND created_at > ? LIMIT 1",
+                Number(r.target), String(r.created_at ?? ""),
+              )).length > 0;
+              break;
+            }
+            case "goal_payday": {
+              verified = this.#rows(sql.exec(
+                "SELECT id FROM tasks WHERE type = 'goal_contribution' AND repeat = 'monthly' AND instr(payload, ?) > 0 LIMIT 1",
+                `"goal_id":${Number(r.target)}`,
+              )).length > 0;
+              break;
+            }
           }
           if (!verified) return json({ ok: false, error: "NOT_EXECUTED" });
           sql.exec("UPDATE proposals SET status = 'EXECUTED', executed_at = ? WHERE id = ?", NOW, input.id);
@@ -6703,8 +7172,67 @@ export class LedgerDO {
       await tgNotify(this.env, [...lines, ...(steps.length ? ["路径 " + escHtml(steps.join(" → "))] : []), `<b>Time</b>: ` + new Date().toISOString()].join("\n"));
     } catch { /* 通知外发失败不影响账本结果 */ }
   }
+  /* 目标里程碑/达成触点（月度自动存入路径，DO 内无 waitUntil——直接 await，失败不抛）：
+     站内 notify 已由调用处发；此处补邮件+TG，数字全系统侧。 */
+  async #goalTouch(kind, { name, pct = null, saved, target, amount = null }) {
+    try {
+      const prof = await this.fetch(new Request("https://ledger.internal/", {
+        method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+        body: JSON.stringify({ op: "getProfile" }),
+      })).then((r) => r.json());
+      const email = prof?.profile?.email;
+      if (email) {
+        const m = kind === "achieved" ? goalAchievedMail({ name, target, saved }) : goalMilestoneMail({ name, pct, saved, target, auto: true });
+        await sendMail(this.env, { to: email, ...m });
+      }
+      const lines = kind === "achieved"
+        ? [`🏆 <b>攒钱目标已达成</b>`, "", `目标 ${escHtml(name)}`, `累计 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)} · 已解锁退回可用余额`]
+        : [`🎯 <b>目标进度 ${escHtml(String(pct))}%</b>`, "", `目标 ${escHtml(name)}`, `已存 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}${amount ? ` · 本笔 ¥${escHtml(amount)}（月度自动存入）` : ""}`];
+      await tgNotify(this.env, [...lines, `<b>Time</b>: ` + new Date().toISOString()].join("\n"));
+    } catch { /* 通知外发失败不影响账本结果 */ }
+  }
+  /* 提议扫描（proposalPage 与 proposalBadge 共用，遗留①：badge 拉取也触发——6h 节流在调用方判定） */
+  #proposalScan(sql) {
+    const subs = this.#rows(sql.exec("SELECT * FROM subscriptions"));
+    const bills = this.#rows(sql.exec("SELECT * FROM bills"));
+    const payees = this.#rows(sql.exec("SELECT * FROM payees"));
+    const tasks = this.#rows(sql.exec("SELECT * FROM tasks"));
+    const txs = this.#rows(sql.exec("SELECT counterparty, amount_cents, ts FROM tx WHERE direction='OUT' AND ts >= datetime('now','-120 days')"));
+    const cred = this.#rows(sql.exec("SELECT balance_cents FROM cards WHERE kind='credit' LIMIT 1"))[0];
+    const bal = this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(balance_cents AS INTEGER)),0) AS s FROM cards WHERE kind='debit'"))[0];
+    const gm = this.#rows(sql.exec("SELECT amount_cents FROM holdings WHERE fund = 'global-money-1'"))[0];
+    /* 目标快照（进度数学 + 已挂月度任务去重）；发薪日=近 120 天 ≥¥2000 入账的日频众数（≥2 次，1-28） */
+    const goals = this.#rows(sql.exec("SELECT * FROM goals WHERE status = 'ACTIVE'"));
+    const tasked = new Set();
+    for (const t of this.#rows(sql.exec("SELECT payload FROM tasks WHERE type = 'goal_contribution' AND status = 'PENDING'"))) {
+      try { tasked.add(Number(JSON.parse(t.payload ?? "{}").goal_id)); } catch { /* 脏 payload 忽略 */ }
+    }
+    const goalSnap = goals.map((g) => ({
+      id: g.id, name: g.name, target_cents: g.target_cents, deadline: g.deadline, monthly_plan_cents: g.monthly_plan_cents, created_at: g.created_at,
+      saved_cents: String(this.#rows(sql.exec("SELECT COALESCE(SUM(CAST(amount_cents AS INTEGER)),0) AS s FROM goal_events WHERE goal_id = ? AND kind = 'contribute'", g.id))[0]?.s ?? 0),
+      has_monthly_task: tasked.has(Number(g.id)),
+    }));
+    let paydayDay = null;
+    const pd = this.#rows(sql.exec("SELECT substr(ts,9,2) AS d, COUNT(*) AS n FROM tx WHERE direction='IN' AND CAST(amount_cents AS INTEGER) >= 200000 AND ts >= datetime('now','-120 days') GROUP BY d ORDER BY n DESC, d ASC"));
+    if (pd.length && Number(pd[0].n) >= 2) paydayDay = Math.min(28, Math.max(1, Number(pd[0].d)));
+    const bjNow = new Date(Date.now() + 8 * 3600_000);
+    const gen = generateProposals(
+      { subs, bills, payees, tasks, routine_tx: txs, creditDebtCents: BigInt(cred?.balance_cents ?? "0"), debitBalanceCents: BigInt(bal?.s ?? 0), gmHoldingCents: BigInt(gm?.amount_cents ?? "0"), goals: goalSnap, paydayDay },
+      { monthKey: bjNow.toISOString().slice(0, 7), nowMs: Date.now() },
+    );
+    let added = 0;
+    for (const p of gen) {
+      if (this.#rows(sql.exec("SELECT id FROM proposals WHERE dedup_key = ?", p.dedup_key))[0]) continue;
+      sql.exec("INSERT INTO proposals(kind, rule, target, dedup_key, params, impact_cents, status, created_at) VALUES(?,?,?,?,?,?, 'PENDING', ?)",
+        p.kind, p.rule, p.target, p.dedup_key, JSON.stringify({ ...p.params, tier: p.tier }), p.impact_cents, new Date().toISOString());
+      added++;
+    }
+    sql.exec("INSERT OR REPLACE INTO meta(k, v) VALUES('prop_scan_at', ?)", this.#now());
+    return added;
+  }
   /* 提议列表 + 北京月战报（proposalPage / Dismiss / Settle 共用视图）：PENDING（60 天内）+ 本月 EXECUTED；
-     saved_cents 只累计 SAVE 类 impact（不把理财申购额当"省下"——绝不幸存收益口径） */
+     saved_cents 只累计 SAVE 类 impact（不把理财申购额当"省下"——绝不幸存收益口径）；
+     routine_count 纳入目标月度自动存入（goal_contribution 任务本月执行数计 1 笔/次，金额不当"省钱"） */
   #proposalView(sql) {
     const bjMonth = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 7);
     const bjMonthOf = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t + 8 * 3600_000).toISOString().slice(0, 7) : ""; };
@@ -6718,7 +7246,57 @@ export class LedgerDO {
     const pending = rows.filter((r) => r.status === "PENDING" && String(r.created_at ?? "") >= cutoff).map(fmt);
     const done = rows.filter((r) => r.status === "EXECUTED" && bjMonthOf(r.executed_at) === bjMonth).map(fmt);
     const saved = done.reduce((a, r) => a + (r.impact_cents ? BigInt(r.impact_cents) : 0n), 0n);
-    return { list: [...pending, ...done], report: { month: bjMonth, saved_cents: String(saved), done_count: done.length, routine_count: done.filter((r) => r.kind === "ROUTINE").length } };
+    const goalAutoCount = this.#rows(sql.exec("SELECT completed_at FROM tasks WHERE type = 'goal_contribution' AND completed_at IS NOT NULL"))
+      .filter((r) => bjMonthOf(r.completed_at) === bjMonth).length;
+    return { list: [...pending, ...done], report: { month: bjMonth, saved_cents: String(saved), done_count: done.length, routine_count: done.filter((r) => r.kind === "ROUTINE").length + goalAutoCount, goal_auto_count: goalAutoCount } };
+  }
+  /* 目标种子（第二十二期）：状态自洽律——contributions 合计即目标 saved、同步增 held（叠加不覆盖，
+     生日硬置 60000 之后执行）、linked 月度任务 payload.goal_id 指向真实行 id、月计划=target/总月数。
+     merge 模式按 name 幂等（不清既有目标）；返回新插任务 id 供 saga 排程。 */
+  #seedGoals(sql, seed, { wipe }) {
+    if (!Array.isArray(seed) || !seed.length) return [];
+    if (wipe) { sql.exec("DELETE FROM goal_events"); sql.exec("DELETE FROM goals"); }
+    const NOW = this.#now();
+    const DAY = 86400000, MONTH = 30 * DAY;
+    const taskIds = [];
+    for (const g of seed) {
+      if (!wipe && this.#rows(sql.exec("SELECT id FROM goals WHERE name = ?", g.name))[0]) continue;
+      const nowMs = Date.now();
+      const createdAgo = Number(g.created_days_ago ?? 60);
+      const deadlineIn = Number(g.deadline_days ?? 120);
+      const createdIso = new Date(nowMs - createdAgo * DAY).toISOString();
+      const monthsTotal = Math.max(1, Math.ceil((createdAgo + deadlineIn) * DAY / MONTH));
+      const target = BigInt(g.target_cents);
+      const monthly = (target + BigInt(monthsTotal) - 1n) / BigInt(monthsTotal);
+      const deadline = new Date(nowMs + deadlineIn * DAY).toISOString().slice(0, 10);
+      let saved = 0n;
+      for (const c of g.contributions ?? []) saved += BigInt(c);
+      const pct = target > 0n ? Number((saved * 10000n) / target) / 100 : 0;
+      const milestone = Math.min(75, Math.floor(pct / 25) * 25);
+      sql.exec("INSERT INTO goals(name, purpose, target_cents, deadline, monthly_plan_cents, status, created_at, milestone) VALUES(?,?,?,?,?,'ACTIVE',?,?)",
+        g.name, g.purpose ?? null, g.target_cents, deadline, String(monthly), createdIso, String(milestone));
+      const gid = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;
+      (g.contributions ?? []).forEach((c, i) => {
+        /* 钳制到 now-25h（昨天）：事件若落"今天"会污染 todayOutCents 日累计，AI 通道存入被误升红/误拦 */
+        sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'contribute', ?, '月度自动存入', ?)",
+          gid, c, new Date(Math.min(nowMs - 25 * 3600_000, nowMs - createdAgo * DAY + (i + 1) * MONTH)).toISOString());
+      });
+      if (saved > 0n) {
+        const held = BigInt(this.#rows(sql.exec("SELECT held_cents FROM cards WHERE is_default = 1"))[0]?.held_cents ?? "0");
+        sql.exec("UPDATE cards SET held_cents = ? WHERE is_default = 1", String(held + saved));
+      }
+      if (g.task) {
+        const dom = Math.min(28, Math.max(1, Number(g.task.day_of_month ?? 3)));
+        const bj = new Date(nowMs + 8 * 3600_000);
+        let d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), dom, 1, 0, 0));
+        if (d.getTime() <= nowMs) d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth() + 1, dom, 1, 0, 0));
+        sql.exec("INSERT INTO tasks(type, title, payload, status, next_run_at, repeat, created_at) VALUES(?,?,?, 'PENDING', ?, 'monthly', ?)",
+          "goal_contribution", `每月自动存入「${g.name}」`, JSON.stringify({ goal_id: gid, amount: centsToStr(BigInt(g.task.amount_cents)) }), d.toISOString(), NOW);
+        const id = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;
+        taskIds.push({ id, execute_at: d.toISOString() });
+      }
+    }
+    return taskIds;
   }
   /* 提议种子（demo 战报非零）：EXECUTED 预置行 + 对象状态同步（订阅置 CANCELLED / 账单置 autopay）——
      settle 核验若重跑也能通过，账本口径自洽 */
