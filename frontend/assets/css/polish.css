@@ -435,11 +435,11 @@ body.tc-open { overflow: hidden; }
   .hscroll { margin: 0 -16px; padding: 0 16px var(--sp-2); }
 }
 
-/* ===== 26. Header logo（第二十三轮：桌面 24→27px +12.5%；头像直径 32→27px≈logo 高；手机 56px 顶栏不变） ===== */
+/* ===== 26. Header logo（第二十五轮：桌面 avatar 27→32px =×1.185；手机 logo 22→29px =×1.32、avatar 24→31px =×1.29；≤380 再降档防溢出） ===== */
 .app-header .logo-link img { height: 27px; transition: height .2s ease; }
-@media (min-width: 768px) { .app-header .avatar { width: 27px; height: 27px; font-size: 12px; } }
-@media (max-width: 767px) { .app-header .logo-link img { height: 22px; } .app-header .avatar { width: 24px; height: 24px; font-size: 11px; } }
-@media (max-width: 380px) { .app-header .logo-link img { height: 24px; } }
+@media (min-width: 768px) { .app-header .avatar { width: 32px; height: 32px; font-size: 14px; } }
+@media (max-width: 767px) { .app-header .logo-link img { height: 29px; } .app-header .avatar { width: 31px; height: 31px; font-size: 13px; } }
+@media (max-width: 380px) { .app-header .logo-link img { height: 26px; } .app-header .avatar { width: 29px; height: 29px; font-size: 12px; } }
 
 /* ===== 27. 手风琴收起态零高度（padding 也要归零，否则露半行答案） ===== */
 .acc-item.hacc .acc-body { padding: 0 16px !important; max-height: 0 !important; }

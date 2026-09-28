@@ -38,7 +38,9 @@ S.router.register("wealth-goals", async ({ user }) => {
     if (d) { d.textContent = S.t("goals.pickDate"); d.classList.remove("has"); }
   };
   newBtn.addEventListener("click", (e) => {
-    if (e.target.closest("#gl-form") || e.target.closest("#gl-collapse")) return;
+    /* 收起钮在最前（它在 form 内部，不能被 form-guard 拦截） */
+    if (e.target.closest("#gl-collapse")) { collapseNew(); return; }
+    if (e.target.closest("#gl-form")) return;
     if (e.target.closest("#gl-new-btn")) {
       if (!newBtn.classList.contains("open")) {
         newBtn.style.width = newBtn.offsetWidth + "px";

@@ -510,7 +510,7 @@
 
 /* ===== P41 /wealth/goals 攒钱目标（第二十三期改版：摩尔斯新建卡 + 日历 + 同行 % + 纵向分隔线） ===== */
 /* 新建目标：navy 胶囊 → 白卡形变（宽度 JS 定桩→100%；底色/圆角/内距/阴影同步过渡，微回弹曲线） */
-.gl-new { display: block; width: fit-content; max-width: 100%; overflow: hidden; text-align: left;
+.gl-new { display: block; width: fit-content; max-width: 100%; overflow: hidden; text-align: left; margin-top: 7px;
   border: 1px solid transparent; border-radius: 999px; background: var(--color-navy); color: #fff;
   transition: width .42s cubic-bezier(.22, 1.18, .36, 1), background-color .3s ease, border-radius .3s ease, padding .3s ease, box-shadow .3s ease; }
 .gl-new:hover { box-shadow: 0 6px 18px rgba(16, 24, 81, .22); }
@@ -519,13 +519,13 @@
 .gl-new-t .ic { color: #fff; }
 .gl-new-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .42s cubic-bezier(.25,.6,.3,1) .12s, opacity .3s ease .18s; }
 .gl-new-inner { min-height: 0; overflow: hidden; }
-.gl-new.open { background: #fff; border-color: var(--color-line); border-radius: var(--r-card); padding: 16px 18px; box-shadow: var(--shadow); }
+.gl-new.open { background: #fff; border-color: var(--color-line); border-radius: var(--r-card); padding: 14px 16px; box-shadow: var(--shadow); color: var(--color-ink); } /* color 修复：胶囊时代 #fff 继承让标签/勾选文字隐形（第二十五轮） */
 .gl-new.open .gl-new-t { display: none; } /* 展开态即目标设立卡：胶囊文案退役，卡从"目标名称"开始 */
 .gl-new.open .gl-new-body { grid-template-rows: 1fr; opacity: 1; }
 .gl-new .field { flex: 1 1 160px; margin: 0; }
-.gl-new .gl-new-inner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding-top: 4px; }
+.gl-new .gl-new-inner { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .gl-new .input { font-size: 16px; } /* iOS ≥16px */
-.gl-new-head { display: flex; align-items: center; justify-content: space-between; flex: 1 1 100%; margin-bottom: 6px; }
+.gl-new-head { display: flex; align-items: center; justify-content: space-between; flex: 1 1 100%; margin-bottom: 2px; }
 .gl-new-head b { font-size: 15px; color: var(--color-ink); }
 .gl-collapse { border: none; background: none; font-family: inherit; font-size: 13px; color: var(--color-ink-2); cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background-color .12s ease, color .12s ease; }
 .gl-collapse:hover { background: var(--color-surface); color: var(--color-ink); }
