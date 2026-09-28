@@ -61,7 +61,8 @@ SUPPORT_INBOX = "support@suveoo.com"
 # 缺省不设置 MODEL_PROFILE = 沿用下方 LLM_* 三变量（与历史行为逐字节一致）。
 # 完整教程（三步切换法/新增模型/回滚/常见坑）：for_developer/switch_models.md
 MODEL_PROFILE = "glm-5.3-flash"
-# 当前（第二十八轮）：智谱开放平台 Anthropic 兼容端点 + glm-5.3-flash（思考型；tools/tool_use/流式实测全兼容）
+# 当前（第二十八轮起）：智谱开放平台 Anthropic 兼容端点 + glm-5.3-flash（思考型；tools/tool_use/流式实测全兼容）
+# （第十三期红队测试 2026-09-29 曾切 qwen3.7-flash 全量测试 ~135 轮，测毕已切回）
 LLM_PROVIDER = "glm"
 LLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
 LLM_MODEL = "glm-5.3-flash"
