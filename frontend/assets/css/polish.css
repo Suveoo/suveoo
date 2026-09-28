@@ -717,7 +717,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .pp-count, .pp-bubble { animation: none !important; } .pp-bubble.pp-out { transition: none; } }
 
 /* ===== 日历选择器（第二十三期 /wealth/goals 截止日期）：模糊遮罩 + 锁滚 + 年月可键入 ===== */
-.cal-mask { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; background: rgba(16, 24, 81, .32); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cal-in .2s ease both; }
+.cal-mask { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, .32); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cal-in .2s ease both; }
 @keyframes cal-in { from { opacity: 0; } to { opacity: 1; } }
 .cal { width: min(316px, calc(100vw - 48px)); background: #fff; border-radius: 16px; box-shadow: 0 16px 44px rgba(16, 24, 81, .24); padding: 14px 16px 16px; animation: cal-pop .26s cubic-bezier(.22, 1.18, .36, 1) both; }
 @keyframes cal-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }

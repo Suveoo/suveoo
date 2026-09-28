@@ -24,43 +24,43 @@
 <meta name="twitter:description" content="Suveoo 帮助中心：快速指引、常见问题（账户/转账/理财/订阅/隐私）、防诈骗指南与 AI 安全说明；支持全文搜索，多数问题自助解决。（模拟银行系统，不涉及真实资金行为。）">
 <meta name="twitter:image" content="https://suveoo.com/assets/images/og-image.png">
 <link rel="preconnect" href="https://www.googletagmanager.com">
-<link rel="stylesheet" href="/assets/css/tokens.css?v=b231">
-<link rel="stylesheet" href="/assets/css/base.css?v=b231">
-<link rel="stylesheet" href="/assets/css/layout.css?v=b231">
-<link rel="stylesheet" href="/assets/css/components.css?v=b231">
-<link rel="stylesheet" href="/assets/css/genui.css?v=b231">
-<link rel="stylesheet" href="/assets/css/trust-console.css?v=b231">
-<link rel="stylesheet" href="/assets/css/pages.css?v=b231">
-<link rel="stylesheet" href="/assets/css/polish.css?v=b231">
+<link rel="stylesheet" href="/assets/css/tokens.css?v=b234">
+<link rel="stylesheet" href="/assets/css/base.css?v=b234">
+<link rel="stylesheet" href="/assets/css/layout.css?v=b234">
+<link rel="stylesheet" href="/assets/css/components.css?v=b234">
+<link rel="stylesheet" href="/assets/css/genui.css?v=b234">
+<link rel="stylesheet" href="/assets/css/trust-console.css?v=b234">
+<link rel="stylesheet" href="/assets/css/pages.css?v=b234">
+<link rel="stylesheet" href="/assets/css/polish.css?v=b234">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KLK499CDQF"></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","name":"Suveoo 帮助中心常见问题","inLanguage":"zh-CN","mainEntity":[{"@type":"Question","name":"支持哪些登录方式？","acceptedAnswer":{"@type":"Answer","text":"两种标识符均可登录：注册邮箱，或本平台签发的 16 位虚拟卡号，配合密码使用；开启两步验证后还需输入邮箱验证码（5 分钟有效）。验证码单码限 5 次尝试，防止暴力猜测。"}},{"@type":"Question","name":"登录失败被锁定了怎么办？","acceptedAnswer":{"@type":"Answer","text":"连续 5 次密码错误将触发 15 分钟锁定，这是防暴力破解的标准措施，到期自动解锁，无需人工干预。如果你忘记了密码，请使用「找回密码」流程：在预留邮箱接收验证码即可自助重置（模拟系统无需护照号）。重置后建议立即登录并检查最近交易。"}},{"@type":"Question","name":"收不到登录验证码怎么办？","acceptedAnswer":{"@type":"Answer","text":"按以下顺序排查：①检查邮箱的垃圾邮件/促销邮件文件夹（发件人为 noreply@suveoo.com，经 Cloudflare Email Service 发出）；②注意 60 秒重发冷却与每小时 5 封的频控——频繁点击「重新发送」只会更慢；③验证码 10 分钟内有效、单码限 5 次尝试，过期请重新获取；④确认邮箱地址拼写无误。因你方邮箱服务商拒收或延迟导致的送达问题不属于平台过错，可更换邮箱服务商测试。"}},{"@type":"Question","name":"注册时一定要填真实姓名吗？","acceptedAnswer":{"@type":"Answer","text":"不需要。这是模拟银行系统，姓名仅作界面展示，可使用化名；但请勿冒用真实他人身份并宣称系其本人，也不得使用侵犯他人商标或姓名权的标识。开户即时签发 4 张借记卡（余额为随机模拟数据，合计约 ¥100 万）与 1 张信用卡（额度 ¥320,000）。"}},{"@type":"Question","name":"如何开启/关闭两步验证（2FA）？","acceptedAnswer":{"@type":"Answer","text":"进入「安全中心」，切换「两步验证」开关：开启时系统先向你预留邮箱发送验证码，输入正确后立即生效。开启后，登录需额外验证码，红色级操作（大额转账、基金申购、卡片冻结等）也要求更强验证。关闭 2FA 同样需要 OTP 确认，防止他人替你关闭。"}},{"@type":"Question","name":"可以删除账户吗？","acceptedAnswer":{"@type":"Answer","text":"可以。发送邮件至 support@suveoo.com 说明来意，我们将删除账户、卡片、流水与持仓数据（存储期限详见《隐私政策》第八条）。删除不影响你在本平台浏览公开页面。"}},{"@type":"Question","name":"为什么跨行转账和跨境汇款是灰色的？","acceptedAnswer":{"@type":"Answer","text":"模拟银行系统仅支持行内转账（Suveoo 16 位虚拟卡号之间）。跨行与跨境汇款入口以灰色展示并在点击时说明，这是「模拟」边界的显式呈现，而非功能缺陷。外汇牌价与兑换计算器可作为跨境场景的演示替代。"}},{"@type":"Question","name":"什么操作需要确认？什么是绿色/黄色/红色？","acceptedAnswer":{"@type":"Answer","text":"三色分级由服务端策略引擎按操作类型与金额实时判定：绿色（查询、账单分析、联系人检索等只读操作）自动执行；黄色（转账、限额调整、订阅取消等）需要你确认；红色（大额转账、基金申购赎回、存款开户、卡片冻结、改密等）需要两段式确认加邮箱 OTP 强验证。分级与金额、日累计相关，客户端展示不构成判定依据。"}},{"@type":"Question","name":"确认卡里的 grant 是什么？为什么 120 秒后就失效？","acceptedAnswer":{"@type":"Answer","text":"grant_hash 是对你确认内容（收款人、金额、币种等授权字段）的加密快照绑定：有效期 120 秒、一次性消费、与你的账户绑定。确认时系统逐字段比对——任何参数变化都会使授权失效（CONSENT_INVALIDATED），这保证「你确认过的」与「实际执行的」完全一致。过期或已使用的 grant 重新发起操作即可获得新的 grant。"}},{"@type":"Question","name":"提示余额不足，但我明明有钱？","acceptedAnswer":{"@type":"Answer","text":"可用余额 = 卡余额 − 锁定资金。锁定期资金（如「生日订花」长程任务的预算）在卡片上以黄色徽章单独标注，任务完成时资金付出，取消任务或履约失败时自动解锁返还。请检查是否选择了余额不足的付款卡，或资金正处于锁定状态。"}},{"@type":"Question","name":"预约转账可以取消吗？钱会退回吗？","acceptedAnswer":{"@type":"Answer","text":"可以。在「预约转账」页对待执行任务点击取消：若任务已锁定资金，系统自动执行补偿（资金解锁返还），任务标记为已补偿。到点履约还有到期扫描兜底，即使调度事件丢失也会在列表读取时补履约。"}},{"@type":"Question","name":"转账后对方/我能收到通知吗？","acceptedAnswer":{"@type":"Answer","text":"会。行内转账完成后，转出方与转入方（如配置了邮箱）都会收到邮件通知；填写备注时备注内容将包含在邮件中。邮件由 noreply@suveoo.com 经 Cloudflare Email Service 发出。"}},{"@type":"Question","name":"基金净值和收益率是真实数据吗？","acceptedAnswer":{"@type":"Answer","text":"不是。全部净值、历史业绩、费率与存款利率均为静态编造的演示数据，仅用于展示界面与计算链路，不代表任何真实产品，也不构成投资建议。这是「模拟银行系统」声明的组成部分。"}},{"@type":"Question","name":"为什么我无法申购某只基金？","acceptedAnswer":{"@type":"Answer","text":"触发了适当性保护：产品风险等级（R1–R5）必须不高于你的风险承受等级（PR1–PR5，由注册时的八题测评折算，可在安全中心重新测评）。不匹配时服务端拒绝（APPROPRIATENESS_MISMATCH），界面会预先提示——即使绕过界面直接提交，验证运行时也会拦截。"}},{"@type":"Question","name":"持仓市值是怎么算的？","acceptedAnswer":{"@type":"Answer","text":"持仓市值 ≈ 本金 × 当前净值 ÷ 成本净值，用于资产总览与仪表盘演示；「今日收益」为基于模拟净值的近似浮动盈亏。真实基金的费用、分红与税费不在演示范围内。"}},{"@type":"Question","name":"外汇兑换有额度限制吗？","acceptedAnswer":{"@type":"Answer","text":"有。模拟年度换汇额度为 $50,000 等值，用于演示额度不变量校验：额度不足时兑换被拒绝。牌价为静态演示数据，与真实市场无关；兑换为黄色操作，需两段式确认。"}},{"@type":"Question","name":"赎回基金为什么也要红色验证？","acceptedAnswer":{"@type":"Answer","text":"赎回直接减少你的资产，与申购同属高影响操作，因此统一要求两段式确认加邮箱 OTP。这是「操作影响越大、验证越强」分级原则的体现。"}},{"@type":"Question","name":"如何取消订阅？","acceptedAnswer":{"@type":"Answer","text":"在「账单与订阅」页对活跃订阅点击「取消订阅」：黄色两段式确认后立即生效，订阅状态转为已取消，提醒同步关闭。取消不可撤销，但你可以随时重新关注类似产品（演示语义）。"}},{"@type":"Question","name":"「低使用率」标记是什么？","acceptedAnswer":{"@type":"Answer","text":"使用率低于 20% 的活跃订阅会触发醒目提示（含使用率与月费），这是对真实银行 App「订阅提醒」功能的演示，帮你识别闲置扣费——页面同时提供一键让 AI 分析并退掉最少用订阅的入口。"}},{"@type":"Question","name":"自动扣费可以关闭吗？","acceptedAnswer":{"@type":"Answer","text":"可以。每条订阅提供「提醒」开关（关闭后不再生成扣费提醒通知），账单也支持一键缴费与自动扣费开关演示。"}},{"@type":"Question","name":"你们设置哪些 Cookie？","acceptedAnswer":{"@type":"Answer","text":"全部为第一方：会话令牌（1 小时，localStorage）、语言偏好（1 年）、Cookie 同意状态（1 年）、分析同意标记（1 年）。分析类 Cookie（GA4 的 _ga 系列，2 年）仅在你明确选择「接受全部」或开启分析开关后才由 Google 设置。完整清单、用途与期限见《Cookie 政策》第 2 条。"}},{"@type":"Question","name":"我如何更改或撤回 Cookie 同意？","acceptedAnswer":{"@type":"Answer","text":"两个入口即时生效：页脚「Cookie Preferences」按钮，或任意页面首次访问约 4 秒后出现的偏好卡。你可以单独开关「分析与统计」，也可以仅必要/接受全部。撤回后 GA4 立即停止测量，分析 Cookie 随浏览器清除策略删除。"}},{"@type":"Question","name":"拒绝分析 Cookie 后你们还能看到我吗？","acceptedAnswer":{"@type":"Answer","text":"不能。拒绝时 GA4 进入 Cookieless 模式：不设置 Cookie、不读取设备标识，仅发送不含客户端 ID 的无 Cookie 度量 ping，用于聚合估算「大约多少人拒绝」；这些数据不进入你的个体报告，也无法关联到你的账户。"}},{"@type":"Question","name":"AI 对话会被记录吗？","acceptedAnswer":{"@type":"Answer","text":"对话经本平台服务端代理转发至模型服务商（详见《隐私政策》第六条）；对话历史随会话保留，你可随时发起新会话隔离上下文。传输内容不含密码、令牌、验证码与完整卡号；AI 的输出只是「提议」，任何影响资金的动作仍需你确认。"}},{"@type":"Question","name":"页面一直显示加载中或不响应？","acceptedAnswer":{"@type":"Answer","text":"本平台内置三层自愈：请求超时自动换连接重试、20 秒启动看门狗自动刷新、Service Worker 离线兜底。若仍异常：①手动刷新一次；②清除本站站点数据后重试；③检查是否有代理/防火墙拦截。若反复出现，请连同时间点报告至 support@suveoo.com。"}},{"@type":"Question","name":"界面文字出现「xxx.yyy」形式的裸键？","acceptedAnswer":{"@type":"Answer","text":"这通常是语言包加载被中断所致，刷新一次即可恢复；若持续出现，请告知具体页面与语言组合。"}},{"@type":"Question","name":"AI 回答一直没有输出？","acceptedAnswer":{"@type":"Answer","text":"AI 对话依赖模型服务商可用性，高峰期可能偶发超时；点击输入框重新发送即可重试。对话不会因重试产生费用（模拟系统）。"}},{"@type":"Question","name":"收到的邮件格式混乱或缺失？","acceptedAnswer":{"@type":"Answer","text":"部分邮箱客户端对 HTML 邮件渲染不一致，正文关键信息（验证码、金额、流水号）始终以纯文本同时提供；若缺失请反馈至 support@suveoo.com 并附邮件截图。"}}]}</script>
 </head>
 <body data-page="help">
 <main id="main" class="page"><div id="content"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></main>
-<script src="/assets/js/core/format.js?v=b231" defer></script>
-<script src="/assets/js/core/ui.js?v=b231" defer></script>
-<script src="/assets/js/core/ctl.js?v=b231" defer></script>
-<script src="/assets/js/core/api.js?v=b231" defer></script>
-<script src="/assets/js/core/auth.js?v=b231" defer></script>
-<script src="/assets/js/core/ga4.js?v=b231"></script>
-<script src="/assets/js/core/i18n.js?v=b231" defer></script>
-<script src="/assets/js/core/sim-notice.js?v=b231" defer></script>
-<script src="/assets/js/core/insights.js?v=b231" defer></script>
-<script src="/assets/js/core/voice.js?v=b231" defer></script>
-<script src="/assets/js/charts/line.js?v=b231" defer></script>
-<script src="/assets/js/charts/bar.js?v=b231" defer></script>
-<script src="/assets/js/charts/donut.js?v=b231" defer></script>
-<script src="/assets/js/charts/sankey.js?v=b231" defer></script>
-<script src="/assets/js/charts/sparkline.js?v=b231" defer></script>
-<script src="/assets/js/genui/renderer.js?v=b231" defer></script>
-<script src="/assets/js/genui/cards.js?v=b231" defer></script>
-<script src="/assets/js/genui/consent.js?v=b231" defer></script>
-<script src="/assets/js/chat/chat-client.js?v=b231" defer></script>
-<script src="/assets/js/chat/trust-console.js?v=b231" defer></script>
-<script src="/assets/js/core/router.js?v=b231" defer></script>
-<script src="/assets/js/core/app.js?v=b231" defer></script>
-<script src="/assets/js/core/prefetch.js?v=b231" defer></script>
-<script src="/assets/js/pages/docs-help.js?v=b231" defer></script>
-<script src="/assets/js/pages/help.js?v=b231" defer></script>
+<script src="/assets/js/core/format.js?v=b234" defer></script>
+<script src="/assets/js/core/ui.js?v=b234" defer></script>
+<script src="/assets/js/core/ctl.js?v=b234" defer></script>
+<script src="/assets/js/core/api.js?v=b234" defer></script>
+<script src="/assets/js/core/auth.js?v=b234" defer></script>
+<script src="/assets/js/core/ga4.js?v=b234"></script>
+<script src="/assets/js/core/i18n.js?v=b234" defer></script>
+<script src="/assets/js/core/sim-notice.js?v=b234" defer></script>
+<script src="/assets/js/core/insights.js?v=b234" defer></script>
+<script src="/assets/js/core/voice.js?v=b234" defer></script>
+<script src="/assets/js/charts/line.js?v=b234" defer></script>
+<script src="/assets/js/charts/bar.js?v=b234" defer></script>
+<script src="/assets/js/charts/donut.js?v=b234" defer></script>
+<script src="/assets/js/charts/sankey.js?v=b234" defer></script>
+<script src="/assets/js/charts/sparkline.js?v=b234" defer></script>
+<script src="/assets/js/genui/renderer.js?v=b234" defer></script>
+<script src="/assets/js/genui/cards.js?v=b234" defer></script>
+<script src="/assets/js/genui/consent.js?v=b234" defer></script>
+<script src="/assets/js/chat/chat-client.js?v=b234" defer></script>
+<script src="/assets/js/chat/trust-console.js?v=b234" defer></script>
+<script src="/assets/js/core/router.js?v=b234" defer></script>
+<script src="/assets/js/core/app.js?v=b234" defer></script>
+<script src="/assets/js/core/prefetch.js?v=b234" defer></script>
+<script src="/assets/js/pages/docs-help.js?v=b234" defer></script>
+<script src="/assets/js/pages/help.js?v=b234" defer></script>
 </body>
 </html>

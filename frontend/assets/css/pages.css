@@ -512,11 +512,10 @@
 /* 新建目标：navy 胶囊 → 白卡形变（宽度 JS 定桩→100%；底色/圆角/内距/阴影同步过渡，微回弹曲线） */
 .gl-new { display: block; width: fit-content; max-width: 100%; overflow: hidden; text-align: left;
   border: 1px solid transparent; border-radius: 999px; background: var(--color-navy); color: #fff;
-  padding: 11px 20px; cursor: pointer; font-family: inherit;
   transition: width .42s cubic-bezier(.22, 1.18, .36, 1), background-color .3s ease, border-radius .3s ease, padding .3s ease, box-shadow .3s ease; }
 .gl-new:hover { box-shadow: 0 6px 18px rgba(16, 24, 81, .22); }
-.gl-new:active { transform: scale(.98); }
-.gl-new-t { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+/* 触发层是真 button（外层不能用 button——button 内嵌 form 会被浏览器剥离） */
+.gl-new-t { display: inline-flex; align-items: center; gap: 6px; border: none; background: none; color: #fff; font-size: 14px; font-weight: 600; padding: 11px 20px; cursor: pointer; font-family: inherit; }
 .gl-new-t .ic { color: #fff; }
 .gl-new-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .42s cubic-bezier(.25,.6,.3,1) .12s, opacity .3s ease .18s; }
 .gl-new-inner { min-height: 0; overflow: hidden; }
@@ -524,17 +523,24 @@
 .gl-new.open .gl-new-t { display: none; } /* 展开态即目标设立卡：胶囊文案退役，卡从"目标名称"开始 */
 .gl-new.open .gl-new-body { grid-template-rows: 1fr; opacity: 1; }
 .gl-new .field { flex: 1 1 160px; margin: 0; }
-.gl-new .gl-new-inner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.gl-new .gl-new-inner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding-top: 4px; }
 .gl-new .input { font-size: 16px; } /* iOS ≥16px */
+.gl-new-head { display: flex; align-items: center; justify-content: space-between; flex: 1 1 100%; margin-bottom: 6px; }
+.gl-new-head b { font-size: 15px; color: var(--color-ink); }
+.gl-collapse { border: none; background: none; font-family: inherit; font-size: 13px; color: var(--color-ink-2); cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background-color .12s ease, color .12s ease; }
+.gl-collapse:hover { background: var(--color-surface); color: var(--color-ink); }
+.gl-new .gl-date { font-family: inherit; display: inline-flex; align-items: center; }
 .gl-auto { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; padding: 9px 0; cursor: pointer; white-space: nowrap; }
 .gl-auto input { width: 17px; height: 17px; accent-color: var(--color-navy); }
 .gl-date { text-align: left; }
 .gl-date.has { color: var(--color-ink); }
 
-/* 已有目标卡：桌面 = 左主区 + 1px 纵向分隔线 + 右信息栏（grid）；手机单列（徽章并入名称行） */
-.gl-card { padding: 18px 16px; margin-top: 14px; display: grid; grid-template-columns: minmax(0,1fr) 1px minmax(150px, 208px); gap: 0 16px; }
+/* 已有目标卡：桌面 = 左主区 + 1px 纵向分隔线 + 右信息栏（grid，栏宽 216 定宽防中文竖排）；手机单列（徽章并入名称行） */
+.gl-card { padding: 18px 16px; margin-top: 14px; display: grid; grid-template-columns: minmax(0,1fr) 1px 224px; gap: 0 18px; }
 .gl-card.ended { opacity: .72; }
-.gl-side { border-left: 1px solid var(--color-line); padding-left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.gl-side { border-left: 1px solid var(--color-line); padding-left: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; }
+.gl-side .muted.small { white-space: nowrap; }
+.gl-badge-d { white-space: nowrap; }
 .gl-badge-d { margin-bottom: 2px; }
 .gl-badge-m { display: none; }
 .gl-head { display: flex; gap: 14px; align-items: center; }
@@ -560,11 +566,13 @@
 .gl-inline { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .32s cubic-bezier(.25,.6,.3,1), opacity .24s ease, margin-top .32s ease; margin-top: 0; grid-column: 1 / -1; }
 .gl-inline > .gl-inline-in { min-height: 0; overflow: hidden; }
 .gl-inline.open { grid-template-rows: 1fr; opacity: 1; margin-top: 12px; }
-.gl-inline-in { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: var(--color-surface); border-radius: 12px; padding: 0 14px; }
+.gl-inline-in { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: var(--color-surface); border-radius: 12px; padding: 0 14px; transition: padding .32s ease; }
 .gl-inline.open .gl-inline-in { padding: 14px; }
-.gl-inline-in { transition: padding .32s ease; }
 .gl-inline .field { flex: 1 1 150px; margin: 0; }
-.gl-inline .input { font-size: 16px; }
+.gl-inline .input, .gl-inline .gl-date { font-size: 16px; }
+/* 手机端"问 AI"移入按钮行（"放弃"右侧）；桌面仅在右侧栏显示 */
+.gl-ask-m { display: none; }
+@media (max-width: 600px) { .gl-ask-m { display: inline-flex; margin-left: auto; } .gl-side .ask { display: none; } }
 .gl-note { margin-top: 14px; }
 .gl-empty-tip { text-align: center; }
 @media (prefers-reduced-motion: reduce) { .gl-ring .pr, .gl-bar i { transition: none; } .gl-new { transition: none; } .gl-new.open { width: 100% !important; } }

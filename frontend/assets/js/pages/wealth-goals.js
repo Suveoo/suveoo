@@ -10,8 +10,9 @@ S.router.register("wealth-goals", async ({ user }) => {
   const esc = S.fmt.escape;
   c.innerHTML = `
     <h1>${esc(S.t("wealth.goals"))}</h1>
-    <button class="gl-new" id="gl-new" type="button"><span class="gl-new-t">${S.ui.icon("plus", 14)} ${esc(S.t("goals.new"))}</span>
+    <div class="gl-new" id="gl-new"><button type="button" class="gl-new-t" id="gl-new-btn">${S.ui.icon("plus", 14)} ${esc(S.t("goals.new"))}</button>
       <form class="gl-new-body" id="gl-form" novalidate><div class="gl-new-inner">
+        <div class="gl-new-head"><b>${esc(S.t("goals.setupTitle"))}</b><button type="button" class="gl-collapse" id="gl-collapse">${esc(S.t("goals.collapse"))}</button></div>
         <label class="field"><span class="lb">${esc(S.t("goals.name"))}</span>
           <input class="input" id="gl-name" maxlength="40" placeholder="${esc(S.t("goals.namePh"))}"></label>
         <label class="field"><span class="lb">${esc(S.t("goals.target"))}</span>
@@ -21,20 +22,33 @@ S.router.register("wealth-goals", async ({ user }) => {
         <label class="gl-auto"><input type="checkbox" id="gl-auto"><span>${esc(S.t("goals.autoMonthly"))}</span></label>
         <button class="btn btn-primary" type="submit">${esc(S.t("goals.create"))}</button>
       </div></form>
-    </button>
+    </div>
     <div id="gl-list">${S.ui.skeleton(3)}</div>`;
 
-  /* 新建目标：胶囊按钮向外（右下）扩张成白卡——宽度 JS 定桩后过渡到 100%，底色/圆角/内距同步形变 */
+  /* 新建目标：胶囊按钮向外（右下）扩张成白卡——宽度 JS 定桩后过渡到 100%；收起钮反向收回 */
   let newDeadline = "";
   const newBtn = document.getElementById("gl-new");
+  const collapseNew = () => {
+    newBtn.style.width = newBtn.offsetWidth + "px";
+    void newBtn.offsetWidth;
+    newBtn.classList.remove("open");
+    requestAnimationFrame(() => { newBtn.style.width = ""; });
+    newDeadline = "";
+    const d = document.getElementById("gl-deadline");
+    if (d) { d.textContent = S.t("goals.pickDate"); d.classList.remove("has"); }
+  };
   newBtn.addEventListener("click", (e) => {
-    if (e.target.closest("#gl-form")) return;
-    if (!newBtn.classList.contains("open")) {
-      newBtn.style.width = newBtn.offsetWidth + "px";
-      void newBtn.offsetWidth; /* 强制回流，确保宽度过渡起点生效 */
-      newBtn.classList.add("open");
-      requestAnimationFrame(() => { newBtn.style.width = "100%"; setTimeout(() => document.getElementById("gl-name")?.focus(), 260); });
+    if (e.target.closest("#gl-form") || e.target.closest("#gl-collapse")) return;
+    if (e.target.closest("#gl-new-btn")) {
+      if (!newBtn.classList.contains("open")) {
+        newBtn.style.width = newBtn.offsetWidth + "px";
+        void newBtn.offsetWidth; /* 强制回流，确保宽度过渡起点生效 */
+        newBtn.classList.add("open");
+        requestAnimationFrame(() => { newBtn.style.width = "100%"; setTimeout(() => document.getElementById("gl-name")?.focus(), 260); });
+      }
+      return;
     }
+    if (!newBtn.contains(e.target)) collapseNew();
   });
   document.getElementById("gl-deadline").onclick = async () => {
     const v = await S.ctl.calendar({ value: newDeadline });
@@ -101,6 +115,7 @@ S.router.register("wealth-goals", async ({ user }) => {
           <button class="btn btn-primary btn-sm gl-put" data-id="${g.id}" data-name="${esc(g.name)}">${esc(S.t("goals.contribute"))}</button>
           <button class="btn btn-light btn-sm gl-adj" data-id="${g.id}" data-name="${esc(g.name)}">${esc(S.t("goals.adjust"))}</button>
           <button class="btn btn-ghost btn-sm gl-abd" data-id="${g.id}" data-name="${esc(g.name)}">${esc(S.t("goals.abandon"))}</button>
+          <button class="ai-chip ask gl-ask-m" data-q="${esc(S.t("goals.askAiQ", g.name))}">${S.ui.icon("ai", 12)} ${esc(S.t("goals.askAi"))}</button>
         </div>` : ""}
       </div>
       <div class="gl-side">
