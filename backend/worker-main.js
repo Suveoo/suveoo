@@ -409,8 +409,8 @@ export const TOOL_SCHEMA = {
   subscription_reminder_toggle: { authFields: ["subscription_id", "enabled"], preconditions: ["subscription.status == ACTIVE"], compensation: [] },
   deposit_open:           { authFields: ["product_id", "amount"], preconditions: [], compensation: [] },
   ecommerce_order_mock:   { authFields: ["item", "amount"], preconditions: ["locked_funds >= amount"], compensation: ["cancel_order"] },
-  goal_create:            { authFields: ["name", "target_amount", "deadline"], preconditions: [], compensation: [] },
-  goal_adjust:            { authFields: ["goal_id"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
+  goal_create:            { authFields: ["name", "target_amount", "deadline", "auto_monthly"], preconditions: [], compensation: [] },
+  goal_adjust:            { authFields: ["goal_id", "auto_monthly"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
   goal_contribute:        { authFields: ["goal_id", "amount"], preconditions: ["balance >= amount", "goal.status == ACTIVE"], compensation: [] },
   goal_abandon:           { authFields: ["goal_id"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
 };
@@ -1972,7 +1972,16 @@ async function executeIntent(env, ir) {
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已建立", body: `「${p.name}」目标 ¥${p.target_amount}，截止 ${p.deadline}。建议每月存 ¥${r.monthly}，对我说“每月自动存”即可挂月度任务。` });
       const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
       if (prof.email) await sendMail(env, { to: prof.email, ...goalCreatedMail({ name: p.name, target: p.target_amount, deadline: p.deadline, monthly: r.monthly, months: r.months }) });
-      return { ok: true, goal_id: r.id, monthly: r.monthly, months: r.months, summary: `目标「${p.name}」已建立：攒到 ¥${p.target_amount}，截止 ${p.deadline}（约 ${r.months} 个月，每月约存 ¥${r.monthly}）。存入即锁定进目标桶，达成或放弃时解锁退回。` };
+      /* 每月自动存入勾选（第二十三期）：同一次确认内一站式挂月度任务（goal_contribution，执行时才锁） */
+      let autoTask = null;
+      if (p.auto_monthly === true) {
+        autoTask = await U(env, uid)({ op: "goalAutoMonthly", goal_id: r.id, enabled: true });
+        if (autoTask.ok && autoTask.created) {
+          const stub2 = env.SAGA.get(env.SAGA.idFromName(`task:${uid}:${autoTask.task_id}`));
+          await stub2.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "schedule", user_id: uid, task_id: autoTask.task_id, execute_at: autoTask.execute_at }) });
+        }
+      }
+      return { ok: true, goal_id: r.id, monthly: r.monthly, months: r.months, auto_monthly: p.auto_monthly === true, summary: `目标「${p.name}」已建立：攒到 ¥${p.target_amount}，截止 ${p.deadline}（约 ${r.months} 个月，每月约存 ¥${r.monthly}）。${p.auto_monthly === true ? `已开启每月自动存入 ¥${r.monthly}。` : ""}存入即锁定进目标桶，达成或放弃时解锁退回。` };
     }
     case "goal_contribute": {
       const r = await U(env, uid)({ op: "goalContribute", goal_id: p.goal_id, amount_cents: String(toCents(p.amount)), source: ir.channel });
@@ -1995,7 +2004,20 @@ async function executeIntent(env, ir) {
       if (!r.ok) return r;
       await U(env, uid)({ op: "audit", action: "goal_adjust", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已调整", body: `「${r.name}」目标 ¥${r.target}，截止 ${r.deadline}，月计划调整为 ¥${r.monthly}。` });
-      return { ok: true, goal_id: p.goal_id, monthly: r.monthly, summary: `目标「${r.name}」已调整：目标 ¥${r.target}，截止 ${r.deadline}，每月约存 ¥${r.monthly}。` };
+      /* auto_monthly 勾选（第二十三期）：true=无则按新月计划挂任务；false=取消既有 */
+      let autoLine = "";
+      if (p.auto_monthly === true) {
+        const t = await U(env, uid)({ op: "goalAutoMonthly", goal_id: p.goal_id, enabled: true, amount_cents: String(toCents(r.monthly)) });
+        if (t.ok && t.created) {
+          const stub2 = env.SAGA.get(env.SAGA.idFromName(`task:${uid}:${t.task_id}`));
+          await stub2.fetch("https://saga.internal/", { method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL }, body: JSON.stringify({ op: "schedule", user_id: uid, task_id: t.task_id, execute_at: t.execute_at }) });
+          autoLine = `已开启每月自动存入 ¥${r.monthly}。`;
+        } else if (t.ok) autoLine = `每月自动存入保持开启。`;
+      } else if (p.auto_monthly === false) {
+        const t = await U(env, uid)({ op: "goalAutoMonthly", goal_id: p.goal_id, enabled: false });
+        if (t.ok && t.cancelled) autoLine = "已关闭每月自动存入。";
+      }
+      return { ok: true, goal_id: p.goal_id, monthly: r.monthly, summary: `目标「${r.name}」已调整：目标 ¥${r.target}，截止 ${r.deadline}，每月约存 ¥${r.monthly}。${autoLine}` };
     }
     case "goal_abandon": {
       const r = await U(env, uid)({ op: "goalAbandon", goal_id: p.goal_id });
@@ -2192,7 +2214,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     }
     if (path === "/api/goals" && method === "POST") {
       const b = await readJsonBody(request);
-      const g = await runGuarded(env, ctxInfo, { intent: "goal_create", args: { name: b.name, target_amount: String(b.target_amount ?? ""), deadline: b.deadline }, grantHash: b.grant_hash });
+      const g = await runGuarded(env, ctxInfo, { intent: "goal_create", args: { name: b.name, target_amount: String(b.target_amount ?? ""), deadline: b.deadline, ...(b.auto_monthly != null ? { auto_monthly: b.auto_monthly === true } : {}) }, grantHash: b.grant_hash });
       return guardResponse(g);
     }
     {
@@ -2202,7 +2224,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
         const intent = rg[2] === "/contribute" ? "goal_contribute" : rg[2] === "/abandon" ? "goal_abandon" : "goal_adjust";
         const args = intent === "goal_contribute" ? { goal_id: Number(rg[1]), amount: String(b.amount ?? "") }
           : intent === "goal_abandon" ? { goal_id: Number(rg[1]) }
-          : { goal_id: Number(rg[1]), ...(b.target_amount != null ? { target_amount: String(b.target_amount) } : {}), ...(b.deadline != null ? { deadline: b.deadline } : {}) };
+          : { goal_id: Number(rg[1]), ...(b.target_amount != null ? { target_amount: String(b.target_amount) } : {}), ...(b.deadline != null ? { deadline: b.deadline } : {}), ...(b.auto_monthly != null ? { auto_monthly: b.auto_monthly === true } : {}) };
         const g = await runGuarded(env, ctxInfo, { intent, args, grantHash: b.grant_hash, otp: b.otp, balanceOf: intent === "goal_contribute" ? { op: "cardAvailable", slug: null } : null });
         return guardResponse(g);
       }
@@ -5620,9 +5642,38 @@ export function genDimensionalSeed(rng, presetRaw) {
     debit_total_cents: card_updates.slice(0, 4).reduce((a, c) => a + BigInt(c.balance_cents), 0n).toString(),
     credit_limit_cents: String(creditLimitCents),
     monthAvgTx: Math.round(txs.length / 12),
-    signaturePoints: prof.cos.length + prof.shops.length + prof.subs.length + prof.big.length,
+    signaturePoints: prof.cos.length + prof.shops.length + prof.big.length + prof.subs.length,
   };
-  return { txs, payees, bills, subs, holdings, notifs, tasks, fx_balances, credit_debt_cents: String(creditDebt), card_updates, summary };
+  /* ---- 攒钱目标（第二十三期补：维度化种子此前不含 goals_seed——tier×人生阶段目标档案，rng 确定性） ---- */
+  const GOAL_POOL = {
+    mass: [["应急备用金", "3-6 个月家庭开支", [300000, 1800000]], ["数码换新基金", "手机/平板/相机", [200000, 800000]], ["国内旅行基金", "长假出行", [300000, 1200000]]],
+    affluent: [["购车首付基金", "首付三成", [6000000, 20000000]], ["装修基金", "全屋硬装+软装", [15000000, 40000000]], ["日本旅行基金", "关西深度游", [2000000, 6000000]], ["子女教育金", "课外与研学", [3000000, 12000000]]],
+    hnwi: [["置业首付基金", "改善型住宅", [150000000, 600000000]], ["子女留学金", "海外本科四年", [80000000, 300000000]], ["高端旅行基金", "南极/环球邮轮", [10000000, 40000000]]],
+  };
+  const pool = (GOAL_POOL[preset.tier] ?? GOAL_POOL.mass).slice();
+  const goalCount = int(2, Math.min(3, pool.length));
+  const goalsSeed = [];
+  for (let gi = 0; gi < goalCount; gi++) {
+    const [gname, gpurpose, [lo, hi]] = pool.splice(int(0, pool.length - 1), 1)[0];
+    const targetCents = String(BigInt(Math.round(Number(amt(lo, hi)) * 100)));
+    const createdDays = int(40, 220), deadlineDays = int(90, 420);
+    const frac = 0.08 + rng() * 0.7; /* 进度比例；截断到分 */
+    const savedCents = BigInt(Math.round(Number(targetCents) * frac));
+    const nChunk = int(2, 4);
+    const chunks = [];
+    let rest = savedCents;
+    for (let ci = 0; ci < nChunk; ci++) {
+      const take = ci === nChunk - 1 ? rest : rest * BigInt(int(25, 45)) / 100n;
+      chunks.push(String(take)); rest -= take;
+    }
+    goalsSeed.push({
+      name: gname, purpose: gpurpose, target_cents: targetCents,
+      created_days_ago: createdDays, deadline_days: deadlineDays,
+      contributions: chunks,
+      ...(rng() < 0.6 ? { task: { day_of_month: int(2, 25), amount_cents: String(BigInt(Math.round(Number(targetCents) / Math.max(2, Math.round((createdDays + deadlineDays) / 30))))) } } : {}),
+    });
+  }
+  return { txs, payees, bills, subs, holdings, notifs, tasks, fx_balances, credit_debt_cents: String(creditDebt), card_updates, summary, goals_seed: goalsSeed };
 }
 
 /* ===== 演示人物落户：种子里的收款人全部变成真实 Suveoo 账户（DEMO_MODE 管理员操作，跳过邮箱验证码） ===== */
@@ -5770,12 +5821,12 @@ async function seedDemo(env, targetEmail, opts = {}) {
     });
   }
   let txs, payees, bills, subs, holdings, notifs, tasks, creditDebt, fxBalances = [];
-  let preset = null, cardUpdates = null, seedSummary = null;
+  let preset = null, cardUpdates = null, seedSummary = null, presetGoals = null;
   if (opts.preset) {
     /* 维度化种子（第三十五轮 /demo-lab）：四维度确定性生成；mode/blocks 透传 DO 分流覆盖/合并/自定义 */
     preset = normalizeSeedPreset(opts.preset);
     const gen = genDimensionalSeed(seededRng(presetRngSeed(preset)), preset);
-    ({ txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt, card_updates: cardUpdates, summary: seedSummary } = gen);
+    ({ txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt, card_updates: cardUpdates, summary: seedSummary, goals_seed: presetGoals } = gen);
   } else if (isDemo) {
     /* demo 增强种子（第十六轮 mogul 剖面）：竞赛锚点全保留（火锅 860 / 注入 memo / 生日订花 / README 口径账单订阅持仓），
        三城房产 + 六爱好商户池 + 海外人脉与外币消费全板块加量 */
@@ -5803,7 +5854,7 @@ async function seedDemo(env, targetEmail, opts = {}) {
   }
   const r = await ledgerOp(env, userInstance(userId), { op: "seedDemo", txs, payees, bills, subs, holdings, notifs, tasks, fx_balances: fxBalances, credit_debt_cents: creditDebt,
     ...(isDemo && !opts.preset ? { proposals_seed: demoProposalSeed(), goals_seed: demoGoalSeed() } : {}),
-    ...(preset ? { mode: preset.mode, blocks: preset.blocks, card_updates: cardUpdates } : {}) });
+    ...(preset ? { mode: preset.mode, blocks: preset.blocks, card_updates: cardUpdates, goals_seed: presetGoals } : {}) });
   if (isDemo) await ledgerOp(env, userInstance(userId), { op: "set2fa", enabled: 0 }); // 演示账户关闭 2FA：demo@suveoo.com 无收件箱，验证码无人可读；真实账户 2FA 状态不动
   if (r.ok) {
     for (const t of r.task_ids ?? []) {
@@ -6585,6 +6636,28 @@ export class LedgerDO {
           sql.exec("INSERT INTO goal_events(goal_id, kind, amount_cents, note, created_at) VALUES(?, 'abandon', NULL, ?, ?)", g.id, `放弃 · 解锁退回 ¥${centsToStr(unlock)}`, NOW);
           return json({ ok: true, name: g.name, unlocked: centsToStr(unlock) });
         }
+        /* 月度自动存入开关（第二十三期：目标建/调时勾选 auto_monthly 的一站式落点）：
+           enabled=true → 无则建（金额=当前月计划，锚北京当日 1-28 号；有则幂等返回既有）；
+           enabled=false → 取消既有 PENDING 任务（月度任务执行时才锁资金，取消无需解锁）。返回给确认卡/审计。 */
+        case "goalAutoMonthly": {
+          const g = this.#rows(sql.exec("SELECT * FROM goals WHERE id = ?", input.goal_id))[0];
+          if (!g) return json({ ok: false, error: "GOAL_NOT_FOUND" });
+          const existing = this.#rows(sql.exec("SELECT id, next_run_at FROM tasks WHERE type = 'goal_contribution' AND status = 'PENDING' AND instr(payload, ?) > 0", `"goal_id":${Number(input.goal_id)}`))[0];
+          if (input.enabled === false) {
+            if (existing) sql.exec("UPDATE tasks SET status = 'CANCELLED' WHERE id = ?", existing.id);
+            return json({ ok: true, enabled: false, task_id: existing?.id ?? null, cancelled: !!existing });
+          }
+          if (existing) return json({ ok: true, enabled: true, task_id: existing.id, execute_at: existing.next_run_at, created: false });
+          const dom = Math.min(28, new Date(Date.now() + 8 * 3600_000).getUTCDate());
+          const bj = new Date(Date.now() + 8 * 3600_000);
+          let d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), dom, 1, 0, 0));
+          if (d.getTime() <= Date.now()) d = new Date(Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth() + 1, dom, 1, 0, 0));
+          const amtCents = input.amount_cents ?? g.monthly_plan_cents;
+          sql.exec("INSERT INTO tasks(type, title, payload, status, next_run_at, repeat, created_at) VALUES(?,?,?, 'PENDING', ?, 'monthly', ?)",
+            "goal_contribution", `每月自动存入「${g.name}」`, JSON.stringify({ goal_id: Number(input.goal_id), amount: centsToStr(BigInt(amtCents)) }), d.toISOString(), NOW);
+          const id = this.#rows(sql.exec("SELECT last_insert_rowid() AS id"))[0].id;
+          return json({ ok: true, enabled: true, task_id: id, execute_at: d.toISOString(), created: true });
+        }
         /* ---- 测试/演示亲和（DEMO_MODE 门，同 taskInjectFailure 先例）：构造 off-track 目标与老化扫描戳 ---- */
         case "goalBackdate": {
           if (this.env.DEMO_MODE !== "true") return json({ ok: false, error: "FORBIDDEN" }, 403);
@@ -7020,7 +7093,7 @@ export class LedgerDO {
               sql.exec("DELETE FROM fx_balances");
               for (const fxb of input.fx_balances ?? []) sql.exec("INSERT INTO fx_balances(currency, amount) VALUES(?,?)", fxb.currency, fxb.amount);
             }
-            taskIds.push(...this.#seedGoals(sql, input.goals_seed, { wipe: touched("goals") }));
+            if (touched("goals")) taskIds.push(...this.#seedGoals(sql, input.goals_seed, { wipe: true }));
           }
           /* 提议种子：合并模式按 dedup_key 幂等补齐（不清既有 EXECUTED 战报）；自定义模式勾选块整段替换 */
           if (mode === "merge") this.#seedProposals(sql, input.proposals_seed, { wipe: false });

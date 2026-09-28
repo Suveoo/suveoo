@@ -58,12 +58,13 @@ S.router.register("wealth", async () => {
       card.className = "card";
       card.style.marginTop = "10px";
       card.innerHTML = act.length ? act.slice(0, 3).map((g) => `
-        <div class="list-row"><div class="grow" style="min-width:0">
-          <b>${S.fmt.escape(g.name)}</b> ${g.on_track ? S.ui.badge(S.t("goals.onTrack"), "badge-green") : S.ui.badge(S.t("goals.offTrack"), "badge-yellow")}
+        <div class="gl-mini">
+          <div class="gl-mini-top"><b class="gl-mini-name">${S.fmt.escape(g.name)}</b>
+            <span class="gl-mini-badge">${g.on_track ? S.ui.badge(S.t("goals.onTrack"), "badge-green") : S.ui.badge(S.t("goals.offTrack"), "badge-yellow")}</span>
+            <span class="mono gl-mini-pct">${Math.round(Number(g.pct ?? 0))}%</span></div>
           <div class="gl-mini-bar"><i style="width:${Math.min(100, Number(g.pct ?? 0)).toFixed(1)}%"></i></div>
-        </div>
-        <div style="text-align:right"><span class="mono small">¥${S.fmt.moneyPlain(g.saved)} / ¥${S.fmt.moneyPlain(g.target)}</span>
-        <div class="muted small">${Math.round(Number(g.pct ?? 0))}%</div></div></div>`).join("")
+          <div class="gl-mini-meta muted small"><span class="mono">¥${S.fmt.moneyPlain(g.saved)} / ¥${S.fmt.moneyPlain(g.target)}</span><span>·</span><span>${S.fmt.escape(S.t("goals.deadlineLabel"))} <span class="mono">${S.fmt.escape(g.deadline)}</span></span>${g.has_monthly_task ? `<span class="gl-mini-auto">${S.ui.icon("clock", 11)} ${S.fmt.escape(S.t("goals.autoMonthly"))}</span>` : ""}</div>
+        </div>`).join("")
         : `<div class="row between"><span class="muted small">${S.fmt.escape(S.t("goals.emptyTitle"))} · ${S.fmt.escape(S.t("goals.emptyTip"))}</span></div>`;
       hc.insertAdjacentElement("afterend", card);
       hc.insertAdjacentElement("afterend", el);

@@ -435,8 +435,9 @@ body.tc-open { overflow: hidden; }
   .hscroll { margin: 0 -16px; padding: 0 16px var(--sp-2); }
 }
 
-/* ===== 26. Header logo（第二十一轮：桌面 31→24px 随顶栏缩高 46px；手机 56px 顶栏维持 26/24） ===== */
-.app-header .logo-link img { height: 24px; transition: height .2s ease; }
+/* ===== 26. Header logo（第二十三轮：桌面 24→27px +12.5%；头像直径 32→27px≈logo 高；手机 56px 顶栏不变） ===== */
+.app-header .logo-link img { height: 27px; transition: height .2s ease; }
+@media (min-width: 768px) { .app-header .avatar { width: 27px; height: 27px; font-size: 12px; } }
 @media (max-width: 767px) { .app-header .logo-link img { height: 26px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 24px; } }
 
@@ -714,3 +715,24 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 /* 通知正文站内链接（linkify 产物） */
 .notif-link { color: var(--color-navy); text-decoration: underline; word-break: break-all; }
 @media (prefers-reduced-motion: reduce) { .pp-count, .pp-bubble { animation: none !important; } .pp-bubble.pp-out { transition: none; } }
+
+/* ===== 日历选择器（第二十三期 /wealth/goals 截止日期）：模糊遮罩 + 锁滚 + 年月可键入 ===== */
+.cal-mask { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; background: rgba(16, 24, 81, .32); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cal-in .2s ease both; }
+@keyframes cal-in { from { opacity: 0; } to { opacity: 1; } }
+.cal { width: min(316px, calc(100vw - 48px)); background: #fff; border-radius: 16px; box-shadow: 0 16px 44px rgba(16, 24, 81, .24); padding: 14px 16px 16px; animation: cal-pop .26s cubic-bezier(.22, 1.18, .36, 1) both; }
+@keyframes cal-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-ym { display: inline-flex; align-items: baseline; gap: 3px; font-size: 15px; font-weight: 700; }
+.cal-ym i { font-style: normal; font-size: 12px; color: var(--color-ink-2); font-weight: 400; }
+.cal-y, .cal-m { font: inherit; border: none; background: none; cursor: pointer; padding: 2px 6px; border-radius: 6px; color: var(--color-ink); transition: background-color .12s ease; }
+.cal-y:hover, .cal-m:hover { background: var(--color-primary-tint); }
+.cal-nav { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--color-line); background: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-2); transition: background-color .12s ease, color .12s ease; }
+.cal-nav:hover { background: var(--color-primary-tint); color: var(--color-navy); }
+.cal-edit { width: 58px; font: inherit; font-weight: 700; border: none; border-bottom: 2px solid var(--color-navy); outline: none; text-align: center; background: none; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-wk { text-align: center; font-size: 11px; color: var(--color-ink-2); padding: 4px 0 8px; }
+.cal-grid button { aspect-ratio: 1; border: none; background: none; border-radius: 8px; font-size: 13px; font-family: var(--font-mono); color: var(--color-ink); cursor: pointer; transition: background-color .12s ease, color .12s ease; }
+.cal-grid button:hover { background: var(--color-primary-tint); }
+.cal-grid button.today { color: var(--color-navy); font-weight: 700; box-shadow: inset 0 0 0 1px var(--color-navy); }
+.cal-grid button.sel { background: var(--color-navy); color: #fff; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .cal-mask, .cal { animation: none; } }

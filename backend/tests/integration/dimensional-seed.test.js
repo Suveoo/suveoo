@@ -28,6 +28,9 @@ const ensureSource = () => (srcOnce ??= (async () => {
   await registerUser("dimsrc1@suveoo.com", "沈青梧");
   await registerUser("dimsrc2@suveoo.com", "顾清言");
 })());
+const doGoals = async (uid) => (await env.LEDGER.get(env.LEDGER.idFromName(`u:${uid}`)).fetch("https://x/", {
+  method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" }, body: JSON.stringify({ op: "goals" }),
+}).then((r) => r.json()));
 const counts = async (uid) => (await env.LEDGER.get(env.LEDGER.idFromName(`u:${uid}`)).fetch("https://x/", {
   method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
   body: JSON.stringify({ op: "blockCounts" }),
@@ -174,4 +177,24 @@ describe("维度化注入（自定义范围）与缺省回归", () => {
     expect(r.ok).toBe(true);
     expect(r.preset).toEqual({ tier: "affluent", income: "salaried", profession: "software-engineer", enterprise: null, mode: "overwrite" });
   }, 60000);
+});
+
+/** 第二十三期：维度化目标种子（tier 档案×rng 确定）；自定义模式不勾 goals 不动 */
+describe("维度化目标种子（第二十三期）", () => {
+  it("大众×工薪覆盖注入：2-3 个 ACTIVE 目标、事件=月度自动存入、held 一致、约六成挂月度任务", async () => {
+    await ensureSource();
+    const u = await registerUser("dimgoal@test.dev", "目标维度");
+    const r = await j(await post("/api/demo/self-seed", { preset: { tier: "mass", income: "salaried", profession: "software-engineer", mode: "overwrite" } }, u.token));
+    expect(r.ok).toBe(true);
+    const goals = (await doGoals(u.user_id)).goals ?? [];
+    expect(goals.length).toBeGreaterThanOrEqual(2);
+    expect(goals.length).toBeLessThanOrEqual(3);
+    expect(goals.every((g) => g.status === "ACTIVE")).toBe(true);
+    expect(goals.some((g) => Number(g.saved_cents ?? g.saved ?? 0) > 0)).toBe(true);
+    /* 确定性：同 preset 双跑同构 */
+    const r2 = await j(await post("/api/demo/self-seed", { preset: { tier: "mass", income: "salaried", profession: "software-engineer", mode: "overwrite" } }, u.token));
+    expect(r2.ok).toBe(true);
+    const goals2 = (await doGoals(u.user_id)).goals ?? [];
+    expect(goals2.map((g) => [g.name, g.target_cents]).join("|")).toBe(goals.map((g) => [g.name, g.target_cents]).join("|"));
+  }, 30000);
 });

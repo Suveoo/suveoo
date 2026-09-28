@@ -96,6 +96,81 @@ S.ctl = {
     return root;
   },
   /**
+   * 日历选择器（第二十三期 /wealth/goals 截止日期）：背景模糊遮罩 + 锁滚；
+   * 头部年/月为可点击数字 → 变输入框直接键入（鲁棒解析：去空格/全角/前导零，年夹 1970-2100、月 1-12）；
+   * resolve("YYYY-MM-DD") 或 resolve(null)（取消/点遮罩）。挂 body 突破容器。
+   */
+  calendar({ value = "" } = {}) {
+    return new Promise((resolve) => {
+      let cur = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + "T00:00:00") : new Date();
+      if (Number.isNaN(cur.getTime())) cur = new Date();
+      const today = new Date();
+      const mask = S.ui.el(`<div class="cal-mask"></div>`);
+      const box = S.ui.el(`<div class="cal" role="dialog" aria-label="date"></div>`);
+      mask.appendChild(box);
+      document.body.appendChild(mask);
+      S.ui._lockScroll();
+      const close = (v) => { mask.remove(); S.ui._unlockScroll(); resolve(v); };
+      mask.addEventListener("click", (e) => { if (e.target === mask) close(null); });
+      const esc = (e) => { if (e.key === "Escape") { close(null); document.removeEventListener("keydown", esc); } };
+      document.addEventListener("keydown", esc);
+      /* 鲁棒数字解析："01"/"1"/"0001"/"0 1"/全角 → int 或 null */
+      const num = (raw) => {
+        const n = parseInt(String(raw ?? "").replace(/[\s\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/^0+(?=\d)/, ""), 10);
+        return Number.isFinite(n) ? n : null;
+      };
+      const render = () => {
+        const y = cur.getFullYear(), m = cur.getMonth();
+        const sel = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+        const firstDow = (new Date(y, m, 1).getDay() + 6) % 7; /* 周一为首 */
+        const dim = new Date(y, m + 1, 0).getDate();
+        const wk = [...Array(7)].map((_, i) => `<span class="cal-wk">${"一二三四五六日"[i]}</span>`).join("");
+        let cells = "";
+        for (let i = 0; i < firstDow; i++) cells += "<span></span>";
+        for (let d = 1; d <= dim; d++) {
+          const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const cls = sel === iso ? "sel" : (today.getFullYear() === y && today.getMonth() === m && today.getDate() === d ? "today" : "");
+          cells += `<button type="button" class="${cls}" data-d="${iso}">${d}</button>`;
+        }
+        box.innerHTML = `
+          <div class="cal-head">
+            <button type="button" class="cal-nav" data-n="-1" aria-label="prev">${S.ui.icon("arrow-left", 14)}</button>
+            <span class="cal-ym"><button type="button" class="cal-y" data-y="${y}">${y}</button><i>年</i><button type="button" class="cal-m" data-m="${m + 1}">${m + 1}</button><i>月</i></span>
+            <button type="button" class="cal-nav" data-n="1" aria-label="next">${S.ui.icon("arrow-right", 14)}</button>
+          </div>
+          <div class="cal-grid cal-wkrow">${wk}</div>
+          <div class="cal-grid">${cells}</div>`;
+        /* 年/月点击 → 数字进入输入态（Enter/失焦提交，Esc 还原） */
+        const editNum = (btn, val, lo, hi, apply) => {
+          const inp = document.createElement("input");
+          inp.type = "text"; inp.inputMode = "numeric"; inp.className = "cal-edit";
+          inp.value = String(val);
+          btn.replaceWith(inp);
+          inp.focus(); inp.select();
+          const commit = () => {
+            const n = num(inp.value);
+            if (n != null) apply(Math.min(hi, Math.max(lo, n)));
+            render();
+          };
+          inp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+            else if (e.key === "Escape") { inp.value = String(val); inp.blur(); }
+          });
+          inp.addEventListener("blur", commit);
+        };
+        box.querySelector(".cal-y").onclick = (e) => editNum(e.currentTarget, y, 1970, 2100, (ny) => { cur = new Date(ny, m, 1); });
+        box.querySelector(".cal-m").onclick = (e) => editNum(e.currentTarget, m + 1, 1, 12, (nm) => { cur = new Date(y, nm - 1, 1); });
+        box.querySelectorAll(".cal-nav").forEach((b) => {
+          b.onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth() + Number(b.dataset.n), 1); render(); };
+        });
+        box.querySelectorAll(".cal-grid [data-d]").forEach((b) => {
+          b.onclick = () => close(b.dataset.d);
+        });
+      };
+      render();
+    });
+  },
+  /**
    * Promise 化 OTP 弹窗（复用 consent 弹窗视觉）。
    * opts = { email（展示用）, send: async () => {...}（发码，抛错或返回 falsy 视为失败） }
    * resolve(6 位码) 或 resolve(null)（取消）。发送按钮三态：待发 → 60s 倒计时 → 可重发。

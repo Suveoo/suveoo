@@ -251,3 +251,30 @@ describe("目标陪伴全链（第二十二期）", () => {
     expect((s2.proposal ?? {}).status).toBe("EXECUTED");
   }, 30000);
 });
+
+/** 第二十三期：auto_monthly 一站式（建目标勾选→月度任务挂上；调整关→任务取消） */
+describe("goal auto_monthly（第二十三期）", () => {
+  it("create with auto_monthly wires the monthly task in one confirm; adjust off cancels it", async () => {
+    const out = await registerUser(mailOf("auto"), "勾选验收");
+    const token = out.token, uid = out.user_id;
+    const d1 = await j(await post("/api/goals", { name: "婚礼基金", target_amount: "30000.00", deadline: "2027-06-30", auto_monthly: true }, token));
+    expect(d1.status).toBe("INPUT_REQUIRED");
+    const c1 = await j(await post("/api/goals", { name: "婚礼基金", target_amount: "30000.00", deadline: "2027-06-30", auto_monthly: true, grant_hash: d1.grant.grant_hash }, token));
+    expect(c1.status).toBe("EXECUTED");
+    expect(c1.result.auto_monthly).toBe(true);
+    const gid = c1.result.goal_id;
+    const tasks1 = (await doOp(uid, { op: "tasks" })).tasks.filter((t) => t.type === "goal_contribution" && JSON.stringify(t.payload).includes(`"goal_id":${gid}`) && t.status === "PENDING");
+    expect(tasks1.length).toBe(1);
+    const goals1 = (await doOp(uid, { op: "goals" })).goals.find((g) => g.id === gid);
+    expect(goals1.has_monthly_task).toBe(true);
+    /* 调整：只关自动（不改金额/日期）→ auto_monthly:false 走 PATCH goal_adjust */
+    const a1 = await j(await SELF.fetch(BASE + `/api/goals/${gid}`, { method: "PATCH", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ auto_monthly: false }) }));
+    expect(a1.status).toBe("INPUT_REQUIRED");
+    const a2 = await j(await SELF.fetch(BASE + `/api/goals/${gid}`, { method: "PATCH", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ auto_monthly: false, grant_hash: a1.grant.grant_hash }) }));
+    expect(a2.status).toBe("EXECUTED");
+    const tasks2 = (await doOp(uid, { op: "tasks" })).tasks.filter((t) => t.type === "goal_contribution" && JSON.stringify(t.payload).includes(`"goal_id":${gid}`) && t.status === "PENDING");
+    expect(tasks2.length).toBe(0);
+    const goals2 = (await doOp(uid, { op: "goals" })).goals.find((g) => g.id === gid);
+    expect(goals2.has_monthly_task).toBe(false);
+  }, 30000);
+});

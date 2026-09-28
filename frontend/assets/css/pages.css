@@ -508,39 +508,86 @@
 }
 @media (prefers-reduced-motion: reduce) { .pp-hero { animation: none; } }
 
-/* ===== P41 /wealth/goals 攒钱目标（第二十二期：目标陪伴）——进度环主视觉，克制版工具页 ===== */
-.gl-sub { margin: -6px 0 16px; }
-.gl-new-card { padding: 14px 16px; }
-.gl-form { display: none; }
-.gl-form.open { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 12px; }
-.gl-form .field { flex: 1 1 150px; margin: 0; }
-.gl-form .field .input { font-size: 16px; } /* iOS 聚焦放大根治：输入一律 ≥16px */
-.gl-card { padding: 16px; margin-top: 14px; }
+/* ===== P41 /wealth/goals 攒钱目标（第二十三期改版：摩尔斯新建卡 + 日历 + 同行 % + 纵向分隔线） ===== */
+/* 新建目标：navy 胶囊 → 白卡形变（宽度 JS 定桩→100%；底色/圆角/内距/阴影同步过渡，微回弹曲线） */
+.gl-new { display: block; width: fit-content; max-width: 100%; overflow: hidden; text-align: left;
+  border: 1px solid transparent; border-radius: 999px; background: var(--color-navy); color: #fff;
+  padding: 11px 20px; cursor: pointer; font-family: inherit;
+  transition: width .42s cubic-bezier(.22, 1.18, .36, 1), background-color .3s ease, border-radius .3s ease, padding .3s ease, box-shadow .3s ease; }
+.gl-new:hover { box-shadow: 0 6px 18px rgba(16, 24, 81, .22); }
+.gl-new:active { transform: scale(.98); }
+.gl-new-t { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.gl-new-t .ic { color: #fff; }
+.gl-new-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .42s cubic-bezier(.25,.6,.3,1) .12s, opacity .3s ease .18s; }
+.gl-new-inner { min-height: 0; overflow: hidden; }
+.gl-new.open { background: #fff; border-color: var(--color-line); border-radius: var(--r-card); padding: 16px 18px; box-shadow: var(--shadow); }
+.gl-new.open .gl-new-t { display: none; } /* 展开态即目标设立卡：胶囊文案退役，卡从"目标名称"开始 */
+.gl-new.open .gl-new-body { grid-template-rows: 1fr; opacity: 1; }
+.gl-new .field { flex: 1 1 160px; margin: 0; }
+.gl-new .gl-new-inner { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.gl-new .input { font-size: 16px; } /* iOS ≥16px */
+.gl-auto { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; padding: 9px 0; cursor: pointer; white-space: nowrap; }
+.gl-auto input { width: 17px; height: 17px; accent-color: var(--color-navy); }
+.gl-date { text-align: left; }
+.gl-date.has { color: var(--color-ink); }
+
+/* 已有目标卡：桌面 = 左主区 + 1px 纵向分隔线 + 右信息栏（grid）；手机单列（徽章并入名称行） */
+.gl-card { padding: 18px 16px; margin-top: 14px; display: grid; grid-template-columns: minmax(0,1fr) 1px minmax(150px, 208px); gap: 0 16px; }
 .gl-card.ended { opacity: .72; }
-.gl-head { display: flex; gap: 16px; align-items: center; }
+.gl-side { border-left: 1px solid var(--color-line); padding-left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.gl-badge-d { margin-bottom: 2px; }
+.gl-badge-m { display: none; }
+.gl-head { display: flex; gap: 14px; align-items: center; }
 .gl-info { min-width: 0; flex: 1; }
+.gl-namerow { gap: 8px; flex-wrap: wrap; align-items: center; }
 .gl-name { font-size: 16px; }
-.gl-nums { margin: 2px 0; }
+.gl-nums { margin: 2px 0 6px; }
 .gl-saved { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .gl-saved + .muted { font-size: 13px; margin-left: 6px; }
-.gl-task-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 3px 10px; border-radius: 24px; background: var(--c-teal-tint); color: var(--c-teal-deep); font-size: 12px; white-space: nowrap; }
-.gl-ring { width: 96px; height: 96px; flex: none; transform: rotate(-90deg); }
+.gl-bar { height: 5px; border-radius: 5px; background: var(--color-primary-tint); overflow: hidden; }
+.gl-bar i { display: block; height: 100%; background: var(--color-primary); border-radius: 5px; transition: width .8s ease; }
+.gl-card .gl-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.gl-task-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 24px; background: var(--c-teal-tint); color: var(--c-teal-deep); font-size: 12px; white-space: nowrap; }
+.gl-ring { width: 92px; height: 92px; flex: none; transform: rotate(-90deg); }
 .gl-ring .tr { fill: none; stroke: var(--color-primary-tint); stroke-width: 10; }
 .gl-ring .pr { fill: none; stroke: var(--color-primary); stroke-width: 10; stroke-linecap: round; transition: stroke-dasharray .8s ease; }
 .gl-ring.done .pr { stroke: var(--color-green); }
-.gl-ring text { transform: rotate(90deg); transform-origin: 50px 50px; text-anchor: middle; }
-.gl-ring text .n { font-size: 24px; font-weight: 700; fill: var(--color-ink); font-variant-numeric: tabular-nums; }
-.gl-ring text .u { font-size: 11px; fill: var(--color-ink-2); }
-.gl-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.gl-inline { margin-top: 10px; }
+/* 数字与 % 同一行：% 上标式贴数字右上（dy 负值收紧基线差） */
+.gl-ring text { transform: rotate(90deg); transform-origin: 50px 50px; text-anchor: middle; dominant-baseline: central; }
+.gl-ring text .n { font-size: 26px; font-weight: 700; fill: var(--color-ink); font-variant-numeric: tabular-nums; }
+.gl-ring text .u { font-size: 12px; font-weight: 600; fill: var(--color-ink-2); dy: -8; }
+/* 内联表单：grid-rows 0fr→1fr 平滑展开 */
+.gl-inline { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .32s cubic-bezier(.25,.6,.3,1), opacity .24s ease, margin-top .32s ease; margin-top: 0; grid-column: 1 / -1; }
+.gl-inline > .gl-inline-in { min-height: 0; overflow: hidden; }
+.gl-inline.open { grid-template-rows: 1fr; opacity: 1; margin-top: 12px; }
+.gl-inline-in { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: var(--color-surface); border-radius: 12px; padding: 0 14px; }
+.gl-inline.open .gl-inline-in { padding: 14px; }
+.gl-inline-in { transition: padding .32s ease; }
+.gl-inline .field { flex: 1 1 150px; margin: 0; }
+.gl-inline .input { font-size: 16px; }
 .gl-note { margin-top: 14px; }
 .gl-empty-tip { text-align: center; }
-@media (prefers-reduced-motion: reduce) { .gl-ring .pr { transition: none; } }
-@media (max-width: 600px) {
+@media (prefers-reduced-motion: reduce) { .gl-ring .pr, .gl-bar i { transition: none; } .gl-new { transition: none; } .gl-new.open { width: 100% !important; } }
+@media (max-width: 860px) {
+  .gl-card { grid-template-columns: 1fr; }
+  .gl-side { border-left: none; padding-left: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 12px; border-top: 1px dashed var(--color-line); padding-top: 10px; }
+  .gl-badge-d { display: none; }
+  .gl-badge-m { display: inline-flex; }
   .gl-head { gap: 12px; }
-  .gl-ring { width: 84px; height: 84px; }
-  .gl-ring text .n { font-size: 20px; }
+  .gl-ring { width: 80px; height: 80px; }
+  .gl-ring text .n { font-size: 22px; }
   .gl-saved { font-size: 19px; }
+  .gl-meta-m, .gl-meta-p { display: none; } /* 手机信息栏瘦身：月存/预测折叠，详情留桌面 */
 }
 .gl-mini-bar { height: 6px; border-radius: 6px; background: var(--color-primary-tint); margin-top: 6px; overflow: hidden; }
 .gl-mini-bar i { display: block; height: 100%; background: var(--color-primary); border-radius: 6px; }
+/* /wealth 攒钱目标迷你卡（第二十三期改版：名/徽章/百分比一行 + 全宽进度条 + 元信息行；手机徽章隐藏） */
+.gl-mini { padding: 12px 0; border-bottom: 1px dashed var(--color-line); }
+.gl-mini:last-child { border-bottom: none; }
+.gl-mini-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gl-mini-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-mini-pct { margin-left: auto; font-size: 16px; font-weight: 700; color: var(--color-navy); font-variant-numeric: tabular-nums; flex: none; }
+.gl-mini-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.gl-mini-auto { display: inline-flex; align-items: center; gap: 4px; color: var(--c-teal-deep); background: var(--c-teal-tint); padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+.gl-mini-auto svg { width: 11px; height: 11px; }
+@media (max-width: 600px) { .gl-mini-badge { display: none; } } /* 队长要求：手机去属性徽章（大概率折行显尴尬） */

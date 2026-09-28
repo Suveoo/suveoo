@@ -60,7 +60,7 @@ S.router.register("demo-lab", async ({ user }) => {
       const cat = d.catalog;
 
       /* ---- 维度状态 ---- */
-      const state = { tier: "affluent", income: "salaried", profession: "software-engineer", enterprise: null, mode: "overwrite", blocks: { txs: true, payees: true, bills: true, subs: true, holdings: true, tasks: true, notifs: true, fx: true, credit: true } };
+      const state = { tier: "affluent", income: "salaried", profession: "software-engineer", enterprise: null, mode: "overwrite", blocks: { txs: true, payees: true, bills: true, subs: true, holdings: true, tasks: true, notifs: true, fx: true, credit: true, goals: true } };
       let before = null; /* 预检时的当前库计数（核对对照用） */
 
       const optCards = (items, key, { nullable = false } = {}) => `
@@ -87,7 +87,7 @@ S.router.register("demo-lab", async ({ user }) => {
           <div id="dl-blocks" hidden>
             <div class="dl-sec-lb" style="margin-top:10px">${S.fmt.escape(S.t("demoLab.blockLabel"))}</div>
             <div class="dl-blocks">
-              ${["txs", "payees", "bills", "subs", "holdings", "tasks", "notifs", "fx", "credit"].map((b) => `
+              ${["txs", "payees", "bills", "subs", "holdings", "tasks", "notifs", "fx", "credit", "goals"].map((b) => `
               <label class="dl-block"><input type="checkbox" data-b="${b}" checked> ${S.fmt.escape(S.t(`demoLab.block.${b}`))}</label>`).join("")}
             </div>
           </div>
