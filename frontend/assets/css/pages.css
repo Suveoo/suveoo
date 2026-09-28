@@ -560,8 +560,9 @@
 .gl-ring.done .pr { stroke: var(--color-green); }
 /* 数字与 % 同一行：% 上标式贴数字右上（dy 负值收紧基线差） */
 .gl-ring text { transform: rotate(90deg); transform-origin: 50px 50px; text-anchor: middle; dominant-baseline: central; }
-.gl-ring text .n { font-size: 26px; font-weight: 700; fill: var(--color-ink); font-variant-numeric: tabular-nums; }
-.gl-ring text .u { font-size: 12px; font-weight: 600; fill: var(--color-ink-2); dy: -8; }
+.gl-ring text .n { font-size: 30px; font-weight: 700; fill: var(--color-ink); font-variant-numeric: tabular-nums; }
+.gl-ring .utxt { dominant-baseline: central; }
+.gl-ring text .u { font-size: 11px; font-weight: 400; fill: #999; }
 /* 内联表单：grid-rows 0fr→1fr 平滑展开 */
 .gl-inline { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .32s cubic-bezier(.25,.6,.3,1), opacity .24s ease, margin-top .32s ease; margin-top: 0; grid-column: 1 / -1; }
 .gl-inline > .gl-inline-in { min-height: 0; overflow: hidden; }
@@ -572,7 +573,7 @@
 .gl-inline .input, .gl-inline .gl-date { font-size: 16px; }
 /* 手机端"问 AI"移入按钮行（"放弃"右侧）；桌面仅在右侧栏显示 */
 .gl-ask-m { display: none; }
-@media (max-width: 600px) { .gl-ask-m { display: inline-flex; margin-left: auto; } .gl-side .ask { display: none; } }
+.gl-ask-m { display: inline-flex; margin-left: auto; } .gl-side .ask { display: none; }
 .gl-note { margin-top: 14px; }
 .gl-empty-tip { text-align: center; }
 @media (prefers-reduced-motion: reduce) { .gl-ring .pr, .gl-bar i { transition: none; } .gl-new { transition: none; } .gl-new.open { width: 100% !important; } }
@@ -598,4 +599,4 @@
 .gl-mini-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .gl-mini-auto { display: inline-flex; align-items: center; gap: 4px; color: var(--c-teal-deep); background: var(--c-teal-tint); padding: 2px 8px; border-radius: 999px; font-size: 11px; }
 .gl-mini-auto svg { width: 11px; height: 11px; }
-@media (max-width: 600px) { .gl-mini-badge { display: none; } } /* 队长要求：手机去属性徽章（大概率折行显尴尬） */
+/* 第二十五轮：迷你卡改版后手机有空间，徽章加回（队长令） */

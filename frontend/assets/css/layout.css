@@ -41,7 +41,7 @@
   .bn-ai .ai-circle { width: 56px; height: 56px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; margin-top: -24px; box-shadow: var(--shadow); border: 3px solid #fff; }
   .bn-ai .ai-circle img { width: 28px; height: 28px; }
   .page { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
-  .app-header { height: 56px; }
+  .app-header { height: 49px; }
   .app-header .logo-link img { height: 22px; }
 }
 
@@ -95,7 +95,7 @@
 
 /* ---- 下拉容器（通知/语言） ---- */
 .dropdown { position: absolute; top: calc(100% + 6px); right: 0; width: 340px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-card); box-shadow: var(--shadow); z-index: var(--z-dropdown); overflow: hidden; }
-@media (max-width: 767px) { .dropdown.notif { position: fixed; top: 56px; left: 8px; right: 8px; width: auto; } }
+@media (max-width: 767px) { .dropdown.notif { position: fixed; top: 49px; left: 8px; right: 8px; width: auto; } }
 .dropdown .dd-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--color-line); font-weight: 600; }
 .dropdown .dd-list { max-height: 380px; overflow-y: auto; }
 .dropdown .dd-foot { display: flex; border-top: 1px solid var(--color-line); }
@@ -120,4 +120,4 @@
 
 /* viewport-fit=cover（2026-09）：绘制延伸进刘海/手势条区域——顶部 header 垫入安全区，底部导航已带 inset */
 .app-header { padding-top: env(safe-area-inset-top); height: calc(64px + env(safe-area-inset-top)); }
-@media (max-width: 767px) { .app-header { height: calc(56px + env(safe-area-inset-top)); } }
+@media (max-width: 767px) { .app-header { height: calc(49px + env(safe-area-inset-top)); } }

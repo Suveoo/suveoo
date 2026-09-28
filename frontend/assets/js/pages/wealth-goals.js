@@ -84,11 +84,13 @@ S.router.register("wealth-goals", async ({ user }) => {
   const R = 44, CIRC = 2 * Math.PI * R;
   const ring = (pct, done) => {
     const n = Math.round(Math.min(100, pct));
+    /* 数字严格光学中心（大号主视觉）+ % 灰色小字位于数字下方（第二十五轮队长要求） */
     return `
     <svg class="gl-ring${done ? " done" : ""}" viewBox="0 0 100 100" role="img" aria-label="${n}%">
       <circle class="tr" cx="50" cy="50" r="${R}"></circle>
       <circle class="pr" cx="50" cy="50" r="${R}" style="stroke-dasharray:${(Math.min(100, pct) * CIRC / 100).toFixed(1)} ${CIRC.toFixed(1)}"></circle>
-      <text x="50" y="50"><tspan class="n">${n}</tspan><tspan class="u">%</tspan></text>
+      <text class="ntxt" x="50" y="48.5"><tspan class="n">${n}</tspan></text>
+      <text class="utxt" x="50" y="66">%</text>
     </svg>`;
   };
 

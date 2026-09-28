@@ -159,7 +159,7 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     padding: var(--sp-3) var(--sp-3) calc(178px + env(safe-area-inset-bottom));
   }
   .ai-layout { display: block; }
-  .mobile-tabs { position: sticky; top: 56px; z-index: 60; margin: 0 0 var(--sp-2); box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
+  .mobile-tabs { position: sticky; top: 49px; z-index: 60; margin: 0 0 var(--sp-2); box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
   .chat-area { height: auto; min-height: 0; background: transparent; border: none; box-shadow: none; border-radius: 0; } /* 去壳：对话区与白页融为一体 */
   .chat-thread { overflow: visible; height: auto; }
   .composer-hint { display: none; }
@@ -189,7 +189,7 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
      真机 webview 上系统栏/导航条与 fixed 层叠不可控，几何让位是最稳的修法（PC DevTools 无法复现该遮挡）。 */
   .trust-console {
     position: fixed;
-    top: calc(56px + env(safe-area-inset-top));
+    top: calc(49px + env(safe-area-inset-top));
     bottom: calc(64px + env(safe-area-inset-bottom));
     left: 0;
     right: 0;
@@ -343,7 +343,7 @@ body.tc-open { overflow: hidden; }
 .acc-item.hacc.open .acc-head svg { transform: rotate(90deg); color: var(--color-navy); }
 .acc-item.hacc .acc-body { max-height: 0; overflow: hidden; transition: max-height .32s cubic-bezier(.25,.6,.3,1); }
 @media (max-width: 900px) { .help-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .help-grid { grid-template-columns: 1fr; } .help-pills { top: 60px; } .help-cta { flex-wrap: wrap; } .help-cta .btn { margin-left: 0; } }
+@media (max-width: 600px) { .help-grid { grid-template-columns: 1fr; } .help-pills { top: 53px; } .help-cta { flex-wrap: wrap; } .help-cta .btn { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .help-sec { opacity: 1; transform: none; transition: none; } }
 
 /* 手风琴开态：JS 内联 maxHeight 精确控高，此处固定值为无 JS 兜底 */
@@ -438,7 +438,7 @@ body.tc-open { overflow: hidden; }
 /* ===== 26. Header logo（第二十三轮：桌面 24→27px +12.5%；头像直径 32→27px≈logo 高；手机 56px 顶栏不变） ===== */
 .app-header .logo-link img { height: 27px; transition: height .2s ease; }
 @media (min-width: 768px) { .app-header .avatar { width: 27px; height: 27px; font-size: 12px; } }
-@media (max-width: 767px) { .app-header .logo-link img { height: 26px; } }
+@media (max-width: 767px) { .app-header .logo-link img { height: 22px; } .app-header .avatar { width: 24px; height: 24px; font-size: 11px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 24px; } }
 
 /* ===== 27. 手风琴收起态零高度（padding 也要归零，否则露半行答案） ===== */
@@ -642,7 +642,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 /* 移动/平板全屏抽屉（≤1023）：复用 Trust Console 抽屉几何（避开移动 header 与底导航），与 TC 抽屉互斥 */
 .hist-drawer { display: none; }
 @media (max-width: 1023px) {
-  .hist-drawer { position: fixed; top: calc(56px + env(safe-area-inset-top)); bottom: calc(64px + env(safe-area-inset-bottom)); left: 0; right: 0; z-index: var(--z-drawer); background: #fff; flex-direction: column; }
+  .hist-drawer { position: fixed; top: calc(49px + env(safe-area-inset-top)); bottom: calc(64px + env(safe-area-inset-bottom)); left: 0; right: 0; z-index: var(--z-drawer); background: #fff; flex-direction: column; }
   .hist-drawer.open { display: flex; animation: fade-in .18s ease-out both; }
 }
 .hist-drawer .hd-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--color-line); flex: none; }
