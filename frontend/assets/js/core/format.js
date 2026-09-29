@@ -23,6 +23,11 @@ S.fmt = {
     return S.t("time.dayAgo", Math.floor(diff / 86400e3));
   },
   cardNum(n) { return /^\d{16}$/.test(n ?? "") ? `**** ${n.slice(-4)}` : n; },
+  /* 卡号输入鲁棒化（第二十八轮转账页）：全角/空格/横线全收 → 数字串；groupCard 每 4 位插空格。
+     "6222880177757477" 与 "6222 8801 7775 7477" 归一为同一 16 位串。 */
+  digits16(raw) { return String(raw ?? "").replace(/[\s\uFF10-\uFF19-]/g, (c) => (c === "-" ? "" : String.fromCharCode(c.charCodeAt(0) - 0xFEE0))).replace(/\D/g, "").slice(0, 16); },
+  groupCard(digits) { return this.digits16(digits).replace(/(\d{4})(?=\d)/g, "$1 "); },
+  luhn16(digits) { const d = this.digits16(digits); if (d.length !== 16) return false; let s = 0; for (let i = 0; i < 16; i++) { let n = Number(d[15 - i]); if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; } s += n; } return s % 10 === 0; },
   /* 时区双显（预约转账）：本地 + 北京时间 */
   dualTime(iso) {
     const d = new Date(iso);

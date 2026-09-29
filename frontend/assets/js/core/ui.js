@@ -37,6 +37,7 @@ S.ui = {
     }[fam];
     const g = {
       pay: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>',
+      users: '<circle cx="9" cy="8" r="3.5"/><path d="M3.2 19c.6-3.2 2.9-4.8 5.8-4.8s5.2 1.6 5.8 4.8"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.4c2.6.1 4.4 1.6 4.9 4.1"/>',
       bank: '<path d="m3 9 9-6 9 6"/><path d="M5 9v10h14V9"/><path d="M9 19v-6h6v6"/>',
       globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/>',
       doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 17h5"/>',

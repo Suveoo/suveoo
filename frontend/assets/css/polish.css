@@ -735,4 +735,17 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .cal-grid button:hover { background: var(--color-primary-tint); }
 .cal-grid button.today { color: var(--color-navy); font-weight: 700; box-shadow: inset 0 0 0 1px var(--color-navy); }
 .cal-grid button.sel { background: var(--color-navy); color: #fff; font-weight: 700; }
+/* 第二十八轮：日期时间版（预约转账执行时间）——时/分/秒 三段可点击键入 + 此刻/取消/确定 */
+.cal.cal-time { width: min(336px, calc(100vw - 40px)); }
+.cal-timerow { display: flex; align-items: center; justify-content: center; gap: 2px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--color-line); }
+.cal-timerow i { font-style: normal; font-size: 12px; color: var(--color-ink-2); padding: 0 4px 0 1px; }
+.cal-t { font: inherit; font-family: var(--font-mono); font-size: 15px; font-weight: 700; border: none; background: none; cursor: pointer; padding: 3px 8px; border-radius: 6px; color: var(--color-ink); transition: background-color .12s ease; }
+.cal-t:hover { background: var(--color-primary-tint); }
+.cal-timerow .cal-edit { width: 44px; padding: 3px 0; font-size: 15px; }
+.cal-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.cal-foot .grow { flex: 1; }
+.cal-quick, .cal-cancel { font: inherit; font-size: 13px; border: 1px solid var(--color-line); background: #fff; color: var(--color-ink-2); cursor: pointer; padding: 6px 12px; border-radius: 8px; transition: background-color .12s ease, color .12s ease; }
+.cal-quick:hover, .cal-cancel:hover { background: var(--color-surface); color: var(--color-ink); }
+.cal-ok { font: inherit; font-size: 13px; font-weight: 600; border: none; background: var(--color-navy); color: #fff; cursor: pointer; padding: 6px 18px; border-radius: 8px; transition: background-color .12s ease; }
+.cal-ok:hover { background: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { .cal-mask, .cal { animation: none; } }

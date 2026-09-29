@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>预约转账 · Suveoo</title>
-<meta name="description" content="Suveoo 预约转账：设定未来日期或每月定期的自动转账任务，资金先行锁定保障履约，取消即解锁，Saga 编排保证到点执行（模拟银行）。">
+<meta name="description" content="Suveoo 预约转账：设定未来时刻（可精确到秒）或每月/每年定期的自动转账任务，到点由 Saga 编排自动执行、收款方真实入账，可随时取消（模拟银行）。">
 <link rel="icon" href="/favicon/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/favicon/favicon.ico">
 <link rel="manifest" href="/manifest.json">
@@ -17,48 +17,48 @@
 <meta property="og:url" content="https://suveoo.com/transfer/intrabank-scheduled">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Suveoo">
-<meta property="og:description" content="Suveoo 预约转账：设定未来日期或每月定期的自动转账任务，资金先行锁定保障履约，取消即解锁，Saga 编排保证到点执行（模拟银行）。（模拟银行系统，不涉及真实资金行为。）">
+<meta property="og:description" content="Suveoo 预约转账：设定未来时刻（可精确到秒）或每月/每年定期的自动转账任务，到点由 Saga 编排自动执行、收款方真实入账，可随时取消（模拟银行）。（模拟银行系统，不涉及真实资金行为。）">
 <meta property="og:locale" content="zh_CN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="预约转账 · Suveoo">
-<meta name="twitter:description" content="Suveoo 预约转账：设定未来日期或每月定期的自动转账任务，资金先行锁定保障履约，取消即解锁，Saga 编排保证到点执行（模拟银行）。（模拟银行系统，不涉及真实资金行为。）">
+<meta name="twitter:description" content="Suveoo 预约转账：设定未来时刻（可精确到秒）或每月/每年定期的自动转账任务，到点由 Saga 编排自动执行、收款方真实入账，可随时取消（模拟银行）。（模拟银行系统，不涉及真实资金行为。）">
 <meta name="twitter:image" content="https://suveoo.com/assets/images/og-image.png">
 <link rel="preconnect" href="https://www.googletagmanager.com">
-<link rel="stylesheet" href="/assets/css/tokens.css?v=b240">
-<link rel="stylesheet" href="/assets/css/base.css?v=b240">
-<link rel="stylesheet" href="/assets/css/layout.css?v=b240">
-<link rel="stylesheet" href="/assets/css/components.css?v=b240">
-<link rel="stylesheet" href="/assets/css/genui.css?v=b240">
-<link rel="stylesheet" href="/assets/css/trust-console.css?v=b240">
-<link rel="stylesheet" href="/assets/css/pages.css?v=b240">
-<link rel="stylesheet" href="/assets/css/polish.css?v=b240">
+<link rel="stylesheet" href="/assets/css/tokens.css?v=b244">
+<link rel="stylesheet" href="/assets/css/base.css?v=b244">
+<link rel="stylesheet" href="/assets/css/layout.css?v=b244">
+<link rel="stylesheet" href="/assets/css/components.css?v=b244">
+<link rel="stylesheet" href="/assets/css/genui.css?v=b244">
+<link rel="stylesheet" href="/assets/css/trust-console.css?v=b244">
+<link rel="stylesheet" href="/assets/css/pages.css?v=b244">
+<link rel="stylesheet" href="/assets/css/polish.css?v=b244">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KLK499CDQF"></script>
 </head>
 <body data-page="intrabank-scheduled">
 <main id="main" class="page"><div id="content"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></main>
-<script src="/assets/js/core/format.js?v=b240" defer></script>
-<script src="/assets/js/core/ui.js?v=b240" defer></script>
-<script src="/assets/js/core/ctl.js?v=b240" defer></script>
-<script src="/assets/js/core/api.js?v=b240" defer></script>
-<script src="/assets/js/core/auth.js?v=b240" defer></script>
-<script src="/assets/js/core/ga4.js?v=b240"></script>
-<script src="/assets/js/core/i18n.js?v=b240" defer></script>
-<script src="/assets/js/core/sim-notice.js?v=b240" defer></script>
-<script src="/assets/js/core/insights.js?v=b240" defer></script>
-<script src="/assets/js/core/voice.js?v=b240" defer></script>
-<script src="/assets/js/charts/line.js?v=b240" defer></script>
-<script src="/assets/js/charts/bar.js?v=b240" defer></script>
-<script src="/assets/js/charts/donut.js?v=b240" defer></script>
-<script src="/assets/js/charts/sankey.js?v=b240" defer></script>
-<script src="/assets/js/charts/sparkline.js?v=b240" defer></script>
-<script src="/assets/js/genui/renderer.js?v=b240" defer></script>
-<script src="/assets/js/genui/cards.js?v=b240" defer></script>
-<script src="/assets/js/genui/consent.js?v=b240" defer></script>
-<script src="/assets/js/chat/chat-client.js?v=b240" defer></script>
-<script src="/assets/js/chat/trust-console.js?v=b240" defer></script>
-<script src="/assets/js/core/router.js?v=b240" defer></script>
-<script src="/assets/js/core/app.js?v=b240" defer></script>
-<script src="/assets/js/core/prefetch.js?v=b240" defer></script>
-<script src="/assets/js/pages/intrabank-scheduled.js?v=b240" defer></script>
+<script src="/assets/js/core/format.js?v=b244" defer></script>
+<script src="/assets/js/core/ui.js?v=b244" defer></script>
+<script src="/assets/js/core/ctl.js?v=b244" defer></script>
+<script src="/assets/js/core/api.js?v=b244" defer></script>
+<script src="/assets/js/core/auth.js?v=b244" defer></script>
+<script src="/assets/js/core/ga4.js?v=b244"></script>
+<script src="/assets/js/core/i18n.js?v=b244" defer></script>
+<script src="/assets/js/core/sim-notice.js?v=b244" defer></script>
+<script src="/assets/js/core/insights.js?v=b244" defer></script>
+<script src="/assets/js/core/voice.js?v=b244" defer></script>
+<script src="/assets/js/charts/line.js?v=b244" defer></script>
+<script src="/assets/js/charts/bar.js?v=b244" defer></script>
+<script src="/assets/js/charts/donut.js?v=b244" defer></script>
+<script src="/assets/js/charts/sankey.js?v=b244" defer></script>
+<script src="/assets/js/charts/sparkline.js?v=b244" defer></script>
+<script src="/assets/js/genui/renderer.js?v=b244" defer></script>
+<script src="/assets/js/genui/cards.js?v=b244" defer></script>
+<script src="/assets/js/genui/consent.js?v=b244" defer></script>
+<script src="/assets/js/chat/chat-client.js?v=b244" defer></script>
+<script src="/assets/js/chat/trust-console.js?v=b244" defer></script>
+<script src="/assets/js/core/router.js?v=b244" defer></script>
+<script src="/assets/js/core/app.js?v=b244" defer></script>
+<script src="/assets/js/core/prefetch.js?v=b244" defer></script>
+<script src="/assets/js/pages/intrabank-scheduled.js?v=b244" defer></script>
 </body>
 </html>

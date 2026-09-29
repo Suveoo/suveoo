@@ -600,3 +600,63 @@
 .gl-mini-auto { display: inline-flex; align-items: center; gap: 4px; color: var(--c-teal-deep); background: var(--c-teal-tint); padding: 2px 8px; border-radius: 999px; font-size: 11px; }
 .gl-mini-auto svg { width: 11px; height: 11px; }
 /* 第二十五轮：迷你卡改版后手机有空间，徽章加回（队长令） */
+
+/* ===== 第二十八轮：转账页大改（P08 行内 + P09 预约）——去外层大卡，分节表单；
+   付款卡改双列紧凑选卡；快捷收款人/本人互转双彩色图标 chip；免手续费 nowrap 胶囊（防手机断行） ===== */
+.tf-form { max-width: 720px; }
+.tf-group { padding: 18px 0 8px; border-top: 1px solid var(--color-line); }
+.tf-group:first-child { border-top: none; padding-top: 4px; }
+.tf-lb { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-14); font-weight: 600; color: var(--color-ink); margin-bottom: 10px; }
+.tf-fee { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--color-green); background: var(--color-green-bg); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.tf-namerow { display: flex; gap: 8px; align-items: stretch; }
+.tf-namerow .input { flex: 1; min-width: 0; }
+.tf-namerow .ai-chip { flex: none; border-radius: var(--r-btn); white-space: nowrap; }
+.tf-quick { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.tf-qchip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--color-line); background: #fff; border-radius: var(--r-btn); padding: 7px 14px 7px 8px; font-size: 13px; font-weight: 500; color: var(--color-ink); cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease; }
+.tf-qchip:hover { border-color: var(--color-navy); box-shadow: var(--shadow); }
+.tf-qchip:active { transform: translateY(1px); }
+.tf-qchip svg { flex: none; }
+.tf-st { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--color-ink-2); min-height: 17px; }
+.tf-st.ok { color: var(--color-green); }
+.tf-st.bad { color: var(--color-red); }
+.tf-st svg { flex: none; }
+.tf-warn { display: flex; gap: 8px; align-items: flex-start; background: var(--color-red-bg); color: var(--color-red); font-size: 12.5px; border-radius: var(--r-btn); padding: 9px 12px; margin-top: 10px; }
+.tf-warn svg { flex: none; margin-top: 1px; }
+.tf-warn[hidden] { display: none; }
+.tf-amtrow { display: flex; gap: 8px; align-items: stretch; }
+.tf-amtwrap { position: relative; flex: 1; min-width: 0; }
+.tf-amtwrap .cur { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 19px; color: var(--color-ink-2); pointer-events: none; }
+.tf-amtwrap .input-lg { width: 100%; padding-left: 36px; }
+.tf-amtrow .btn-ghost { flex: none; white-space: nowrap; }
+.tf-amthint { margin-top: 7px; font-size: 12px; color: var(--color-ink-2); }
+.tf-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); gap: 10px; }
+.tf-card { position: relative; display: flex; gap: 12px; align-items: center; border: 1.5px solid var(--color-line); border-radius: 12px; padding: 12px 14px; cursor: pointer; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+.tf-card:hover { border-color: #b9c3e8; }
+.tf-card.on { border-color: var(--color-navy); background: linear-gradient(0deg, rgba(30, 42, 120, .055), rgba(30, 42, 120, .055)), #fff; box-shadow: 0 0 0 3px var(--color-primary-tint); }
+.tf-card.off { opacity: .55; cursor: not-allowed; }
+.tf-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.tf-card .bc-art { width: 54px; height: 35px; border-radius: 6px; flex: none; background: var(--color-surface); object-fit: cover; }
+.tf-cinfo { flex: 1; min-width: 0; }
+.tf-cnum { font-family: var(--font-mono); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tf-cmeta { font-size: 12px; color: var(--color-ink-2); margin-top: 3px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-cright { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 46%; }
+.tf-cbal { font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+.tf-cbal.held, .tf-cbal .held { font-family: var(--font-sans); font-size: 11px; color: var(--color-ink-2); white-space: nowrap; }
+.tf-check { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-navy); color: #fff; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(30, 42, 120, .35); }
+.tf-card.on .tf-check { display: inline-flex; }
+.tf-whenrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+.tf-when { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; font-family: var(--font-mono); font-size: 14px; border: 1px solid var(--color-line); border-radius: var(--r-btn); background: #fff; padding: 11px 14px; cursor: pointer; color: var(--color-ink); transition: border-color .15s ease, box-shadow .15s ease; }
+.tf-when:hover { border-color: var(--color-navy); }
+.tf-when .ph { color: var(--color-ink-2); font-family: var(--font-sans); }
+.tf-when svg { margin-left: auto; flex: none; color: var(--color-ink-2); }
+.tf-submit { display: flex; gap: 10px; margin-top: 20px; }
+.tf-submit .btn-primary { flex: 1; }
+@media (max-width: 767px) {
+  .tf-cards { grid-template-columns: 1fr; }
+  .tf-whenrow { grid-template-columns: 1fr; }
+  .tf-card { padding: 10px 12px; gap: 10px; }
+  .tf-card .bc-art { width: 46px; height: 30px; }
+  .tf-cnum { font-size: 13.5px; }
+  .tf-cbal { font-size: 12.5px; }
+  .tf-namerow .ai-chip { padding: 6px 10px; }
+}

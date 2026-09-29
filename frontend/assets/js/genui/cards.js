@@ -56,7 +56,14 @@ S.genuiCards = {
       else if (isGoalTask) subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
       else if (c.action === "goal_create") subject = p.name ?? null;
       else if (c.action === "goal_contribute" || c.action === "goal_adjust" || c.action === "goal_abandon") subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
-      else subject = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
+      else {
+        /* REST 通道快照里的 recipient 是内部引用（self:/acct:/payee:）——回落为友好展示，不裸露 slug */
+        const r0 = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
+        subject = typeof r0 === "string" && r0.startsWith("self:") ? S.t("genui.selfTo")
+          : typeof r0 === "string" && r0.startsWith("acct:") && !p.recipient_name ? `**** ${r0.slice(-4)}`
+          : typeof r0 === "string" && r0.startsWith("payee:") ? S.t("genui.payeeRef", r0.slice(6))
+          : r0;
+      }
     }
     const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
     /* "ALL" 全额赎回占位按文案显示；既无金额也无 ALL（退订/开关类操作）不渲染金额行——

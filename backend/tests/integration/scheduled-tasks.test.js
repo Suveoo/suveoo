@@ -39,6 +39,8 @@ describe("预约转账（长程任务）", () => {
     const def = myCards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
     const other = myCards.find((c) => c.kind === "debit" && c.slug !== def.slug);
     const before = await cardBal(out.user_id, other.slug);
+    const toDef0 = (await cardsOf(to.user_id)).find((c) => c.kind === "debit" && Number(c.is_default) === 1);
+    const toInitial = await cardBal(to.user_id, toDef0.slug);
 
     const body = {
       recipient_account: toDebit.number, recipient_name: "收款丙",
@@ -61,7 +63,38 @@ describe("预约转账（长程任务）", () => {
     expect(task.status).toBe("DONE");
     /* 指定付款卡扣款（from_card 生效），而非默认卡 */
     expect(BigInt(await cardBal(out.user_id, other.slug))).toBe(BigInt(before) - toCents("200"));
+    /* 第二十八轮资金守恒：收款方（跨用户）默认借记卡同额入账——此前到期只扣款不入账（资金黑洞） */
+    const toDef = (await cardsOf(to.user_id)).find((c) => c.kind === "debit" && Number(c.is_default) === 1);
+    expect(BigInt(await cardBal(to.user_id, toDef.slug))).toBe(BigInt(toInitial) + toCents("200"));
+    /* 收款方收到 IN 流水与站内通知（与即时转账同口径） */
+    const toTx = await env.LEDGER.get(env.LEDGER.idFromName(`u:${to.user_id}`)).fetch("https://x/", {
+      method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+      body: JSON.stringify({ op: "transfers", scope: "all" }),
+    }).then((r) => r.json());
+    expect(toTx.txs.some((x) => x.direction === "IN" && BigInt(x.amount_cents) === toCents("200"))).toBe(true);
+    const toNotifs = await env.LEDGER.get(env.LEDGER.idFromName(`u:${to.user_id}`)).fetch("https://x/", {
+      method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+      body: JSON.stringify({ op: "notifications" }),
+    }).then((r) => r.json());
+    expect((toNotifs.notifications ?? []).some((n) => (n.title ?? "").includes("收到转账"))).toBe(true);
   }, 30000);
+
+  it("同卡自转/信用卡收款 → 建单即拒（异步执行无处可拦，出卡前守卫）", async () => {
+    const out = await registerUser("st10@test.dev", "同卡甲");
+    const myCards = await cardsOf(out.user_id);
+    const def = myCards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
+    const cred = myCards.find((c) => c.kind === "credit");
+    /* 收款=付款同一张卡 */
+    const s1 = await j(await post("/api/schedules", { recipient_account: def.number, recipient_name: "同卡甲", amount: "10", from_card: def.slug, execute_at: new Date(Date.now() + 60000).toISOString(), repeat: "once" }, out.token));
+    expect(s1.status).toBe("BLOCKED");
+    expect(s1.reason).toBe("SAME_CARD");
+    /* 收款=本人信用卡（即时通道 CREDIT_TARGET_UNSUPPORTED 同口径） */
+    if (cred) {
+      const s2 = await j(await post("/api/schedules", { recipient_account: cred.number, recipient_name: "同卡甲", amount: "10", from_card: def.slug, execute_at: new Date(Date.now() + 60000).toISOString(), repeat: "once" }, out.token));
+      expect(s2.status).toBe("BLOCKED");
+      expect(s2.reason).toBe("CREDIT_TARGET_UNSUPPORTED");
+    }
+  });
 
   it("编造收款卡号 → 建单即拦（与即时转账同一真实性口径）", async () => {
     const out = await registerUser("st3@test.dev", "定时乙");

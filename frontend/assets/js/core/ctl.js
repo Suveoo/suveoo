@@ -99,14 +99,19 @@ S.ctl = {
    * 日历选择器（第二十三期 /wealth/goals 截止日期）：背景模糊遮罩 + 锁滚；
    * 头部年/月为可点击数字 → 变输入框直接键入（鲁棒解析：去空格/全角/前导零，年夹 1970-2100、月 1-12）；
    * resolve("YYYY-MM-DD") 或 resolve(null)（取消/点遮罩）。挂 body 突破容器。
+   * 第二十八轮 time:true → 日期时间版（预约转账）：日不直接关闭改为高亮，附 时/分/秒 三段
+   * 可点击键入（同款鲁棒解析），resolve("YYYY-MM-DD HH:mm:ss")；此刻/取消/确定 三钮。
    */
-  calendar({ value = "" } = {}) {
+  calendar({ value = "", time = false } = {}) {
     return new Promise((resolve) => {
-      let cur = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + "T00:00:00") : new Date();
+      const m0 = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(value);
+      let cur = m0 ? new Date(m0[1] + "T00:00:00") : new Date();
       if (Number.isNaN(cur.getTime())) cur = new Date();
+      let selDate = m0 ? m0[1] : null;
+      let hh = m0 ? Number(m0[2]) : 9, mi = m0 ? Number(m0[3]) : 0, ss = m0?.[4] ? Number(m0[4]) : 0;
       const today = new Date();
       const mask = S.ui.el(`<div class="cal-mask"></div>`);
-      const box = S.ui.el(`<div class="cal" role="dialog" aria-label="date"></div>`);
+      const box = S.ui.el(`<div class="cal${time ? " cal-time" : ""}" role="dialog" aria-label="date"></div>`);
       mask.appendChild(box);
       document.body.appendChild(mask);
       S.ui._lockScroll();
@@ -119,9 +124,20 @@ S.ctl = {
         const n = parseInt(String(raw ?? "").replace(/[\s\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/^0+(?=\d)/, ""), 10);
         return Number.isFinite(n) ? n : null;
       };
+      const p2 = (x) => String(x).padStart(2, "0");
+      /* 悬空编辑兜底：blur 未及触发（焦点被程序化挪走等边角）时，任何重渲染先把编辑值收账再重建 */
+      let editing = null;
+      const finishEdit = () => {
+        if (!editing) return;
+        const { inp, apply, lo, hi } = editing;
+        editing = null;
+        if (!inp.isConnected) return;
+        const n = num(inp.value);
+        if (n != null) apply(Math.min(hi, Math.max(lo, n)));
+      };
       const render = () => {
+        finishEdit();
         const y = cur.getFullYear(), m = cur.getMonth();
-        const sel = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
         const firstDow = (new Date(y, m, 1).getDay() + 6) % 7; /* 周一为首 */
         const dim = new Date(y, m + 1, 0).getDate();
         const wk = [...Array(7)].map((_, i) => `<span class="cal-wk">${"一二三四五六日"[i]}</span>`).join("");
@@ -129,9 +145,21 @@ S.ctl = {
         for (let i = 0; i < firstDow; i++) cells += "<span></span>";
         for (let d = 1; d <= dim; d++) {
           const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-          const cls = sel === iso ? "sel" : (today.getFullYear() === y && today.getMonth() === m && today.getDate() === d ? "today" : "");
+          const cls = selDate === iso ? "sel" : (today.getFullYear() === y && today.getMonth() === m && today.getDate() === d ? "today" : "");
           cells += `<button type="button" class="${cls}" data-d="${iso}">${d}</button>`;
         }
+        const timeRow = !time ? "" : `
+          <div class="cal-timerow">
+            <button type="button" class="cal-t" data-k="h">${p2(hh)}</button><i>时</i>
+            <button type="button" class="cal-t" data-k="m">${p2(mi)}</button><i>分</i>
+            <button type="button" class="cal-t" data-k="s">${p2(ss)}</button><i>秒</i>
+          </div>
+          <div class="cal-foot">
+            <button type="button" class="cal-quick" data-q="now">此刻</button>
+            <span class="grow"></span>
+            <button type="button" class="cal-cancel">取消</button>
+            <button type="button" class="cal-ok">确定</button>
+          </div>`;
         box.innerHTML = `
           <div class="cal-head">
             <button type="button" class="cal-nav" data-n="-1" aria-label="prev">${S.ui.icon("arrow-left", 14)}</button>
@@ -139,19 +167,17 @@ S.ctl = {
             <button type="button" class="cal-nav" data-n="1" aria-label="next">${S.ui.icon("arrow-right", 14)}</button>
           </div>
           <div class="cal-grid cal-wkrow">${wk}</div>
-          <div class="cal-grid">${cells}</div>`;
-        /* 年/月点击 → 数字进入输入态（Enter/失焦提交，Esc 还原） */
+          <div class="cal-grid">${cells}</div>
+          ${timeRow}`;
+        /* 数字点击 → 输入态（Enter/失焦提交，Esc 还原）：年/月/时/分/秒共用 */
         const editNum = (btn, val, lo, hi, apply) => {
           const inp = document.createElement("input");
           inp.type = "text"; inp.inputMode = "numeric"; inp.className = "cal-edit";
           inp.value = String(val);
           btn.replaceWith(inp);
           inp.focus(); inp.select();
-          const commit = () => {
-            const n = num(inp.value);
-            if (n != null) apply(Math.min(hi, Math.max(lo, n)));
-            render();
-          };
+          editing = { inp, apply, lo, hi };
+          const commit = () => { finishEdit(); render(); };
           inp.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
             else if (e.key === "Escape") { inp.value = String(val); inp.blur(); }
@@ -164,8 +190,27 @@ S.ctl = {
           b.onclick = () => { cur = new Date(cur.getFullYear(), cur.getMonth() + Number(b.dataset.n), 1); render(); };
         });
         box.querySelectorAll(".cal-grid [data-d]").forEach((b) => {
-          b.onclick = () => close(b.dataset.d);
+          b.onclick = () => {
+            if (!time) close(b.dataset.d);
+            else { selDate = b.dataset.d; render(); }
+          };
         });
+        if (time) {
+          const seg = { h: [() => hh, (v) => (hh = v), 0, 23], m: [() => mi, (v) => (mi = v), 0, 59], s: [() => ss, (v) => (ss = v), 0, 59] };
+          box.querySelectorAll(".cal-t").forEach((b) => {
+            const [get, set, lo, hi] = seg[b.dataset.k];
+            b.onclick = (e) => editNum(e.currentTarget, get(), lo, hi, set);
+          });
+          box.querySelector(".cal-quick").onclick = () => {
+            const n = new Date();
+            cur = new Date(n.getFullYear(), n.getMonth(), 1);
+            selDate = `${n.getFullYear()}-${p2(n.getMonth() + 1)}-${p2(n.getDate())}`;
+            hh = n.getHours(); mi = n.getMinutes(); ss = n.getSeconds();
+            render();
+          };
+          box.querySelector(".cal-cancel").onclick = () => close(null);
+          box.querySelector(".cal-ok").onclick = () => { finishEdit(); close(selDate ? `${selDate} ${p2(hh)}:${p2(mi)}:${p2(ss)}` : null); };
+        }
       };
       render();
     });

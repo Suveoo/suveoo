@@ -1622,6 +1622,12 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     if (account == null || name == null) return null; // 非转账型长程任务（订花等）不在此口径
     const t = await resolveTransferTarget(env, { name, account, selfUserId: ctxInfo.userId });
     if (!t.ok) return reject(t.code);
+    /* 同卡自转/信用卡收款在建单前拦（即时转账由 DO 执行层拦，预约是异步执行无处可拦——等到点才发现只能失败） */
+    if (t.self && b.from_card) {
+      const own = ((await U(env, ctxInfo.userId)({ op: "getCards" })).cards ?? []).find((c) => c.number === account);
+      if (own && own.slug === b.from_card) return { ...reject("SAME_CARD"), message: "同一张卡不能转给同一张卡：收款卡与付款卡（from_card）相同，请换一张付款卡或另选收款卡。" };
+      if (own && own.kind === "credit") return { ...reject("CREDIT_TARGET_UNSUPPORTED"), message: "信用卡只作付款卡（消费计欠款）；给自己信用卡入账请走卡片设置页「立即还款」。" };
+    }
     return null;
   }
   if (intent === "task_cancel" && args.task_id != null) {
@@ -3551,6 +3557,9 @@ export async function handleMcp(request, env, url, ctx) {
 async function genuiCardFor(env, ctxInfo, g) {
   const p = { ...g.ir.steps[0].params };
   const snap = g.grant.snapshot;
+  /* 卡列表按需取一次（self 收款方别名 + from_card 展示共用，避免重复 DO 往返） */
+  let cardsCache = null;
+  const myCards = async () => (cardsCache ?? (cardsCache = (await U(env, ctxInfo.userId)({ op: "getCards" })).cards ?? []));
   if (g.ir.intent === "transfer_execute" && p.recipient != null) {
     const ref = String(p.recipient);
     if (ref.startsWith("payee:")) {
@@ -3560,7 +3569,9 @@ async function genuiCardFor(env, ctxInfo, g) {
     } else if (ref.startsWith("acct:")) {
       p.recipient_display = p.recipient_name ? `${p.recipient_name}（**** ${ref.slice(-4)}）` : `**** ${ref.slice(-4)}`;
     } else if (ref.startsWith("self:")) {
-      p.recipient_display = `本人互转 → ${ref.slice(5)}`;
+      /* 本人互转展示卡别名/尾号（只显示尾 4 位——完整卡号不出现在任何确认卡） */
+      const cc = (await myCards()).find((x) => x.slug === ref.slice(5));
+      p.recipient_display = cc ? `本人互转 → ${cc.alias ? `${cc.alias}（**** ${String(cc.number).slice(-4)}）` : `**** ${String(cc.number).slice(-4)}`}` : "本人互转";
     }
     /* 校验前置后此卡只会为真实对手方生成：verified 供前端展示"收款方已验证"徽章 */
     p.verified = true;
@@ -3575,7 +3586,7 @@ async function genuiCardFor(env, ctxInfo, g) {
   /* 付款卡展示名：from_card 为空/空串 = 默认借记卡（与执行端同语义）；信用卡标注"信用支付" */
   if (["transfer_execute", "bill_pay", "ecommerce_order_mock", "fx_exchange", "scheduled_task_create"].includes(g.ir.intent)) {
     try {
-      const cards = (await U(env, ctxInfo.userId)({ op: "getCards" })).cards ?? [];
+      const cards = await myCards();
       const fc = p.from_card ? cards.find((c) => c.slug === p.from_card) : cards.find((c) => c.kind === "debit" && Number(c.is_default) === 1);
       p.from_card_display = fc ? `${fc.class_label}（尾号 ${String(fc.number ?? "").slice(-4)}）${fc.kind === "credit" ? " · 信用支付" : ""}` : p.from_card ?? null;
     } catch { /* 卡列表查询失败不阻塞出卡 */ }
@@ -3852,8 +3863,8 @@ export const SITE_GUIDE_PAGES = [
   { route: "/pay", aliases: ["收付", "收付总览", "转账入口", "常用收款人", "最近转账"], section: "pay", purpose: "收付总览：转账三入口 + 次级功能 + 常用收款人 + 最近转账。", entry: "侧栏「收付」/ 底部导航 / home 宫格", actions: ["三大转账卡：行内转账可点；跨行/跨境灰置弹模态", "次级功能行：预约转账/转账记录/转账限额/账单与订阅", "AI 快捷条（收款人驱动建议句按日轮换）", "常用收款人横滑卡（每卡「转账」按钮带 ?payee= 预填 /transfer/intrabank）", "最近转账列表（查看全部 → /transfer/history）"], flow: "选收款人「转账」→ 预填转账页 → 黄/红确认。", notes: "跨行与跨境仅架构演示未开放。" },
   { route: "/pay/bills", aliases: ["账单", "缴费", "账单支付", "水电费", "自动扣款", "贷款还款", "信用卡还款"], section: "pay", purpose: "账单支付：缴费账单列表 + 贷款/信用卡还款 + 自动扣款开关。", entry: "/pay 次级功能「账单与订阅」/ home 宫格「账单支付」", actions: ["「立即缴费」按钮（黄级确认弹窗）", "「自动扣款」开关（黄级确认：商户+金额上限+扣款日）", "车贷还款卡 / 信用卡还款卡（账单金额/最低还款/还款日）", "订阅扣款预览 → /pay/subscriptions", "账单洞察卡"], flow: "立即缴费 → 黄确认卡 → 执行扣款；信用卡全额还款也可走 /account/card/{slug}/settings「立即还款」。", notes: "SimNotice banner；账单金额为模拟定价。" },
   { route: "/pay/subscriptions", aliases: ["订阅", "订阅管理", "退订", "取消订阅", "续费提醒", "暗黑模式"], section: "pay", purpose: "订阅管理（赛题场景 5）：订阅卡列表 + 使用频率 + Dark Pattern 预警 + 退订。", entry: "/pay「账单与订阅」/ /pay/bills「管理订阅」", actions: ["「取消订阅」（黄级确认：提示下次扣费前是否仍扣款）——AI 通道同义工具 subscription_cancel", "「续费提醒」开关（扣费前 48h 站内+邮件提醒，反 Dark Pattern）", "使用频率条（0-100%，subscription_scan 评分）", "Dark Pattern 预警角标（如首月特惠恢复原价）", "沉睡订阅预警洞察卡"], flow: "取消订阅 → 黄确认 → 生效；AI 说「退订 Netflix」会先 subscription_scan 再出确认卡。", notes: "SimNotice banner；订阅数据为模拟。" },
-  { route: "/transfer/intrabank", aliases: ["转账", "行内转账", "汇款", "转钱", "付款", "问问 AI", "AI 帮我核对"], section: "pay", purpose: "行内转账（核心写操作页）：向真实 Suveoo 用户转账。", entry: "/pay 三大卡 / home 宫格 / 收款人卡「转账」(?payee= 预填) / 卡片页「转账汇款」(?from=)", actions: ["收款人输入（姓名/卡号；「常用收款人」抽屉回填；仅支持 Suveoo 16 位卡号，姓名须与户名匹配）", "「问问 AI / AI 帮我核对」chip（随表单双态切换）", "金额输入（免手续费；实时联动付款卡余额）", "付款卡选择（借记+信用卡信用支付 badge；「全部转出」二次确认）", "备注（选填，含在双方邮件通知中）", "提交 → 黄级确认卡（≤¥1,000 日累计；120s 倒计时+grant 前 12 位）→ 确认执行；红级（>¥1,000 日累计）确认卡内嵌邮箱 OTP"], flow: "填收款人+金额+选卡 → 提交 → 确认卡 →（红级填 OTP）→ 成功回执（流水号/双方/金额/Merkle 存证 ID/邮件状态）；AI 通道由 transfer_execute 出同款确认卡。", notes: "SimNotice banner；非 Suveoo 账号行内红条拦截；收款人三重校验（格式/存在/户名）。" },
-  { route: "/transfer/intrabank-scheduled", aliases: ["预约转账", "定时转账", "未来转账", "周期转账"], section: "pay", purpose: "预约转账：指定未来时刻自动执行的行内转账。", entry: "/pay 次级功能「预约转账」", actions: ["转账表单（同 P08：收款人/金额/付款卡[仅借记]/备注）", "日期选择器 + 时间选择（5 分钟粒度）", "重复规则：单次 once / 每月 monthly / 每年 yearly", "双时区显示（您的时区 + 北京时间 UTC+8）", "提交 → 黄级确认卡"], flow: "建单 → 黄确认 → 任务进 /ai/tasks（PENDING）→ 到期 saga 闹钟唤醒执行 → 可在任务中心取消（补偿=删除预约不动账）；AI 通道 scheduled_task_create（execute_at 须 ISO 8601 带 +08:00）。", notes: "执行以服务端 UTC 存储定时器为准；SimNotice footnote。" },
+  { route: "/transfer/intrabank", aliases: ["转账", "行内转账", "汇款", "转钱", "付款", "问问 AI", "AI 帮我核对"], section: "pay", purpose: "行内转账（核心写操作页）：向真实 Suveoo 用户转账。", entry: "/pay 三大卡 / home 宫格 / 收款人卡「转账」(?payee= 预填) / 卡片页「转账汇款」(?from=)", actions: ["分节表单（无外层大卡）：收款人（对方开户姓名）/收款账号/金额/付款卡/备注", "收款账号鲁棒输入：全角与空格归一、每 4 位自动分组、Luhn 即时校验（绿✓/红警）、自动识别本人卡、与付款卡同卡即时红警并禁提交", "快捷双 chip：常用收款人（抽屉回填）/转入本人其他（借记卡列表→回填本人真实姓名+完整 16 位卡号，可继续手改不锁死；信用卡行引导走「立即还款」）", "「问问 AI / AI 帮我核对」chip（随表单双态切换）", "金额（¥ 前缀 + 全部转出一键填可用额 + 免手续费胶囊；超 ¥1,000 单笔/日累计触发邮箱 OTP 强验证）", "付款卡双列紧凑选卡（借记+信用卡信用支付 badge+已锁定金额行）", "备注（选填，含在双方邮件通知中）", "提交 → 黄级确认卡（≤¥1,000 日累计；120s 倒计时+grant 前 12 位）→ 确认执行；红级（>¥1,000 日累计）确认卡内嵌邮箱 OTP"], flow: "填收款人+金额+选卡 → 提交 → 确认卡 →（红级填 OTP）→ 成功回执（流水号/双方/金额/Merkle 存证 ID/邮件状态）；AI 通道由 transfer_execute 出同款确认卡。", notes: "SimNotice banner；非 Suveoo 账号行内红条拦截；收款人三重校验（格式/存在/户名）；完整卡号仅在本人互转回填时经 reveal 接口取用。" },
+  { route: "/transfer/intrabank-scheduled", aliases: ["预约转账", "定时转账", "未来转账", "周期转账"], section: "pay", purpose: "预约转账：指定未来时刻自动执行的行内转账。", entry: "/pay 次级功能「预约转账」", actions: ["与行内转账同款分节表单：收款人/收款账号（同款鲁棒 16 位+Luhn+同卡警示）/快捷双 chip/问问 AI 双态/金额（¥前缀+全部转出+免手续费胶囊）/付款卡[仅借记]/备注（选填）", "执行时间：自绘日历弹窗（年月日+时/分/秒均可点击直输，模糊遮罩锁滚，含「此刻」快捷），精确到秒", "重复规则：单次 once / 每月 monthly / 每年 yearly（到点自动轮转下一期）", "双时区显示（您的时区 + 北京时间 UTC+8）", "提交 → 黄级确认卡 → 成功回执卡（收款人/执行时间/重复）", "长程任务中心（行尾「查看全部 →」直达 /ai/tasks）；到期执行资金守恒：收款方真实入账（本人其他卡直接加余额 / 跨用户入账+通知）"], flow: "建单 → 黄确认 → 任务进 /ai/tasks（PENDING）→ 到期 saga 闹钟唤醒执行（收款方入账）→ 可在任务中心取消（补偿=删除预约不动账）；AI 通道 scheduled_task_create（execute_at 须 ISO 8601 带 +08:00）。", notes: "执行以服务端 UTC 存储定时器为准；同卡自转/信用卡收款建单即拦；SimNotice footnote。" },
   { route: "/transfer/history", aliases: ["转账记录", "交易记录", "流水", "导出 CSV", "导出", "明细"], section: "pay", purpose: "转账记录：纯转账口径的流水查询、筛选、详情与导出。", entry: "/pay「最近转账·查看全部」/ 侧栏「转账记录」", actions: ["筛选条：时间范围（近 7 天/1 月/3 月）+ 方向（支出/收入）+ 状态 + 卡", "统计条与搜索", "行点击展开详情（流水号/双方掩码卡号/备注/手续费/Merkle 存证 ID/经手渠道=AI trace 或经典表单）", "游标分页（每页 20，「加载更多」）", "「导出 CSV」按钮（本地生成，BOM 保 Excel 中文，文件名 suveoo-transfers-日期.csv）"], flow: "筛选 → 查看列表 → 展开详情 → 可导出 CSV。全量收支口径请用 /account/transactions。", notes: "只读无写操作；AI 回答「转账记录在哪导出」应引用本页链接。" },
   { route: "/transfer/limits", aliases: ["转账限额", "限额", "额度调整", "单笔限额", "日累计"], section: "pay", purpose: "转账限额：按渠道×卡展示限额矩阵并支持调整。", entry: "/pay 次级功能「转账限额」/ /account 宫格 / 单卡设置跳转", actions: ["限额矩阵：行内转账（默认单笔 ¥50,000/日 ¥100,000）、AI 通道（单笔 ¥5,000/日 ¥10,000，独立且更低）", "每行「调整」按钮 → 弹窗（滑杆+数字输入）：下调至 ≥¥100 黄级确认；上调需红级", "页面底部三色分级与 ¥1,000 黄红阈值说明"], flow: "调整 → 黄（或红 OTP）确认卡 → 生效。AI 通道同义工具 card_limit_adjust。", notes: "AI 通道限额是硬上限（AI_CAP_TOOLS 限制），页面调整不能突破。" },
   { route: "/transfer/payees", aliases: ["常用收款人", "收款人管理", "添加收款人", "删除收款人", "收款人分组"], section: "pay", purpose: "常用收款人管理：分组列表 + 增删改。", entry: "/pay「查看全部及管理」/ 侧栏", actions: ["「添加」表单（姓名 + Suveoo 16 位卡号 + 手机号可选[1 开头 11 位] + 分组）", "「编辑」「删除」（删除黄级确认）", "每卡「转账」按钮（跳 /transfer/intrabank?payee= 预填）", "分组：家人/朋友/同事/生活缴费/其他+自定义"], flow: "添加 → 可校验真实户名 → 转账时可从抽屉选择；AI 通道 payee_manage（黄）同口径，带手机号后 contacts_search 可按全号/尾号命中。", notes: "姓名为脱敏模拟数据；未验证收款人转账被拦截。" },
@@ -6856,12 +6867,49 @@ export class LedgerDO {
               ?? this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
             const amt = BigInt(toCents(String(b.amount ?? "0")));
             if (amt > BigInt(from.balance_cents)) { this.#notify(sql, "TASK", "预约转账失败", "余额不足，任务标记失败。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "INSUFFICIENT_BALANCE" }); }
+            /* 第二十八轮资金守恒修复：此前到期只扣款记 OUT，收款方永不到账（本人其他卡/对方账户均无入账）——
+               与即时转账同口径补齐：本人卡（同 DO）直接加余额；跨用户经 registry 查归属 → #crossCredit 先入账
+               （credit-first：入账失败即整体失败不扣款，杜绝只扣不加）。收款方卡号在建单时已过真实性校验；
+               无卡号的存量/种子任务保持原出金语义（demo-lab 现金流建模）。 */
+            const toAcct = String(b.recipient_account ?? "").trim();
+            const own = /^\d{16}$/.test(toAcct) ? this.#rows(sql.exec("SELECT * FROM cards WHERE number = ?", toAcct))[0] : null;
+            if (own && (own.slug === from.slug || own.kind === "credit")) {
+              /* 同卡自转/信用卡收款（建单校验前存量的极端个案）：直接按未执行完成，不动账 */
+              this.#notify(sql, "TASK", "预约转账未执行", `「${t.title}」收款卡不可用（同卡或信用卡），任务已结束，余额未受影响。`);
+              sql.exec("UPDATE tasks SET status='DONE' WHERE id=?", input.id);
+              return json({ ok: true, outcome: "DONE", skipped: "SAME_CARD" });
+            }
+            let cross = null;
+            if (!own && /^\d{16}$/.test(toAcct)) {
+              /* 归属查询走 registry 实例（reg_cards 表只在 registry DO；self-fetch 只会打到本用户 DO 查空） */
+              const reg = await this.env.LEDGER.get(this.env.LEDGER.idFromName("registry")).fetch("https://ledger.internal/", {
+                method: "POST", headers: { "content-type": "application/json", ...DO_INTERNAL },
+                body: JSON.stringify({ op: "userByCard", number: toAcct }),
+              }).then((r) => r.json()).catch(() => ({ user_id: null }));
+              const selfId = this.#rows(sql.exec("SELECT user_id FROM profile LIMIT 1"))[0]?.user_id ?? null;
+              cross = reg.user_id && reg.user_id !== selfId ? reg.user_id : null;
+              if (!cross) {
+                this.#notify(sql, "TASK", "预约转账失败", `收款卡号 ${toAcct.slice(-4)} 已无法解析归属，任务标记失败，余额未受影响。`);
+                sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id);
+                return json({ ok: false, error: "TARGET_CARD_NOT_FOUND" });
+              }
+              const traceId = `sch-t${input.id}-${NOW}`;
+              const cr = await this.#crossCredit(cross, { amount_cents: String(amt), counterparty: b.recipient_name ?? "预约转账付款方", memo: b.memo ?? null, trace_id: traceId, channel: "task" });
+              if (!cr.ok) { this.#notify(sql, "TASK", "预约转账失败", "收款方入账未成功，任务标记失败，余额未受影响。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "CREDIT_FAILED" }); }
+            }
             sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(from.balance_cents) - amt), from.slug);
+            if (own) sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(own.balance_cents) + amt), own.slug);
             const txId = this.#txId();
             sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,?,?,?,'SUCCESS','task',NULL,'转账', ?)",
               txId, NOW, String(amt), "OUT", b.recipient_name ?? "收款人", b.memo ?? null, from.slug);
             if (t.repeat === "monthly") {
               const nextRun = new Date(Date.now() + 30 * 86400000).toISOString();
+              sql.exec("UPDATE tasks SET status='PENDING', next_run_at=? WHERE id=?", nextRun, input.id);
+              return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun });
+            }
+            if (t.repeat === "yearly") {
+              /* 每年轮转：desc 承诺 repeat=yearly，此前落到 DONE 只执行一次（真实银行差距修复） */
+              const nextRun = new Date(Date.now() + 365 * 86400000).toISOString();
               sql.exec("UPDATE tasks SET status='PENDING', next_run_at=? WHERE id=?", nextRun, input.id);
               return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun });
             }
