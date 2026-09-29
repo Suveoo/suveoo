@@ -52,7 +52,7 @@ S.router.register("about", async () => {
           <div class="acc-item hacc ab-ann">
             <button class="acc-head" type="button" aria-expanded="false">
               <span class="ab-ann-l"><span class="ab-bell">${S.ui.icon("ic-bell-navy", 26)}</span><b>${S.fmt.escape(a.title)}</b>${i === 0 ? `<i class="ab-new">${S.fmt.escape(S.t("about.latest"))}</i>` : ""}</span>
-              <span class="ab-ann-r mono small">${a.date}${S.ui.icon("arrow-right", 14)}</span>
+              <span class="ab-ann-r mono small">${a.date}${S.ui.icon("chevron", 14)}</span>
             </button>
             <div class="acc-body"><div class="acc-inner">${S.fmt.escape(a.body)}</div></div>
           </div>`).join("")}</div>

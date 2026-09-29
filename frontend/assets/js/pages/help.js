@@ -32,7 +32,7 @@ S.router.register("help", async () => {
   /* 手风琴条目（data-k 供搜索；aria-expanded 供无障碍） */
   const acc = (items) => items.map((it) => `
     <div class="acc-item hacc" data-k="${esc((it.q + " " + it.a).toLowerCase())}">
-      <button class="acc-head" type="button" aria-expanded="false"><span>${esc(it.q)}</span>${S.ui.icon("arrow-right", 14)}</button>
+      <button class="acc-head" type="button" aria-expanded="false"><span>${esc(it.q)}</span>${S.ui.icon("chevron", 14)}</button>
       <div class="acc-body"><div class="acc-inner">${esc(it.a)}</div></div>
     </div>`).join("");
 

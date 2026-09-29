@@ -24,8 +24,8 @@ label.field .lb { display: block; font-weight: 500; margin-bottom: 6px; font-siz
 .ctl-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--color-line); border-radius: var(--r-btn); padding: 10px 14px; font-size: var(--fs-14); font-family: inherit; background: #fff; color: var(--color-ink); cursor: pointer; text-align: left; }
 .ctl-btn:focus-visible { border-color: var(--color-navy); outline: none; box-shadow: 0 0 0 3px var(--color-primary-tint); }
 .ctl-btn .ctl-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ctl-btn .ic { color: var(--color-ink-2); flex: none; transition: transform .18s ease; }
-.ctl-select.open .ctl-btn .ic { transform: rotate(180deg); }
+.ctl-btn .ic { color: var(--color-ink-2); flex: none; transition: transform .18s ease; transform: rotate(90deg); } /* 第二十七轮：人字字形朝右，下拉惯例应闭合朝下 ∨、展开朝上 ∧ */
+.ctl-select.open .ctl-btn .ic { transform: rotate(270deg); }
 .ctl-select.open .ctl-btn { border-color: var(--color-navy); }
 /* fixed 由 S.ctl.open 挂 body 锚定（突破祖先 overflow/滚动容器，不被模态/卡片裁剪）；长列表自身滚动。
    z 必须高于模态遮罩（下拉常在模态内打开——挂 body 后若仍在 --z-dropdown(200) 会被 modal(300) 遮罩盖住变灰不可点） */
