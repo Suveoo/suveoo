@@ -26,13 +26,18 @@ S.router.register("login", async () => {
     pw.type = show ? "text" : "password";
     document.getElementById("l-eye").innerHTML = S.ui.icon(show ? "eye-off" : "eye", 18);
   };
+  /* 提交期间按钮进入 spinner 态：disabled 灰样式 + 旋转指示 + "正在登录/验证"文案——
+     2FA 用户服务端往返更久，静止的灰按钮易被误认为卡死（队长第三十轮反馈） */
+  const busy = (btn, on, textKey) => {
+    if (on) { btn.dataset.label = btn.innerHTML; btn.innerHTML = `<span class="spin"></span>${S.fmt.escape(S.t(textKey))}`; btn.disabled = true; }
+    else { btn.innerHTML = btn.dataset.label ?? btn.innerHTML; btn.disabled = false; }
+  };
   const go = async () => {
     const btn = document.getElementById("l-go");
-    btn.disabled = true;
+    busy(btn, true, "login.working");
     const r = await S.auth.login(document.getElementById("l-id").value.trim(), document.getElementById("l-pw").value);
-    btn.disabled = false;
-    if (!r.ok) { S.ui.toast(r.data?.error?.message ?? S.t("login.failed"), true); return; }
-    if (r.data.mfa_required) { twoFa(r.data.mfa_token); return; }
+    if (!r.ok) { busy(btn, false); S.ui.toast(r.data?.error?.message ?? S.t("login.failed"), true); return; }
+    if (r.data.mfa_required) { twoFa(r.data.mfa_token); return; } /* spinner 保持到 2FA 表单就位自然替换 */
     S.ui.toast(S.t("common.opOk"));
     location.replace(next);
   };
@@ -45,9 +50,11 @@ S.router.register("login", async () => {
       <label class="field"><span class="lb">Code</span><input class="input mono" id="l-otp" maxlength="6" inputmode="numeric" placeholder="${S.fmt.escape(S.t("login.otpPh"))}"></label>
       <button class="btn btn-primary btn-block" id="l-go2">${S.fmt.escape(S.t("login.submit"))}</button>`;
     const go2 = async () => {
+      const btn2 = document.getElementById("l-go2");
+      busy(btn2, true, "login.verifying");
       const r2 = await S.auth.mfa(mfaToken, document.getElementById("l-otp").value.trim());
-      if (!r2.ok) { S.ui.toast(r2.data?.error?.message ?? r2.data?.error?.code ?? S.t("login.mfaFailed"), true); return; }
-      location.replace(next);
+      if (!r2.ok) { busy(btn2, false); S.ui.toast(r2.data?.error?.message ?? r2.data?.error?.code ?? S.t("login.mfaFailed"), true); return; }
+      location.replace(next); /* 成功路径 spinner 保持到跳转 */
     };
     document.getElementById("l-go2").onclick = go2;
     document.getElementById("l-otp").addEventListener("keydown", (e) => { if (e.key === "Enter") go2(); });

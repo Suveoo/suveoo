@@ -661,13 +661,12 @@
   .tf-namerow .ai-chip { padding: 6px 10px; }
 }
 
-/* ===== 第二十九轮：通知中心改版（nt-* 系统）——分类 hpill × 时间分组 × 单条操作 ===== */
-.nt-head { align-items: flex-start; gap: 12px; }
+/* ===== 第二十九轮：通知中心改版（nt-* 系统）——分类 hpill × 时间分组 × 单条操作 =====
+   第三十轮：安全条移除，操作按钮独立成行（副标题→按钮 8px、按钮→chips 14px）；
+   图标光学下移 4px（手机 3px）；操作区展开动画；标题/时间戳基线严格同线。 */
 .nt-head h1 { margin: 0; }
 .nt-sub { margin: 4px 0 0; }
-.nt-ops { display: flex; gap: 10px; flex: none; }
-.nt-sec { display: flex; align-items: center; gap: 6px; margin: 12px 0 4px; padding: 5px 11px; border-radius: 9px; background: rgba(220, 38, 38, .045); color: #b42420; font-size: 12px; }
-.nt-sec .ic { flex: none; }
+.nt-ops { display: flex; gap: 10px; margin: 8px 0 14px; }
 /* 分类徽章用中性 navy（计数语义），仅"未读"总徽章保留红色提醒——多枚红徽章并排显噪（队长返修） */
 .chip-n { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 999px; background: rgba(30, 42, 120, .08); color: var(--color-navy); font-size: 11px; font-weight: 600; line-height: 16px; }
 .hpill[data-v="unread"] .chip-n { background: rgba(220, 38, 38, .12); color: #dc2626; }
@@ -685,19 +684,24 @@
 .nt-row.open { background: #f6f8fe; }
 .nt-row:not(.is-unread) .nt-dot { display: none; }
 .nt-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--color-navy); margin-top: 14px; }
-.nt-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+/* 图标光学下移：正文两行时图标视觉重心偏高（队长第三十轮），桌面 +4px / 手机 +3px */
+.nt-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; margin-top: 4px; }
 .nt-ico.t-transfer { background: rgba(5, 122, 85, .1); color: #059669; }
 .nt-ico.t-security { background: rgba(220, 38, 38, .1); color: #dc2626; }
 .nt-ico.t-wealth { background: rgba(180, 131, 8, .12); color: #a16207; }
 .nt-ico.t-task { background: rgba(109, 40, 217, .1); color: #7c3aed; }
 .nt-ico.t-system { background: rgba(100, 116, 139, .12); color: #64748b; }
 .nt-main { flex: 1; min-width: 0; }
-.nt-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.nt-title { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt-time { flex: none; font-size: 12px; color: var(--color-ink-2); }
+/* 标题/时间戳严格同线：统一 20px 行高 + baseline 对齐（14px 粗标题与 12px 时间戳文字底座同一条线） */
+.nt-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.nt-title { font-size: 14px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-time { flex: none; font-size: 12px; line-height: 20px; color: var(--color-ink-2); margin-bottom: -1px; } /* 盒底对齐后数字行光学下沉 1px 补偿，与中文标题严格同线 */
 .nt-body { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--color-ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
-.nt-row.open .nt-body { display: block; -webkit-line-clamp: unset; color: var(--color-ink); }
-.nt-acts { display: flex; gap: 8px; margin-top: 10px; }
+.nt-row.open .nt-body { display: block; -webkit-line-clamp: unset; color: var(--color-ink); animation: nt-fade .16s ease-out; }
+/* 展开操作区动画：新插入元素用 animation（innerHTML 重建不触发 transition） */
+.nt-acts { display: flex; gap: 8px; margin-top: 10px; animation: nt-rise .18s ease-out; }
+@keyframes nt-rise { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@keyframes nt-fade { from { opacity: .4; } to { opacity: 1; } }
 .mini-btn { font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--color-line); background: #fff; color: var(--color-ink); cursor: pointer; transition: border-color .15s ease, color .15s ease; }
 .mini-btn:hover { border-color: var(--color-navy); color: var(--color-navy); }
 .mini-btn.danger { color: #dc2626; }
@@ -708,11 +712,23 @@
 .nt-nomore { text-align: center; margin: 16px 0 4px; color: var(--color-ink-2); }
 
 @media (max-width: 768px) {
-  .nt-head { flex-direction: column; align-items: stretch; }
-  .nt-ops { justify-content: flex-end; }
   .nt-row { padding: 10px 12px; gap: 10px; }
-  .nt-ico { width: 32px; height: 32px; border-radius: 9px; }
+  .nt-ico { width: 32px; height: 32px; border-radius: 9px; margin-top: 3px; }
   .nt-dot { margin-top: 12px; }
   .nt-chev { display: none; }
   .nt-h { flex-wrap: wrap; }
+}
+
+/* ===== 第三十轮：卡片设置页去大容器分节（cs-*）——卡面区无边框满宽、节间大留白 ===== */
+.cs-hero { display: flex; align-items: center; gap: 16px; margin: 14px 0 4px; }
+.cs-hero .bc-art { width: 96px; height: 61px; border-radius: 10px; flex: none; background: var(--color-surface); object-fit: cover; box-shadow: var(--shadow); }
+.cs-hero-info { flex: 1; min-width: 0; }
+.cs-numrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cs-numrow .mono { font-size: 16px; }
+.cs-sec { margin-top: 26px; }
+.cs-sec h3 { margin: 0; }
+@media (max-width: 768px) {
+  .cs-hero { gap: 12px; margin-top: 10px; }
+  .cs-hero .bc-art { width: 78px; height: 50px; border-radius: 8px; }
+  .cs-sec { margin-top: 22px; }
 }

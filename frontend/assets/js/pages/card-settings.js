@@ -1,44 +1,51 @@
-/* card-settings.js — P26 单卡设置（Debit/Credit 差异化） */
+/* card-settings.js — P26 单卡设置（Debit/Credit 差异化）；
+   第三十轮去外层大容器改分节布局（同转账页 tf-form 律）：卡面区无边框、
+   节标题+轻虚线 kv，元素满内容宽；全部功能绑定保留（别名/默认卡/reveal/复制/还款/冻结/限额）。 */
 S.router.register("card-settings", async () => {
   const c = document.getElementById("content");
   const slug = (location.pathname.match(/\/account\/card\/([a-z0-9-]+)/) ?? [])[1];
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("card.settings"))}</h1><div class="card" id="pane">${S.ui.skeleton(3)}</div>`;
+  c.innerHTML = `<h1>${S.fmt.escape(S.t("card.settings"))}</h1><div id="pane">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get(`/api/cards/${slug}`);
   const pane = document.getElementById("pane");
   if (!r.ok) { pane.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
   const cd = r.data.card;
   const isCredit = cd.kind === "credit";
   pane.innerHTML = `
-    <div class="bc-main" style="margin-bottom:16px"><img class="bc-art" src="/${cd.art}" alt="">
-      <div>
-        <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="cs-hero">
+      <img class="bc-art" src="/${cd.art}" alt="">
+      <div class="cs-hero-info">
+        <div class="cs-numrow">
           <b class="mono" id="cs-num">${S.fmt.escape(cd.number)}</b>
           <button class="eye-toggle" id="cs-eye" title="${S.fmt.escape(S.t("cards.fullNumber"))}" aria-label="${S.fmt.escape(S.t("cards.fullNumber"))}">${S.ui.icon("eye", 18)}</button>
           <button class="btn btn-sm btn-light" id="cs-copy" hidden>${S.ui.icon("copy", 13)} ${S.fmt.escape(S.t("cards.copy"))}</button>
         </div>
-        <div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}</div>
-      </div></div>
+        <div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}${cd.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</div>
+      </div>
+      ${isCredit ? S.ui.badge(S.t("cards.creditTag"), "badge-navy") : ""}
+    </div>
+    <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("cs.basic"))}</h3></div>
     <label class="field"><span class="lb">${S.fmt.escape(S.t("card.alias"))}</span>
       <div class="row"><input class="input" id="cs-alias" value="${S.fmt.escape(cd.alias ?? "")}"><button class="btn btn-light" id="cs-alias-go" style="flex:none">${S.fmt.escape(S.t("common.save"))}</button></div></label>
-    ${cd.is_default ? S.ui.badge(S.t("cards.default"), "badge-navy") : `<button class="btn btn-ghost btn-sm" id="cs-default">${S.fmt.escape(S.t("card.setDefault"))}</button>`}
+    <div class="row" style="gap:10px;align-items:center;margin-top:12px">
+      ${cd.is_default ? `${S.ui.badge(S.t("cards.default"), "badge-navy")}<span class="muted small">${S.fmt.escape(S.t("cs.isDefault"))}</span>` : `<button class="btn btn-ghost btn-sm" id="cs-default">${S.fmt.escape(S.t("card.setDefault"))}</button>`}
+    </div>
     ${isCredit ? `
-      <div class="section-title" style="margin-top:8px"><h3>${S.fmt.escape(S.t("card.repayInfo"))}</h3></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cs.repayCycle"))}</span><span class="v mono">${S.fmt.escape(S.t("cs.repayCycleVal"))}</span></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLimit"))}</span><span class="v mono">¥ ${cd.limit}</span></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.outstanding"))}</span><span class="v mono">¥ ${cd.balance}</span></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLeft"))}</span><span class="v mono">¥ ${cd.available}</span></div>
-      <button class="btn btn-primary" id="cs-repay" style="margin-top:10px">${S.ui.icon("check", 14)} ${S.fmt.escape(S.t("cards.repay"))}</button>
-      <p class="muted small" style="margin-top:6px">${S.fmt.escape(S.t("cards.repayNote"))}</p>
-      <h3 style="margin-top:16px">${S.fmt.escape(S.t("card.geo"))}</h3>
-      <p class="muted small">${S.fmt.escape(S.t("cs.geoNote"))}</p>
-      <label class="row" style="gap:8px"><span class="switch"><input type="checkbox" id="cs-geo"><span class="tk"></span></span><span class="small">${S.fmt.escape(S.t("cs.geoLabel"))}</span></label>` : `
-      <div class="section-title" style="margin-top:8px"><h3>${S.fmt.escape(S.t("limits.title"))}</h3></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("limits.single"))}</span><span class="v mono">¥ ${cd.limit_single}</span></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("limits.daily"))}</span><span class="v mono">¥ ${cd.limit_daily}</span></div>
-      <a class="btn btn-ghost btn-sm" style="margin-top:8px" href="/transfer/limits">${S.fmt.escape(S.t("limits.adjust"))}</a>`}
-    <div class="row" style="margin-top:20px">
-      <button class="btn btn-danger" id="cs-fz">${S.ui.icon("snow", 14)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}（RED）</button>
-    </div>`;
+    <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("card.repayInfo"))}</h3></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cs.repayCycle"))}</span><span class="v mono">${S.fmt.escape(S.t("cs.repayCycleVal"))}</span></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLimit"))}</span><span class="v mono">¥ ${cd.limit}</span></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.outstanding"))}</span><span class="v mono">¥ ${cd.balance}</span></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("cards.creditLeft"))}</span><span class="v mono">¥ ${cd.available}</span></div>
+    <button class="btn btn-primary" id="cs-repay" style="margin-top:14px">${S.ui.icon("check", 14)} ${S.fmt.escape(S.t("cards.repay"))}</button>
+    <p class="muted small" style="margin-top:6px">${S.fmt.escape(S.t("cards.repayNote"))}</p>
+    <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("card.geo"))}</h3></div>
+    <p class="muted small" style="margin:0 0 8px">${S.fmt.escape(S.t("cs.geoNote"))}</p>
+    <label class="row" style="gap:8px"><span class="switch"><input type="checkbox" id="cs-geo"><span class="tk"></span></span><span class="small">${S.fmt.escape(S.t("cs.geoLabel"))}</span></label>` : `
+    <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("limits.title"))}</h3></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("limits.single"))}</span><span class="v mono">¥ ${cd.limit_single}</span></div>
+    <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("limits.daily"))}</span><span class="v mono">¥ ${cd.limit_daily}</span></div>
+    <a class="btn btn-ghost btn-sm" style="margin-top:12px" href="/transfer/limits">${S.fmt.escape(S.t("limits.adjust"))}</a>`}
+    <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("cs.security"))}</h3></div>
+    <button class="btn btn-danger" id="cs-fz">${S.ui.icon("snow", 14)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}（RED）</button>`;
   /* 完整卡号：默认掩码；点击眼睛才调用 reveal 端点取完整 16 位，展开后可复制，再点收回 */
   const numEl = document.getElementById("cs-num");
   const eyeBtn = document.getElementById("cs-eye");

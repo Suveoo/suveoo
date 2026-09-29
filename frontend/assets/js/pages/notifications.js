@@ -27,16 +27,15 @@ S.router.register("notifications", async () => {
   const CATS = [["all", "common.all", null], ["unread", "notif.unread", "unread"], ["TRANSFER", "notif.cat.transfer", "TRANSFER"], ["SECURITY", "notif.cat.security", "SECURITY"], ["WEALTH", "notif.cat.wealth", "WEALTH"], ["TASK", "notif.cat.task", "TASK"], ["SYSTEM", "notif.cat.system", "SYSTEM"]];
 
   c.innerHTML = `
-    <div class="row between nt-head">
-      <div><h1>${S.fmt.escape(S.t("nav.notifications"))}</h1>
-        <p class="muted small nt-sub" id="n-sub"></p></div>
-      <div class="nt-ops">
-        <button class="btn btn-ghost btn-sm" id="clear-read" hidden>${S.fmt.escape(S.t("notif.clearRead"))}</button>
-        <button class="btn btn-light btn-sm" id="read-all">${S.fmt.escape(S.t("notif.markAll"))}</button>
-      </div>
+    <div class="nt-head">
+      <h1>${S.fmt.escape(S.t("nav.notifications"))}</h1>
+      <p class="muted small nt-sub" id="n-sub"></p>
+    </div>
+    <div class="nt-ops">
+      <button class="btn btn-ghost btn-sm" id="clear-read" hidden>${S.fmt.escape(S.t("notif.clearRead"))}</button>
+      <button class="btn btn-light btn-sm" id="read-all">${S.fmt.escape(S.t("notif.markAll"))}</button>
     </div>
     <div class="th-chips" id="n-chips"></div>
-    <p class="nt-sec small"><span class="nt-secico">${S.ui.icon("shield", 13)}</span>${S.fmt.escape(S.t("notif.securityAlways"))}</p>
     <div class="nt-list" id="n-list"></div>`;
 
   let cat = "all";
