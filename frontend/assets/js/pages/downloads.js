@@ -1,17 +1,31 @@
-/* downloads.js — P28 月度报告（pdf-lib 服务端生成；含数据口径说明与状态徽章） */
+/* downloads.js — P28 月度报告（pdf-lib 服务端生成；状态徽章）；
+   第三十六轮：说明卡移除，列表首尾留白收紧，列表外下方安全提示区（线性图标直接图案、无容器无标题） */
 S.router.register("downloads", async () => {
   const c = document.getElementById("content");
   c.innerHTML = `<h1>${S.fmt.escape(S.t("dl.title"))}</h1>
-    <div class="card dl-note">
-      <div class="row" style="gap:10px;align-items:flex-start">
-        <span class="avatar" style="flex:none">${S.ui.icon("doc", 14)}</span>
-        <div class="small muted" style="line-height:1.65;min-width:0">${S.fmt.escape(S.t("dl.noteCompact"))}</div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:12px">${S.ui.skeleton(3)}</div>`;
+    <div class="card dl-list">${S.ui.skeleton(3)}</div>`;
   const r = await S.api.get("/api/reports");
-  const el = c.querySelectorAll(".card")[1];
+  const el = c.querySelector(".dl-list");
   if (!r.ok) { el.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
+  el.innerHTML = (r.data.months ?? []).map((m) => `
+    <div class="list-row">
+      <span class="avatar">${S.ui.icon("doc", 14)}</span>
+      <div class="grow"><b class="mono">${S.fmt.escape(m)}</b>
+        <div class="muted small">${S.fmt.escape(S.t("dl.statementNote"))} · <span class="dl-status" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.statusPending"))}</span></div></div>
+      <button class="btn btn-sm btn-light gen" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.gen"))}</button>
+      <button class="btn btn-sm btn-primary dl hidden" data-m="${S.fmt.escape(m)}">${S.ui.icon("download", 12)} ${S.fmt.escape(S.t("dl.download"))}</button>
+    </div>`).join("") || S.ui.empty(S.t("common.noData"));
+  /* 安全提示区（列表容器外下方）：线性图标直接图案（无 squircle 外套）×4 条，细分隔线隔开 */
+  el.insertAdjacentHTML("afterend", `
+    <div class="dl-safe">
+      <div class="dl-safe-row"><span class="ds-ico ds-red">${S.ui.icon("shield", 18)}</span><span>${S.fmt.escape(S.t("dl.safe1"))}</span></div>
+      <hr class="ds-sep">
+      <div class="dl-safe-row"><span class="ds-ico ds-amber">${S.ui.icon("lock", 18)}</span><span>${S.fmt.escape(S.t("dl.safe2"))}</span></div>
+      <hr class="ds-sep">
+      <div class="dl-safe-row"><span class="ds-ico ds-navy">${S.ui.icon("eye", 18)}</span><span>${S.fmt.escape(S.t("dl.safe3"))}</span></div>
+      <hr class="ds-sep">
+      <div class="dl-safe-row"><span class="ds-ico ds-slate">${S.ui.icon("globe2", 18)}</span><span>${S.fmt.escape(S.t("dl.safe4"))}</span></div>
+    </div>`);
   el.innerHTML = (r.data.months ?? []).map((m) => `
     <div class="list-row">
       <span class="avatar">${S.ui.icon("doc", 14)}</span>

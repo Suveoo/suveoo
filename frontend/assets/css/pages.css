@@ -752,3 +752,20 @@
   .cs-netline { margin-top: 3px; }
   .cs-tag { margin-top: 2px; }
 }
+
+/* ===== 第三十六轮：月度报告页——列表首尾留白收紧 + 无容器安全提示区 ===== */
+.dl-list { padding-top: 9px; padding-bottom: 9px; }
+.dl-safe { margin-top: 20px; }
+.dl-safe-row { display: flex; align-items: center; gap: 11px; font-size: 12.5px; line-height: 1.55; color: var(--color-ink-2); }
+.ds-ico { flex: none; display: inline-flex; }
+.ds-ico .ic { display: block; }
+.ds-red .ic { color: #C0392B; }
+.ds-amber .ic { color: #B45309; }
+.ds-navy .ic { color: var(--color-navy); }
+.ds-slate .ic { color: #64748B; }
+.ds-sep { border: none; border-top: 1px solid var(--color-line); margin: 11px 0; }
+@media (max-width: 768px) {
+  .dl-safe { margin-top: 16px; }
+  .dl-safe-row { font-size: 12px; gap: 10px; }
+  .ds-sep { margin: 10px 0; }
+}

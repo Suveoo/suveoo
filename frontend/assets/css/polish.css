@@ -438,7 +438,8 @@ body.tc-open { overflow: hidden; }
 /* ===== 26. Header logo（第二十五轮：桌面 avatar 27→32px =×1.185；手机 logo 22→29px、avatar 24→31px；≤380 再降档防溢出；
    第三十轮：手机端再缩——logo 29→27px(×0.93)/26→24px(×0.92)、avatar 31→28px(×0.90)/29→27px(×0.93)，队长视觉校准） ===== */
 .app-header .logo-link img { height: 27px; transition: height .2s ease; }
-@media (min-width: 768px) { .app-header .avatar { width: 28px; height: 28px; font-size: 12px; } } /* 第三十五轮：桌面 32→28=×0.875（队长校准） */
+.app-header .avatar { line-height: 1; } /* 首字严格光学居中（flex 居中+行高 1 消除基线偏移） */
+@media (min-width: 768px) { .app-header .avatar { width: 29px; height: 29px; font-size: 12.5px; } } /* 第三十六轮：28→29=×1.036+line-height 光学居中 */
 @media (max-width: 767px) { .app-header .logo-link img { height: 27px; } .app-header .avatar { width: 28px; height: 28px; font-size: 12px; } }
 @media (max-width: 380px) { .app-header .logo-link img { height: 24px; } .app-header .avatar { width: 27px; height: 27px; font-size: 12px; } }
 
