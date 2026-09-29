@@ -2659,6 +2659,9 @@ function guardResponse(g) {
 /* logo 形状取自 frontend/assets/images/suveoo-logo-long.svg（pdf-lib 不支持嵌 SVG，故按原 path 矢量重绘，视觉一致且任意缩放清晰） */
 const LOGO_TILE_PATH = "M215 0H809A215 215 0 0 1 1024 215V809A215 215 0 0 1 809 1024H215A215 215 0 0 1 0 809V215A215 215 0 0 1 215 0Z";
 const LOGO_MARK_PATH = "M605.4 512H336.8c-63.2 0-110.6-47.4-110.6-110.6s47.4-110.6 110.6-110.6H637M257.8 733.2h426.6c63.2 0 110.6-47.4 110.6-110.6S747.6 512 684.4 512h-79M336.8 812.2l-79-79 79-79m460.98-363.4a79 79 0 1 0-158 0 79 79 0 1 0 158 0";
+/* "Suveoo" 字形（suveoo-logo-long.svg 第三段 path，4920×1024 视界、fill navy）——
+   PDF 报告品牌区不再"方徽标+文本"拼接，与站内长 logo 完全同源（第三十四轮） */
+const LOGO_WORD_PATH = "M1304 704.9v-41.4l113.4-23.4v83.7h377.1V563.6h-323.1q-35.55 0-64.125-5.4t-48.6-19.575-30.6-39.6T1317.5 434V314.3q0-38.7 11.25-62.775t31.5-37.575 48.6-18.225T1471.4 191h272.7q34.65 0 63 4.725t48.825 18.225 31.725 37.575 11.25 62.775v45l-113.4 22.5v-81h-354.6v153h322.2q34.65 0 63 4.725t48.825 18.225 31.725 37.575 11.25 62.775v127.8q0 79.65-41.175 104.175T1753.1 833.6h-295.2q-35.55 0-64.125-5.175t-48.6-19.35-30.6-39.375T1304 704.9Zm701.1 35.1V377.3h111.6V731h241.2V377.3h111.6V740q0 57.15-29.475 74.475T2358.8 831.8h-243.9q-51.75 0-80.775-17.325T2005.1 740Zm824.85 87.3h-80.1l-225.9-450h126.45L2793.5 677l144.9-299.7h109.35zm265.95-112.5v-243q0-48.15 29.925-73.575T3217.4 372.8h238.5q61.65 0 92.025 25.875T3578.3 473.6v172.8h-370.8V740h259.2v-49.5l111.6 19.8v4.5q0 63-32.85 90t-110.25 27H3230q-67.95 0-101.025-26.55T3095.9 714.8Zm111.6-250.2h259.2v90h-259.2zm471.6 270.9V464.6q0-49.05 26.775-70.425T3794.3 372.8h261q62.1 0 88.65 21.375t26.55 70.425v270.9q0 52.2-26.1 74.25t-89.1 22.05h-261q-62.55 0-88.875-22.05T3679.1 735.5Zm111.6-261.9h268.2V731h-268.2zm480.6 261.9V464.6q0-49.05 26.775-70.425T4386.5 372.8h261q62.1 0 88.65 21.375t26.55 70.425v270.9q0 52.2-26.1 74.25t-89.1 22.05h-261q-62.55 0-88.875-22.05T4271.3 735.5Zm111.6-261.9h268.2V731h-268.2z";
 async function generateReport(env, ctxInfo, month) {
   const { userId, email } = ctxInfo;
   const prof = (await U(env, userId)({ op: "getProfile" })).profile ?? {};
@@ -2672,6 +2675,14 @@ async function generateReport(env, ctxInfo, month) {
     const s = size / 1024;
     page.drawSvgPath(LOGO_TILE_PATH, { x, y: topY, scale: s, color: NAVY });
     page.drawSvgPath(LOGO_MARK_PATH, { x, y: topY, scale: s, borderColor: rgb(1, 1, 1), borderWidth: 79 });
+  };
+  /* 长 logo（第三十四轮）：tile+S 徽标+Suveoo 字形同视界 4920×1024 一体绘制，
+     取代"方徽标+Helvetica 文本"拼接（基线不齐/比例失衡，队长指出）；h=tile 边长，整宽 h*4.805 */
+  const pdfLongLogo = (page, x, topY, h) => {
+    const s = h / 1024;
+    page.drawSvgPath(LOGO_TILE_PATH, { x, y: topY, scale: s, color: NAVY });
+    page.drawSvgPath(LOGO_MARK_PATH, { x, y: topY, scale: s, borderColor: rgb(1, 1, 1), borderWidth: 79 });
+    page.drawSvgPath(LOGO_WORD_PATH, { x, y: topY, scale: s, color: NAVY });
   };
   let cjk = null;
   try {
@@ -2716,11 +2727,9 @@ async function generateReport(env, ctxInfo, month) {
   };
   /* ---- 明细页页眉 ---- */
   const txHeader = (p) => {
-    pdfLogo(p, MX, 795, 26);
-    const t = F("Suveoo", 13, bold);
-    p.drawText(t.t, { x: MX + 34, y: 802, size: t.size, font: t.f, color: NAVY });
+    pdfLongLogo(p, MX, 793, 24); /* 长 logo 高 24（宽 115），与右侧标题行视觉平衡 */
     const s = F(`${month} · 交易明细`, 10, font);
-    p.drawText(s.t, { x: PW - MX - W(s), y: 803, size: s.size, font: s.f, color: INK2 });
+    p.drawText(s.t, { x: PW - MX - W(s), y: 801, size: s.size, font: s.f, color: INK2 });
     p.drawLine({ start: { x: MX, y: 786 }, end: { x: PW - MX, y: 786 }, thickness: 1, color: NAVY });
     return 766;
   };
@@ -2728,12 +2737,10 @@ async function generateReport(env, ctxInfo, month) {
   /* ==== P1：品牌摘要封面 ==== */
   const txs = data.txs ?? []; /* 声明在块外：明细表段也要用（try 块级作用域） */
   try {
-  /* drawSvgPath 的 y 为 path 顶部（向下生长）：tile 占 782→698，避让 650 起的标题区 */
-  pdfLogo(page, MX, 782, 84);
-  let brand = F("Suveoo", 30, bold);
-  page.drawText(brand.t, { x: MX + 100, y: 738, size: brand.size, font: brand.f, color: NAVY });
+  /* 长 logo（高 72，宽 346）顶部 784→底 712；副标题随 logo 底部下移，与 650 标题区留呼吸 */
+  pdfLongLogo(page, MX, 784, 72);
   let sub = F("Agentic Banking Control Plane", 10, font);
-  page.drawText(sub.t, { x: MX + 101, y: 722, size: sub.size, font: sub.f, color: INK2 });
+  page.drawText(sub.t, { x: MX + 2, y: 692, size: sub.size, font: sub.f, color: INK2 });
   let title = F(`${month} 月度账户报告`, 22, bold);
   page.drawText(title.t, { x: MX, y: 650, size: title.size, font: title.f, color: rgb(0, 0, 0) });
   const genAt = F(`账户：${userId} · ${email ?? ""}`, 10, font);
