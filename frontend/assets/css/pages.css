@@ -456,13 +456,16 @@
 .insight-card { align-items: flex-start; }
 @media (prefers-reduced-motion: reduce) { .brand-banner { animation: none; } }
 
-/* ===== /wealth/my 我的持仓（第四十二轮 T4；第三十一轮顶部改 pay 式：AI 试试行 + 总资产，标题挪卡外）===== */
-.wmy-hero { padding: 14px 16px 18px; }
+/* ===== /wealth/my 我的持仓（第四十二轮 T4；第三十一轮顶部改 pay 式；第三十二轮：卡下移 5px+当日涨跌行）===== */
+.wmy-hero { padding: 14px 16px 18px; margin-top: 5px; }
 .wmy-hero .ph-ai { margin-bottom: 2px; }
 .wmy-hero .num-xl { margin-top: 12px; }
 .wmy-hero .num-xl .n { color: #fff; }
 .wmy-hero .num-xl .lb { color: rgba(255,255,255,.7); }
 .wmy-hero .num-xl .u { color: rgba(255,255,255,.6); }
+.wmy-day { margin-top: 4px; font-size: 13px; font-weight: 600; }
+.wmy-day.up { color: #7FE0AC; }
+.wmy-day.down { color: #FFB3AB; }
 .wmy-item { border-bottom: 1px dashed var(--color-line); padding: 14px 0; }
 .wmy-item:last-child { border-bottom: none; }
 .wmy-name { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -717,16 +720,19 @@
   .nt-h { flex-wrap: wrap; }
 }
 
-/* ===== 第三十轮：卡片设置页去大容器分节（cs-*）——卡面区无边框满宽、节间大留白 ===== */
-.cs-hero { display: flex; align-items: center; gap: 16px; margin: 14px 0 4px; }
-.cs-hero .bc-art { width: 96px; height: 61px; border-radius: 10px; flex: none; background: var(--color-surface); object-fit: cover; box-shadow: var(--shadow); }
+/* ===== 第三十轮：卡片设置页去大容器分节（cs-*）——卡面区无边框满宽、节间大留白；
+   第三十二轮：卡图放大对齐手机银行参考（桌面 200px / 手机满宽容器宽，勿缩小）===== */
+.cs-hero { display: flex; align-items: center; gap: 20px; margin: 14px 0 4px; }
+.cs-hero .bc-art { width: 200px; aspect-ratio: 1.586; height: auto; border-radius: 12px; flex: none; background: var(--color-surface); object-fit: cover; box-shadow: var(--shadow); }
 .cs-hero-info { flex: 1; min-width: 0; }
 .cs-numrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cs-numrow .mono { font-size: 16px; }
 .cs-sec { margin-top: 26px; }
 .cs-sec h3 { margin: 0; }
 @media (max-width: 768px) {
-  .cs-hero { gap: 12px; margin-top: 10px; }
-  .cs-hero .bc-art { width: 78px; height: 50px; border-radius: 8px; }
+  .cs-hero { flex-direction: column; align-items: stretch; gap: 14px; margin-top: 10px; }
+  /* 手机端卡图 = 满宽容器宽（与表单/列表容器同宽），不缩小 */
+  .cs-hero .bc-art { width: 100%; border-radius: 12px; }
+  .cs-numrow .mono { font-size: 15px; }
   .cs-sec { margin-top: 22px; }
 }

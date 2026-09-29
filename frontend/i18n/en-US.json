@@ -1240,6 +1240,7 @@
   "wealth.m6": "6M",
   "wealth.manage": "Manage",
   "wealth.my": "My Portfolio",
+  "wealth.pnl": "Total",
   "wealth.prLevel": "Your Risk Level",
   "wealth.purchase": "Purchase",
   "wealth.redeem": "Redeem",
@@ -1248,6 +1249,7 @@
   "wealth.riskMismatch": "Product R{0} exceeds your PR{1}: appropriateness mismatch — the server will reject this purchase.",
   "wealth.suitPrompt": "Does {0} suit me?",
   "wealth.title": "Wealth",
+  "wealth.today": "Today",
   "wealth.toolHub": "Financial Calculators",
   "wealth.tryConvert": "Convert",
   "wealth.viewHoldings": "View Holdings"

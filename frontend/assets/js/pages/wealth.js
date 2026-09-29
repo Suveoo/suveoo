@@ -1,8 +1,7 @@
 /* wealth.js — P04 财富总览（共享助手见 core/app.js 的 S.wealth/S.fundCache/S.purchaseModal） */
 S.router.register("wealth", async () => {
   const c = document.getElementById("content");
-  c.innerHTML = `<h1>${S.fmt.escape(S.t("wealth.title"))}</h1>
-    <div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
+  c.innerHTML = `<div class="ai-quick-bar" id="ai-bar"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="go">${S.ui.icon("arrow-right", 16)}</span></div>
     <div class="card">${S.ui.skeleton(3)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.funds"))}</h2><a class="more" href="/wealth/funds">${S.fmt.escape(S.t("wealth.allFunds"))} →</a></div>
     <div class="hscroll" id="funds"></div>

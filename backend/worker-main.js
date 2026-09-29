@@ -6894,7 +6894,9 @@ export class LedgerDO {
                 sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id);
                 return json({ ok: false, error: "TARGET_CARD_NOT_FOUND" });
               }
-              const traceId = `sch-t${input.id}-${NOW}`;
+              /* 幂等键=任务+执行日（日粒度）：SagaDO alarm 重投/重试时 NOW 毫秒差不再击穿幂等——
+                 全量测试两轮复现"收款方 +400"双入账（trace 随毫秒变化），日粒度同任务同日至多入账一次 */
+              const traceId = `sch-t${input.id}-${new Date(NOW).toISOString().slice(0, 10)}`;
               const cr = await this.#crossCredit(cross, { amount_cents: String(amt), counterparty: b.recipient_name ?? "预约转账付款方", memo: b.memo ?? null, trace_id: traceId, channel: "task" });
               if (!cr.ok) { this.#notify(sql, "TASK", "预约转账失败", "收款方入账未成功，任务标记失败，余额未受影响。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "CREDIT_FAILED" }); }
             }

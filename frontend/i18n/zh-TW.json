@@ -1240,6 +1240,7 @@
   "wealth.m6": "近6月",
   "wealth.manage": "管理",
   "wealth.my": "我的持倉",
+  "wealth.pnl": "累計",
   "wealth.prLevel": "你的風險等級",
   "wealth.purchase": "申購",
   "wealth.redeem": "贖回",
@@ -1248,6 +1249,7 @@
   "wealth.riskMismatch": "產品 R{0} 已超你的 PR{1}：適當性不匹配，伺服器將拒絕該申購。",
   "wealth.suitPrompt": "{0} 適合我嗎",
   "wealth.title": "財富",
+  "wealth.today": "今日",
   "wealth.toolHub": "金融計算工具",
   "wealth.tryConvert": "換匯試算",
   "wealth.viewHoldings": "查看持倉"

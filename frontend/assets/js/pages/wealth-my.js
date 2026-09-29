@@ -9,6 +9,7 @@ S.router.register("wealth-my", async ({ user }) => {
     <div class="pay-hero bg-grad-navy wmy-hero">
       <div class="ph-ai" id="ai-bar" role="button" tabindex="0"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="ph-go">${S.ui.icon("arrow-right", 14)}</span></div>
       <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="n wmy-total">—</span><span class="u">CNY</span></div>
+      <div class="wmy-day" id="wmy-day"></div>
     </div>
     <div class="card" id="wmy-funds">${S.ui.skeleton(4)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("acct.fxAssets"))}</h2><a class="more" href="/wealth/fx">${S.fmt.escape(S.t("wealth.allFx"))} →</a></div>
@@ -23,17 +24,32 @@ S.router.register("wealth-my", async ({ user }) => {
   if (aiSpan) aiSpan.textContent = S.t("pay.tryPrefix", aiSentence);
   document.getElementById("ai-bar").onclick = () => { if (aiSentence) S.router.ai(aiSentence); };
 
-  /* 基金持仓：逐项市值/成本/涨跌 + 详情直达 + 逐项赎回（RED 两段式，0 值不发起） */
+  /* 基金持仓：逐项市值/成本/当日涨跌 + 详情直达 + 逐项赎回（RED 两段式，0 值不发起） */
   const fh = await S.api.get("/api/wealth/holdings");
   const box = document.getElementById("wmy-funds");
   const fundsBoxTotal = document.querySelector(".wmy-total");
+  /* 当日涨跌（第三十二轮）：day_change 为当日百分比，金额按 市值-市值/(1+dc%) 反推；涨绿跌红全按当日方向 */
+  const dayDelta = (x) => {
+    const v = Number(x.value ?? x.amount ?? 0), dc = Number(x.day_change ?? 0);
+    return v - v / (1 + dc / 100);
+  };
   if (fh.ok) {
-    const list = (fh.data.holdings ?? []).filter((x) => Number(x.value ?? x.amount) > 0);
+    const list = (fh.data.holdings ?? []).filter((x) => Number(x.value ?? x.amount ?? 0) > 0);
     const all = fh.data.holdings ?? [];
     const total = all.reduce((a, x) => a + Number(x.value ?? x.amount ?? 0), 0);
     fundsBoxTotal.textContent = `¥${S.fmt.moneyPlain(total)}`;
+    /* hero 当日汇总：Σ涨跌额 / Σ昨日市值 */
+    const sumDelta = all.reduce((a, x) => a + dayDelta(x), 0);
+    const sumBase = all.reduce((a, x) => a + Number(x.value ?? x.amount ?? 0) - dayDelta(x), 0);
+    const heroDelta = document.getElementById("wmy-day");
+    if (heroDelta && sumBase > 0) {
+      const pctD = (sumDelta / sumBase) * 100;
+      heroDelta.textContent = `${S.t("wealth.today")} ${sumDelta >= 0 ? "+" : "-"}¥${S.fmt.moneyPlain(Math.abs(sumDelta).toFixed(2))}（${sumDelta >= 0 ? "+" : "-"}${Math.abs(pctD).toFixed(2)}%）`;
+      heroDelta.className = "wmy-day " + (sumDelta >= 0 ? "up" : "down");
+    }
     box.innerHTML = list.map((x) => {
       const up = Number(x.day_change ?? 0) >= 0;
+      const dlt = dayDelta(x);
       const pnl = Number(x.value ?? 0) - Number(x.amount ?? 0);
       return `
       <div class="wmy-item">
@@ -44,7 +60,7 @@ S.router.register("wealth-my", async ({ user }) => {
           </div>
           <div style="text-align:right">
             <div class="num-xl"><span class="n" style="font-size:22px">¥${S.fmt.moneyPlain(x.value ?? x.amount ?? 0)}</span></div>
-            <div class="small" style="color:${pnl >= 0 ? "var(--color-green)" : "var(--color-red)"}">${up ? "↑" : "↓"} ${Math.abs(Number(x.day_change ?? 0))}% · ${pnl >= 0 ? "+" : "-"}¥${S.fmt.moneyPlain(Math.abs(pnl).toFixed(2))}</div>
+            <div class="small" style="color:${up ? "var(--color-green)" : "var(--color-red)"}">${up ? "↑" : "↓"} ${Math.abs(Number(x.day_change ?? 0))}% · ${S.t("wealth.today")} ${dlt >= 0 ? "+" : "-"}¥${S.fmt.moneyPlain(Math.abs(dlt).toFixed(2))}<span class="muted">（${S.fmt.escape(S.t("wealth.pnl"))} ${pnl >= 0 ? "+" : "-"}¥${S.fmt.moneyPlain(Math.abs(pnl).toFixed(2))}）</span></div>
           </div>
         </div>
         <div class="row" style="margin-top:10px;gap:8px">

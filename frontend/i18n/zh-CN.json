@@ -1240,6 +1240,7 @@
   "wealth.m6": "近6月",
   "wealth.manage": "管理",
   "wealth.my": "我的持仓",
+  "wealth.pnl": "累计",
   "wealth.prLevel": "你的风险等级",
   "wealth.purchase": "申购",
   "wealth.redeem": "赎回",
@@ -1248,6 +1249,7 @@
   "wealth.riskMismatch": "产品 R{0} 已超你的 PR{1}：适当性不匹配，服务端将拒绝该申购。",
   "wealth.suitPrompt": "{0} 适合我吗",
   "wealth.title": "财富",
+  "wealth.today": "今日",
   "wealth.toolHub": "金融计算工具",
   "wealth.tryConvert": "换汇试算",
   "wealth.viewHoldings": "查看持仓"
