@@ -29,7 +29,7 @@ S.router.register("notifications", async () => {
   c.innerHTML = `
     <div class="row between nt-head">
       <div><h1>${S.fmt.escape(S.t("nav.notifications"))}</h1>
-        <p class="muted small nt-sub" id="n-sub">${S.ui.skeleton(1)}</p></div>
+        <p class="muted small nt-sub" id="n-sub"></p></div>
       <div class="nt-ops">
         <button class="btn btn-ghost btn-sm" id="clear-read" hidden>${S.fmt.escape(S.t("notif.clearRead"))}</button>
         <button class="btn btn-light btn-sm" id="read-all">${S.fmt.escape(S.t("notif.markAll"))}</button>

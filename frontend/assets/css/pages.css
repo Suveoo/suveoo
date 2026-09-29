@@ -665,15 +665,19 @@
 .nt-head { align-items: flex-start; gap: 12px; }
 .nt-head h1 { margin: 0; }
 .nt-sub { margin: 4px 0 0; }
-.nt-ops { display: flex; gap: 8px; flex: none; }
-.nt-sec { display: flex; align-items: center; gap: 6px; margin: 12px 0 4px; padding: 6px 12px; border-radius: 10px; background: rgba(220, 38, 38, .06); color: #b91c1c; }
+.nt-ops { display: flex; gap: 10px; flex: none; }
+.nt-sec { display: flex; align-items: center; gap: 6px; margin: 12px 0 4px; padding: 5px 11px; border-radius: 9px; background: rgba(220, 38, 38, .045); color: #b42420; font-size: 12px; }
 .nt-sec .ic { flex: none; }
-.chip-n { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 999px; background: rgba(220, 38, 38, .12); color: #dc2626; font-size: 11px; font-weight: 600; line-height: 16px; }
+/* 分类徽章用中性 navy（计数语义），仅"未读"总徽章保留红色提醒——多枚红徽章并排显噪（队长返修） */
+.chip-n { display: inline-block; min-width: 18px; text-align: center; padding: 0 5px; border-radius: 999px; background: rgba(30, 42, 120, .08); color: var(--color-navy); font-size: 11px; font-weight: 600; line-height: 16px; }
+.hpill[data-v="unread"] .chip-n { background: rgba(220, 38, 38, .12); color: #dc2626; }
 .hpill.on .chip-n { background: rgba(255, 255, 255, .24); color: #fff; }
 .nt-list { margin-top: 6px; }
 .nt-group { margin: 18px 2px 6px; font-size: 12px; font-weight: 600; color: var(--color-ink-2); letter-spacing: .02em; }
 .nt-group:first-child { margin-top: 8px; }
 .nt-row { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 12px; cursor: pointer; transition: background-color .15s ease; }
+/* 相邻行留 3px 白缝：未读浅底不再连成一片（队长返修第二点；等价旧版 .list-row.unread margin 3px 手法） */
+.nt-row + .nt-row { margin-top: 3px; }
 .nt-row:hover { background: var(--color-surface); }
 .nt-row.is-unread { background: var(--color-primary-tint); }
 .nt-row.is-unread:hover { background: #e3e9fb; }
@@ -681,7 +685,7 @@
 .nt-row.open { background: #f6f8fe; }
 .nt-row:not(.is-unread) .nt-dot { display: none; }
 .nt-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--color-navy); margin-top: 14px; }
-.nt-ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.nt-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
 .nt-ico.t-transfer { background: rgba(5, 122, 85, .1); color: #059669; }
 .nt-ico.t-security { background: rgba(220, 38, 38, .1); color: #dc2626; }
 .nt-ico.t-wealth { background: rgba(180, 131, 8, .12); color: #a16207; }
@@ -691,7 +695,7 @@
 .nt-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .nt-title { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-time { flex: none; font-size: 12px; color: var(--color-ink-2); }
-.nt-body { margin-top: 2px; font-size: 13px; color: var(--color-ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.nt-body { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--color-ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
 .nt-row.open .nt-body { display: block; -webkit-line-clamp: unset; color: var(--color-ink); }
 .nt-acts { display: flex; gap: 8px; margin-top: 10px; }
 .mini-btn { font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--color-line); background: #fff; color: var(--color-ink); cursor: pointer; transition: border-color .15s ease, color .15s ease; }
