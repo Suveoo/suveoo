@@ -1959,7 +1959,7 @@ async function executeIntent(env, ir) {
       }
       await U(env, uid)({ op: "audit", action: "scheduled_task_create", detail: { type: p.task_type, execute_at: p.execute_at, locked_cents: lockedCents > 0n ? String(lockedCents) : null }, channel: ir.channel, trace_id: ir.trace_id });
       const lockTxt = bdTask && r.ok ? `已锁定 ¥${p.amount}（执行后扣款，取消即解锁），` : "";
-      await U(env, uid)({ op: "notify", type: "TASK", title: "长程任务已建立", body: `「${p.title ?? p.task_type}」${lockTxt}将于 ${p.execute_at} 执行（可随时取消，取消即补偿）。` });
+      await U(env, uid)({ op: "notify", type: "TASK", title: "长程任务已建立", body: `「${p.title ?? p.task_type}」${lockTxt}将于 ${p.execute_at ?? "设定时间"} 执行（可随时取消，取消即补偿）。` });
       /* 建单触点邮件（birthday）：金额/执行时间由系统给出，模型不参与 */
       if (bdTask && r.ok) {
         const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
@@ -2464,6 +2464,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
     /* ---- 通知 / 审计 / 报告 / 安全 ---- */
     if (path === "/api/notifications" && method === "GET") { const r = await UU({ op: "notifications", cursor: url.searchParams.get("cursor") ?? "0" }); return json(r); }
     if (path === "/api/notifications/read" && method === "POST") { const b = await readJsonBody(request); const r = await UU({ op: "notifRead", ids: b.ids ?? "all" }); return json(r); }
+    if (path === "/api/notifications/delete" && method === "POST") { const b = await readJsonBody(request); const r = await UU({ op: "notifDelete", ids: b.ids ?? "read" }); return json(r); }
     if (path === "/api/audit/me" && method === "GET") { const r = await UU({ op: "userAudit" }); return json(r); }
     if (path === "/api/reports" && method === "GET") { const r = await UU({ op: "reportList" }); return json(r); }
     mm = m(/^\/api\/reports\/(\d{4}-\d{2})$/);
@@ -3890,7 +3891,7 @@ export const SITE_GUIDE_PAGES = [
   { route: "/account/security", aliases: ["安全中心", "改密码", "修改密码", "两步验证", "2FA", "Passkey", "登录设备", "操作审计", "熔断", "风险承受", "重新评估"], section: "account", purpose: "安全中心：密码/2FA/Passkey/设备会话/审计流/熔断状态的统一管理。", entry: "/account 宫格「安全中心」", actions: ["改密弹窗（红级：当前密码+邮箱 OTP+新密码+确认；成功后就地换新纪元 token，其他设备全下线）", "两步验证 2FA 开关（关闭须当前密码；开启仅 OTP）", "Passkey 注册/管理（WebAuthn，红级验证可替代 OTP）", "风险承受能力：当前 PR 等级 chip + 「重新评估」→ /account/risk-assessment", "登录设备与会话列表（「下线」其他会话）", "操作审计流（时间/动作/渠道/trace_id/grant 前 12 位——Merkle 审计链用户可读透出）", "异常熔断卡（正常绿态三计数 / 锁定红条剩余分钟 + 邮箱验证码提前解锁）"], flow: "改密 → 红 OTP → 完成；AI 不代办任何密码类操作（规则 6 引导到本页）。", notes: "熔断触发口径：OTP 连错 5/注入拦截 2/grant 篡改 3；锁定期写全拒、GREEN 查询不受影响。" },
   { route: "/account/risk-assessment", aliases: ["风险测评", "风险评估", "风险承受能力", "PR 等级", "重新评估", "适当性"], section: "account", purpose: "风险承受能力重评估（独立页）：8 题问卷更新 PR1-PR5 等级。", entry: "/account/security「重新评估」", actions: ["8 题单选表单（三语题库）", "提交 → 红级 OTP 强验证 → 更新 PR 等级"], flow: "答题 → 红 OTP → 等级生效（影响理财适当性：只能推荐 ≤ PR 等级的产品）。", notes: "PR 等级与 wealth_product_query 返回的 user_pr_level 同源。" },
   { route: "/account/transactions", aliases: ["交易记录", "全部交易", "收支记录", "全量流水", "导出交易"], section: "account", purpose: "交易记录：全量收支口径（含消费/转账/理财）的查询与导出。", entry: "/account「最近交易·查看全部」/ /pay「交易记录」", actions: ["结论区（本月收/支/结余大数字 + 环比胶囊 + 分类归因 + 分类环比柱图）", "搜索 + 方向/时间/分类筛选 chips", "流水列表（分类图标、日期分组）", "「导出 CSV」（本地生成）"], flow: "筛选 → 浏览 → 导出；转账纯口径请用 /transfer/history。", notes: "只读；与 /transfer/history 的区别是包含全部收支类型。" },
-  { route: "/notifications", aliases: ["通知", "全部通知", "站内通知", "未读", "已读"], section: "portal", purpose: "全部通知中心：站内通知的未读/已读管理。", entry: "header 铃铛「查看全部通知」/ footer「通知中心」/ /account 宫格", actions: ["未读/已读筛选", "「全部已读」按钮", "通知列表（类型图标：交易/安全/理财/系统/任务；站内 URL 可点击跳转）"], flow: "查收 → 标记已读；红级 OTP 邮件与站内通知同步发送。", notes: "header 下拉为最近 8 条速览，本页为全量。" },
+  { route: "/notifications", aliases: ["通知", "全部通知", "站内通知", "未读", "已读", "消息中心"], section: "portal", purpose: "通知中心（第二十九轮改版）：全量站内通知的分类筛选、时间分组与已读/删除管理。", entry: "header 铃铛「查看全部通知」/ footer「通知中心」/ /account 宫格", actions: ["分类筛选 hpill（全部/未读/转账/安全/理财/任务/系统，带分类未读徽章）", "时间分组（今天/昨天/近 7 天/更早）", "点行展开全文（站内 URL 可点击）+未读自动标已读", "单条操作：标为已读/删除；头部「全部已读」「清空已读」", "「加载更多」cursor 分页（每页 50 条）", "语义色类型图标（转账绿/安全红含左侧警示条/理财金/任务紫/系统灰）+安全通知即时送达承诺条"], flow: "chips 筛选 → 点行展开即读 → 单条或批量清理；未读数与 header 铃铛实时同步。", notes: "header 下拉为最近 8 条速览，本页为全量管理；安全类通知不可关闭。" },
   { route: "/about", aliases: ["关于", "关于 Suveoo", "公告", "存款利率", "利率表", "免责声明", "disclaimer", "公司介绍"], section: "portal", purpose: "关于 Suveoo：公司简介、官方公告、存款利率表与免责声明。", entry: "footer「关于 Suveoo」/ home 品牌横幅 / 顶栏 SIMULATED 徽标点击", actions: ["渐变 Hero + 4 亮点胶囊（说话就能办业务/三色权限分级/五道确定性验证/全线上模拟银行）", "粘性目录卡（滚动激活态）+ 九章节正文（公司/服务/安全/AI 能力等）", "官方公告手风琴（首条「最新」徽章）", "存款利率表（六档大数字）+ 利率变更时间线", "联系我们双卡（客户支持/安全事务 mailto）", "免责声明 tint 卡（#disclaimer 锚点：模拟银行系统声明全文）"], flow: "目录导航阅读；利率表与 /wealth/deposits 数据同源。", notes: "免登录；Organization JSON-LD 所在页。" },
   { route: "/help", aliases: ["帮助", "帮助中心", "FAQ", "常见问题", "防诈骗", "反诈", "AI 安全", "怎么用"], section: "portal", purpose: "帮助中心：FAQ、防诈骗指南与 AI 安全说明。", entry: "header 问号按钮 / footer「帮助」", actions: ["FAQ 手风琴四类：账户与登录/转账/理财/AI 与安全（含「什么是三色权限」「为什么确认后修改金额会被拦截」「什么是 Trust Console」）", "#antifraud 防诈骗指南：六条守则 + 常见骗局示例（含「AI 也无法绕过你的确认」）", "AI 安全说明：五道验证器图解（静态 SVG 流程图）", "「联系我们」→ /contact"], flow: "按类查阅；FAQ 28 问与 /ai 的 FAQPage JSON-LD 同源。", notes: "免登录。" },
   { route: "/contact", aliases: ["联系我们", "联系", "客服", "反馈", "投诉", "留言"], section: "portal", purpose: "联系我们：问题反馈表单与官方邮箱。", entry: "footer「联系我们」/ /help「联系我们」按钮", actions: ["表单（登录态 Email 自动预填；必填星标；字数计数 ≤2000；行内校验；提交三态：默认→发送中→成功面板翻转整卡）", "官方邮箱双卡：客户支持 support@suveoo.com（账户/交易咨询）/ 安全事务 security@suveoo.com（漏洞与隐私事件）mailto 直达", "FAQ 速查行（先看 /help 也许更快）"], flow: "填表 → 提交 → 转发 support 收件箱（1-3 个工作日回复）。", notes: "表单邮件为结构化 HTML 模板（Tuta 等客户端实测可见）。" },
@@ -6929,13 +6930,26 @@ export class LedgerDO {
         }
         case "notify": { this.#notify(sql, input.type ?? "SYSTEM", input.title, input.body); return json({ ok: true }); }
         case "notifications": {
-          const rows = this.#rows(sql.exec("SELECT * FROM notifications ORDER BY id DESC LIMIT 30"));
-          return json({ notifications: rows, unread: this.#rows(sql.exec("SELECT COUNT(*) AS c FROM notifications WHERE read=0"))[0]?.c ?? 0 });
+          /* 分页（通知中心"加载更多"）：cursor=已取条数，多取 1 条判 hasMore；byType=分类未读计数（chips 徽章） */
+          const cur = Math.max(0, Number(input.cursor) || 0);
+          const rows = this.#rows(sql.exec("SELECT * FROM notifications ORDER BY id DESC LIMIT 51 OFFSET ?", cur));
+          const hasMore = rows.length > 50;
+          const byType = {};
+          for (const r of this.#rows(sql.exec("SELECT type, COUNT(*) AS c FROM notifications WHERE read=0 GROUP BY type"))) byType[r.type] = r.c;
+          return json({ notifications: hasMore ? rows.slice(0, 50) : rows, unread: this.#rows(sql.exec("SELECT COUNT(*) AS c FROM notifications WHERE read=0"))[0]?.c ?? 0, byType, nextCursor: hasMore ? cur + 50 : null });
         }
         case "unreadCount": { return json({ count: this.#rows(sql.exec("SELECT COUNT(*) AS c FROM notifications WHERE read=0"))[0]?.c ?? 0 }); }
         case "notifRead": {
           if (input.ids === "all") sql.exec("UPDATE notifications SET read = 1");
           else for (const id of input.ids ?? []) sql.exec("UPDATE notifications SET read = 1 WHERE id = ?", Number(id));
+          return json({ ok: true });
+        }
+        case "notifDelete": {
+          /* 通知清理：ids 为 id 数组、"read"（清空已读）或 "all"（清空全部）；未读不在"read"范围 */
+          const n = input.ids;
+          if (Array.isArray(n)) { for (const id of n) sql.exec("DELETE FROM notifications WHERE id = ?", Number(id)); }
+          else if (n === "read") sql.exec("DELETE FROM notifications WHERE read = 1");
+          else if (n === "all") sql.exec("DELETE FROM notifications");
           return json({ ok: true });
         }
         case "audit": { sql.exec("INSERT INTO user_audit(action, detail, channel, trace_id, ts) VALUES(?,?,?,?,?)", input.action, JSON.stringify(input.detail ?? {}), input.channel ?? "form", input.trace_id ?? null, NOW); return json({ ok: true }); }
