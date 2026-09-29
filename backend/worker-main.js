@@ -2662,6 +2662,10 @@ const LOGO_MARK_PATH = "M605.4 512H336.8c-63.2 0-110.6-47.4-110.6-110.6s47.4-110
 /* "Suveoo" 字形（suveoo-logo-long.svg 第三段 path，4920×1024 视界、fill navy）——
    PDF 报告品牌区不再"方徽标+文本"拼接，与站内长 logo 完全同源（第三十四轮） */
 const LOGO_WORD_PATH = "M1304 704.9v-41.4l113.4-23.4v83.7h377.1V563.6h-323.1q-35.55 0-64.125-5.4t-48.6-19.575-30.6-39.6T1317.5 434V314.3q0-38.7 11.25-62.775t31.5-37.575 48.6-18.225T1471.4 191h272.7q34.65 0 63 4.725t48.825 18.225 31.725 37.575 11.25 62.775v45l-113.4 22.5v-81h-354.6v153h322.2q34.65 0 63 4.725t48.825 18.225 31.725 37.575 11.25 62.775v127.8q0 79.65-41.175 104.175T1753.1 833.6h-295.2q-35.55 0-64.125-5.175t-48.6-19.35-30.6-39.375T1304 704.9Zm701.1 35.1V377.3h111.6V731h241.2V377.3h111.6V740q0 57.15-29.475 74.475T2358.8 831.8h-243.9q-51.75 0-80.775-17.325T2005.1 740Zm824.85 87.3h-80.1l-225.9-450h126.45L2793.5 677l144.9-299.7h109.35zm265.95-112.5v-243q0-48.15 29.925-73.575T3217.4 372.8h238.5q61.65 0 92.025 25.875T3578.3 473.6v172.8h-370.8V740h259.2v-49.5l111.6 19.8v4.5q0 63-32.85 90t-110.25 27H3230q-67.95 0-101.025-26.55T3095.9 714.8Zm111.6-250.2h259.2v90h-259.2zm471.6 270.9V464.6q0-49.05 26.775-70.425T3794.3 372.8h261q62.1 0 88.65 21.375t26.55 70.425v270.9q0 52.2-26.1 74.25t-89.1 22.05h-261q-62.55 0-88.875-22.05T3679.1 735.5Zm111.6-261.9h268.2V731h-268.2zm480.6 261.9V464.6q0-49.05 26.775-70.425T4386.5 372.8h261q62.1 0 88.65 21.375t26.55 70.425v270.9q0 52.2-26.1 74.25t-89.1 22.05h-261q-62.55 0-88.875-22.05T4271.3 735.5Zm111.6-261.9h268.2V731h-268.2z";
+/* e/o/o 字形内圈（counter）挖空：pdf-lib drawSvgPath 不支持 fill-rule=evenodd，
+   nonzero 填充下内圈不挖空致封闭区填死 navy——在 word path 后用背景色重绘内圈（白底）。
+   绝对化起点：e 内圈 (3207.5,464.6)（m111.6-250.2 相对外圈起点 3095.9,714.8）；o 内圈 ×2 同款 (3790.7/4382.9,473.6) */
+const LOGO_WORD_CUTOUT = "M3207.5 464.6h259.2v90h-259.2z M3790.7 473.6h268.2v257.4h-268.2z M4382.9 473.6h268.2v257.4h-268.2z";
 async function generateReport(env, ctxInfo, month) {
   const { userId, email } = ctxInfo;
   const prof = (await U(env, userId)({ op: "getProfile" })).profile ?? {};
@@ -2678,11 +2682,14 @@ async function generateReport(env, ctxInfo, month) {
   };
   /* 长 logo（第三十四轮）：tile+S 徽标+Suveoo 字形同视界 4920×1024 一体绘制，
      取代"方徽标+Helvetica 文本"拼接（基线不齐/比例失衡，队长指出）；h=tile 边长，整宽 h*4.805 */
-  const pdfLongLogo = (page, x, topY, h) => {
+  const pdfLongLogo = (page, x, topY, h, bg = "white") => {
     const s = h / 1024;
     page.drawSvgPath(LOGO_TILE_PATH, { x, y: topY, scale: s, color: NAVY });
     page.drawSvgPath(LOGO_MARK_PATH, { x, y: topY, scale: s, borderColor: rgb(1, 1, 1), borderWidth: 79 });
     page.drawSvgPath(LOGO_WORD_PATH, { x, y: topY, scale: s, color: NAVY });
+    /* e/o/o 内圈挖空（nonzero 填充补 evenodd 语义；bg 可指定底色） */
+    const cut = bg === "white" ? rgb(1, 1, 1) : NAVY;
+    page.drawSvgPath(LOGO_WORD_CUTOUT, { x, y: topY, scale: s, color: cut });
   };
   let cjk = null;
   try {
@@ -2727,7 +2734,8 @@ async function generateReport(env, ctxInfo, month) {
   };
   /* ---- 明细页页眉 ---- */
   const txHeader = (p) => {
-    pdfLongLogo(p, MX, 793, 24); /* 长 logo 高 24（宽 115），与右侧标题行视觉平衡 */
+    /* 长 logo 高 20（宽 96）顶部 814.5：中心 804.5 与右侧 10pt 文本视觉中心严格同线（第三十五轮队长要求） */
+    pdfLongLogo(p, MX, 814.5, 20);
     const s = F(`${month} · 交易明细`, 10, font);
     p.drawText(s.t, { x: PW - MX - W(s), y: 801, size: s.size, font: s.f, color: INK2 });
     p.drawLine({ start: { x: MX, y: 786 }, end: { x: PW - MX, y: 786 }, thickness: 1, color: NAVY });
@@ -2748,12 +2756,14 @@ async function generateReport(env, ctxInfo, month) {
   const genAt2 = F(`客户姓名：${prof.name ?? "—"} · 生成时间：${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC`, 10, font);
   page.drawText(genAt2.t, { x: MX, y: 612, size: genAt2.size, font: genAt2.f, color: INK2 });
 
-  /* 摘要四格卡 */
+  /* 摘要四格卡——reportData 的 total_in/out 已是元（centsToStr 在 DO 侧转好），
+     此前误走 fmtC（分→元）再除 100 致汇总缩百倍（第三十五轮队长对账抓出；明细行 amount_cents 是真分不变） */
+  const fmtY = (yuan) => Number(yuan ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const net = Number(data.total_in ?? 0) - Number(data.total_out ?? 0);
   const cards = [
-    [F("本月支出（CNY）", 9), F(fmtC(data.total_out), 17, bold), RED],
-    [F("本月收入（CNY）", 9), F(fmtC(data.total_in), 17, bold), GREEN],
-    [F("净现金流（CNY）", 9), F((net >= 0 ? "+" : "") + fmtC(net), 17, bold), net >= 0 ? GREEN : RED],
+    [F("本月支出（CNY）", 9), F(fmtY(data.total_out), 17, bold), RED],
+    [F("本月收入（CNY）", 9), F(fmtY(data.total_in), 17, bold), GREEN],
+    [F("净现金流（CNY）", 9), F((net >= 0 ? "+" : "") + fmtY(net), 17, bold), net >= 0 ? GREEN : RED],
     [F("交易笔数", 9), F(String(txs.length), 17, bold), rgb(0, 0, 0)],
   ];
   const CW = (PW - MX * 2 - 30) / 4;
@@ -2805,7 +2815,8 @@ async function generateReport(env, ctxInfo, month) {
   y = txHeader(page);
   try {
   drawRow({ date: F("日期", 8.5).t, desc: "描述 / 对手方", cat: "类别", amt: "金额（CNY）" }, { head: true });
-  page.drawLine({ start: { x: MX, y: y + 10 }, end: { x: PW - MX, y: y + 10 }, thickness: 0.75, color: NAVY });
+  /* 表头上框线：y+10→y+6 下移 4pt（内容与下框线不动，第三十五轮队长要求） */
+  page.drawLine({ start: { x: MX, y: y + 6 }, end: { x: PW - MX, y: y + 6 }, thickness: 0.75, color: NAVY });
   y -= 6;
   txs.forEach((t, i) => {
     const cents = Number(t.amount_cents ?? 0);

@@ -12,7 +12,8 @@ S.insights = (() => {
   function cashflowOf(dash) {
     const now = new Date();
     const thisM = monthKey(now);
-    const lastM = monthKey(new Date(now.getTime() - 26 * 86400000));
+    /* 上个自然月：UTC 月 15 日锚定（本地 1 号 00:00 在 UTC+8 下仍是上月 31 号，曾错配到前两个月） */
+    const lastM = monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15)));
     const g = { inThis: 0, outThis: 0, inLast: 0, outLast: 0, thisM, lastM };
     for (const r of dash?.monthly ?? []) {
       if (r.m === thisM) { if (r.direction === "IN") g.inThis = Number(r.total); else g.outThis = Number(r.total); }
