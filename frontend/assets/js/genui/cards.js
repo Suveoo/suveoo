@@ -82,8 +82,8 @@ S.genuiCards = {
           ...(p.subscription_amount != null ? [[S.t("genui.subFee"), `¥${S.fmt.moneyPlain(p.subscription_amount)} / ${S.fmt.escape(p.subscription_cycle ?? "月")}`]] : []),
           ...(p.subscription_next != null ? [[S.t("genui.subNext"), S.fmt.escape(p.subscription_next)]] : []),
         ] : []),
-        ...(c.action === "task_cancel" && p.task_next != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.task_next)]] : []),
-        ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetime(p.execute_at)]] : []),
+        ...(c.action === "task_cancel" && p.task_next != null ? [[S.t("genui.executeAt"), S.fmt.datetimeSec(p.task_next)]] : []),
+        ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetimeSec(p.execute_at)]] : []),
         ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : p.repeat === "yearly" ? S.t("sch.yearly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
         ...(c.action === "subscription_reminder_toggle" ? [

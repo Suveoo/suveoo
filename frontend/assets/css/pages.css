@@ -456,15 +456,13 @@
 .insight-card { align-items: flex-start; }
 @media (prefers-reduced-motion: reduce) { .brand-banner { animation: none; } }
 
-/* ===== /wealth/my 我的持仓（第四十二轮 T4）===== */
-.wmy-hero { border-radius: var(--r-card-lg); padding: 18px 20px; color: #fff; margin-bottom: 16px; animation: rise-in .28s cubic-bezier(.25,.6,.3,1) both; }
+/* ===== /wealth/my 我的持仓（第四十二轮 T4；第三十一轮顶部改 pay 式：AI 试试行 + 总资产，标题挪卡外）===== */
+.wmy-hero { padding: 14px 16px 18px; }
+.wmy-hero .ph-ai { margin-bottom: 2px; }
+.wmy-hero .num-xl { margin-top: 12px; }
 .wmy-hero .num-xl .n { color: #fff; }
 .wmy-hero .num-xl .lb { color: rgba(255,255,255,.7); }
 .wmy-hero .num-xl .u { color: rgba(255,255,255,.6); }
-.wmy-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.wmy-head img { width: 22px; height: 22px; flex: none; }
-.wmy-head b { font-size: 16px; }
-.wmy-sub { font-size: 12px; color: rgba(255,255,255,.7); }
 .wmy-item { border-bottom: 1px dashed var(--color-line); padding: 14px 0; }
 .wmy-item:last-child { border-bottom: none; }
 .wmy-name { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

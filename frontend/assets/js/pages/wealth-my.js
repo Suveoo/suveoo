@@ -5,8 +5,9 @@ S.router.register("wealth-my", async ({ user }) => {
   const c = document.getElementById("content");
   if (!user) { location.replace("/account/login?next=/wealth/my"); return; }
   c.innerHTML = `
-    <div class="card wmy-hero bg-grad-navy">
-      <div class="wmy-head"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><b>${S.fmt.escape(S.t("wealth.my"))}</b><span class="wmy-sub">${S.fmt.escape(S.t("wealth.mySub"))}</span></div>
+    <h1>${S.fmt.escape(S.t("wealth.my"))}</h1>
+    <div class="pay-hero bg-grad-navy wmy-hero">
+      <div class="ph-ai" id="ai-bar" role="button" tabindex="0"><img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt=""><span class="grow"></span><span class="ph-go">${S.ui.icon("arrow-right", 14)}</span></div>
       <div class="num-xl"><span class="lb">${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="n wmy-total">—</span><span class="u">CNY</span></div>
     </div>
     <div class="card" id="wmy-funds">${S.ui.skeleton(4)}</div>
@@ -15,6 +16,12 @@ S.router.register("wealth-my", async ({ user }) => {
     <div class="section-title"><h2>${S.fmt.escape(S.t("wealth.deposits"))}</h2><a class="more" href="/wealth/deposits">${S.fmt.escape(S.t("wealth.allDeposits"))} →</a></div>
     <div class="hscroll deps" id="wmy-deps"></div>
     ${S.sim.footnote()}`;
+  /* AI 试试行（同 /pay 顶部模式）：理财语境句池按日轮换，点击直达 AI 对话（第三十一轮） */
+  const rot = Math.floor(Date.now() / 86400_000);
+  const aiSentence = [S.t("my.tryTop"), S.t("my.tryRisk"), S.t("my.tryFx")][rot % 3];
+  const aiSpan = document.querySelector("#ai-bar .grow");
+  if (aiSpan) aiSpan.textContent = S.t("pay.tryPrefix", aiSentence);
+  document.getElementById("ai-bar").onclick = () => { if (aiSentence) S.router.ai(aiSentence); };
 
   /* 基金持仓：逐项市值/成本/涨跌 + 详情直达 + 逐项赎回（RED 两段式，0 值不发起） */
   const fh = await S.api.get("/api/wealth/holdings");

@@ -275,7 +275,7 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
   const taskBox = document.getElementById("tasks");
   taskBox.innerHTML = (t.data?.tasks ?? []).filter((x) => x.type === "scheduled_transfer").map((x) => `
     <div class="list-row"><span class="avatar">${S.ui.icon("clock", 14)}</span>
-      <div class="grow"><b>${S.fmt.escape(x.title)}</b><div class="muted small mono">${S.fmt.escape(S.t("tasks.next"))} ${x.next_run_at ? S.fmt.datetime(x.next_run_at) : "—"}</div></div>
+      <div class="grow"><b>${S.fmt.escape(x.title)}</b><div class="muted small mono">${S.fmt.escape(S.t("tasks.next"))} ${x.next_run_at ? S.fmt.datetimeSec(x.next_run_at) : "—"}</div></div>
       ${S.ui.badge(S.t("tasks.status." + x.status) ?? x.status, x.status === "DONE" ? "badge-green" : x.status === "PENDING" ? "badge-yellow" : "badge-gray")}
     </div>`).join("") || S.ui.empty(S.t("common.noData"));
 });

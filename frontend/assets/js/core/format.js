@@ -15,6 +15,13 @@ S.fmt = {
     return withTime ? `${base} ${p(d.getHours())}:${p(d.getMinutes())}` : base;
   },
   datetime(iso) { return this.date(iso, true); },
+  /* 精确到秒：预约转账执行时间语义专用（确认卡/任务中心/任务列表——第二十八轮起预约可精确到秒，展示层不得截断） */
+  datetimeSec(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return this.date(iso, true);
+    return `${this.date(iso, true)}:${String(d.getSeconds()).padStart(2, "0")}`;
+  },
   relTime(iso) {
     const diff = Date.now() - Date.parse(iso);
     if (diff < 60e3) return S.t("time.justNow");
@@ -31,8 +38,9 @@ S.fmt = {
   /* 时区双显（预约转账）：本地 + 北京时间 */
   dualTime(iso) {
     const d = new Date(iso);
-    const local = this.datetime(iso);
-    const bj = d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(/\//g, "-");
+    /* 执行时间语义带秒（预约转账可精确到秒，第二十八轮起展示层不得截断） */
+    const local = this.datetimeSec(iso);
+    const bj = d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\//g, "-");
     return { local, beijing: bj + " (UTC+8)" };
   },
   escape(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); },
