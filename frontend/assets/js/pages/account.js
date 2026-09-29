@@ -47,9 +47,9 @@ S.router.register("account", async ({ user }) => {
       <div><div class="num-xl"><span class="lb">${S.fmt.escape(S.t("home.totalAssets"))}</span><span class="n">¥${S.fmt.moneyPlain(ov.data.total_assets)}</span><span class="u">CNY</span></div>
         <div class="acct-pnl">${S.fmt.escape(S.t("home.todayPnl"))} <b class="mono ${pnlCls}">${S.fmt.escape(String(ov.data.today_pnl?.amount ?? "—"))}（${S.fmt.escape(String(ov.data.today_pnl?.percent ?? "—"))}）</b></div></div>
       <div class="acct-ov-side" style="text-align:right">
-        <div class="gc-kv acct-ovrow"><span class="muted">${S.ui.icon("bank", 13)} ${S.fmt.escape(S.t("acct.balance"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.total_balance)}</span></div>
-        <div class="gc-kv acct-ovrow"><span class="muted">${S.ui.icon("wealth", 13)} ${S.fmt.escape(S.t("wealth.holdings"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.holdings_total)}</span></div>
-        ${fxSum > 0 ? `<a class="gc-kv acct-ovrow" href="/wealth/fx"><span class="muted">${S.ui.icon("exchange", 13)} ${S.fmt.escape(S.t("acct.fxAssets"))}</span><span class="v mono">¥ ${S.fmt.moneyPlain(fxSum.toFixed(2))} →</span></a>` : ""}
+        <a class="gc-kv acct-ovrow" href="/account/cards"><span class="muted ov-l">${S.ui.icon("bank", 13)}<span>${S.fmt.escape(S.t("acct.balance"))}</span></span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.total_balance)}${S.ui.icon("chevron", 12)}</span></a>
+        <a class="gc-kv acct-ovrow" href="/wealth/my"><span class="muted ov-l">${S.ui.icon("wealth", 13)}<span>${S.fmt.escape(S.t("wealth.holdings"))}</span></span><span class="v mono">¥ ${S.fmt.moneyPlain(ov.data.holdings_total)}${S.ui.icon("chevron", 12)}</span></a>
+        ${fxSum > 0 ? `<a class="gc-kv acct-ovrow" href="/wealth/fx"><span class="muted ov-l">${S.ui.icon("exchange", 13)}<span>${S.fmt.escape(S.t("acct.fxAssets"))}</span></span><span class="v mono">¥ ${S.fmt.moneyPlain(fxSum.toFixed(2))}${S.ui.icon("chevron", 12)}</span></a>` : ""}
       </div>
     </div>` : S.ui.empty(S.t("common.loadFailed"));
   /* 最近 5 笔流水：分类彩色 squircle + 日期分组（与 /account/transactions、/pay 最近交易同构） */

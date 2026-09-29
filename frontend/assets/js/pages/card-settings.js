@@ -17,11 +17,11 @@ S.router.register("card-settings", async () => {
         <div class="cs-numrow">
           <b class="mono" id="cs-num">${S.fmt.escape(cd.number)}</b>
           <button class="eye-toggle" id="cs-eye" title="${S.fmt.escape(S.t("cards.fullNumber"))}" aria-label="${S.fmt.escape(S.t("cards.fullNumber"))}">${S.ui.icon("eye", 18)}</button>
-          <button class="btn btn-sm btn-light" id="cs-copy" hidden>${S.ui.icon("copy", 13)} ${S.fmt.escape(S.t("cards.copy"))}</button>
+          <button class="cs-copy mini-btn" id="cs-copy" type="button">${S.ui.icon("copy", 12)} ${S.fmt.escape(S.t("cards.copy"))}</button>
         </div>
-        <div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}${cd.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</div>
+        <div class="muted small cs-netline">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.alias ?? slug)}${cd.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</div>
+        ${isCredit ? `<span class="cs-tag">${S.ui.badge(S.t("cards.creditTag"), "badge-navy")}</span>` : ""}
       </div>
-      ${isCredit ? S.ui.badge(S.t("cards.creditTag"), "badge-navy") : ""}
     </div>
     <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("cs.basic"))}</h3></div>
     <label class="field"><span class="lb">${S.fmt.escape(S.t("card.alias"))}</span>
@@ -61,17 +61,21 @@ S.router.register("card-settings", async () => {
       }
       numEl.textContent = fmtGroups(fullNumber);
       eyeBtn.innerHTML = S.ui.icon("eye-off", 18);
-      copyBtn.hidden = false;
       revealed = true;
     } else {
       numEl.textContent = cd.number;
       eyeBtn.innerHTML = S.ui.icon("eye", 18);
-      copyBtn.hidden = true;
       revealed = false;
     }
   };
+  /* 复制：卡号隐藏态点击也直接复制完整卡号（按需 reveal 取号，不强制先点眼睛）——
+     此前按钮 hidden 被 .btn display:inline-flex 压制而"假隐藏"，点到的又是 null 号 */
   copyBtn.onclick = async () => {
-    if (!fullNumber) return;
+    if (!fullNumber) {
+      const r = await S.api.get(`/api/cards/${slug}/reveal`);
+      if (!r.ok || !r.data?.number) { S.ui.toast(S.t("common.loadFailed"), true); return; }
+      fullNumber = r.data.number;
+    }
     if (await S.ui.copy(fullNumber)) S.ui.toast(S.t("cards.copied"));
     else S.ui.toast(S.t("common.opFailed"), true);
   };

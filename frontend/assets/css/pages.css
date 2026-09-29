@@ -736,3 +736,19 @@
   .cs-numrow .mono { font-size: 15px; }
   .cs-sec { margin-top: 22px; }
 }
+
+/* ===== 第三十三轮：卡设置复制钮缩小+信用标识移位 / account 资产行跳转对齐 ===== */
+.cs-copy { font-size: 12px; padding: 3px 10px; gap: 4px; }
+.cs-copy .ic { flex: none; }
+.cs-netline { margin-top: 6px; }
+.cs-tag { display: inline-flex; margin-top: 3px; }
+.acct-ovrow { align-items: center; text-decoration: none; color: inherit; }
+.acct-ovrow:hover .v { color: var(--color-navy); }
+.acct-ovrow .ov-l { display: inline-flex; align-items: center; gap: 6px; }
+.acct-ovrow .ov-l .ic { flex: none; }
+.acct-ovrow .v { display: inline-flex; align-items: center; gap: 5px; }
+.acct-ovrow .v .ic { flex: none; color: var(--color-ink-2); }
+@media (max-width: 768px) {
+  .cs-netline { margin-top: 3px; }
+  .cs-tag { margin-top: 2px; }
+}

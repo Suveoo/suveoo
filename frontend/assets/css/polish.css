@@ -750,3 +750,6 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .cal-ok { font: inherit; font-size: 13px; font-weight: 600; border: none; background: var(--color-navy); color: #fff; cursor: pointer; padding: 6px 18px; border-radius: 8px; transition: background-color .12s ease; }
 .cal-ok:hover { background: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { .cal-mask, .cal { animation: none; } }
+
+/* 第三十三轮：.btn 的 display:inline-flex 特异性压过 UA [hidden]——cs-copy 曾"假隐藏"可点到 null 值；全站 btn 补齐 */
+.btn[hidden] { display: none; }

@@ -57,8 +57,8 @@ S.ui = {
     if (!grad || !g) return `<svg class="ic" width="${size}" height="${size}" aria-hidden="true"><use href="/assets/icons/sprite.svg?v=${S.ui.v()}#i-${glyph}"/></svg>`;
     const id = "icg-" + (++S.ui._icSeq);
     const fg = fam === "gold" ? "#4A3200" : "#fff";
-    const hl = fam === "gold" ? .7 : .5;
-    return `<svg class="ic ic-c" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${grad[0]}"/><stop offset="1" stop-color="${grad[1]}"/></linearGradient></defs><rect width="24" height="24" rx="7.5" fill="url(#${id})"/><circle cx="6.5" cy="6.5" r="1.6" fill="#fff" opacity="${hl}"/><g fill="none" stroke="${fg}" stroke-width="3.43" stroke-linecap="round" stroke-linejoin="round" transform="translate(5 5) scale(.583)">${g}</g></svg>`;
+    /* 左上高光小点已按队长要求移除（第三十三轮）：全站彩色 squircle 图标不再带偏左上圆点 */
+    return `<svg class="ic ic-c" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${grad[0]}"/><stop offset="1" stop-color="${grad[1]}"/></linearGradient></defs><rect width="24" height="24" rx="7.5" fill="url(#${id})"/><g fill="none" stroke="${fg}" stroke-width="3.43" stroke-linecap="round" stroke-linejoin="round" transform="translate(5 5) scale(.583)">${g}</g></svg>`;
   },
   _icSeq: 0,
   /* 当前 HTML 资产版本（?v=bNNN）：JS 内引用图片/插画时拼 ?v= 用——R2 内容更新后 bump 版本即全员换图（第十七轮教训） */
