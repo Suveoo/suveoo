@@ -157,7 +157,7 @@ S.router.register("register", async () => {
     pane.innerHTML = `<div class="center"><img src="/assets/images/illustrations/security-shield.svg" width="90" alt="">
       <h2>${S.fmt.escape(S.t("reg.done"))}</h2><p class="muted small">${S.fmt.escape(r.data.notice ?? "")}</p></div>
       <div class="grid grid-2" style="margin:16px 0">
-        ${r.data.cards.map((cd) => `<div class="mcard" style="background-image:url(/${cd.art})"><b>${S.fmt.escape(cd.number)}</b>
+        ${r.data.cards.map((cd) => `<div class="mcard" style="background-image:url(${S.fmt.cardFront(cd)})"><b>${S.fmt.escape(cd.number)}</b>
           <div class="row between"><span class="small">${S.fmt.escape(cd.network)}</span><span class="small mono">${cd.kind === "credit" ? "¥320,000" : "¥" + cd.balance}</span></div></div>`).join("")}
       </div>
       <button class="btn btn-primary btn-block" id="r-in">${S.fmt.escape(S.t("reg.enter"))}</button>`;

@@ -14,7 +14,7 @@ S.router.register("transfer-limits", async () => {
       ${S.ui.badge("AI", "badge-navy")}</div>
     ` + cards.map((cd) => `
     <div class="list-row">
-      <img class="bc-art" src="/${cd.art}" alt="" style="width:64px;height:40px">
+      <img class="bc-art" src="${S.fmt.cardFront(cd)}" alt="" style="width:64px;height:40px">
       <div class="grow"><b class="mono">${S.fmt.escape(cd.number)}</b>
         <div class="muted small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(S.t("cards.classIc", cd.class_label))}${cd.is_default ? " · " + S.fmt.escape(S.t("cards.default")) : ""}</div>
         <div class="muted small">${S.fmt.escape(S.t("limits.single"))} <b class="mono">¥${S.fmt.moneyPlain(cd.limit_single ?? "50000")}</b>

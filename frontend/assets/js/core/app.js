@@ -398,6 +398,14 @@ S.purchaseModal = async (fund) => {
 (async function boot() {
   if (document.readyState === "loading") await new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true }));
   try { await S.i18n.init(); } catch (e) { console.error("[boot] i18n failed", e); }
+  /* 卡面清单（第四十四轮）：阻塞式加载（1.5s 超时，失败静默）——渲染点在 boot 后执行，
+   * 必须保证清单先于页面控制器就位，否则组织补图后渲染仍取基座回落（竞态实证：b266 src 无组织段） */
+  try {
+    await Promise.race([
+      fetch("/assets/data/card-arts.json?v=" + (S.ui.v() || "1")).then((r) => r.ok ? r.json() : null).then((j) => { if (j) S.cardArts = j; }),
+      new Promise((r2) => setTimeout(r2, 1500)),
+    ]);
+  } catch { /* 清单失败：cardFront 回落基座 art，卡面不变 */ }
   try { await S.chrome.render(); } catch (e) { console.error("[boot] chrome failed", e); }
   /* Service Worker 注册（此前从未注册——SW 的超时重试由此生效；activate 会 claim 现有标签页） */
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {});

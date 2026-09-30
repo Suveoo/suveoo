@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-09-30T15:54:22.259Z",
+  "recordedAt": "2026-09-30T17:28:44.284Z",
   "sessionId": "sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7",
   "event": "PostToolUse",
-  "toolName": "Edit",
-  "file": "D:\\suveoo\\frontend\\assets\\js\\core\\voice.js",
+  "toolName": "Write",
+  "file": "D:\\suveoo\\notes\\_tmp_doc.js",
   "outcome": "inconclusive",
   "coverage": "partial",
   "findingCount": 0,
-  "durationMs": 19,
+  "durationMs": 25,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

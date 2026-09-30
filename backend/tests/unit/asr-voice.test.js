@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { aliPercentEncode, aliPopSignatureAsync, nlsTokenParams, nlsWsDirective } from "../../worker-main.js";
+import { aliPercentEncode, aliPopSignatureAsync, nlsTokenParams, nlsWsDirective, debitArtFor, creditArtFor } from "../../worker-main.js";
+
+/** 第四十四轮：借记卡面按组织解析（回落/槽位稳定/自动换图语义锁定）。 */
+describe("卡面组织解析（debitArtFor）", () => {
+  const manifest = { debit: { mastercard: ["mc1.webp", "mc2.webp", "mc3.webp", "mc4.webp", "mc5.webp", "mc6.webp", "mc7.webp", "mc8.webp"], visa: [], "american-express": [], unionpay: [] }, credit: { mastercard: ["cmc1.webp"] } };
+  it("组织目录空 → 回落 mastercard 同槽位（现状卡面不变：slot4=第 5 张）", () => {
+    expect(debitArtFor("银联", 4, manifest)).toBe("mc5.webp");
+    expect(debitArtFor("全付通", 7, manifest)).toBe("mc8.webp");
+  });
+  it("补图后自动换真组织图且槽位稳定固定", () => {
+    const m2 = { ...manifest, debit: { ...manifest.debit, unionpay: ["u1.webp", "u2.webp", "u3.webp"] } };
+    expect(debitArtFor("银联", 4, m2)).toBe("u2.webp"); /* 4%3=1 */
+    expect(debitArtFor("银联", 4, m2)).toBe(debitArtFor("银联", 4, m2)); /* 稳定 */
+  });
+  it("万事达卡恒走 mastercard 不受其他组织补图影响；图不够（2 张 Visa 需求溢出取模不重复越界）", () => {
+    expect(debitArtFor("万事达", 2, manifest)).toBe("mc3.webp");
+    const m3 = { ...manifest, debit: { ...manifest.debit, visa: ["v1.webp"] } };
+    expect(debitArtFor("维萨", 0, m3)).toBe("v1.webp");
+    expect(debitArtFor("维萨", 1, m3)).toBe("v1.webp"); /* 仅 1 张：取模回落同图不越界 */
+  });
+  it("credit 同构（万事达单图）", () => {
+    expect(creditArtFor("万事达", 0, manifest)).toBe("cmc1.webp");
+  });
+});
 
 /** 第四十一轮：语音 ASR 代理纯函数——签名用阿里云官方离线测试向量锁定（文档《通过OpenAPI获取Token》示例）。 */
 describe("ASR 语音代理（阿里云 NLS）", () => {

@@ -70,7 +70,7 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     box.innerHTML = debits.map((d) => `
       <label class="tf-card${d.slug === fromSlug ? " on" : ""}">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""}>
-        <img class="bc-art" src="/${d.art}" alt="">
+        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="">
         <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}</span>
           <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(S.t("cards.classIc", d.class_label))}${d.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</span></span>
         <span class="tf-cright"><span class="tf-cbal">${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</span>${d.held ? `<span class="tf-cbal held">${S.fmt.escape(S.t("transfer.held", d.held))}</span>` : ""}</span>
@@ -157,11 +157,11 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("transfer.self"))}</h2><div id="pp-list"></div>`, { large: false });
     m.el.querySelector("#pp-list").innerHTML = allCards.filter((x) => x.status === "ACTIVE").map((d) => d.kind === "credit" ? `
       <a class="list-row" href="/account/cards" style="text-decoration:none;color:inherit">
-        <img class="bc-art" src="/${d.art}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(S.t("transfer.selfRepay"))}</div></div>
         ${S.ui.badge(S.t("cards.credit"), "badge-navy")}<span class="small" style="color:var(--color-navy);white-space:nowrap">${S.fmt.escape(S.t("transfer.selfRepayGo"))}</span></a>` : `
       <div class="list-row" style="cursor:pointer" data-slug="${d.slug}">
-        <img class="bc-art" src="/${d.art}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(S.t("cards.classIc", d.class_label))} · ${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</div></div>
         ${d.is_default ? S.ui.badge(S.t("cards.default"), "badge-gray") : ""}</div>`).join("");
     S.ui.$$(".list-row[data-slug]", m.el).forEach((row) => {

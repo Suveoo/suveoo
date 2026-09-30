@@ -46,4 +46,23 @@ S.fmt = {
   escape(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); },
   /* 通知正文链接化（第七期）：先转义，再仅对站内 URL 生成锚点（限定 suveoo.com 域，不接受外链） */
   linkify(s) { return this.escape(s).replace(/(https:\/\/suveoo\.com\/[a-z0-9/-]+)/g, '<a href="$1" class="notif-link">$1</a>'); },
+  /* 卡面解析（第四十四轮）：按卡组织+槽位从 S.cardArts 清单（assets/data/card-arts.json，部署自动更新）
+   * 选真图；组织目录空/图不够回落 mastercard；基座 art 尾号 N 即槽位（N 从 1 起）——存量卡面不变，
+   * 队长补 visa/american-express/unionpay 图并部署后对应组织卡自动换真图且固定（槽位稳定）。
+   * 任何异常/清单未加载一律回落基座 art 原样（零风险）。 */
+  cardFront(card) {
+    const fallback = "/" + (card?.art ?? "");
+    try {
+      const table = card?.kind === "debit" ? S.cardArts?.debit : S.cardArts?.credit;
+      if (!table || !card?.network || !card.art) return fallback;
+      const last = String(card.art).split("/").pop(); /* debit-card-8-front.webp（旧/新路径末段同名，含连字符的前缀段不影响） */
+      const parts = last.split("-"); /* ["debit","card","8","front.webp"] */
+      const slot = Number(parts[2]) - 1;
+      if (!Number.isInteger(slot) || slot < 0) return fallback;
+      const dir = { "万事达": "mastercard", "维萨": "visa", "Visa": "visa", "美国运通": "american-express", "运通": "american-express", "银联": "unionpay", "全付通": "unionpay" }[card.network] ?? "mastercard";
+      const pool = (table[dir] ?? []).length ? table[dir] : table.mastercard ?? [];
+      if (!pool.length) return fallback;
+      return "/" + pool[slot % pool.length];
+    } catch { return fallback; }
+  },
 };
