@@ -11,8 +11,13 @@
  */
 S.voice = (() => {
   const Ctor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
-  let providerPromise = null;   /* 模块级缓存：一次会话只问一次 /api/voice/config */
-  const provider = () => (providerPromise ??= fetch("/api/voice/config").then((r) => r.json()).then((j) => j.provider ?? "webspeech").catch(() => "webspeech"));
+  let providerPromise = null;   /* 模块级缓存：一次会话只问一次 /api/voice/config（失败不缓存——弱网瞬时失败不能把整个会话钉死在 webspeech） */
+  const provider = () => {
+    if (!providerPromise) {
+      providerPromise = fetch("/api/voice/config").then((r) => r.json()).then((j) => j.provider ?? "webspeech").catch(() => { providerPromise = null; return "webspeech"; });
+    }
+    return providerPromise;
+  };
 
   /* ============ 通道 ①：Web Speech（原实现整段保留） ============ */
   let rec = null, activeBtn = null, timer = null;
@@ -97,7 +102,7 @@ S.voice = (() => {
     btn.onclick = async () => {
       if (s2) { /* 会话中点击=正常收尾（发 stop 等 TranscriptionCompleted 拿尾句） */
         try { s2.ws?.readyState === 1 && s2.ws.send(JSON.stringify({ type: "stop" })); } catch { /* ignore */ }
-        setTimeout(() => aliTeardown(true), 2500); /* 网关无响应兜底强收 */
+        setTimeout(() => aliTeardown(), 2500); /* 网关无响应兜底收口：同样派发 onFinal（committed 已含已到句，silence 会丢回调） */
         return;
       }
       let stream, ctx;
@@ -153,7 +158,10 @@ S.voice = (() => {
           st.done = true;
           aliTeardown(); /* onFinal 在 teardown 内派发（committed 已含尾句） */
         } else if (m.type === "error") {
-          failAli(String(m.message ?? "").includes("token") ? "voice.err" : "voice.network");
+          /* 网关错误原文透传（额度尽/项目配置错等），不再误标为"网络问题"——只留 token 类走通用文案 */
+          const isToken = /token/i.test(String(m.message ?? ""));
+          S.ui.toast(isToken ? S.t("voice.err") : `${S.t("voice.err")}（${String(m.message ?? "").slice(0, 60)}）`, true);
+          aliTeardown();
         }
       };
     };

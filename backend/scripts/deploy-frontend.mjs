@@ -71,6 +71,8 @@ async function uploadOne({ rel, full }, attempt = 0) {
 }
 
 async function main() {
+  /* 前置：重新生成卡面清单（队长把新卡图放对应目录后部署即自动更新可用图集，第四十三轮） */
+  await import("./gen-card-arts.mjs");
   const all = (await walk(FRONTEND_DIR)).filter((f) => !FILTER || f.rel.includes(FILTER));
   /* 发布顺序纪律（b151 实证教训）：资产（JS/CSS/图片）先全部就位，HTML 最后切换——
      若 HTML 先到，页面以新 ?v= 引用拉到尚未更新的旧资产，SW/CDN 会把"新参数→旧内容"缓存住 1h */

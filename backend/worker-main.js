@@ -195,9 +195,24 @@ export function buildCardsForRegistration(plan, numbers) {
   }));
   return [...debit, {
     slug: "credit-card-1", number: numbers[4], network: "万事达", class_label: "信用", kind: "credit",
-    art: `assets/images/cards-front/credit-cards/credit-card-${plan.creditArt}-front.webp`,
+    art: `assets/images/cards-front/credit-cards/mastercard/credit-card-${plan.creditArt}-front.webp`,
     balance_cents: "0", limit_cents: String(CREDIT_LIMIT_CENTS), is_default: 0,
   }];
+}
+
+/* ===== 信用卡面按组织分配（第四十三轮） =====
+ * 目录：credit-cards/{mastercard,visa,american-express,unionpay}/；清单=assets/data/card-arts.json
+ * （gen-card-arts.mjs 生成，deploy-frontend 前置重跑——补图后部署即自动纳入可用集）。
+ * 分配语义：目标组织目录有图→按槽位取（槽位由 sampleDistinct 保证同用户不重复）；
+ * 空目录/数量不足→回落 mastercard（同样槽位稳定）；将来网络映射见 NET_TO_ART_DIR。 */
+export const NET_TO_ART_DIR = { "万事达": "mastercard", "维萨": "visa", "Visa": "visa", "VISA": "visa", "美国运通": "american-express", "American Express": "american-express", "运通": "american-express", "银联": "unionpay", "UnionPay": "unionpay", "全付通": "unionpay" };
+/** 纯函数：给某网络第 slot 张卡选卡面 art（清单驱动+mastercard 回落+槽位稳定） */
+export function creditArtFor(network, slot, manifest) {
+  const arts = manifest?.arts ?? {};
+  const dir = NET_TO_ART_DIR[network] ?? "mastercard";
+  const pool = (arts[dir] ?? []).length ? arts[dir] : arts.mastercard ?? [];
+  if (!pool.length) return null;
+  return pool[slot % pool.length];
 }
 export function publicCard(c) {
   const bal = BigInt(c.balance_cents ?? "0");
@@ -6393,6 +6408,10 @@ export function rewriteDynamicRoutes(pathname) {
   if (m) return `/account/card/${m[1]}`;
   /* AI 会话独立 URL（第四十轮）：/ai/s/{sid} 复用 /ai 页面；HTML 同源，noindex 由 serveStatic 响应头注入防变体索引 */
   if (/^\/ai\/s\/[a-zA-Z0-9_-]+\/?$/.test(pathname)) return "/ai";
+  /* 信用卡面按组织分目录（第四十三轮）：存量 art 仍写旧路径（credit-cards/xxx.webp）——
+   * 兼容重写到 mastercard/（既有 4 张全为万事达，零 DB 迁移；新分配一律写新路径不经过此规则） */
+  const cm = /^\/assets\/images\/cards-front\/credit-cards\/(?!mastercard\/|visa\/|american-express\/|unionpay\/)([^/]+\.webp)$/.exec(pathname);
+  if (cm) return `/assets/images/cards-front/credit-cards/mastercard/${cm[1]}`;
   return pathname;
 }
 function r2Headers(obj, key) {
