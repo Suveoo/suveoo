@@ -2,9 +2,9 @@
 node_modules/
 dist/
 .wrangler/
+.claude/
 .zcode/
 .mimosa/
-.claude/
 nls/
 .dev.vars.*
 !.dev.vars.example
@@ -34,6 +34,7 @@ $RECYCLE.BIN/
 .vscode/
 .idea/
 *.swp
+*.zcodeignore
 
 # ===== Internal working notes & local screenshots (not for publication) =====
 /To Do.md

@@ -1,9 +1,0 @@
-const fs = require("fs");
-let r = fs.readFileSync("README.md", "utf8");
-const anchor = "## 15. 变更记录\n\n";
-const entry = `- v3.78（2026-09-30）：**第五期 idle 核验返修：工具链接强迫度+工具页手机排版（v=b257，worker 6ba4c605）**。核验 idle 交付（v3.77/b255：384×2 绿复跑确认、GLM 已切回、AI 链接化/内嵌渲染/solution_package 抽查过；git 入库仍被 Mimosa L3 拦截，与 idle 侧同因——114 high 均既有架构误判，留队长决策）。队长三反馈修复：① **calc 工具链接强迫度**——系统提示词规则 7 由"优先 calc_*"改"必须先调（禁止心算估数）+回答末尾必须原样附 link，无 link 视为未完成"（1798≤1850 预算内，锁定测试 9/9 绿）；生产复验同款"攒 50 万"问题：必附"打开图形化计算器"按钮+内嵌工具渲染（数值一致 ¥5,937.48）。② **deposit-compare 手机排版**——5 列表窄屏挤压（数字换行/徽章贴边）重构为 4 列（徽章并入方案列）+ 手机 CSS 卡片化（每方案一张卡：名称行+期限/年利率/到期本息 ::before 标签 kv 组；thead 隐藏；推荐卡大数字手机降 16px 可换行）；独立页与 AI 内嵌同源生效；深链参数回填实测。③ **budget-allocator 结果区手机重排**——必要支出独占首行、想要支出+储蓄金额第二行并排（grid 两条须置于 polish.css 293 行 flex 之后——pages.css 先加载会被同特异性覆盖，踩加载序坑 b256→b257）；**全站环形图手机居中**（charts/donut.js 统一注入 .donut-wrap+CSS，dashboard/budget-allocator/fund-detail/docs 同步生效，实测 cx=0）。vitest 384×2 绿。\n`;
-fs.writeFileSync("README.md", r.replace(anchor, anchor + entry));
-let n = fs.readFileSync("notes/idle-quad.md", "utf8");
-n += "\n# 第三十七轮（2026-09-30，主会话）：idle 五期核验返修（v=b257，worker 6ba4c605）\n\n- 规则 7 强迫度措辞：改写同时净省字符（1787→1798 加内容仍在预算）；实测法=同款问题复问，断言 .tool-open≥1+内嵌数值。\n- **CSS 加载序坑**：pages.css 在 polish.css 之前加载，同特异性规则（.tc-result flex）会被后者的旧规则反杀——覆盖型手机规则放 polish.css 尾。\n- 窄屏表格通用解：thead 隐藏+tr 卡片化+td[data-lb]::before 标签（dc-tbl 范式可复用）。\n- donut 居中在渲染器层统一（donut-wrap 类）而非逐页改。\n- 384×2 绿；git 入库两轮被 Mimosa 拦（同因）。\n";
-fs.writeFileSync("notes/idle-quad.md", n);
-console.log("docs done");
