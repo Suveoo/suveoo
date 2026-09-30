@@ -1,14 +1,14 @@
 {
   "schemaVersion": "mimosa-hook-status/v1",
-  "recordedAt": "2026-09-30T08:29:03.630Z",
+  "recordedAt": "2026-09-30T12:24:22.476Z",
   "sessionId": "sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7",
   "event": "PostToolUse",
-  "toolName": "Edit",
-  "file": "backend/tests/integration/static-routing.test.js",
-  "outcome": "clear",
+  "toolName": "Write",
+  "file": "backend/tests/integration/voice-stream.test.js",
+  "outcome": "static_verified",
   "coverage": "complete",
-  "findingCount": 0,
-  "durationMs": 18,
+  "findingCount": 3,
+  "durationMs": 829,
   "hostState": "hook_complete",
   "reportHint": ".mimosa/reports/"
 }

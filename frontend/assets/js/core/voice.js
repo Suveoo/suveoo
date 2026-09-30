@@ -1,20 +1,21 @@
-/* voice.js — 语音输入（主页 hero 与 /ai 输入框共用）
- * Web Speech API（SpeechRecognition/webkitSpeechRecognition，zh-CN，continuous=false，interim=true）；
- * feature-detect：不支持的环境按钮降级为 i18n toast；不引入第三方库。
- * S.voice.bind(btn, input)：识别结果填入输入框（interim 实时上屏），不自动发送。
+/* voice.js — 语音输入（主页 hero 与 /ai 输入框共用），双通道可切换（第四十一轮）：
+ * ① webspeech：Web Speech API（原行为原样保留——zh-CN、interim 实时上屏、final 即停、iOS 僵尸会话硬复位）。
+ * ② ali：阿里云智能语音交互实时识别（Worker /api/voice/stream WS 代理，密钥只在 Worker；
+ *    AudioContext(sampleRate:16000) 采 PCM16 → 二进制帧上流 → TranscriptionResultChanged/SentenceEnd
+ *    边说边出字回填输入框）。无 GMS 的国产 Android/鸿蒙与 WebView 壳内唯一可用通道，四端通用。
+ * 通道选择：GET /api/voice/config → {provider}（后端 VOICE_ASR_PROVIDER var 一行切换+deploy）。
+ * UI 不变：同一按钮、同一红色脉冲/aria 语义；点击开始-再点结束。
  *
- * 补记 7：错误分流 i18n + 会话生命周期加固（Safari onend 僵尸→硬复位；final 即停；30s 上限；页面隐藏收口）。
- * 补记 11（队长三平台实测定案）：**识别器独占麦克风**——彻底移除点环并行取流与 getUserMedia 预检：
- *   Android Chromium：并行 gUM 流抢麦克风路由饿死识别（环动字不进）；
- *   iOS Safari：并行流/AudioContext 损坏首次之后的音频会话（gUM 报 NotReadable/Abort，
- *   预检反而把本可工作的识别器拦死在门外）。
- *   识别器自身触发授权弹窗（Permissions-Policy 已放行 microphone=(self)，真机实证会弹窗），
- *   错误码直接映射 i18n 文案；监听反馈仅保留按钮本身的红色脉冲（纯 CSS，零麦克风成本）。
+ * 补记 7/11 纪律全部保留：错误分流 i18n、30s 上限、页面隐藏收口、webspeech 通道绝不并行取流（独占麦克风实证）。
+ *   ali 通道自身持流（AudioContext），与识别器互斥使用同一会话状态机，无并行冲突。
  */
 S.voice = (() => {
   const Ctor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
+  let providerPromise = null;   /* 模块级缓存：一次会话只问一次 /api/voice/config */
+  const provider = () => (providerPromise ??= fetch("/api/voice/config").then((r) => r.json()).then((j) => j.provider ?? "webspeech").catch(() => "webspeech"));
+
+  /* ============ 通道 ①：Web Speech（原实现整段保留） ============ */
   let rec = null, activeBtn = null, timer = null;
-  /* 识别器错误码 → i18n 键（voice.err 为兜底，未映射码在文案后附原始 code） */
   const MSG = {
     "not-allowed": "voice.denied", "service-not-allowed": "voice.denied",
     "audio-capture": "voice.noMic", "network": "voice.network", "no-speech": "voice.noSpeech",
@@ -24,7 +25,6 @@ S.voice = (() => {
     btn.setAttribute("aria-label", S.t(on ? "voice.stopAria" : "voice.aria"));
     btn.title = S.t(on ? "voice.stopAria" : "voice.aria");
   };
-  /* 硬复位：同步清空一切后再 abort 旧实例（并摘除其回调）——绝不依赖 onend 触发（iOS 缺陷） */
   const hardReset = () => {
     const r = rec;
     rec = null;
@@ -32,10 +32,8 @@ S.voice = (() => {
     if (activeBtn) { setState(activeBtn, false); activeBtn = null; }
     if (r) { r.onresult = r.onerror = r.onend = r.onspeechstart = r.onaudiostart = null; try { r.abort(); } catch { /* 已结束 */ } }
   };
-  function bind(btn, input, { onFinal = null } = {}) {
-    if (!btn || !input) return;
+  function bindWebSpeech(btn, input, { onFinal = null } = {}) {
     if (typeof Ctor() !== "function") {
-      /* 降级：不支持语音识别的环境（如 Firefox）保留按钮但只给提示 */
       btn.classList.add("voice-off");
       btn.setAttribute("aria-label", S.t("voice.aria"));
       btn.onclick = () => S.ui.toast(S.t("voice.unsupported"));
@@ -44,7 +42,7 @@ S.voice = (() => {
     btn.setAttribute("aria-label", S.t("voice.aria"));
     btn.title = S.t("voice.aria");
     btn.onclick = () => {
-      if (rec) { hardReset(); return; } /* 会话中点击=停止（同步复位，修僵尸会话） */
+      if (rec) { hardReset(); return; }
       let gotFinal = false;
       let r;
       try { r = new (Ctor())(); } catch { S.ui.toast(S.t("voice.err"), true); return; }
@@ -58,11 +56,11 @@ S.voice = (() => {
         input.value = text.trim();
         if (e.results[e.results.length - 1].isFinal) {
           gotFinal = true;
-          try { r.stop(); } catch { /* 已收口 */ } /* 拿到 final 即停，缩短音频会话（Safari 长挂诱因） */
+          try { r.stop(); } catch { /* 已收口 */ }
         }
       };
       r.onerror = (e) => {
-        if (e.error === "aborted") return; /* 用户主动停/收口，不提示 */
+        if (e.error === "aborted") return;
         const key = MSG[e.error];
         if (key && key !== "voice.err") S.ui.toast(S.t(key), e.error !== "no-speech");
         else S.ui.toast(S.t("voice.err") + " (" + e.error + ")", true);
@@ -75,10 +73,93 @@ S.voice = (() => {
       activeBtn = btn;
       setState(btn, true);
       try { r.start(); } catch { hardReset(); S.ui.toast(S.t("voice.err"), true); return; }
-      timer = setTimeout(hardReset, 30000); /* 绝对上限：覆盖 onend 永不触发的环境 */
+      timer = setTimeout(hardReset, 30000);
     };
   }
-  /* 页面切走/隐藏即收口（移动端切后台音频会话必挂） */
-  document.addEventListener("visibilitychange", () => { if (document.hidden) hardReset(); });
-  return { supported: () => typeof Ctor() === "function", bind };
+
+  /* ============ 通道 ②：阿里云 NLS 实时识别（Worker WS 管道） ============ */
+  let s2 = null; /* { ws, ctx, stream, node, btn, input, committed, partial, onFinal, timer, done } */
+  const aliTeardown = (silence = false) => {
+    const st = s2;
+    s2 = null;
+    if (!st) return;
+    if (st.timer) clearTimeout(st.timer);
+    setState(st.btn, false);
+    try { st.node?.disconnect(); } catch { /* ignore */ }
+    try { st.stream?.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
+    try { st.ctx?.close(); } catch { /* ignore */ }
+    try { st.ws?.close(); } catch { /* ignore */ }
+    if (!silence && typeof st.onFinal === "function" && (st.committed || st.partial)) st.onFinal((st.committed + st.partial).trim());
+  };
+  function bindAli(btn, input, opts) {
+    btn.setAttribute("aria-label", S.t("voice.aria"));
+    btn.title = S.t("voice.aria");
+    btn.onclick = async () => {
+      if (s2) { /* 会话中点击=正常收尾（发 stop 等 TranscriptionCompleted 拿尾句） */
+        try { s2.ws?.readyState === 1 && s2.ws.send(JSON.stringify({ type: "stop" })); } catch { /* ignore */ }
+        setTimeout(() => aliTeardown(true), 2500); /* 网关无响应兜底强收 */
+        return;
+      }
+      let stream, ctx;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+        ctx = new AudioContext({ sampleRate: 16000 }); /* 浏览器侧重采样到 16k（NLS 协议口径） */
+      } catch (e) {
+        S.ui.toast(S.t(e?.name === "NotAllowedError" ? "voice.denied" : e?.name === "NotFoundError" ? "voice.noMic" : "voice.err"), true);
+        try { stream?.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
+        return;
+      }
+      const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/api/voice/stream?t=${encodeURIComponent(S.api.token ?? "")}`);
+      ws.binaryType = "arraybuffer";
+      const st = { ws, ctx, stream, btn, input, committed: "", partial: "", onFinal: opts.onFinal ?? null, timer: null, done: false };
+      s2 = st;
+      setState(btn, true);
+      st.timer = setTimeout(() => aliTeardown(), 60000); /* 绝对上限 60s（实时流多句长于 webspeech 单句） */
+      const failAli = (key) => { S.ui.toast(S.t(key), true); aliTeardown(); };
+      ws.onopen = () => ws.send(JSON.stringify({ type: "start" }));
+      ws.onerror = () => { if (s2 === st) failAli("voice.network"); };
+      ws.onclose = () => { if (s2 === st) aliTeardown(); };
+      ws.onmessage = (ev) => {
+        if (s2 !== st) return;
+        let m; try { m = JSON.parse(String(ev.data)); } catch { return; }
+        if (m.type === "started") {
+          const src = ctx.createMediaStreamSource(stream);
+          const node = ctx.createScriptProcessor(4096, 1, 1);
+          st.node = node;
+          node.onaudioprocess = (e) => {
+            if (s2 !== st || ws.readyState !== 1) return;
+            const f32 = e.inputBuffer.getChannelData(0);
+            const i16 = new Int16Array(f32.length);
+            for (let i = 0; i < f32.length; i++) {
+              const v = Math.max(-1, Math.min(1, f32[i]));
+              i16[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+            }
+            try { ws.send(i16.buffer); } catch { /* ignore */ }
+          };
+          src.connect(node);
+          node.connect(ctx.destination); /* ScriptProcessor 需接 destination 才回调（静音播放即可） */
+        } else if (m.type === "result") {
+          if (m.isFinal) { st.committed += m.text ?? ""; st.partial = ""; }
+          else st.partial = m.text ?? "";
+          input.value = (st.committed + st.partial).trim();
+        } else if (m.type === "completed") {
+          st.done = true;
+          aliTeardown(); /* onFinal 在 teardown 内派发（committed 已含尾句） */
+        } else if (m.type === "error") {
+          failAli(String(m.message ?? "").includes("token") ? "voice.err" : "voice.network");
+        }
+      };
+    };
+  }
+
+  function bind(btn, input, opts = {}) {
+    if (!btn || !input) return;
+    provider().then((p) => (p === "ali" ? bindAli(btn, input, opts) : bindWebSpeech(btn, input, opts)));
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { hardReset(); aliTeardown(); } });
+  return {
+    supported: () => true, /* 双通道时代总有一条可用（ali 不依赖 Web Speech）；保留字段兼容旧调用 */
+    bind,
+    provider,
+  };
 })();

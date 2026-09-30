@@ -52,6 +52,10 @@ FIDO2_ORIGIN = "https://suveoo.com"
 SENDER_NOREPLY = "noreply@suveoo.com"
 SENDER_SECURITY = "security@suveoo.com"
 SUPPORT_INBOX = "support@suveoo.com"
+# 语音输入底层通道（第四十一轮）："webspeech"=浏览器 Web Speech API（原行为，无 GMS 环境不可用）；
+# "ali"=阿里云智能语音交互实时识别（Worker WS 代理，密钥在 secrets ASR_ALI_*，四端通用）。
+# 切换只需改这一行 + npx wrangler deploy（教程 for_developer/switch_suveoo_ai_voice_input_path.md）
+VOICE_ASR_PROVIDER = "ali"
 # LLM Provider（可配置；模型名手动指定，不走 /v1/models 自动发现）
 # ── 第十一期起推荐：MODEL_PROFILE 档位切换（worker MODEL_PROFILES 注册表）──
 # 设置 MODEL_PROFILE = "glm-5.3-flash" | "glm-5.3-max" | "qwen3.7-flash" 后，

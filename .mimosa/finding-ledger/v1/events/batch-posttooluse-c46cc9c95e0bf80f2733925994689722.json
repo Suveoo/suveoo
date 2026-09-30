@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "posttooluse-c46cc9c95e0bf80f2733925994689722",
+  "runId": null,
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "PostToolUse"
+  },
+  "revision": null,
+  "diffHash": null,
+  "rulesVersion": null,
+  "sessionHash": "7f4db2b606c50daa7d0aaa9b88caac60a770655b4069fcad1bff806b0184fab2",
+  "reportRef": null,
+  "events": [
+    {
+      "eventId": "hook-0173558b6c0a5599f9a891bc8540cb70",
+      "findingId": "mimosa-b97fc9b78c5837688f2b9652",
+      "type": "static_fix_verified",
+      "at": "2026-09-30T12:24:22.079Z",
+      "identity": {
+        "projectRelativeFile": "backend/tests/integration/voice-stream.test.js",
+        "ruleId": "security",
+        "codeEvidenceHash": "f05a5686012d3ff0227831c2a26843adfdc36428caf106e4219f1340dbcfe025",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 5,
+      "endLine": 5,
+      "reasonCode": "static_rescan_passed",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "evidenceHash": "f05a5686012d3ff0227831c2a26843adfdc36428caf106e4219f1340dbcfe025"
+      },
+      "sequence": 0
+    },
+    {
+      "eventId": "hook-fd44ff1b3f1b17629dc45a70ef97d7a4",
+      "findingId": "mimosa-5f311160e369e0b58559569f",
+      "type": "static_fix_verified",
+      "at": "2026-09-30T12:24:22.079Z",
+      "identity": {
+        "projectRelativeFile": "backend/tests/integration/voice-stream.test.js",
+        "ruleId": "security",
+        "codeEvidenceHash": "e7eb316c108d02c870d7fe0d5f440019722a3dac6a1799db529a6ff8e4f5495f",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 12,
+      "endLine": 12,
+      "reasonCode": "static_rescan_passed",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "evidenceHash": "e7eb316c108d02c870d7fe0d5f440019722a3dac6a1799db529a6ff8e4f5495f"
+      },
+      "sequence": 1
+    },
+    {
+      "eventId": "hook-65de08ba22d986aaa3266dc8bc6eb263",
+      "findingId": "mimosa-f02c1af41236cbeb5d266119",
+      "type": "static_fix_verified",
+      "at": "2026-09-30T12:24:22.079Z",
+      "identity": {
+        "projectRelativeFile": "backend/tests/integration/voice-stream.test.js",
+        "ruleId": "security",
+        "codeEvidenceHash": "2c3beebe82edeeba88645f89a6f064677768143574691cd436952e6f2a5e8c8e",
+        "confidence": "stable"
+      },
+      "scope": "direct",
+      "line": 10,
+      "endLine": 10,
+      "reasonCode": "static_rescan_passed",
+      "reportedToAgent": false,
+      "evidence": {
+        "kind": "static_scan",
+        "boundary": "observed",
+        "producer": "deterministic",
+        "evidenceHash": "2c3beebe82edeeba88645f89a6f064677768143574691cd436952e6f2a5e8c8e"
+      },
+      "sequence": 2
+    }
+  ],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-09-30T12:24:22.459Z"
+}

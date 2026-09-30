@@ -6301,6 +6301,89 @@ export function nlsHex32() {
   crypto.getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/** NLS token（运行时）：CreateToken POP API + SESSION_KV 缓存（到期前 300s 提前刷新；失败向上抛错文本） */
+async function nlsToken(env) {
+  const cached = await env.SESSION_KV.get("voice:nls-token", "json").catch(() => null);
+  if (cached?.id && cached.exp - 300 > Date.now() / 1000) return cached.id;
+  const params = nlsTokenParams(env.ASR_ALI_KEY_ID, crypto.randomUUID(), new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
+  const sig = await aliPopSignatureAsync(env.ASR_ALI_KEY_SECRET, "GET", params);
+  const qs = Object.keys(params).sort().map((k) => `${aliPercentEncode(k)}=${aliPercentEncode(params[k])}`).join("&") + "&Signature=" + aliPercentEncode(sig);
+  const r = await fetch("https://nls-meta.cn-shanghai.aliyuncs.com/?" + qs, { headers: { accept: "application/json" } });
+  const j = await r.json().catch(() => null);
+  if (!j?.Token?.Id) throw new Error(`NLS token failed: ${j?.Code ?? j?.Message ?? r.status}`);
+  const ttl = Math.max(60, j.Token.ExpireTime - Math.floor(Date.now() / 1000) - 60);
+  await env.SESSION_KV.put("voice:nls-token", JSON.stringify({ id: j.Token.Id, exp: j.Token.ExpireTime }), { expirationTtl: ttl }).catch(() => {});
+  return j.Token.Id;
+}
+
+/**
+ * /api/voice/stream —— 语音输入 ASR 双向管道（第四十一轮）。
+ * 客户端协议：文本帧 {type:"start"} 开始（此后二进制帧=PCM16k/16bit/mono）→ {type:"stop"} 结束；
+ * 服务端文本帧：{type:"started"} | {type:"result",isFinal,index,text}（边说边出字：false=中间结果，true=句子定稿）
+ *   | {type:"completed"} | {type:"error",message}。密钥只在本 Worker（前端零密钥）。
+ * 中转语义：Worker 是管道不做存储；阿里事件按句透传，多句由前端累积。 */
+async function handleVoiceStream(request, env, ctx) {
+  /* 浏览器 WebSocket 无法带 Authorization 头：支持 ?t=<token> 查询参数（与 Bearer 等价） */
+  const url = new URL(request.url);
+  const auth = request.headers.get("authorization") ?? (url.searchParams.get("t") ? `Bearer ${url.searchParams.get("t")}` : "");
+  const claims = auth.startsWith("Bearer ") ? await verifyJwt(auth.slice(7), env.JWT_SECRET).catch(() => null) : null;
+  if (!claims) return apiError("UNAUTHORIZED", "invalid session", 401);
+  if (env.VOICE_ASR_PROVIDER !== "ali") return apiError("NOT_ENABLED", "voice provider is not ali (set VOICE_ASR_PROVIDER var)", 403);
+  if (request.headers.get("upgrade") !== "websocket") return apiError("INVALID_REQUEST", "websocket upgrade required", 400);
+
+  const [client, server] = Object.values(new WebSocketPair());
+  server.accept();
+  let ali = null;          /* 出站 WebSocket（连阿里） */
+  let taskId = "";         /* 同任务 Start/Stop 共用（阿里协议要求 task_id 一致） */
+  let started = false;     /* 收到 TranscriptionStarted 后才透传音频 */
+  let closing = false;
+  const send = (o) => { try { server.send(JSON.stringify(o)); } catch { /* 客户端已断 */ } };
+  const fail = (message) => { if (closing) return; send({ type: "error", message }); closing = true; try { ali?.close(); } catch { /* ignore */ } try { server.close(); } catch { /* ignore */ } };
+  const shutdown = () => { if (closing) return; closing = true; try { ali?.close(); } catch { /* ignore */ } try { server.close(1000); } catch { /* ignore */ } };
+
+  server.addEventListener("message", async (ev) => {
+    try {
+      /* workedd WS 二进制帧默认 Blob（非 ArrayBuffer）：按"非字符串即音频"分流，Blob 转 buffer 再透传 */
+      if (typeof ev.data !== "string") {
+        if (!started || !ali || ali.readyState !== 1) return;
+        ali.send(ev.data instanceof ArrayBuffer ? ev.data : await ev.data.arrayBuffer());
+        return;
+      }
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "start") {
+        const token = await nlsToken(env);
+        ali = new WebSocket(`wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1?token=${encodeURIComponent(token)}`);
+        taskId = nlsHex32();
+        ali.addEventListener("open", () => {
+          ali.send(nlsWsDirective("StartTranscription", env.ASR_APPKEY, taskId, nlsHex32(), {
+            format: "pcm", sample_rate: 16000,
+            enable_intermediate_result: true, enable_punctuation_prediction: true, enable_inverse_text_normalization: true,
+            max_sentence_silence: 800,
+          }));
+        });
+        ali.addEventListener("message", (e) => {
+          /* NLS 会下发二进制心跳帧（Blob/ArrayBuffer，Workers 环境无 Blob 全局）：非字符串一律忽略，只解析文本 JSON 事件 */
+          if (typeof e.data !== "string") return;
+          let h; try { h = JSON.parse(String(e.data)); } catch { return; }
+          const name = h?.header?.name;
+          if (name === "TranscriptionStarted") { started = true; send({ type: "started" }); }
+          else if (name === "TranscriptionResultChanged" || name === "SentenceEnd") {
+            send({ type: "result", isFinal: name === "SentenceEnd", index: h.payload?.index ?? null, text: h.payload?.result ?? "" });
+          } else if (name === "SentenceBegin") { /* 句开始：无需透传 */ }
+          else if (name === "TranscriptionCompleted") { send({ type: "completed" }); shutdown(); }
+          else if (name === "TaskFailed") { fail(`ASR ${h.header?.status ?? ""} ${h.header?.status_text ?? ""}`.trim()); }
+        });
+        ali.addEventListener("error", () => fail("ASR gateway connection error"));
+        ali.addEventListener("close", (e) => { if (!closing && e.code !== 1000) fail("ASR gateway closed unexpectedly"); else if (!closing) shutdown(); });
+      } else if (msg.type === "stop" && ali && ali.readyState === 1) {
+        ali.send(nlsWsDirective("StopTranscription", env.ASR_APPKEY, taskId, nlsHex32()));
+      } else if (msg.type === "abort") shutdown();
+    } catch (e) { fail(String(e?.message ?? e)); }
+  });
+  server.addEventListener("close", shutdown);
+  return new Response(null, { status: 101, webSocket: client });
+}
 export function rewriteDynamicRoutes(pathname) {
   const m = /^\/account\/card\/[^/]+\/(history|settings)\/?$/.exec(pathname);
   if (m) return `/account/card/${m[1]}`;
@@ -6363,6 +6446,12 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return handleAuthApi(request, env, url, ctx);
     if (url.pathname === "/api/session") return handleSession(request, env);
     if (url.pathname === "/api/ai/chat") return handleAiChat(request, env, ctx);
+    if (url.pathname === "/api/voice/config" && request.method === "GET") {
+      /* 底层通道开关（第四十一轮）：VOICE_ASR_PROVIDER var（"ali"|"webspeech"，缺省 webspeech=原行为） */
+      const provider = env.VOICE_ASR_PROVIDER === "ali" && env.ASR_ALI_KEY_ID && env.ASR_ALI_KEY_SECRET && env.ASR_APPKEY ? "ali" : "webspeech";
+      return json({ provider, reason: provider === "webspeech" && env.VOICE_ASR_PROVIDER === "ali" ? "ASR secrets 未配置（wrangler secret put ASR_ALI_KEY_ID/ASR_ALI_KEY_SECRET/ASR_APPKEY）" : null });
+    }
+    if (url.pathname === "/api/voice/stream") return handleVoiceStream(request, env, ctx);
     if (url.pathname.startsWith("/mcp")) return handleMcp(request, env, url, ctx);
     if (url.pathname === "/api/fx" && request.method === "GET") {
       return json(await hFxLive(env, { refresh: url.searchParams.get("refresh") === "1" }));

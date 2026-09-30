@@ -1,6 +1,6 @@
 {
   "schema_version": "mimosa-task-review/v2",
-  "run_id": "20260930T095140148Z-8292-014d9cddc925",
+  "run_id": "20260930T125255134Z-4720-032fe71c6b05",
   "run_status": "inconclusive",
   "errors": [
     {
@@ -15,31 +15,31 @@
     "scope": "hook_observed_diff",
     "baseline": {
       "complete": false,
-      "captured_files": 60,
+      "captured_files": 61,
       "candidate_limit": 5000,
       "truncated": false,
       "enumeration_error_count": 0,
-      "snapshot_error_count": 1,
-      "compensated_target_count": 0
+      "snapshot_error_count": 2,
+      "compensated_target_count": 2
     },
     "change_tracking": {
-      "touched_observed": 0,
-      "touched_retained": 0,
+      "touched_observed": 2,
+      "touched_retained": 2,
       "truncated": false,
       "bash_mutation": true,
-      "bash_discovered": 0,
+      "bash_discovered": 2,
       "bash_discovery_limit": 80,
       "bash_discovery_truncated": false
     },
     "candidates": {
-      "eligible_files": 0,
-      "selected_files": 0,
+      "eligible_files": 2,
+      "selected_files": 2,
       "limit": 20,
       "truncated": false
     },
     "scanning": {
-      "required_files": 0,
-      "scanned_files": 0,
+      "required_files": 2,
+      "scanned_files": 2,
       "skipped_files": 0,
       "failed_files": 0,
       "project_checks_required": 0,
@@ -73,21 +73,48 @@
     ],
     "reasons_truncated": false
   },
-  "generated_at": "2026-09-30T09:51:40.148Z",
+  "generated_at": "2026-09-30T12:52:55.134Z",
   "session_id": "sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7",
   "target": ".",
-  "revision": "0abee44a89b44eace0aea6a26643b74dbb3de589",
+  "revision": "ed24bb970244c7d6a11979d43bd7a020ddc14ae4",
   "rules_version": "unavailable",
-  "diff_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "diff_hash": "60338c594eda684d84228202f25fca4a1985306950d49ac2f71642e142ca8256",
   "diff": {
     "algorithm": "sha256",
-    "changed_file_count": 0,
-    "changed_files": []
+    "changed_file_count": 2,
+    "changed_files": [
+      {
+        "file": "tests/integration/voice-stream.test.js",
+        "ranges": [
+          {
+            "start": 25,
+            "end": 26
+          }
+        ],
+        "before_hash": "da84a39f7ae3beb5c2d24bc747e26eaf7a2c200029f9888708ce6f0d8ac93c6a",
+        "after_hash": "f398021a3ed829827252e2d6462f743175ff1283ffb1b23eee7246a7819124d4"
+      },
+      {
+        "file": "worker-main.js",
+        "ranges": [
+          {
+            "start": 6260,
+            "end": 6386
+          },
+          {
+            "start": 6449,
+            "end": 6454
+          }
+        ],
+        "before_hash": "1d6136c7ca2f1f090d9aecdf230bdf0dd99847332c0e83f80f963b3f0bac1bc2",
+        "after_hash": "ac82a41f39ad4bba4f9d4b9dcb52fb22af8c5c0f40dc83188bcce0267b2288d8"
+      }
+    ]
   },
   "timing": {
-    "started_at": "2026-09-30T09:51:39.593Z",
-    "completed_at": "2026-09-30T09:51:40.148Z",
-    "duration_ms": 555,
+    "started_at": "2026-09-30T12:52:53.461Z",
+    "completed_at": "2026-09-30T12:52:55.134Z",
+    "duration_ms": 1673,
     "measurement": "hook_wall_clock"
   },
   "tokens": {
@@ -102,10 +129,10 @@
     "profile": "gate",
     "operation": "Stop",
     "outcome": "partial/INCONCLUSIVE",
-    "latencyMs": 555,
-    "peakMemoryBytes": 111034368,
+    "latencyMs": 1673,
+    "peakMemoryBytes": 228245504,
     "memoryMeasurement": "max-observed-process-rss",
-    "scannedFiles": 0,
+    "scannedFiles": 2,
     "cache": {
       "hits": 0,
       "misses": 0,
@@ -130,8 +157,8 @@
   "finding_events": [],
   "findings": [],
   "artifacts": {
-    "immutable_report": ".mimosa/reports/task-review-sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7-20260930T095140148Z-8292-014d9cddc925.json",
+    "immutable_report": ".mimosa/reports/task-review-sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7-20260930T125255134Z-4720-032fe71c6b05.json",
     "latest_report": ".mimosa/reports/task-review-sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7.json",
-    "history_summary": ".mimosa/history/run-20260930T095140148Z-8292-014d9cddc925.json"
+    "history_summary": ".mimosa/history/run-20260930T125255134Z-4720-032fe71c6b05.json"
   }
 }
