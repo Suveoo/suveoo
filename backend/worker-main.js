@@ -6356,11 +6356,15 @@ async function handleVoiceStream(request, env, ctx) {
         ali = new WebSocket(`wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1?token=${encodeURIComponent(token)}`);
         taskId = nlsHex32();
         ali.addEventListener("open", () => {
-          ali.send(nlsWsDirective("StartTranscription", env.ASR_APPKEY, taskId, nlsHex32(), {
+          /* vocabulary_id 可选（第四十二轮热词）：控制台"项目热词"与 Appkey 绑定无需此参；
+             若走 POP API 业务专属热词（CreateVocab）或需显式指定，注入 secret ASR_VOCAB_ID 即自动携带 */
+          const payload = {
             format: "pcm", sample_rate: 16000,
             enable_intermediate_result: true, enable_punctuation_prediction: true, enable_inverse_text_normalization: true,
             max_sentence_silence: 800,
-          }));
+          };
+          if (env.ASR_VOCAB_ID) payload.vocabulary_id = env.ASR_VOCAB_ID;
+          ali.send(nlsWsDirective("StartTranscription", env.ASR_APPKEY, taskId, nlsHex32(), payload));
         });
         ali.addEventListener("message", (e) => {
           /* NLS 会下发二进制心跳帧（Blob/ArrayBuffer，Workers 环境无 Blob 全局）：非字符串一律忽略，只解析文本 JSON 事件 */
@@ -6452,6 +6456,15 @@ export default {
       return json({ provider, reason: provider === "webspeech" && env.VOICE_ASR_PROVIDER === "ali" ? "ASR secrets 未配置（wrangler secret put ASR_ALI_KEY_ID/ASR_ALI_KEY_SECRET/ASR_APPKEY）" : null });
     }
     if (url.pathname === "/api/voice/stream") return handleVoiceStream(request, env, ctx);
+    if (url.pathname === "/api/voice/warm" && request.method === "GET") {
+      /* Token 预热（第四十二轮）：登录态点击前把 NLS token 写入 KV 缓存，消除会话首开的 CreateToken 往返 */
+      const auth = request.headers.get("authorization") ?? "";
+      const claims = auth.startsWith("Bearer ") ? await verifyJwt(auth.slice(7), env.JWT_SECRET).catch(() => null) : null;
+      if (!claims) return apiError("UNAUTHORIZED", "invalid session", 401);
+      if (env.VOICE_ASR_PROVIDER !== "ali") return json({ ok: true, warmed: false, reason: "provider not ali" });
+      try { await nlsToken(env); return json({ ok: true, warmed: true }); }
+      catch (e) { return json({ ok: false, error: String(e?.message ?? e) }, 200); }
+    }
     if (url.pathname.startsWith("/mcp")) return handleMcp(request, env, url, ctx);
     if (url.pathname === "/api/fx" && request.method === "GET") {
       return json(await hFxLive(env, { refresh: url.searchParams.get("refresh") === "1" }));

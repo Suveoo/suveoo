@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-09-30T15:51:27.084Z",
+  "arts": {
+    "mastercard": [
+      "assets/images/cards-front/credit-cards/mastercard/credit-card-1-front.webp",
+      "assets/images/cards-front/credit-cards/mastercard/credit-card-2-front.webp",
+      "assets/images/cards-front/credit-cards/mastercard/credit-card-3-front.webp",
+      "assets/images/cards-front/credit-cards/mastercard/credit-card-4-front.webp"
+    ],
+    "visa": [],
+    "american-express": [],
+    "unionpay": []
+  }
+}

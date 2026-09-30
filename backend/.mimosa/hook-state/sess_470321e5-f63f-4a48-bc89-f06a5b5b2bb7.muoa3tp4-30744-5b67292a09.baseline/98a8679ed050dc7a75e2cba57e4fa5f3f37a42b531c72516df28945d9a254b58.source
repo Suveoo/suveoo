@@ -1,0 +1,59 @@
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// worker-main.js
+var VERSION = "0.1.0-skeleton";
+function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", ...headers }
+  });
+}
+__name(json, "json");
+var worker_main_default = {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/health") {
+      return json({ status: "ok", version: VERSION });
+    }
+    if (url.pathname === "/api/version") {
+      return json({ version: VERSION, provider: env.LLM_PROVIDER ?? null, demo_mode: env.DEMO_MODE ?? null });
+    }
+    if (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/api/")) {
+      return json({ error: { code: "NOT_IMPLEMENTED", message: "Skeleton worker; block \u2463 not built yet.", trace_id: null } }, 501);
+    }
+    return json({ error: { code: "STATIC_NOT_SERVING", message: "R2 static serving not implemented yet. Upload frontend/ and implement block \u2460." } }, 501);
+  }
+};
+var LedgerDO = class {
+  static {
+    __name(this, "LedgerDO");
+  }
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+  async fetch(request) {
+    return json({ error: { code: "NOT_IMPLEMENTED", message: "LedgerDO skeleton" } }, 501);
+  }
+};
+var SagaDO = class {
+  static {
+    __name(this, "SagaDO");
+  }
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+  async fetch(request) {
+    return json({ error: { code: "NOT_IMPLEMENTED", message: "SagaDO skeleton" } }, 501);
+  }
+  async alarm() {
+  }
+};
+export {
+  LedgerDO,
+  SagaDO,
+  worker_main_default as default
+};
+//# sourceMappingURL=worker-main.js.map

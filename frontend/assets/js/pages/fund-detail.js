@@ -32,7 +32,7 @@ S.router.register("fund-detail", async () => {
   const norm = (arr) => { const b = arr[0] || 1; return arr.map((v) => +(v / b).toFixed(4)); };
 
   c.innerHTML = `<div class="row between wrap"><h1>${S.fmt.escape(f.name)}</h1>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
-    ${S.sim.banner(S.fmt.escape(S.t("funds.riskWarn")))}
+    <div class="banner" role="note">${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("funds.riskWarn"))}</div></div>
     <div class="card">
       <div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("funds.nav"))}</div>
         <div class="total mono" style="font-size:32px;font-weight:700">${f.nav}</div>

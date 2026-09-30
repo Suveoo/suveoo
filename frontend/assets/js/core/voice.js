@@ -111,10 +111,28 @@ S.voice = (() => {
       }
       const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/api/voice/stream?t=${encodeURIComponent(S.api.token ?? "")}`);
       ws.binaryType = "arraybuffer";
-      const st = { ws, ctx, stream, btn, input, committed: "", partial: "", onFinal: opts.onFinal ?? null, timer: null, done: false };
+      const st = { ws, ctx, stream, btn, input, committed: "", partial: "", onFinal: opts.onFinal ?? null, timer: null, done: false, pending: [], live: false };
       s2 = st;
       setState(btn, true);
       st.timer = setTimeout(() => aliTeardown(), 60000); /* 绝对上限 60s（实时流多句长于 webspeech 单句） */
+      /* 点击即采集（不等握手）：握手期（gUM+WS+StartTranscription 约 0.5~1.5s）的语音先进本地缓冲，
+         TranscriptionStarted 一到立即冲刷上行——消除"开始录音却要等一段才转字"与开首丢字（第四十二轮） */
+      const src = ctx.createMediaStreamSource(stream);
+      const node = ctx.createScriptProcessor(4096, 1, 1);
+      st.node = node;
+      node.onaudioprocess = (e) => {
+        if (s2 !== st) return;
+        const f32 = e.inputBuffer.getChannelData(0);
+        const i16 = new Int16Array(f32.length);
+        for (let i = 0; i < f32.length; i++) {
+          const v = Math.max(-1, Math.min(1, f32[i]));
+          i16[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+        }
+        if (!st.live) { st.pending.push(i16); if (st.pending.length > 20) st.pending.shift(); return; } /* 缓冲上限 20 帧≈2.7s 防异常堆积 */
+        try { ws.readyState === 1 && ws.send(i16.buffer); } catch { /* ignore */ }
+      };
+      src.connect(node);
+      node.connect(ctx.destination); /* ScriptProcessor 需接 destination 才回调（静音播放即可） */
       const failAli = (key) => { S.ui.toast(S.t(key), true); aliTeardown(); };
       ws.onopen = () => ws.send(JSON.stringify({ type: "start" }));
       ws.onerror = () => { if (s2 === st) failAli("voice.network"); };
@@ -123,21 +141,10 @@ S.voice = (() => {
         if (s2 !== st) return;
         let m; try { m = JSON.parse(String(ev.data)); } catch { return; }
         if (m.type === "started") {
-          const src = ctx.createMediaStreamSource(stream);
-          const node = ctx.createScriptProcessor(4096, 1, 1);
-          st.node = node;
-          node.onaudioprocess = (e) => {
-            if (s2 !== st || ws.readyState !== 1) return;
-            const f32 = e.inputBuffer.getChannelData(0);
-            const i16 = new Int16Array(f32.length);
-            for (let i = 0; i < f32.length; i++) {
-              const v = Math.max(-1, Math.min(1, f32[i]));
-              i16[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
-            }
-            try { ws.send(i16.buffer); } catch { /* ignore */ }
-          };
-          src.connect(node);
-          node.connect(ctx.destination); /* ScriptProcessor 需接 destination 才回调（静音播放即可） */
+          st.live = true;
+          /* 冲刷握手期缓冲（最早帧先行） */
+          try { for (const buf of st.pending) ws.readyState === 1 && ws.send(buf.buffer); } catch { /* ignore */ }
+          st.pending = [];
         } else if (m.type === "result") {
           if (m.isFinal) { st.committed += m.text ?? ""; st.partial = ""; }
           else st.partial = m.text ?? "";
@@ -154,7 +161,12 @@ S.voice = (() => {
 
   function bind(btn, input, opts = {}) {
     if (!btn || !input) return;
-    provider().then((p) => (p === "ali" ? bindAli(btn, input, opts) : bindWebSpeech(btn, input, opts)));
+    provider().then((p) => {
+      if (p !== "ali") { bindWebSpeech(btn, input, opts); return; }
+      bindAli(btn, input, opts);
+      /* ali 通道：页面就绪即后台预热 NLS token（首次点击少一次 CreateToken 往返；失败静默——冷启仍可用） */
+      fetch("/api/voice/warm", { headers: S.api.token ? { authorization: `Bearer ${S.api.token}` } : {} }).catch(() => {});
+    });
   }
   document.addEventListener("visibilitychange", () => { if (document.hidden) { hardReset(); aliTeardown(); } });
   return {
