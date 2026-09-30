@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** AI 主动银行（第六期 idle）：提议扫描 → 展示 → 执行（既有 intent 两段式）→ settle 核销 → 战报聚合。
  *  执行通道零新资金动作：订阅退订/预约转账/自动扣款全部走既有守卫与确认卡。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

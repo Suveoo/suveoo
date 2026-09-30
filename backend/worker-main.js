@@ -320,6 +320,10 @@ export const TOOL_REGISTRY = {
   goal_adjust:            { tier: RISK.YELLOW },
   goal_contribute:        { tier: RISK.YELLOW, amountArg: "amount", dynamic: true },
   goal_abandon:           { tier: RISK.YELLOW },
+  /* 第五期 idle（任务 5）：对话即方案——动态产品拼装。preview 只读试算（GREEN）；
+     purchase 金额三件套 + dynamic（总额+当日累计 > ¥1,000 升红；产品/合计/适当性全服务端核验） */
+  solution_preview:       { tier: RISK.GREEN },
+  solution_package_purchase: { tier: RISK.YELLOW, amountArg: "total_amount", dynamic: true },
 };
 /* 提醒类长程任务不涉及资金（到期仅站内通知），金额可缺省；预约转账/订花等其余 amountArg 工具仍须正金额。
  * task_type 缺省按 scheduled_transfer 语义处理（与 preValidate/归一逻辑同口径），须显式 "reminder" 才豁免。 */
@@ -356,6 +360,7 @@ export function classifyRisk(toolName, args = {}, ctx = {}) {
   }
   return { tier, reasons };
 }
+/* 组合方案不设 AI 通道 ¥5k 上限：底层单笔申购（红 OTP）本无该上限，组合严于单笔不自洽——大额由红级强验证把关 */
 const AI_CAP_TOOLS = new Set(["transfer_execute", "fx_exchange", "scheduled_task_create", "goal_contribute"]);
 export function hardPolicyDenials(toolName, args = {}, ctx = {}) {
   const denials = [];
@@ -413,6 +418,9 @@ export const TOOL_SCHEMA = {
   goal_adjust:            { authFields: ["goal_id", "auto_monthly"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
   goal_contribute:        { authFields: ["goal_id", "amount"], preconditions: ["balance >= amount", "goal.status == ACTIVE"], compensation: [] },
   goal_abandon:           { authFields: ["goal_id"], preconditions: ["goal.status == ACTIVE"], compensation: [] },
+  /* authFields 用 items_json（服务端规范化明细的确定性 JSON 串）而非 items 数组本身——
+     数组在 grant 哈希里会塌缩成 "[object Object]"（同意绑定失效：确认后改分配不会被判篡改） */
+  solution_package_purchase: { authFields: ["items_json", "total_amount"], preconditions: ["sum(items.amount) == total_amount", "all products exist in server pool", "max(product.risk_level) <= user.pr_level", "balance >= total_amount"], compensation: ["solution_refund_redeem"] },
 };
 export function compileToIR(toolName, args = {}, ctx = {}) {
   const now = ctx.now ?? Date.now();
@@ -515,6 +523,17 @@ export function checkInvariants(ir, ctx = {}) {
     case "wealth_product_purchase": {
       const pr = ctx.userPrLevel, risk = params.product_risk_level;
       if (pr != null && risk != null && Number(risk) > Number(pr)) violations.push({ code: "INVARIANT_PR_MISMATCH", detail: `product R${risk} > user PR${pr}` });
+      break;
+    }
+    case "solution_package_purchase": {
+      /* 余额（总额）+ PR 适当性（组合最高风险档）——注意 switch 不允许重复 case：两检合并于此 */
+      if (ctx.ledgerBalanceCents != null) {
+        const cents = toCents(params.total_amount ?? "0");
+        if (cents > ctx.ledgerBalanceCents) violations.push({ code: "INVARIANT_BALANCE", detail: `total=${centsToStr(cents)} > balance=${centsToStr(ctx.ledgerBalanceCents)}` });
+      } else if (strict) violations.push({ code: "INVARIANT_DATA_MISSING", detail: "ledgerBalanceCents not provided" });
+      else notes.push("balance unchecked");
+      const pr = ctx.userPrLevel, risk = params.solution_max_risk;
+      if (pr != null && risk != null && Number(risk) > Number(pr)) violations.push({ code: "INVARIANT_PR_MISMATCH", detail: `组合含 R${risk} 产品 > 用户 PR${pr}` });
       break;
     }
     case "scheduled_task_create":
@@ -1324,6 +1343,14 @@ function tgActionLines(ir, ex) {
     case "subscription_cancel": title = "❌ 订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
     case "subscription_reminder_toggle": title = "⏰ 续费提醒开关变更"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
     case "deposit_open": title = "🏦 存款已开立"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"]; break;
+    case "solution_package_purchase":
+      title = "📦 组合方案已执行";
+      facts = [
+        "方案 " + escHtml(p.name ?? "—"),
+        "合计 <b>¥" + escHtml(p.total_amount) + "</b> · " + (Array.isArray(p.items) ? p.items.length : "?") + " 笔",
+        ...(Array.isArray(p.items) ? ["明细 " + escHtml(p.items.map((i) => `${i.name} ¥${i.amount}`).join("、").slice(0, 160))] : []),
+      ];
+      break;
     case "payee_manage": title = "👥 收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
     case "funds_lock": title = "🔒 资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
     case "scheduled_task_create":
@@ -1659,6 +1686,36 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     try { cents = toCents(String(args.amount ?? "0")); } catch { cents = null; }
     if (cents == null || cents < minCents) return { ...reject("INVALID_AMOUNT"), message: `该存款起存金额为 ¥${centsToStr(minCents)}，收到 ${args.amount}。` };
   }
+  /* 第五期 idle（任务 5）：组合方案防幻觉核验——产品必须存在于服务端产品池（16 基金 + 六档存款），
+   * 名称/风险/利率由服务端数据覆写（模型自报的产品名不进确认卡）；分配合计必须 cent 级等于总额。 */
+  if (intent === "solution_package_purchase") {
+    const items = Array.isArray(args.items) ? args.items : null;
+    if (!items || !items.length || items.length > 6) return { ...reject("INVALID_ARGS"), message: "items 须为 1-6 个 {product_id, amount}（来自 solution_preview 返回，原样传回）。" };
+    let total;
+    try { total = toCents(String(args.total_amount ?? "0")); } catch { total = null; }
+    if (total == null || total <= 0n) return { ...reject("INVALID_AMOUNT"), message: "total_amount 须为正金额（两位小数字符串）。" };
+    const resolved = [];
+    let sum = 0n, maxRisk = 0;
+    for (const it of items) {
+      const pid = String(it?.product_id ?? "");
+      let cents;
+      try { cents = toCents(String(it?.amount ?? "0")); } catch { cents = null; }
+      if (cents == null || cents <= 0n) return { ...reject("INVALID_AMOUNT"), message: `items 中 ${pid || "(空)"} 的 amount 须为正金额。` };
+      let meta = await solutionProductMeta(env, pid);
+      if (!meta) meta = await solutionProductByPoolName(env, pid); /* 中文名归一为真实 slug（模型格式滑落兜底） */
+      if (!meta) return { ...reject("INVALID_PRODUCT"), message: `产品 ${pid} 不在本行产品池（六档存款 / 16 只基金）。方案只能使用 solution_preview 返回或 wealth_product_query / deposit_product_query 查到的真实产品，不得编造产品名或收益率。` };
+      if (meta.kind === "deposit" && cents < DEPOSIT_MIN_CENTS[pid]) return { ...reject("INVALID_AMOUNT"), message: `${meta.name} 起存 ¥${centsToStr(DEPOSIT_MIN_CENTS[pid])}，该笔 ¥${centsToStr(cents)} 未达标（请调整拆分）。` };
+      sum += cents;
+      maxRisk = Math.max(maxRisk, meta.risk_level);
+      resolved.push({ product_id: pid, amount: centsToStr(cents), kind: meta.kind, name: meta.name, risk_level: meta.risk_level, nav: meta.nav, rate: meta.rate ?? null, pct: Math.round((Number((cents * 10000n) / total) / 100) * 10) / 10 });
+    }
+    if (sum !== total) return { ...reject("INVALID_AMOUNT"), message: `items 分配合计 ¥${centsToStr(sum)} 与 total_amount ¥${centsToStr(total)} 不一致——请把 solution_preview 的 items 原样传回，勿自行改动金额。` };
+    args.name = String(args.name ?? "投资组合方案").slice(0, 40);
+    args.items = resolved; /* 服务端核验后的规范明细（确认卡展示数据全来自此处——模型文本不参与） */
+    args.solution_max_risk = maxRisk; /* 不变量 PR 适当性检查输入 */
+    args.items_json = JSON.stringify(resolved); /* 同意绑定锚（grant 哈希 authField——数组本身无法哈希） */
+    if (args.horizon_months != null) args.horizon_months = Number(args.horizon_months) || null;
+  }
   /* 第二十二期：目标陪伴前置校验——目标存在性/ACTIVE 在出卡前拦（BIZ_REJECT message 供模型自纠） */
   if (intent === "goal_create") {
     const name = String(args.name ?? "").trim();
@@ -1821,8 +1878,9 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
   if (v.status === VERDICT.VERIFIED) {
     const ex = await executeIntent(env, ir);
     if (ex && ex.ok === false) {
-      /* 执行层业务失败（余额/外币不足、对手卡不可用等）：不记 nonce、不通知，返回 BLOCKED 供前端行内提示 */
-      return { status: "BLOCKED", reason: ex.error ?? "EXEC_FAILED", ir, tier, stages: v.stages };
+      /* 执行层业务失败（余额/外币不足、对手卡不可用等）：不记 nonce、不通知，返回 BLOCKED 供前端行内提示；
+         结构化明细（组合方案部分失败的成败笔数/退款语义等）随 result 透传供通道层如实汇报 */
+      return { status: "BLOCKED", reason: ex.error ?? "EXEC_FAILED", ir, tier, stages: v.stages, ...(ex && typeof ex === "object" && Object.keys(ex).length > 2 ? { result: ex } : {}) };
     }
     await nonceStore.record(ir.nonce);
     /* 成功写操作清零 OTP 连错计数（正常用户偶发错码后成功即复位；注入/grant 计数 24h 内累计——攻击信号不因成功而洗白） */
@@ -1842,7 +1900,7 @@ async function runGuarded(env, ctxInfo, { intent, args, provenance, grantHash, o
 }
 
 /** IR → VERIFIED 后的真实执行（唯一写账路径，REST 与 MCP 共用）。 */
-async function executeIntent(env, ir) {
+export async function executeIntent(env, ir) {
   const uid = ir.user_id;
   const p = ir.steps[0].params;
   switch (ir.intent) {
@@ -1990,6 +2048,33 @@ async function executeIntent(env, ir) {
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "存款开立成功", body: `${name} 开立 ¥${p.amount}，到期本息以产品条款为准（定期提前支取按活期计息）。这是模拟数据。` });
       await U(env, uid)({ op: "audit", action: "deposit_open", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       return { ok: r.ok, ...r };
+    }
+    case "solution_package_purchase": {
+      /* 组合方案执行：逐笔复用 wealthPurchase（同一资金路径，非新造）。任一笔失败 → 已成交笔按成本净值
+       * 赎回（wealthRedeem cost→cost 精确回退，credit-first 纪律）并给出明确成败账——绝不停在半途。 */
+      const items = Array.isArray(p.items) ? p.items : [];
+      const done = [], failed = [];
+      for (const it of items) {
+        const r = await U(env, uid)({ op: "wealthPurchase", fund: it.product_id, amount_cents: String(toCents(it.amount)), nav: it.nav ?? "1.00", risk_level: it.risk_level ?? 1 });
+        if (r && r.ok) done.push(it);
+        else failed.push({ ...it, error: r?.error ?? "EXEC_FAILED" });
+      }
+      const refunded = [], stuck = [];
+      if (failed.length) {
+        for (const d of done) {
+          const rr = await U(env, uid)({ op: "wealthRedeem", fund: d.product_id, amount_cents: String(toCents(d.amount)), nav: d.nav ?? "1.00" });
+          (rr && rr.ok ? refunded : stuck).push(d.product_id);
+        }
+      }
+      const lineTxt = done.map((d) => `${d.name} ¥${d.amount}`).join("、");
+      const failTxt = failed.map((f) => `${f.name}（${f.error}）`).join("、");
+      await U(env, uid)({ op: "audit", action: "solution_package_purchase", detail: { name: p.name, total: p.total_amount, ok_count: done.length, fail_count: failed.length, refunded, stuck, failed_items: failed.map((f) => [f.product_id, f.error]) }, channel: ir.channel, trace_id: ir.trace_id });
+      if (!failed.length) {
+        await U(env, uid)({ op: "notify", type: "WEALTH", title: "组合方案已购入", body: `「${p.name ?? "投资组合"}」按 ${done.length} 笔买入：${lineTxt}，合计 ¥${p.total_amount}。理财有风险，这是模拟数据。` });
+        return { ok: true, success_count: done.length, fail_count: 0, total: p.total_amount, tx_ids: done.map((d) => d.product_id) };
+      }
+      await U(env, uid)({ op: "notify", type: "WEALTH", title: "组合方案未完成", body: `「${p.name ?? "投资组合"}」执行中 ${failed.length} 笔失败（${failTxt}）；已成交 ${done.length} 笔${refunded.length ? `已全部按成本退回` : ""}${stuck.length ? `（注意：${stuck.join("、")} 退回失败，请到持仓页手动赎回）` : ""}，资金回到默认卡。` });
+      return { ok: false, error: failed[0]?.error ?? "PARTIAL_FAILURE", success_count: done.length - refunded.length, fail_count: failed.length, refunded, ...(stuck.length ? { stuck } : {}) };
     }
     case "subscription_reminder_toggle": {
       const r = await U(env, uid)({ op: "subReminders", id: p.subscription_id, enabled: p.enabled });
@@ -3005,10 +3090,12 @@ export function calcSplitBill(a = {}) {
   const parts = splitEqually(base, nRaw);
   const splits = names.map((name, i) => ({ name, amount: centsToStr(parts[i] + adjCents[i]) }));
   const sum = splits.reduce((p, s) => p + BigInt(Math.round(Number(s.amount) * 100)), 0n);
+  /* 深链携带调整串（页面 adjust 参数同格式"名:±金额,…"）：AI 给出按人调整时点开即复现分摊 */
+  const adjEntries = Object.entries(adjInput).filter(([, v]) => Number.isFinite(Number(v)));
   return {
     result: { splits, sum: centsToStr(sum), conservation_ok: sum === totalCents },
     summary: `总额 ¥${calcFmt(total)} 由 ${nRaw} 人分摊：` + splits.map((s) => `${s.name} ¥${Number(s.amount).toFixed(2)}`).join("、") + `（合计守恒${sum === totalCents ? "" : "异常"}）。`,
-    link: calcLink("split-bill-plus", { total, n: nRaw }),
+    link: calcLink("split-bill-plus", { total, n: nRaw, ...(adjEntries.length ? { adjust: adjEntries.map(([k, v]) => `${k}:${Number(v)}`).join(",") } : {}) }),
   };
 }
 
@@ -3087,6 +3174,180 @@ export function calcBudgetAllocator(a = {}) {
     },
     summary: `月收入 ¥${calcFmt(income)} 按 ${n}/${w}/${s} 分配：必要开支 ¥${calcFmt(needs)}、弹性消费 ¥${calcFmt(wants)}、储蓄投资 ¥${calcFmt(save)}。${advise}`,
     link: calcLink("budget-allocator", { income, needs: n, wants: w, save: s }),
+  };
+}
+
+/* ================================================================
+ * ③.55 对话即方案——动态产品拼装（第五期 idle 任务 5，赛题创新机制）
+ *    用户在对话中给出「金额 + 期限 + 风险偏好」，服务端按真实产品池
+ *    （六档存款 + 16 基金）确定性拼装组合：期限匹配（到期阶梯）/ 风险梯度 /
+ *    流动性（应急层）三层结构。preview 只读试算（GREEN）；购买走独立 intent
+ *    solution_package_purchase（黄/红两段式，复用 wealthPurchase 执行层）——
+ *    产品、名称、利率全部服务端解析复核，模型编造产品/收益率在出卡前即被拒。
+ * ================================================================ */
+/* 方案基金池（角色标签供理由生成；风险上限由用款期限约束——短期不用高风险资产给用户挖坑） */
+export const SOLUTION_FUND_POOL = {
+  liquidity: "global-money-1",           // R1 货币：流动性层
+  stable: ["global-short-bond", "esg-bond"],        // R1/R2：稳健层
+  balanced: ["global-mixed-1"],                     // R3：均衡层
+  alt: ["gold-index"],                              // R4：抗通胀
+  growth: ["global-equity-index", "ai-semi"],       // R4/R5：进取层
+};
+const SOLUTION_RISK_BY_MONTHS = (m) => (m <= 6 ? 2 : m <= 12 ? 3 : m <= 36 ? 4 : 5);
+/* 存款阶梯档（月数, slug）：用款期限内可完整到期的定档 */
+const SOLUTION_LADDER = [[36, "term-3y"], [12, "term-1y"], [6, "term-6m"], [3, "term-3m"]];
+
+/** 产品名 → slug 归一（去空白精确匹配；模型偶发把表格中文名当 product_id——归一到真实产品再钉死，
+ *  与第十三轮裸收款人归一同律；匹配不到仍按幻觉产品拒绝）。 */
+async function solutionProductByPoolName(env, raw) {
+  const want = String(raw ?? "").replace(/\s+/g, "");
+  if (!want) return null;
+  for (const id of [...FUND_IDS, ...Object.keys(DEPOSIT_MIN_CENTS)]) {
+    const m = await solutionProductMeta(env, id);
+    if (m && String(m.name).replace(/\s+/g, "") === want) return m;
+  }
+  return null;
+}
+/** 产品池解析（防幻觉的事实源）：基金走 fundMeta（实时净值叠加）、存款走 R2 条款 JSON。 */
+async function solutionProductMeta(env, id) {
+  if (typeof id !== "string" || !id) return null;
+  if (FUND_IDS.includes(id)) {
+    const f = await fundMeta(env, id);
+    if (!f) return null;
+    return { id, kind: "fund", name: f.name, risk_level: f.risk_level, nav: String(f.nav), rate: null, ret_1y: f.returns?.["1y"] ?? null };
+  }
+  if (DEPOSIT_MIN_CENTS[id] != null) {
+    const obj = await env.ASSETS.get(`assets/data/deposits/${id}.json`).catch(() => null);
+    const d = obj ? await new Response(obj.body).json().catch(() => null) : null;
+    if (!d) return null;
+    return { id, kind: "deposit", name: d.name, risk_level: 1, nav: "1.00", rate: d.rate ?? null, ret_1y: null };
+  }
+  return null;
+}
+
+/** cents 按比例分摊（整数守恒：BigInt 商天然向下取整，余数从前往后 +1 分）。 */
+function splitByShares(totalCents, shares) {
+  const sum = BigInt(shares.reduce((a, b) => a + b, 0) || 1);
+  const parts = shares.map((s) => (totalCents * BigInt(s)) / sum);
+  let rem = Number(totalCents - parts.reduce((a, b) => a + b, 0n));
+  for (let i = 0; i < parts.length && rem > 0; i++, rem--) parts[i] += 1n;
+  return parts;
+}
+
+/**
+ * 方案拼装（确定性纯函数 + 产品池元数据注入）。动态性来自对话参数：
+ * amount/months/riskPref/purpose 任何一个变化，拆分与产品选择都随之变化——不是固定模板。
+ * 返回 items 每项含 product_id/amount/pct/reason（理由按层生成：期限匹配/风险梯度/流动性/阶梯）。
+ */
+export function solutionAllocate(a = {}, metas = {}) {
+  const amount = calcNum(a.amount), months = calcNum(a.horizon_months), riskPref = ["conservative", "balanced", "growth"].includes(a.risk_pref) ? a.risk_pref : "balanced";
+  const purpose = String(a.purpose ?? "").trim();
+  if (amount == null || months == null) return { status: "INVALID", reason: "amount 与 horizon_months 需为数值" };
+  if (amount <= 0 || months < 1) return { status: "INVALID", reason: "金额需为正、用款期限至少 1 个月" };
+  const total = BigInt(Math.round(amount * 100));
+  const cap = SOLUTION_RISK_BY_MONTHS(months);
+  const M = (id) => metas[id] ?? { id, kind: "fund", name: id, risk_level: 5, nav: "1.00", rate: null };
+  const isEmergency = /应急|月光|备用金|emergency/i.test(purpose);
+  const isEducation = /教育|学费|留学|education/i.test(purpose);
+
+  /* 三层份额（应急/教育场景收紧风险；期限短时 growth 自动回落 balanced/conservative——风险上限约束） */
+  let dep = riskPref === "conservative" ? 90 : riskPref === "balanced" ? 60 : 30;
+  let liq = isEmergency ? 20 : 10;
+  let fund = 100 - dep - liq;
+  if (cap <= 2 && riskPref === "growth") { dep = 60; fund = 30; }      // ≤6 个月：进取降为均衡
+  if (cap <= 2 && riskPref === "balanced") { dep = 75; fund = 15; }
+  if (isEmergency) { dep = 80; liq = 20; fund = 0; }                    // 应急金：不进风险资产
+  if (fund < 0) { dep += fund; fund = 0; }
+
+  const layers = [];
+  /* 流动性层：货币基金（起购低；金额再小也可执行） */
+  layers.push({ share: liq, ids: [SOLUTION_FUND_POOL.liquidity], reason: isEmergency ? "流动性：应急层随取（货币基金，T+0 赎回）" : "流动性：货币基金随取，应对计划外用款" });
+  /* 存款层：期限匹配阶梯（只选 ≤ 用款期限的定档，均匀分摊——每段时间都有一笔到期） */
+  const rungs = SOLUTION_LADDER.filter(([m]) => m <= months).map(([, slug]) => slug);
+  const depReason = rungs.length > 1
+    ? `期限匹配：${Math.round(months)} 个月内分 ${rungs.length} 档阶梯到期，每段时间都有一笔本息可用`
+    : rungs.length === 1 ? `期限匹配：${M(rungs[0]).name} 在用款期限内到期锁息` : "期限匹配：期限不足 3 个月，活期随取";
+  layers.push({ share: dep, ids: rungs.length ? rungs : ["demand"], reason: isEducation ? `教育金阶梯：${depReason}` : depReason });
+  /* 基金层：风险梯度（conservative 无此层；按期限上限过滤产品） */
+  if (fund > 0) {
+    const pick = [];
+    if (riskPref === "balanced") pick.push(...SOLUTION_FUND_POOL.stable, ...SOLUTION_FUND_POOL.balanced);
+    else pick.push(...SOLUTION_FUND_POOL.stable, ...SOLUTION_FUND_POOL.balanced, ...(cap >= 4 ? SOLUTION_FUND_POOL.alt : []), ...(cap >= 4 ? SOLUTION_FUND_POOL.growth.slice(0, 1) : []));
+    const ok = pick.filter((id) => (M(id).risk_level ?? 5) <= cap);
+    const ids = ok.length ? ok : [SOLUTION_FUND_POOL.liquidity];
+    layers.push({ share: fund, ids, reason: `风险梯度：${riskPref === "balanced" ? "稳健为主" : "均衡+进取"}基金层（≤R${cap}，受用款期限约束）博取收益，历史业绩不代表未来` });
+  }
+
+  /* 展开层 → 明细行（ids 在层内均分）；份额为 0 的层丢弃 */
+  const rows = [];
+  for (const l of layers) {
+    if (l.share <= 0) continue;
+    const cents = splitByShares((total * BigInt(Math.round(l.share))) / 100n, l.ids.map(() => 1));
+    l.ids.forEach((id, i) => {
+      if (cents[i] > 0n) rows.push({ id, cents: cents[i], reason: l.reason, layer: l.ids.length });
+    });
+  }
+  /* 修正分摊误差（整数化后合计可能 ≠ total）：差额补到最大笔 */
+  const diff = total - rows.reduce((a, r) => a + r.cents, 0n);
+  if (diff !== 0n && rows.length) rows.sort((x, y) => (y.cents > x.cents ? 1 : -1))[0].cents += diff;
+  /* 小额降级：存款档金额 < 起存（¥50）的行并入货币基金（起购低），保证任意金额可执行 */
+  const merged = [];
+  let spill = 0n;
+  for (const r of rows) {
+    const m = M(r.id);
+    if (m.kind === "deposit" && DEPOSIT_MIN_CENTS[r.id] != null && r.cents < DEPOSIT_MIN_CENTS[r.id]) { spill += r.cents; continue; }
+    merged.push(r);
+  }
+  if (spill > 0n) {
+    const liqRow = merged.find((r) => r.id === SOLUTION_FUND_POOL.liquidity);
+    if (liqRow) { liqRow.cents += spill; liqRow.reason += "；小额并入本层（未达定存起存金额）"; }
+    else merged.push({ id: SOLUTION_FUND_POOL.liquidity, cents: spill, reason: "金额未达定存起存，全部放入货币基金随取", layer: 1 });
+  }
+  const items = merged
+    .map((r) => {
+      const m = M(r.id);
+      const pct = Number((r.cents * 10000n) / total) / 100;
+      return {
+        product_id: r.id, amount: calcRound2Str(r.cents), pct: Math.round(pct * 10) / 10,
+        kind: m.kind, name: m.name, risk_level: m.risk_level, nav: String(m.nav ?? "1.00"), rate: m.rate ?? null, ret_1y: m.ret_1y ?? null,
+        reason: r.reason,
+      };
+    })
+    .sort((x, y) => (parseFloat(y.amount) > parseFloat(x.amount) ? 1 : -1));
+  return { items, total_cents: total, months: Math.round(months), risk_pref: riskPref, cap };
+}
+const calcRound2Str = (cents) => centsToStr(cents);
+
+/** solution_preview（GREEN）：拼装方案 + 汇总预期特征（数字全部来自服务端产品数据）。 */
+export async function solutionPreview(env, a = {}) {
+  const metas = {};
+  const need = new Set([SOLUTION_FUND_POOL.liquidity, ...SOLUTION_FUND_POOL.stable, ...SOLUTION_FUND_POOL.balanced, ...SOLUTION_FUND_POOL.alt, ...SOLUTION_FUND_POOL.growth, "demand", "term-3m", "term-6m", "term-1y", "term-3y"]);
+  for (const id of need) { const m = await solutionProductMeta(env, id); if (m) metas[id] = m; }
+  const alloc = solutionAllocate(a, metas);
+  if (alloc.status === "INVALID") return alloc;
+  const { items } = alloc;
+  /* 合计预期特征：存款按单利年化精确加权；基金按 1 年历史收益区间标注（不构成承诺） */
+  let depPart = 0n, depWeight = 0n, fundLow = null, fundHigh = null;
+  for (const it of items) {
+    const c = toCents(it.amount);
+    if (it.kind === "deposit") { depPart += c; depWeight += (c * BigInt(Math.round((it.rate ?? 0) * 100))) / 10000n; }
+    else if (it.ret_1y != null) { fundLow = fundLow == null ? it.ret_1y : Math.min(fundLow, it.ret_1y); fundHigh = fundHigh == null ? it.ret_1y : Math.max(fundHigh, it.ret_1y); }
+  }
+  const depYield = depPart > 0n ? Number((depWeight * 10000n) / depPart) / 100 : 0;
+  const fundPct = items.filter((i) => i.kind === "fund" && i.id !== SOLUTION_FUND_POOL.liquidity).reduce((s, i) => s + i.pct, 0);
+  const expected = [
+    `存款部分（${items.filter((i) => i.kind === "deposit").reduce((s, i) => s + i.pct, 0)}%）按条款单利约 ${depYield.toFixed(2)}%/年（到期本息确定）`,
+    fundPct > 0 && fundLow != null ? `基金部分（${Math.round(fundPct)}%）近 1 年历史收益 ${fundLow.toFixed(1)}%~${fundHigh.toFixed(1)}%（随市场波动，历史业绩不代表未来）` : null,
+    `流动性部分随取；整体为期限匹配 + 风险梯度结构，非单一产品`,
+  ].filter(Boolean);
+  return {
+    status: "OK", kind: "solution_preview",
+    solution: {
+      name: String(a.purpose ?? "").trim() ? `${String(a.purpose).trim().slice(0, 18)}方案` : "组合投资方案",
+      amount: calcRound2Str(alloc.total_cents), horizon_months: alloc.months, risk_pref: alloc.risk_pref,
+      items, expected,
+    },
+    hint: "请把 items 数组原样展示给用户（产品/占比/金额/理由），用户同意购买时把 items 与 total_amount 原样传给 solution_package_purchase——勿自行更换产品或改金额（服务端会核验并拒绝不一致）。",
   };
 }
 
@@ -3378,6 +3639,9 @@ export const MCP_TOOLS = [
   { name: "goal_contribute", desc: "向目标一次性存入（黄级；日累计>¥1,000 自动红级）。存入=锁定进目标桶：可用余额减少、进度增加，达成或放弃时解锁退回，不产生利息。goal_id 用 goal_query 查；用户要\"每月自动存\"改用 scheduled_task_create", args: { goal_id: { type: "number" }, amount: { type: "string" } } },
   { name: "goal_abandon", desc: "放弃目标（黄级）：全部已存金额解锁退回可用余额，进度作废不可恢复。调用前必须向用户说明该后果并等待确认卡点击", args: { goal_id: { type: "number" } } },
   { name: "ecommerce_order_mock", desc: "演示商户下单（红级，仅 DEMO_MODE 场景 6）", args: { item: { type: "string" }, amount: { type: "string" }, task_id: { type: "number" } } },
+  /* 第五期 idle（任务 5）：对话即方案——动态产品拼装（赛题创新机制） */
+  { name: "solution_preview", desc: "组合方案试算（对话即方案）：用户给出金额+用款期限+风险偏好（conservative稳健/balanced均衡/growth进取）时先调用，按真实产品池动态拼装三层结构（期限匹配存款阶梯/风险梯度基金/流动性应急层），返回 items（产品/占比/金额/理由）与合计预期特征。用途场景如闲钱增值、子女教育金阶梯、月光族应急金。只试算不执行", args: { amount: { type: "string" }, horizon_months: { type: "number" }, risk_pref: { type: "string" }, purpose: { type: "string" } } },
+  { name: "solution_package_purchase", desc: "组合方案一键购买（黄级，总额含当日累计>¥1000 升红）：items 与 total_amount 原样来自 solution_preview（product_id 是英文 slug 如 term-3m/global-money-1，勿改写为中文名；分配合计须等于总额）。产品/金额均服务端核验，编造产品或改金额会被拒绝。任一笔失败将按成本整体回退并回报成败笔数", args: { name: { type: "string" }, items: { type: "array" }, total_amount: { type: "string" }, horizon_months: { type: "number" } } },
 ];
 
 function jsonrpc(id, result) {
@@ -3499,7 +3763,7 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
     return { text: JSON.stringify(out), isError: false };
   }
 
-  const balanceIntent = ["transfer_execute", "funds_lock", "wealth_product_purchase", "fx_exchange", "bill_pay", "scheduled_task_create", "ecommerce_order_mock", "goal_contribute"].includes(name);
+  const balanceIntent = ["transfer_execute", "funds_lock", "wealth_product_purchase", "fx_exchange", "bill_pay", "scheduled_task_create", "ecommerce_order_mock", "goal_contribute", "solution_package_purchase"].includes(name);
   const g = await runGuarded(env, ctxInfo, {
     intent: name, args, provenance, channel: "ai",
     grantHash: args.grant_hash, otp: args.otp,
@@ -3519,6 +3783,11 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
       let amtTxt = String(args.amount ?? "0");
       try { amtTxt = centsToStr(toCents(String(args.amount))); } catch { /* 非法金额保留原样 */ }
       out.summary = `任务「${args.title ?? args.task_type}」已建立并锁定 ¥${amtTxt}（执行后扣款，取消即解锁），将于 ${args.execute_at ?? "设定时间"} 自动执行，可随时取消（取消即解锁退回）。`;
+    }
+    /* 组合方案：确定性 summary（笔数/明细/合计由系统给出——模型与横幅照实复述，不自由发挥） */
+    if (name === "solution_package_purchase" && g.result?.ok) {
+      const items = Array.isArray(args?.items) ? args.items : [];
+      out.summary = `组合「${args?.name ?? "投资组合"}」已按 ${items.length} 笔买入（${items.map((i) => `${i.name} ¥${i.amount}`).join("、")}），合计 ¥${args?.total_amount}；持仓可在财富页查看。`;
     }
     return { text: JSON.stringify(out), isError: false };
   }
@@ -3543,8 +3812,9 @@ async function mcpExecuteToolInner(env, ctxInfo, name, args, sid, push, exposeGr
   }
   push({ kind: "genui", type: "genui_event", card: { component: "blocked_notice", reason: g.blockReason ?? g.reason ?? "BLOCKED" } });
   /* BIZ_REJECT（preValidate 前置拒绝）携带 message：拒绝原因供模型自纠（如存款起存金额、任务非 PENDING），
-     既有先例 INVALID_SCHEDULE_TIME 的双端时刻提示同设计意图 */
-  return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, ...(g.message ? { message: g.message } : {}), stages: g.stages }), isError: true };
+     既有先例 INVALID_SCHEDULE_TIME 的双端时刻提示同设计意图；
+     执行层结构化失败（组合方案部分失败的成败笔数/退款语义）随 result 透传——模型须按数字如实汇报 */
+  return { text: JSON.stringify({ status: "BLOCKED", reason: g.blockReason ?? g.reason, ...(g.message ? { message: g.message } : {}), ...(g.result ? { result: g.result } : {}), stages: g.stages }), isError: true };
 }
 
 export async function handleMcp(request, env, url, ctx) {
@@ -3817,6 +4087,7 @@ async function mcpGreen(env, ctxInfo, name, args) {
       return calcFxConvert(args, fx.quotes ?? []);
     }
     case "calc_budget_allocator": return calcBudgetAllocator(args);
+    case "solution_preview": return await solutionPreview(env, args);
     case "site_guide": return siteGuideLookup(args?.query);
     case "notification_list": {
       const r = await UU({ op: "notifications", cursor: "0" });
@@ -3887,7 +4158,7 @@ export const SITE_GUIDE_PAGES = [
   { route: "/transfer/history", aliases: ["转账记录", "交易记录", "流水", "导出 CSV", "导出", "明细"], section: "pay", purpose: "转账记录：纯转账口径的流水查询、筛选、详情与导出。", entry: "/pay「最近转账·查看全部」/ 侧栏「转账记录」", actions: ["筛选条：时间范围（近 7 天/1 月/3 月）+ 方向（支出/收入）+ 状态 + 卡", "统计条与搜索", "行点击展开详情（流水号/双方掩码卡号/备注/手续费/Merkle 存证 ID/经手渠道=AI trace 或经典表单）", "游标分页（每页 20，「加载更多」）", "「导出 CSV」按钮（本地生成，BOM 保 Excel 中文，文件名 suveoo-transfers-日期.csv）"], flow: "筛选 → 查看列表 → 展开详情 → 可导出 CSV。全量收支口径请用 /account/transactions。", notes: "只读无写操作；AI 回答「转账记录在哪导出」应引用本页链接。" },
   { route: "/transfer/limits", aliases: ["转账限额", "限额", "额度调整", "单笔限额", "日累计"], section: "pay", purpose: "转账限额：按渠道×卡展示限额矩阵并支持调整。", entry: "/pay 次级功能「转账限额」/ /account 宫格 / 单卡设置跳转", actions: ["限额矩阵：行内转账（默认单笔 ¥50,000/日 ¥100,000）、AI 通道（单笔 ¥5,000/日 ¥10,000，独立且更低）", "每行「调整」按钮 → 弹窗（滑杆+数字输入）：下调至 ≥¥100 黄级确认；上调需红级", "页面底部三色分级与 ¥1,000 黄红阈值说明"], flow: "调整 → 黄（或红 OTP）确认卡 → 生效。AI 通道同义工具 card_limit_adjust。", notes: "AI 通道限额是硬上限（AI_CAP_TOOLS 限制），页面调整不能突破。" },
   { route: "/transfer/payees", aliases: ["常用收款人", "收款人管理", "添加收款人", "删除收款人", "收款人分组"], section: "pay", purpose: "常用收款人管理：分组列表 + 增删改。", entry: "/pay「查看全部及管理」/ 侧栏", actions: ["「添加」表单（姓名 + Suveoo 16 位卡号 + 手机号可选[1 开头 11 位] + 分组）", "「编辑」「删除」（删除黄级确认）", "每卡「转账」按钮（跳 /transfer/intrabank?payee= 预填）", "分组：家人/朋友/同事/生活缴费/其他+自定义"], flow: "添加 → 可校验真实户名 → 转账时可从抽屉选择；AI 通道 payee_manage（黄）同口径，带手机号后 contacts_search 可按全号/尾号命中。", notes: "姓名为脱敏模拟数据；未验证收款人转账被拦截。" },
-  { route: "/ai", aliases: ["Suveoo AI", "AI 对话", "AI 助手", "智能助理", "Trust Console", "信任控制台", "历史对话"], section: "ai", purpose: "Suveoo AI 对话页（全站核心）：自然语言办理一切业务 + Trust Console 验证可视化。", entry: "侧栏 Suveoo AI 大卡 / 底部导航中央 AI 圆钮 / 各页 AI 组件 / home 输入条", actions: ["对话输入（?q= 预填自动发送；?ctx= 页面上下文条）", "真流式输出 + 思考提示（思考型模型长思考期显示「正在深度分析您的指令…」）", "GenUI 确认卡（黄：确认/取消+120s 倒计时；红：内嵌邮箱 OTP 输入）", "Trust Console 右栏：五道验证器状态灯 + 实时事件流 + IR 查看器 + trace_id", "历史对话下拉（今天/昨天/7 天分组、重命名、删除、续聊）+「+ 新对话」", "三点菜单：长程任务中心/AI 提议/SuveooBench 看板", "流式中「停止」按钮"], flow: "绿色问题自动执行查询；黄/红写操作出确认卡等待用户点击——AI 绝不代用户确认；BLOCKED 以红卡呈现并可查 trace_id。", notes: "输入框下方固定风险提示「绿色操作自动执行 · 黄色需确认 · 红色需强验证」；欢迎区有本地洞察卡（零模型调用）。" },
+  { route: "/ai", aliases: ["Suveoo AI", "AI 对话", "AI 助手", "智能助理", "Trust Console", "信任控制台", "历史对话"], section: "ai", purpose: "Suveoo AI 对话页（全站核心）：自然语言办理一切业务 + Trust Console 验证可视化。", entry: "侧栏 Suveoo AI 大卡 / 底部导航中央 AI 圆钮 / 各页 AI 组件 / home 输入条", actions: ["对话输入（?q= 预填自动发送；?ctx= 页面上下文条）", "真流式输出 + 思考提示（思考型模型长思考期显示「正在深度分析您的指令…」）", "GenUI 确认卡（黄：确认/取消+120s 倒计时；红：内嵌邮箱 OTP 输入）", "Trust Console 右栏：五道验证器状态灯 + 实时事件流 + IR 查看器 + trace_id", "历史对话下拉（今天/昨天/7 天分组、重命名、删除、续聊）+「+ 新对话」", "每会话独立 URL /ai/s/{id}（可收藏/直达回看：载入或新会话 id 下发时地址栏升级；X-Robots-Tag noindex）", "三点菜单：长程任务中心/AI 提议/SuveooBench 看板", "流式中「停止」按钮", "对话即方案：说「X 元、N 个月后用、偏稳健/均衡/进取」AI 出动态组合方案卡（存款阶梯+基金梯度+流动性三层，产品与数字全服务端真实数据），确认卡一键打包购买（黄/红两段式，任一笔失败整体回退）"], flow: "绿色问题自动执行查询；黄/红写操作出确认卡等待用户点击——AI 绝不代用户确认；BLOCKED 以红卡呈现并可查 trace_id。", notes: "输入框下方固定风险提示「绿色操作自动执行 · 黄色需确认 · 红色需强验证」；欢迎区有本地洞察卡（零模型调用）；组合方案能力 = solution_preview 试算 + solution_package_purchase 购买（产品池服务端核验，防幻觉）。" },
   { route: "/ai/tasks", aliases: ["任务中心", "长程任务", "预约任务", "订花任务", "任务列表", "取消任务", "故障注入"], section: "ai", purpose: "长程任务中心：预约转账/提醒/生日订花等任务的 Saga 时间线管理。", entry: "/ai 三点菜单「长程任务中心」/ 侧栏 AI 组", actions: ["任务卡：状态机时间线（计划→已锁定→等待唤醒→履约→完成/已补偿）+ 检查点 + 下次唤醒时间（双时区）", "「取消」按钮（黄确认 → saga 补偿链；订花类取消同步解锁资金）", "生日任务「立即演示执行」按钮（DEMO_MODE）", "「Inject Merchant Failure」故障注入按钮（DEMO_MODE：T1 ✓ → T2 ✗ → C1 ✓ 补偿演示）"], flow: "AI 建 scheduled_task → 任务卡出现 → 到期自动执行或手动取消（补偿）；AI 通道取消走 task_cancel（黄，仅 PENDING 可取消）。", notes: "AI 查任务用 task_list 工具；建单即锁资金的是生日订花类。" },
   { route: "/ai/proposals", aliases: ["AI 提议", "提议", "主动银行", "让 AI 办", "省下多少", "战报"], section: "ai", purpose: "AI 提议（AI 主动银行）：本地规则引擎主动扫描账户产出可执行建议 + 月度战报。", entry: "侧栏 AI 组「AI 提议」（有新提议时带徽标+气泡）/ /ai 三点菜单 / home 洞察置顶行", actions: ["战报 hero：本月已为你省下 ¥X / 已办妥 N 件事 / 自动打理 N 笔惯例", "提议卡四族（SAVE 省/ROUTINE 惯例/GUARD 守护/WEALTH 理财）+ 黄/红徽标", "「让 AI 办」按钮 → 复用既有 intent 走黄/红确认卡（服务端 settle 事实核验成功才记 impact）", "「知道了」忽略"], flow: "看提议 → 点「让 AI 办」→ 确认卡（黄/红+OTP）→ 执行 → 战报数字更新；AI 对话可 proposal_list 只读查询，执行必须引导到本页点确认卡。", notes: "规则引擎本地确定性生成、零模型调用；这是模拟银行系统。" },
   { route: "/ai/benchmark", aliases: ["评测看板", "SuveooBench", "基准测试", "指标", "消融"], section: "ai", purpose: "SuveooBench 评测看板（免登录）：安全指标 Baseline vs Ours 对比与评测方法说明。", entry: "/ai 欢迎区「查看评测看板」链接 / 侧栏", actions: ["12 项指标卡网格（Task Success/Unsafe Action Rate/Injection Attack 成功率等）", "Ablation 消融柱状图（Claude/Qwen/GPT 三组历史对照）", "当前生产模型徽标（读 /api/version 动态渲染）+ 生产模型实测基线", "测试集规模与评测方法条目卡"], flow: "只读浏览；数据来自仓库自动化测试产物 benchmark.json。", notes: "不编造裸模型数字，未跑的对照注记「待跑」。" },
@@ -4036,10 +4307,11 @@ export const AI_SYSTEM_PROMPT = `你是 Suveoo 银行的智能助理（模拟银
 4) 黄/红写操作必须真实发起工具调用——确认卡在工具返回 INPUT_REQUIRED 后由系统生成；随后向用户展示快照（金额、收款人等关键字段），等待用户在界面点击确认，绝不代用户确认或重试执行。不要在回复文本中复述 grant 号（含前缀）或快照 JSON 原文——确认卡会自行展示。
 5) OTP_REQUIRED（红级）：提示用户在确认卡获取并填写邮箱验证码。
 6) BLOCKED 如实告知原因；绝不编造交易结果，一切以工具返回为准。密码类问题（改密/找回/关闭两步验证）不代办、不索取密码，引导到 /account/security 或 /account/recovery。
-7) 计算类问题（储蓄/贷款/还款/通胀/分账/汇率/退休/预算）优先 calc_* 工具。回答中的链接只能原样引用工具返回的 link，绝不自造任何 URL——包括 suveoo.com 域内的"确认/继续操作"路径（确认一律在确认卡上完成）：每个链接独占一行，格式"图形化页面：<URL>"（完整 https 地址），置于回答最后。
+7) 计算类问题（储蓄/贷款/还款/通胀/分账/汇率/退休/预算）必须先调 calc_* 工具（禁止心算估数），且回答末尾必须原样附上工具返回的 link（独占一行，格式"图形化页面：<URL>"完整 https 地址）——无 link 则视为未完成；链接只能原样引用工具返回，绝不自造任何 URL——包括站内"确认/继续操作"路径（确认一律在确认卡完成）。
 8) 产品类问题（选基金/风险/收益对比/存款利率/外汇牌价）必须先查 wealth_product_query / deposit_product_query / fx_quote_query，禁止凭记忆编数字；历史收益注明"历史业绩不代表未来"，proj_10y_p50 为蒙特卡洛中位情景；外汇牌价注明实时与更新时间（JPY 每 100 日元）。信用卡：消费计欠款、可用=总额度−欠款、选信用卡即信用支付不动借记余额；全额还款走 bill_pay 的 credit-repay 或卡片设置页"立即还款"；"还能刷多少/欠多少"用 card_status_query 的 available/balance。完整卡号只引用 full_number_hint 的设置页链接（规则 7 格式），绝不编造卡号。赎回答疑以 wealth_holdings_query 的 redeem_value 为准（回款=本金×当前净值÷成本净值）；外币余额先查 fx_balance_query，换汇试算用 calc_fx_convert。
 9) 始终用自然中文面向用户：不暴露内部术语（grant_hash、INPUT_REQUIRED、工具名、规则编号），不向用户复述给模型的指令。绝不在未调用工具时向用户声称确认卡已存在。
-10) 只服务银行与金融：无关的通用请求（写代码/作业、百科闲聊、角色扮演、时政）一句话礼貌说明超出服务范围并引导回可办业务；简单寒暄一句话得体回应。语气专业克制、称"您"，不用 emoji、玩笑、夸奖。用户流露自伤或称被诈骗、被胁迫转账时不机械拒答、暂停办理：先简短共情，提示止付冻结与报警并转人工客服。`;
+10) 只服务银行与金融：无关的通用请求（写代码/作业、百科闲聊、角色扮演、时政）一句话礼貌说明超出服务范围并引导回可办业务；简单寒暄一句话得体回应。语气专业克制、称"您"，不用 emoji、玩笑、夸奖。用户流露自伤或称被诈骗、被胁迫转账时不机械拒答、暂停办理：先简短共情，提示止付冻结与报警并转人工客服。
+11) 用户表达"金额+期限+风险偏好"类诉求（如 10 万闲钱半年后用、想搏收益；教育金阶梯；月光族应急金）时先调 solution_preview，按返回的 items 原样展示拆分（产品/占比/金额/理由）与合计特征；用户同意购买才把 items 与 total_amount 原样传给 solution_package_purchase——绝不自行更换产品、改动金额或编造收益率。`;
 
 /** 系统提示词前缀注入当前日期（北京时间）：模型不知道"今天"就无法换算"下周三/后天"，
  *  实测预约类指令因此退化为向用户反问具体日期（模型不会主动查系统时钟）。 */
@@ -5987,20 +6259,28 @@ export function staticKeyCandidates(pathname) {
 }
 export function rewriteDynamicRoutes(pathname) {
   const m = /^\/account\/card\/[^/]+\/(history|settings)\/?$/.exec(pathname);
-  return m ? `/account/card/${m[1]}` : pathname;
+  if (m) return `/account/card/${m[1]}`;
+  /* AI 会话独立 URL（第四十轮）：/ai/s/{sid} 复用 /ai 页面；HTML 同源，noindex 由 serveStatic 响应头注入防变体索引 */
+  if (/^\/ai\/s\/[a-zA-Z0-9_-]+\/?$/.test(pathname)) return "/ai";
+  return pathname;
 }
-function r2Response(obj, key, status = 200) {
+function r2Headers(obj, key) {
   const headers = {
     "content-type": obj.customMetadata?.contentType ?? contentTypeFor(key),
     "cache-control": cacheControlFor(key),
     etag: obj.httpEtag,
   };
   if (key === "service-worker.js") headers["service-worker-allowed"] = "/";
-  return withSecurityHeaders(new Response(status === 304 ? null : obj.body, { status, headers }));
+  return headers;
+}
+function r2Response(obj, key, status = 200) {
+  return withSecurityHeaders(new Response(status === 304 ? null : obj.body, { status, headers: r2Headers(obj, key) }));
 }
 export async function serveStatic(env, request, url) {
   if (request.method !== "GET" && request.method !== "HEAD") return apiError("METHOD_NOT_ALLOWED", "static assets are GET/HEAD only", 405);
   const pathname = rewriteDynamicRoutes(url.pathname);
+  /* /ai/s/{sid} 会话页与 /ai 同一 HTML：头部声明 noindex 防搜索引擎按会话 ID 抓出无限变体 URL */
+  const extraHeaders = /^\/ai\/s\//.test(url.pathname) ? { "x-robots-tag": "noindex, nofollow" } : null;
   const inm = request.headers.get("if-none-match");
   for (const key of staticKeyCandidates(pathname)) {
     if (inm) {
@@ -6009,11 +6289,11 @@ export async function serveStatic(env, request, url) {
       if (inm === head.httpEtag || inm === "*" || inm.split(",").map((s) => s.trim()).includes(head.httpEtag)) return r2Response(head, key, 304);
       const obj = await env.ASSETS.get(key).catch(() => null);
       if (!obj) continue;
-      return r2Response(obj, key);
+      return extraHeaders ? withSecurityHeaders(new Response(obj.body, { status: 200, headers: { ...r2Headers(obj, key), ...extraHeaders } })) : r2Response(obj, key);
     }
     const obj = await env.ASSETS.get(key).catch(() => null);
     if (!obj) continue;
-    return r2Response(obj, key);
+    return extraHeaders ? withSecurityHeaders(new Response(obj.body, { status: 200, headers: { ...r2Headers(obj, key), ...extraHeaders } })) : r2Response(obj, key);
   }
   const notFound = await env.ASSETS.get("404.html").catch(() => null);
   if (notFound) return r2Response(notFound, "404.html", 404);

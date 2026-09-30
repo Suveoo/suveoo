@@ -1,6 +1,6 @@
 /* inflation-calculator.js — 通胀购买力计算器（amount,inflation,years）：购买力侵蚀曲线 */
-S.router.register("inflation-calculator", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["inflation-calculator"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.inflName"))}</h1>
@@ -20,11 +20,10 @@ S.router.register("inflation-calculator", async () => {
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.invalid"))}</div>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("tc.powerCurve"))}</h2></div>
-    <div class="card" id="curve"></div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    <div class="card" id="curve"></div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const calc = () => {
-    const a = S.toolKit.num("amount"), x = S.toolKit.num("inflation"), y = S.toolKit.num("years");
+    const a = S.toolKit.num("amount", c), x = S.toolKit.num("inflation", c), y = S.toolKit.num("years", c);
     if ([a, x, y].some((v) => v == null) || a <= 0 || x < 0 || y <= 0) {
       $("tc-err").hidden = false;
       ["r-power", "r-eq", "r-loss"].forEach((id) => ($(id).textContent = "—"));
@@ -44,5 +43,6 @@ S.router.register("inflation-calculator", async () => {
   };
   S.toolKit.bind([
     { id: "amount", def: "100000" }, { id: "inflation", def: "2.5" }, { id: "years", def: "20" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("inflation-calculator", async () => { await S.toolPages["inflation-calculator"](document.getElementById("content")); });

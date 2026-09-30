@@ -1,6 +1,6 @@
 /* fx-convert.js — 外汇兑换计算器（dir=buy/sell,ccy,amount）：十币种买卖价双向换算 + 点差 */
-S.router.register("fx-convert", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["fx-convert"] = async (c, opts = {}) => {
   const fx = (await (await fetch("/api/fx")).json().catch(() => null)) ?? { quotes: [] }; /* 实时牌价（服务端带静态回退） */
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.fxName"))}</h1>
     <div class="card" style="max-width:520px">
@@ -19,9 +19,8 @@ S.router.register("fx-convert", async () => {
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("tc.rateUsed"))}</span><span class="v mono" id="r-rate">—</span></div>
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("tc.spread"))}</span><span class="v mono" id="r-spread">—</span></div>
       <p class="muted small" style="margin:12px 0 0">${S.fmt.escape(S.t("tc.spreadNote"))}${fx.quotes.some((q) => q.code === "JPY") ? " " + S.fmt.escape(S.t("tc.fxNote100")) : ""}</p>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const dirSel = S.ctl.select({ label: S.t("tc.direction"), options: [{ v: "buy", label: S.t("tc.fxDirBuy") }, { v: "sell", label: S.t("tc.fxDirSell") }], value: "buy" });
   dirSel.id = "dir";
   $("dir").replaceWith(dirSel);
@@ -29,7 +28,7 @@ S.router.register("fx-convert", async () => {
   ccySel.id = "ccy";
   $("ccy").replaceWith(ccySel);
   const calc = () => {
-    const dir = $("dir").value, code = $("ccy").value, amt = S.toolKit.num("amount");
+    const dir = $("dir").value, code = $("ccy").value, amt = S.toolKit.num("amount", c);
     const q = fx.quotes.find((x) => x.code === code);
     if (!q || amt == null || amt <= 0) { $("tc-err").hidden = false; $("r-out").textContent = "—"; return; }
     $("tc-err").hidden = true;
@@ -52,5 +51,6 @@ S.router.register("fx-convert", async () => {
   };
   S.toolKit.bind([
     { id: "dir", def: "buy" }, { id: "ccy", def: "USD" }, { id: "amount", def: "1000" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("fx-convert", async () => { await S.toolPages["fx-convert"](document.getElementById("content")); });

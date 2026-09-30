@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 任务四：换汇按服务端实时牌价结算（购汇 sell / 结汇 buy，JPY 每 100 口径）、可选结算卡、外币余额可见。
  *  测试用已知牌价预置 KV 缓存（fx:live:v2），hFxLive 直接命中缓存 → 无外呼、数字确定。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 /* USD buy 7.1024 / sell 7.1782；JPY buy 4.9000 / sell 5.1000（每 100 日元） */
 const QUOTES = [

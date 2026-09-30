@@ -74,6 +74,19 @@ describe("① 动态卡路由重写", () => {
     expect(rewriteDynamicRoutes("/account/card/x/settings/")).toBe("/account/card/settings");
     expect(rewriteDynamicRoutes("/account/cards")).toBe("/account/cards"); // 不误伤
   });
+
+  it("/ai/s/{sid} → /ai 页面（第四十轮会话直达 URL）+ X-Robots-Tag 防变体索引", async () => {
+    await put("ai/index.html", "<html>AI-PAGE data-page=\"ai\"></html>", "text/html");
+    const r = await get("/ai/s/abc123_-");
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain("AI-PAGE");
+    expect(r.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    const plain = await get("/ai");
+    expect(plain.headers.get("x-robots-tag")).toBe(null); // 原 /ai 不带头
+    expect(rewriteDynamicRoutes("/ai/s/abc")).toBe("/ai");
+    expect(rewriteDynamicRoutes("/ai/tasks")).toBe("/ai/tasks"); // 不误伤兄弟路由
+    expect(rewriteDynamicRoutes("/ai")).toBe("/ai");
+  });
 });
 
 describe("① 缓存头、内容类型与条件请求", () => {

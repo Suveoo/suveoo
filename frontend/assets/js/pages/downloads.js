@@ -11,7 +11,7 @@ S.router.register("downloads", async () => {
     <div class="list-row">
       <span class="avatar">${S.ui.icon("doc", 14)}</span>
       <div class="grow"><b class="mono">${S.fmt.escape(m)}</b>
-        <div class="muted small">${S.fmt.escape(S.t("dl.statementNote"))} · <span class="dl-status" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.statusPending"))}</span></div></div>
+        <div class="muted small">${S.fmt.escape(S.t("dl.statementNote"))} <span class="dl-status" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.statusPending"))}</span></div></div>
       <button class="btn btn-sm btn-light gen" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.gen"))}</button>
       <button class="btn btn-sm btn-primary dl hidden" data-m="${S.fmt.escape(m)}">${S.ui.icon("download", 12)} ${S.fmt.escape(S.t("dl.download"))}</button>
     </div>`).join("") || S.ui.empty(S.t("common.noData"));
@@ -30,7 +30,7 @@ S.router.register("downloads", async () => {
     <div class="list-row">
       <span class="avatar">${S.ui.icon("doc", 14)}</span>
       <div class="grow"><b class="mono">${S.fmt.escape(m)}</b>
-        <div class="muted small">${S.fmt.escape(S.t("dl.statementNote"))} · <span class="dl-status" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.statusPending"))}</span></div></div>
+        <div class="muted small">${S.fmt.escape(S.t("dl.statementNote"))} <span class="dl-status" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.statusPending"))}</span></div></div>
       <button class="btn btn-sm btn-light gen" data-m="${S.fmt.escape(m)}">${S.fmt.escape(S.t("dl.gen"))}</button>
       <button class="btn btn-sm btn-primary dl hidden" data-m="${S.fmt.escape(m)}">${S.ui.icon("download", 12)} ${S.fmt.escape(S.t("dl.download"))}</button>
     </div>`).join("") || S.ui.empty(S.t("common.noData"));

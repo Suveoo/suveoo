@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 第二十六轮：AI 会话历史持久化 + 续聊上文。
@@ -6,7 +7,7 @@ import { SELF, env } from "cloudflare:test";
  *  历史卡片落库形态与终态徽标、过期 grant 重放被 CONSENT 校验拦截、90 天惰性清理。
  *  wrangler.test.toml 的 LLM_BASE_URL 指向拒连地址 → /api/ai/chat 走"上游不可达"失败轮路径。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

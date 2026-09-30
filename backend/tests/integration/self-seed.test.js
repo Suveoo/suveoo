@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF } from "cloudflare:test";
 
 /** 队员自助灌入（/demo-lab）：登录态门、动态收款人数据源、真实性核对、幂等、自查。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

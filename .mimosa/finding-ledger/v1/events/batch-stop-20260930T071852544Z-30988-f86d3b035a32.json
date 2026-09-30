@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260930T071852544Z-30988-f86d3b035a32",
+  "runId": "20260930T071852544Z-30988-f86d3b035a32",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "changed_file_unreadable",
+        "stage": "candidate-select",
+        "target": "notes/_gen_tree.js",
+        "detail": "observed changed file no longer exists or cannot be read",
+        "affectsCompletion": true
+      },
+      {
+        "code": "changed_file_unreadable",
+        "stage": "candidate-select",
+        "target": "notes/_assemble_docs.js",
+        "detail": "observed changed file no longer exists or cannot be read",
+        "affectsCompletion": true
+      },
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": "notes/_tmp_doc.js",
+        "detail": "file is missing from task baseline",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "candidate-select",
+        "target": "notes/_gen_tree.js",
+        "detail": "changed_file_unreadable: observed changed file no longer exists or cannot be read",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "candidate-select",
+        "target": "notes/_assemble_docs.js",
+        "detail": "changed_file_unreadable: observed changed file no longer exists or cannot be read",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": "notes/_tmp_doc.js",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "0abee44a89b44eace0aea6a26643b74dbb3de589",
+  "diffHash": "2a5e3f01a59aa8c56af9e296c44608f25f54f9452e203f478c3571b564dcd80d",
+  "rulesVersion": "unavailable",
+  "sessionHash": "7f4db2b606c50daa7d0aaa9b88caac60a770655b4069fcad1bff806b0184fab2",
+  "reportRef": ".mimosa/reports/task-review-sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7-20260930T071852544Z-30988-f86d3b035a32.json",
+  "events": [],
+  "observedFindingIds": [
+    "mimosa-b92d0261306a935c8ae433ca",
+    "mimosa-d4362202d3a618fcafc73acb",
+    "mimosa-6803bf8781085473e1a748a3",
+    "mimosa-9d083d1fc227b1f73372ad70",
+    "mimosa-95a9b290800054bdea89553a",
+    "mimosa-bc47198287bb4bc14fbf7bd1",
+    "mimosa-e3940fe7ad6253e2f0ec8c9a",
+    "mimosa-e20965ee6870768d33581cb7",
+    "mimosa-7735e07b8a8df5b9436907f4",
+    "mimosa-e60728aff14f3e0e56340055",
+    "mimosa-0587ab0607b21b1a9f454cd0",
+    "mimosa-82e6e073dd4e28fb41bd78a1",
+    "mimosa-79a0a6675c115a78f0286228",
+    "mimosa-7f8f667bbe67d1059256441f",
+    "mimosa-c2d2b92c3cd465a56c5623d3",
+    "mimosa-daa6e1eb36632ad331eab2b2"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "backend/worker-main.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "notes/_tmp_doc.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "frontend/assets/js/pages/deposit-compare.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "frontend/assets/js/charts/donut.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-09-30T07:18:53.001Z"
+}

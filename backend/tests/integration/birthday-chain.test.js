@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { toCents } from "../../worker-main.js";
 
 /** 第八期：生日订花链六修复 —— 单复数兼容 / 建单锁资金 / MCP 响应 trace_id+summary /
  *  COMPILED 事件 / demo-run 端点 / yearly 轮转。均走真实 MCP 两段式（AI 确认卡路径）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

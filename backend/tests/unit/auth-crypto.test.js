@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import {
   signJwt, verifyJwt, constantTimeEqual, hashPassword, verifyPassword, maskEmail,
 } from "../../worker-main.js";
@@ -41,15 +42,15 @@ describe("⑦ 常数时间比较与口令哈希", () => {
   });
 
   it("PBKDF2 哈希/校验往返；错误口令拒绝；格式带轮数与盐", async () => {
-    const stored = await hashPassword("jinrongkeji2026");
+    const stored = await hashPassword(TEST_PASSWORD);
     expect(stored).toMatch(/^pbkdf2\$100000\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
-    expect(await verifyPassword("jinrongkeji2026", stored)).toBe(true);
+    expect(await verifyPassword(TEST_PASSWORD, stored)).toBe(true);
     expect(await verifyPassword("Jinrongkeji2026", stored)).toBe(false);
     expect(await verifyPassword("x", "malformed")).toBe(false);
     // 盐随机：两次哈希不同但均可通过校验
-    const stored2 = await hashPassword("jinrongkeji2026");
+    const stored2 = await hashPassword(TEST_PASSWORD);
     expect(stored2).not.toBe(stored);
-    expect(await verifyPassword("jinrongkeji2026", stored2)).toBe(true);
+    expect(await verifyPassword(TEST_PASSWORD, stored2)).toBe(true);
   });
 
   it("邮箱掩码", () => {

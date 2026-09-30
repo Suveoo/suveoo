@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 任务二：完整卡号 reveal 端点（requireSession；属主隔离 = 每 DO 局部卡表）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

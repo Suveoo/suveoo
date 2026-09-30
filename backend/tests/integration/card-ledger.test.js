@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { toCents, genDemoSeedRich, seededRng } from "../../worker-main.js";
 
 /** 任务 B：交易挂卡 + 信用卡账本（信用支付 / 还款闭环）+ 单卡明细真过滤真分页。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

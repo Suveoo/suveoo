@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { randomHex } from "../../worker-main.js";
 
 /** 同意篡改攻击：grant 签发后任意篡改授权字段 → CONSENT_INVALIDATED / GRANT_NOT_FOUND，绝不重算放行。
  *  任务一后收款方须为真实 Suveoo 账户（攻击载荷也用真实账户——现实中攻击者换成自己的账户更逼真），断言语义不变。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 重放攻击：grant 一次性消费、OTP 一次性消费、验证码跨场景/跨用户不可复用。
  *  任务一后收款方须为真实 Suveoo 账户（realTarget 造真实收款人），断言语义不变。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

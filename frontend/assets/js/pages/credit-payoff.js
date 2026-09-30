@@ -1,6 +1,6 @@
 /* credit-payoff.js — 信用卡还款计算器（debt,apr,monthly 或 months 反推） */
-S.router.register("credit-payoff", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["credit-payoff"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false, hint = "") =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal" ${hint ? `placeholder="${S.fmt.escape(hint)}"` : ""}></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.creditName"))}</h1>
@@ -28,9 +28,8 @@ S.router.register("credit-payoff", async () => {
         <span class="small"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--color-navy);margin-right:6px"></i>${S.fmt.escape(S.t("tc.principalPart"))} <b class="mono" id="v-p">—</b></span>
         <span class="small"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#B7C0E8;margin-right:6px"></i>${S.fmt.escape(S.t("tc.interestPart"))} <b class="mono" id="v-i">—</b></span>
       </div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const simulate = (debt, i, pay) => { // 返回 {months,totalInterest} 或 null（永远还不清）
     let bal = debt, int = 0;
     for (let m = 1; m <= 1200; m++) {
@@ -42,7 +41,7 @@ S.router.register("credit-payoff", async () => {
     return null;
   };
   const calc = () => {
-    const d = S.toolKit.num("debt"), apr = S.toolKit.num("apr"), mPay = S.toolKit.num("monthly"), mTar = S.toolKit.num("months");
+    const d = S.toolKit.num("debt", c), apr = S.toolKit.num("apr", c), mPay = S.toolKit.num("monthly", c), mTar = S.toolKit.num("months", c);
     if (d == null || apr == null || d <= 0 || apr < 0) { $("tc-err").hidden = false; reset(); return; }
     if (mPay != null && mPay < 0) { $("tc-err").hidden = false; reset(); return; }
     if (mTar != null && mTar <= 0) { $("tc-err").hidden = false; reset(); return; }
@@ -82,5 +81,6 @@ S.router.register("credit-payoff", async () => {
   };
   S.toolKit.bind([
     { id: "debt", def: "12000" }, { id: "apr", def: "18" }, { id: "monthly", def: "1200" }, { id: "months", def: "" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("credit-payoff", async () => { await S.toolPages["credit-payoff"](document.getElementById("content")); });

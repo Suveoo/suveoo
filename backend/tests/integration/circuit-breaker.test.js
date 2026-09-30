@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 异常熔断（赛题 §三.2"连续失败或可疑行为触发安全锁定"）：OTP 连错触发 / 写拒查不拦 / 邮箱解锁 / 注入两连触发 / 到期自解。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

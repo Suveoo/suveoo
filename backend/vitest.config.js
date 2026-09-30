@@ -8,5 +8,7 @@ export default defineConfig({
   plugins: [cloudflareTest({ wrangler: { configPath: "./wrangler.test.toml" } })],
   test: {
     pool: cloudflarePool({ wrangler: { configPath: "./wrangler.test.toml" } }),
+    /* 测试沙箱注册口令（一次性用户，隔离环境逐测试回滚；tests/helpers/test-creds.js 消费） */
+    env: { SUVEOO_TEST_PW: "sandbox-test-user" },
   },
 });

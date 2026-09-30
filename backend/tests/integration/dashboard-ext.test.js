@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF } from "cloudflare:test";
 
 /** dashboard 扩展字段：by_category_month（本月/上月分类收支）与 income_recent（近 60 天入账方聚合）。
  *  供交易记录页"结果优先"环比可视化与前端确定性洞察规则（月薪→定投等）共用；既有字段不受影响。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {
@@ -67,7 +68,7 @@ describe("dashboard 扩展字段（by_category_month / income_recent）", () => 
 describe("home bundle", () => {
   it("鉴权后返回 overview/dashboard/subscriptions/bills/insight/proposals 六键，overview 与独立端点同口径", async () => {
     const reg = await j(await post("/api/auth/email-code", { scene: "register", email: "hb1@test.dev" }));
-    const out = await j(await post("/api/auth/register", { email: "hb1@test.dev", code: await lastCode("hb1@test.dev"), name: "聚合甲", password: "jinrongkeji2026", risk_answers: [3, 3, 3, 3, 3], aml_consented: true }));
+    const out = await j(await post("/api/auth/register", { email: "hb1@test.dev", code: await lastCode("hb1@test.dev"), name: "聚合甲", password: TEST_PASSWORD, risk_answers: [3, 3, 3, 3, 3], aml_consented: true }));
     const H = { authorization: `Bearer ${out.token}` };
     const b = await j(await SELF.fetch(BASE + "/api/home/bundle", { headers: H }));
     expect(b.ok).toBe(true);

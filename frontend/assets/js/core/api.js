@@ -34,9 +34,10 @@ S.api = {
       /* 守卫的业务性 401（红级 OTP_REQUIRED）不是会话失效：不清令牌、不跳登录 */
       if (out.data?.status === "OTP_REQUIRED") return out;
       this.token = null; // 会话失效先清令牌，杜绝带着坏 token 循环
-      // 已在登录页时不再跳转（否则 next 参数会无限嵌套）
+      // 已在登录页时不再跳转（否则 next 参数会无限嵌套）；公开页（工具/门户等）只静默降级为未登录态，不踢去登录页
       /* 会话级防抖：一次过期只触发一次跳转（并发 401 全部让位） */
-      if (!path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
+      const onPublicPage = S.router?.PUBLIC_PAGES?.has(document.body?.dataset?.page ?? "") ?? false;
+      if (!onPublicPage && !path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
         sessionStorage.setItem("suveoo_redirecting", "1");
         const next = encodeURIComponent(location.pathname + location.search);
         location.replace(`/account/login?next=${next}`);

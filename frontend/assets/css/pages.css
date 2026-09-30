@@ -769,3 +769,22 @@
   .dl-safe-row { font-size: 12px; gap: 10px; }
   .ds-sep { margin: 10px 0; }
 }
+
+/* ===== 第三十七轮：工具页手机端排版修复（deposit-compare 卡片化 / budget-allocator 结果两行 / donut 居中）===== */
+@media (max-width: 768px) {
+  /* 全站环形图手机居中（donut-wrap 由 charts/donut.js 统一注入） */
+  .donut-wrap { justify-content: center; }
+  /* 存款对比表手机卡片化：每方案一张卡（方案名+徽章 / 期限·利率·本息三组 kv） */
+  .dc-tbl table, .dc-tbl tbody, .dc-tbl tr, .dc-tbl td { display: block; width: 100%; }
+  .dc-tbl thead { display: none; }
+  .dc-tbl tr { border: 1px solid var(--color-line); border-radius: 10px; padding: 10px 12px 8px; margin-bottom: 8px; }
+  .dc-tbl td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0; border: none; }
+  .dc-tbl td[data-lb]::before { content: attr(data-lb); color: var(--color-ink-2); font-size: 12px; flex: none; }
+  .dc-tbl .dc-name { align-items: center; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed var(--color-line); }
+  .dc-tbl .dc-name b { font-size: 14px; }
+  /* 第三十八轮：结果两行卡 label 与 value 同行紧贴（gap 0）——加 6px 呼吸缝+字号降档（队长手机端反馈） */
+  /* grid 两列（左 1fr 右 42% 定比例）：两行列边界严格同线、间隙恒等（flex space-between 内容异宽致行间间距肉眼不均；右列 auto 会随内容浮动，定比例防之——队长第四十轮抓出） */
+  .tk-reco { display: grid; grid-template-columns: 1fr 42%; column-gap: 6px; row-gap: 2px; align-items: baseline; }
+  .tk-reco .muted { font-size: 12px; }
+  .tk-reco .v { font-size: 14px !important; white-space: normal; justify-self: end; text-align: right; }
+}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { MCP_TOOLS } from "../../worker-main.js";
 
@@ -9,7 +10,7 @@ import { MCP_TOOLS } from "../../worker-main.js";
  *  - P1：birthday_flowers 缺 execute_at 建出永不执行的孤儿任务并白锁资金（next_run_at=null + summary 漏 undefined）。
  *  - P2："日限额调成无限"被模型折算成 0 出卡，确认即自锁。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

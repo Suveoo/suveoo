@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-30T09:34:40.001Z",
+  "sessionId": "sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "D:\\suveoo\\frontend\\assets\\js\\pages\\deposit-compare.js",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 16,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

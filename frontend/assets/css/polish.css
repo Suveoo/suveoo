@@ -754,3 +754,36 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 
 /* 第三十三轮：.btn 的 display:inline-flex 特异性压过 UA [hidden]——cs-copy 曾"假隐藏"可点到 null 值；全站 btn 补齐 */
 .btn[hidden] { display: none; }
+
+/* ================================================================
+ * §37 第五期 idle 任务 4：AI 对话内嵌工具（.tool-embed）
+ * 工具按钮卡下方追加的完整可交互工具容器——与工具图形化页同一套 S.toolPages
+ * 渲染主体（输入/计算/图表全可用），此处只做对话流内的容器化适配：
+ * 白底轻边框圆角、上边距 8px；宽度与消息流同宽或略窄；手机 390 不溢出
+ * （内部卡片 max-width:520px 自适应、tc-duo 单列化）。工具内部交互不触发整页路由。
+ * ================================================================ */
+.tool-embed { margin: 8px 0 4px; padding: 14px 16px 16px; background: #fff; border: 1px solid var(--color-line); border-radius: 12px; max-width: 100%; overflow-x: hidden; }
+.tool-embed[hidden] { display: none; }
+.tool-embed > h1 { font-size: 18px; margin: 0 0 10px; }
+.tool-embed .section-title { margin-top: 14px; }
+.tool-embed .section-title h2 { font-size: 15px; }
+.tool-embed .tc-duo { grid-template-columns: 1fr; }
+@media (max-width: 767px) {
+  .tool-embed { padding: 12px 12px 14px; border-radius: 10px; }
+  .tool-embed .card { padding: 12px 14px; }
+  .tool-embed .md-table-wrap, .tool-embed .table { font-size: 12px; }
+}
+
+/* §38 第五期 idle 任务 5：组合方案确认卡明细行（.sol-lines——服务端核验的产品/占比/金额） */
+.sol-lines { margin: 10px 0 2px; border: 1px solid var(--color-line); border-radius: 10px; padding: 4px 12px; background: var(--color-surface); }
+.sol-line { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--color-line); font-size: 13px; }
+.sol-line:last-child { border-bottom: none; }
+.sol-pct { min-width: 44px; color: var(--color-navy); font-weight: 600; }
+.sol-name i { font-style: normal; margin-left: 8px; }
+.sol-total { font-weight: 600; }
+
+/* 第三十七轮：预算分配器结果手机两行（必要支出独占+想要/储蓄并排）——须置于 293 行 .tc-result flex 之后加载 */
+@media (max-width: 768px) {
+  .tc-result { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .tc-result .kv:first-child { grid-column: 1 / -1; }
+}

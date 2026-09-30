@@ -1,6 +1,6 @@
 /* retirement.js — 退休规划器（age,retire,spend,rate,inflation）：所需退休金 + 每月应储蓄 */
-S.router.register("retirement", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["retirement"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.retireName"))}</h1>
@@ -19,11 +19,10 @@ S.router.register("retirement", async () => {
         <div class="kv"><div class="lb">${S.fmt.escape(S.t("tc.needSave"))}（CNY）</div><div class="v total" style="font-size:28px" id="r-save">—</div></div>
       </div>
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.ageInvalid"))}</div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const calc = () => {
-    const age = S.toolKit.num("age"), retire = S.toolKit.num("retire"), spend = S.toolKit.num("spend"), rate = S.toolKit.num("rate"), infl = S.toolKit.num("inflation");
+    const age = S.toolKit.num("age", c), retire = S.toolKit.num("retire", c), spend = S.toolKit.num("spend", c), rate = S.toolKit.num("rate", c), infl = S.toolKit.num("inflation", c);
     if ([age, retire, spend, rate, infl].some((v) => v == null) || age <= 0 || retire <= age || spend <= 0 || rate < 0 || infl < 0) {
       $("tc-err").hidden = false;
       $("r-corpus").textContent = "—"; $("r-save").textContent = "—";
@@ -43,5 +42,6 @@ S.router.register("retirement", async () => {
   };
   S.toolKit.bind([
     { id: "age", def: "30" }, { id: "retire", def: "60" }, { id: "spend", def: "6000" }, { id: "rate", def: "5" }, { id: "inflation", def: "2.5" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("retirement", async () => { await S.toolPages["retirement"](document.getElementById("content")); });

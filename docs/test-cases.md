@@ -43,6 +43,10 @@ Test Files  37 passed (37)
   Duration   ~40s
 ```
 
+2026-09-30（第五期 idle，v3.77）新增测试（377→384，两遍全绿）：
+- tests/integration/solution-package.test.js（7）——①solution_preview 确定性/整数守恒/期限风险上限（6M≤R2、36M 允许 R4）/应急场景零风险资产；②黄级两段式一键购买：默认卡扣减=总额、逐笔持仓=分配额、通知+审计；③幻觉产品 INVALID_PRODUCT 出卡前拦；④分配合计≠总额 INVALID_AMOUNT（服务端复算值入拒绝信息）；⑤PR1 用户含 R2 基金确认段 INVARIANT_PR_MISMATCH；⑥>¥1000 升红（确认段缺 OTP → OTP_REQUIRED）；⑦部分失败：已成交笔按成本 wealthRedeem 精确回退、成败笔数明确、余额/持仓归位
+- tests/unit/reminder-task.test.js / chat-history.test.js 预算断言同步（提示词 1600→1850（+规则 11 对话即方案）、工具 desc 5600→6200（52→54 只））；calc-tools.test.js split 深链断言补 adjust 参数
+
 2026-09-21（第三十三轮，v3.35）新增测试：
 - tests/unit/fund-data.test.js 扩展（+4 净增）——`fxSparkByDay` 按自然日去重（同日多次采样序列不变/跨日追加滑窗 7 点/当日末点更新/JPY 口径与多币种独立累计）；`fxQuotesFromRates` 无历史断言改"单点真实值"（原 7 点平铺锁定的是伪造填充，按第四期任务 A 口径改写）
 - tests/integration/payee-phone.test.js（2）——带手机号添加（REST 两段式）→ /api/payees 返回 phone → contacts_search 全号/尾号命中 → payee 转账 EXECUTED → DELETE 清理；非法手机号 INVALID_PHONE（含 0 开头/短号）与可选性（不填不受影响）

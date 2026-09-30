@@ -1,11 +1,14 @@
 /* router.js — 登录守卫与页面注册 */
 S.router = {
   pages: {},
+  /* 公开页集合（无需登录可浏览）：boot 的 needAuth 与 api.js 的 401 全局守卫共用——
+     过期 token 残留时公开页只清 token 静默降级为未登录态，不强制跳登录（第五期 idle 修：工具深链被弹登录） */
+  PUBLIC_PAGES: new Set(["", "home", "login", "register", "recovery", "ai-benchmark", "tools", "about", "help", "contact", "privacy-policy", "cookie-privacy", "terms", "offline",
+    "savings-compound", "loan-compare", "goal-planner", "credit-payoff", "retirement", "deposit-compare", "fx-convert", "inflation-calculator", "split-bill-plus", "budget-allocator"]),
   register(name, fn) { this.pages[name] = fn; },
   async boot() {
     const page = document.body.dataset.page ?? "";
-    const needAuth = !["", "home", "login", "register", "recovery", "ai-benchmark", "tools", "about", "help", "contact", "privacy-policy", "cookie-privacy", "terms", "offline",
-      "savings-compound", "loan-compare", "goal-planner", "credit-payoff", "retirement", "deposit-compare", "fx-convert", "inflation-calculator", "split-bill-plus", "budget-allocator"].includes(page);
+    const needAuth = !this.PUBLIC_PAGES.has(page);
     if (needAuth || page === "home") {
       const sess = await S.auth.session();
       if (needAuth && !sess) {

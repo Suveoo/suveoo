@@ -1,6 +1,6 @@
 /* split-bill-plus.js — AA 分账高级版（total,n,adjust=张三:-60,李四:10）：整数分运算，总额守恒 */
-S.router.register("split-bill-plus", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["split-bill-plus"] = async (c, opts = {}) => {
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.splitName"))}</h1>
     <div class="card" style="max-width:520px">
       <label class="field"><span class="lb">${S.fmt.escape(S.t("common.total"))}（CNY）</span><input class="input input-lg" id="total" value="860" inputmode="decimal"></label>
@@ -14,9 +14,8 @@ S.router.register("split-bill-plus", async () => {
       <div id="list"></div>
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.invalid"))}</div>
       <div class="field-err" id="adj-err" hidden>${S.fmt.escape(S.t("tc.splitBad"))}</div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   /* 整数分分摊：base 均分（余数从前往后 +1 分），再叠加每人调整额（与后端 splitEqually 同思路） */
   const splitCents = (baseCents, n) => {
     const parts = new Array(n).fill(Math.floor(baseCents / n));
@@ -24,7 +23,7 @@ S.router.register("split-bill-plus", async () => {
     return parts;
   };
   const calc = () => {
-    const total = S.toolKit.num("total"), n = S.toolKit.num("n");
+    const total = S.toolKit.num("total", c), n = S.toolKit.num("n", c);
     const raw = ($("adjust").value ?? "").trim();
     $("tc-err").hidden = true; $("adj-err").hidden = true;
     if (total == null || n == null || total <= 0 || n < 1 || n > 60) { $("tc-err").hidden = false; $("list").innerHTML = ""; return; }
@@ -73,5 +72,6 @@ S.router.register("split-bill-plus", async () => {
   };
   S.toolKit.bind([
     { id: "total", def: "860" }, { id: "n", def: "3" }, { id: "adjust", def: "" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("split-bill-plus", async () => { await S.toolPages["split-bill-plus"](document.getElementById("content")); });

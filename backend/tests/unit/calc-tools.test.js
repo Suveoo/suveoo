@@ -189,7 +189,7 @@ describe("calc_split_bill AA 分账高级版", () => {
     expect(byName["成员3"]).toBe("303.33");
     expect(r.result.sum).toBe("860.00");
     expect(r.result.conservation_ok).toBe(true);
-    expect(r.link).toBe("https://suveoo.com/wealth/tools/split-bill-plus?total=860&n=3");
+    expect(r.link).toBe("https://suveoo.com/wealth/tools/split-bill-plus?total=860&n=3&adjust=%E5%BC%A0%E4%B8%89%3A-60%2C%E6%9D%8E%E5%9B%9B%3A10");
   });
 
   it("零边界：无调整、除不尽仍守恒（860/3）", () => {

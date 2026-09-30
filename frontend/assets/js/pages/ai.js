@@ -4,6 +4,11 @@
 S.router.register("ai", async ({ user }) => {
   const c = document.getElementById("content");
   const q = new URLSearchParams(location.search).get("q");
+  /* 会话独立 URL（第四十轮）：/ai/s/{sid} 由 worker 重写为本页；有 sid 时加载完历史列表自动续入。
+     ?q= 深链（S.router.ai）优先级更高——带着问题来的先出答案，不抢跳历史会话 */
+  const seg = location.pathname.split("/");
+  const sidSeg = seg.length === 4 && seg[1] === "ai" && seg[2] === "s" ? seg[3] : "";
+  const urlSid = q || !/^[a-zA-Z0-9_-]{1,64}$/.test(sidSeg) ? null : sidSeg;
   /* 插画资源跟随 HTML 资产版本（?v=bNN）——R2 内容更新后 bump 版本即对所有用户强制换图（浏览器/SW 缓存按 URL 命中） */
   const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1];
   /* 全新会话首屏（欢迎区 + 洞察加载态）：加载历史/续聊时不渲染；"+ 新对话"恢复 */
@@ -238,10 +243,11 @@ S.router.register("ai", async ({ user }) => {
     scroll();
     return m;
   };
-  /* 历史气泡：与直播态同款样式（用户右对齐纯文本 / AI 左对齐 Markdown 渲染） */
+  /* 历史气泡：与直播态同款样式（用户右对齐纯文本 / AI 左对齐 Markdown 渲染）。
+     AI 气泡含工具按钮卡时同步注水内嵌工具（历史重放与直播同款能力；只读计算交互，不涉资金）。 */
   const histBubble = (role, content) => {
     const m = S.ui.el(`<div class="msg ${role}"></div>`);
-    if (role === "ai") { m.classList.add("md"); m.innerHTML = S.md.render(content); }
+    if (role === "ai") { m.classList.add("md"); m.innerHTML = S.md.render(content); S.tools?.hydrate?.(m); }
     else m.textContent = content;
     thread.appendChild(m);
     return m;
@@ -394,7 +400,12 @@ S.router.register("ai", async ({ user }) => {
   async function loadSession(sid, title) {
     if (busy) return;
     const msgs = await S.chat.load(sid);
-    if (msgs == null) { S.ui.toast(S.t("common.loadFailed"), true); return; }
+    if (msgs == null) {
+      S.ui.toast(S.t("common.loadFailed"), true);
+      /* 直达 URL 指向无效/未落库会话：回退 /ai 全新态，不留死地址（第四十轮防幺蛾子） */
+      try { if (location.pathname.startsWith("/ai/s/")) history.replaceState(null, "", "/ai"); } catch { /* ignore */ }
+      return;
+    }
     clearFirstScreen();
     S.ui.clear(thread);
     document.getElementById("cont-bar")?.remove();
@@ -411,6 +422,8 @@ S.router.register("ai", async ({ user }) => {
     if (!msgs.length) thread.appendChild(S.ui.el(`<div class="hist-divider">${S.fmt.escape(S.t("ai.histEmpty"))}</div>`));
     if (msgs.length) thread.appendChild(S.ui.el(`<div class="hist-divider">${S.fmt.escape(S.t("ai.histDivider"))}</div>`));
     updateLastCache();
+    /* 会话独立 URL（第四十轮）：地址栏随会话切换（replaceState 不入历史栈，后退行为与原先一致；会话数据只读加载不受影响） */
+    try { history.replaceState(null, "", "/ai/s/" + sid); } catch { /* 隐私模式等极端环境静默降级 */ }
     scroll();
     if (window.matchMedia("(min-width: 1024px)").matches) window.setTimeout(() => { thread.scrollTop = thread.scrollHeight; }, 0);
   }
@@ -418,6 +431,7 @@ S.router.register("ai", async ({ user }) => {
   function resetToFresh() {
     if (!S.chat.sid && thread.querySelector(".ai-welcome")) return; /* 已是全新态 */
     S.chat.sid = null;
+    try { if (location.pathname.startsWith("/ai/s/")) history.replaceState(null, "", "/ai"); } catch { /* ignore */ }
     clearFirstScreen();
     S.ui.clear(thread);
     mountFirstScreen();
@@ -517,6 +531,8 @@ S.router.register("ai", async ({ user }) => {
       /* errored 时错误文案已由 onError 写入气泡——绝不能用"（完成）"覆盖（用户会误以为转账成功） */
       if (!raw && !errored) aiMsg.textContent = S.t("ai.done");
       else if (raw) renderAt();
+      /* 工具按钮卡下的内嵌工具在消息定稿后注水（打字机期间每帧重建 innerHTML，注水必须等最终稿） */
+      if (raw) S.tools?.hydrate?.(aiMsg);
       /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
       if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
         const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
@@ -631,8 +647,10 @@ S.router.register("ai", async ({ user }) => {
   };
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { const v = input.value; input.value = ""; send(v); } });
   if (!user) {
-    location.replace("/account/login?next=/ai");
+    location.replace("/account/login?next=" + encodeURIComponent(location.pathname));
     return;
   }
   if (q) send(q);
+  /* 直达会话 URL：自动续入（loadSession 自带失败兜底；?q= 优先已 return 不了但 urlSid 已置 null） */
+  if (urlSid) loadSession(urlSid, null);
 });

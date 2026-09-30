@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { newCardNumber, toCents } from "../../worker-main.js";
 
@@ -6,7 +7,7 @@ import { newCardNumber, toCents } from "../../worker-main.js";
  *  任务一后：收款方必须是真实存在的 Suveoo 用户（16 位 Luhn 卡号 + registry 存在 + 户名匹配），
  *  测试统一用 realTarget() 造真实收款方；跨用户转账双方各记一笔（资金守恒）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { newCardNumber, toCents } from "../../worker-main.js";
 
 /** 预约转账：建立（黄级两段式 + 收款人真实性校验）→ SagaDO alarm 唤醒执行 → 状态/余额/付款卡核对。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { marketValueCents } from "../../worker-main.js";
 
 /** 任务三：赎回按市值结算（回款 = floor(本金 × 当前净值 / 成本净值)，整数运算）。
  *  涨/平/跌三场景精确断言 + API 端到端（页面显示值 === 实际回款额）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

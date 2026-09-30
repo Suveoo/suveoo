@@ -57,7 +57,11 @@ S.chat = {
           const line = part.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
           let ev; try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
-          if (ev.type === "session") this.sid = ev.sid;
+          /* 新会话 id 首次下发：地址栏升级为会话直达 URL（第四十轮；仅 /ai 页启用，replaceState 不动历史栈与数据层） */
+          if (ev.type === "session") {
+            this.sid = ev.sid;
+            try { if (location.pathname === "/ai") history.replaceState(null, "", "/ai/s/" + ev.sid); } catch { /* ignore */ }
+          }
           else if (ev.type === "token") safe(() => onToken?.(ev.text));
           else if (ev.type === "thinking") safe(() => onThinking?.());
           else if (ev.type === "genui_event") safe(() => onGenui?.(ev.card));

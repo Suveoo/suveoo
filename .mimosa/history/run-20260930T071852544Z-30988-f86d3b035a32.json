@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260930T071852544Z-30988-f86d3b035a32",
+  "runStatus": "inconclusive",
+  "errors": [
+    "candidate-select:notes/_gen_tree.js: changed_file_unreadable: observed changed file no longer exists or cannot be read",
+    "candidate-select:notes/_assemble_docs.js: changed_file_unreadable: observed changed file no longer exists or cannot be read",
+    "baseline-read:notes/_tmp_doc.js: baseline_snapshot_unreadable: file is missing from task baseline"
+  ],
+  "target": ".",
+  "revision": "0abee44a89b44eace0aea6a26643b74dbb3de589",
+  "diffHash": "2a5e3f01a59aa8c56af9e296c44608f25f54f9452e203f478c3571b564dcd80d",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-09-30T07:18:52.544Z",
+  "timing": {
+    "startedAt": "2026-09-30T07:18:50.672Z",
+    "completedAt": "2026-09-30T07:18:52.544Z",
+    "durationMs": 1872
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "changed_file_unreadable": 2,
+      "baseline_snapshot_unreadable": 1,
+      "project_check_failed": 3
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_470321e5-f63f-4a48-bc89-f06a5b5b2bb7-20260930T071852544Z-30988-f86d3b035a32.json"
+}

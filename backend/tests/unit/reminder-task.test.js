@@ -64,13 +64,13 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
       expect(AI_SYSTEM_PROMPT, `缺失语义：${name}`).toContain(phrase);
     }
   });
-  it("提示词瘦身达标（≤1600 字符；第二十七轮自 1500 上调：新增领域边界/危机应对/专业语气是银行 AI 必需项，非瘦身回退，并同步精简既有措辞 -51 字符）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
+  it("提示词瘦身达标（≤1850 字符；第二十七轮 1500→1600；第五期 idle 1600→1850：规则 11 对话即方案为赛题创新必需项）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1850);
   });
-  it("工具 desc 总量预算（≤5600 字符；第十一期 +site_guide/notification_list/transfer_limit_query/bill_list/report_status/subscription_reminder_toggle/deposit_open，40→47；第二十二期 +goal_*×5，47→52）", () => {
-    expect(MCP_TOOLS).toHaveLength(52);
+  it("工具 desc 总量预算（≤6200 字符；第十一期 40→47；第二十二期 47→52；第五期 idle +solution_preview/solution_package_purchase，52→54）", () => {
+    expect(MCP_TOOLS).toHaveLength(54);
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
-    expect(total).toBeLessThanOrEqual(5600);
+    expect(total).toBeLessThanOrEqual(6200);
   });
   it("proposal_list 只读且引导页面执行（AI 主动银行：AI 只能提议）", () => {
     const t = MCP_TOOLS.find((t) => t.name === "proposal_list");

@@ -1,6 +1,6 @@
 /* savings-compound.js — 复利储蓄计算器（principal,rate,years,monthly,freq） */
-S.router.register("savings-compound", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["savings-compound"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.savingsName"))}</h1>
@@ -23,14 +23,13 @@ S.router.register("savings-compound", async () => {
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.invalid"))}</div>
     </div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("tc.curve"))}</h2></div>
-    <div class="card" id="curve"></div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    <div class="card" id="curve"></div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const freqSel = S.ctl.select({ label: S.t("tc.freq"), options: [{ v: "12", label: S.t("tc.freqMonth") }, { v: "4", label: S.t("tc.freqQuarter") }, { v: "1", label: S.t("tc.freqYear") }], value: "12" });
   freqSel.id = "freq";
   $("freq").replaceWith(freqSel);
   const calc = () => {
-    const p = S.toolKit.num("principal"), r = S.toolKit.num("rate"), y = S.toolKit.num("years"), m = S.toolKit.num("monthly");
+    const p = S.toolKit.num("principal", c), r = S.toolKit.num("rate", c), y = S.toolKit.num("years", c), m = S.toolKit.num("monthly", c);
     const f = Number($("freq").value) || 12;
     if ([p, r, y, m].some((v) => v == null) || p < 0 || r < 0 || y < 0 || m < 0 || f < 1) {
       $("tc-err").hidden = false;
@@ -62,5 +61,6 @@ S.router.register("savings-compound", async () => {
   S.toolKit.bind([
     { id: "principal", def: "100000" }, { id: "rate", def: "3" }, { id: "years", def: "5" },
     { id: "monthly", def: "2000" }, { id: "freq", def: "12" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("savings-compound", async () => { await S.toolPages["savings-compound"](document.getElementById("content")); });

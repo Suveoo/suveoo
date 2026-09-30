@@ -1,6 +1,6 @@
 /* budget-allocator.js — 预算分配器（income,needs,wants,save）：50/30/20 三区分配 + 环形图 */
-S.router.register("budget-allocator", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["budget-allocator"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.budgetName"))}</h1>
@@ -22,11 +22,10 @@ S.router.register("budget-allocator", async () => {
       </div>
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.ratioWarn", "—"))}</div>
       <div id="donut" style="margin-top:var(--sp-4)"></div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const calc = () => {
-    const inc = S.toolKit.num("income"), n = S.toolKit.num("needs"), w = S.toolKit.num("wants"), s = S.toolKit.num("save");
+    const inc = S.toolKit.num("income", c), n = S.toolKit.num("needs", c), w = S.toolKit.num("wants", c), s = S.toolKit.num("save", c);
     const sum = n != null && w != null && s != null ? Math.round((n + w + s) * 10) / 10 : null;
     if (inc == null || sum == null || inc <= 0 || n < 0 || w < 0 || s < 0) {
       $("tc-err").hidden = false; $("tc-err").textContent = S.t("tc.invalid");
@@ -53,5 +52,6 @@ S.router.register("budget-allocator", async () => {
   };
   S.toolKit.bind([
     { id: "income", def: "12000" }, { id: "needs", def: "50" }, { id: "wants", def: "30" }, { id: "save", def: "20" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("budget-allocator", async () => { await S.toolPages["budget-allocator"](document.getElementById("content")); });

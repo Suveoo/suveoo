@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { toCents } from "../../worker-main.js";
 
 /** 第二十二期：目标陪伴全链 —— MCP 两段式建目标/存入/调整/放弃 + 月度自动存入 taskDue +
  *  里程碑邮件 + badge 6h 节流扫描（遗留①）+ 战报"自动打理"计数。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

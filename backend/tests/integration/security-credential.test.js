@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD, TEST_NEW_PASSWORD, TEST_WRONG_PASSWORD, makePassword } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 import { signJwt } from "../../worker-main.js";
 
@@ -6,7 +7,7 @@ import { signJwt } from "../../worker-main.js";
  *  OTP 注意：发码 60s 冷却 + 每小时 5 次（按 scene+email 计）——各用例独立账户，互不挤兑；
  *  同一用例内多次失败重试共用一码（服务端非消费式校验，密码错不烧码）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {
@@ -47,7 +48,7 @@ describe("A1 改密须当前密码 + 会话纪元", () => {
     const email = "sc1@test.dev";
     const out = await registerUser(email);
     const otp = await redstepOtp(email);
-    const r = await patch("/api/security/password", { otp, new_password: "newpass12345" }, out.token);
+    const r = await patch("/api/security/password", { otp, new_password: TEST_NEW_PASSWORD }, out.token);
     expect(r.status).toBe(400);
     expect((await j(r)).error.code).toBe("PASSWORD_REQUIRED");
   }, 20000);
@@ -56,11 +57,11 @@ describe("A1 改密须当前密码 + 会话纪元", () => {
     const email = "sc2@test.dev";
     const out = await registerUser(email);
     const otp = await redstepOtp(email);
-    const bad = await patch("/api/security/password", { otp, current_password: "wrong-old-pass", new_password: "newpass12345" }, out.token);
+    const bad = await patch("/api/security/password", { otp, current_password: TEST_WRONG_PASSWORD, new_password: TEST_NEW_PASSWORD }, out.token);
     expect(bad.status).toBe(401);
     expect((await j(bad)).error.code).toBe("WRONG_OLD_PASSWORD");
     /* 密码错误路径非消费式校验 OTP：同一验证码应仍可用 */
-    const ok = await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: "newpass12345" }, out.token);
+    const ok = await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: TEST_NEW_PASSWORD }, out.token);
     expect(ok.status).toBe(200);
     const body = await j(ok);
     expect(body.ok).toBe(true);
@@ -71,7 +72,7 @@ describe("A1 改密须当前密码 + 会话纪元", () => {
     const email = "sc3@test.dev";
     const out = await registerUser(email);
     const otp = await redstepOtp(email);
-    const r = await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: "newpass12345" }, out.token);
+    const r = await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: TEST_NEW_PASSWORD }, out.token);
     const body = await j(r);
     expect((await get("/api/session", out.token)).status).toBe(401);   /* 旧 token：纪元不匹配 */
     expect((await get("/api/session", body.token)).status).toBe(200);  /* 新 token：当前设备不掉线 */
@@ -79,7 +80,7 @@ describe("A1 改密须当前密码 + 会话纪元", () => {
     const badLogin = await j(await post("/api/auth/login", { identifier: email, password: PASSWORD }));
     expect(badLogin.mfa_required !== false || badLogin.error).toBeTruthy();
     await doOp(`u:${out.user_id}`, { op: "set2fa", enabled: 0 });
-    const reLogin = await j(await post("/api/auth/login", { identifier: email, password: "newpass12345" }));
+    const reLogin = await j(await post("/api/auth/login", { identifier: email, password: TEST_NEW_PASSWORD }));
     expect(typeof reLogin.token).toBe("string");
     expect((await get("/api/overview", reLogin.token)).status).toBe(200);
   }, 20000);
@@ -90,7 +91,7 @@ describe("A1 改密须当前密码 + 会话纪元", () => {
     const legacyToken = await signJwt(env.JWT_SECRET, { sub: out.user_id, email, typ: "session" }, { ttlSeconds: 3600 });
     expect((await get("/api/session", legacyToken)).status).toBe(200); /* 纪元仍 0：旧令牌有效 */
     const otp = await redstepOtp(email);
-    await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: "newpass12345" }, out.token);
+    await patch("/api/security/password", { otp, current_password: PASSWORD, new_password: TEST_NEW_PASSWORD }, out.token);
     expect((await get("/api/session", legacyToken)).status).toBe(401); /* 纪元 1：旧令牌即刻失效 */
   }, 20000);
 });
@@ -105,7 +106,7 @@ describe("A2 关闭 2FA 须当前密码；开启仍只要 OTP", () => {
     const noPw = await post("/api/security/2fa", { enabled: false, otp }, out.token);
     expect(noPw.status).toBe(400);
     expect((await j(noPw)).error.code).toBe("PASSWORD_REQUIRED");
-    const badPw = await post("/api/security/2fa", { enabled: false, otp, current_password: "nope-nope" }, out.token);
+    const badPw = await post("/api/security/2fa", { enabled: false, otp, current_password: TEST_WRONG_PASSWORD }, out.token);
     expect(badPw.status).toBe(401);
     expect((await j(badPw)).error.code).toBe("WRONG_OLD_PASSWORD");
     const ok = await post("/api/security/2fa", { enabled: false, otp, current_password: PASSWORD }, out.token);
@@ -138,13 +139,13 @@ describe("A3 找回密码：无旧密码字段 + 重置后全设备下线", () =
     await post("/api/auth/email-code", { scene: "recovery", email });
     const code = await lastCode(email, "recovery");
     /* 红线验证：找回流程只提交 email + code + new_password 三字段，绝无旧密码 */
-    const r = await post("/api/auth/recover", { email, code, new_password: "recovered99876" });
+    const r = await post("/api/auth/recover", { email, code, new_password: makePassword("rec-a") });
     expect(r.status).toBe(200);
     expect((await j(r)).ok).toBe(true);
 
     expect((await get("/api/overview", out.token)).status).toBe(401);         /* 注册设备下线 */
     expect((await get("/api/overview", otherDevice.token)).status).toBe(401); /* 另一设备下线 */
-    const reLogin = await j(await post("/api/auth/login", { identifier: email, password: "recovered99876" }));
+    const reLogin = await j(await post("/api/auth/login", { identifier: email, password: makePassword("rec-a") }));
     expect(typeof reLogin.token).toBe("string"); /* 新密码登录拿到新纪元 token */
   }, 20000);
 
@@ -153,7 +154,7 @@ describe("A3 找回密码：无旧密码字段 + 重置后全设备下线", () =
     await registerUser(email);
     await post("/api/auth/email-code", { scene: "recovery", email });
     const code = await lastCode(email, "recovery");
-    const body = { email, code, new_password: "recovered99877" };
+    const body = { email, code, new_password: makePassword("rec-b") };
     expect(Object.keys(body).some((k) => /old|current|previous/i.test(k))).toBe(false);
     const r = await post("/api/auth/recover", body);
     expect(r.status).toBe(200);

@@ -79,8 +79,8 @@ describe("advanceHistory（turn 收尾推进缓存）", () => {
 });
 
 describe("提示词安全预算", () => {
-  it("历史数值过期语义入锁定区且提示词仍在 ≤1600 预算内（第二十七轮自 1500 上调：领域边界/危机应对为必需项）", () => {
+  it("历史数值过期语义入锁定区且提示词仍在 ≤1850 预算内（第二十七轮 1500→1600；第五期 idle 1600→1850：新增规则 11 对话即方案是赛题创新机制必需项）", () => {
     expect(AI_SYSTEM_PROMPT).toContain("历史对话中的数值仅代表当时");
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1600);
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1850);
   });
 });

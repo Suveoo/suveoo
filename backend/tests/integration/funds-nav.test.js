@@ -4,6 +4,7 @@ import { accrualPrice } from "../../worker-main.js";
 import goldJson from "../../../frontend/assets/data/funds/gold-index.json";
 import asemiJson from "../../../frontend/assets/data/funds/ai-semi.json";
 import moneyJson from "../../../frontend/assets/data/funds/global-money-1.json";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 
 /** 第九期 NAV 实时化——集成：/api/wealth/funds-navs 三级降级（live → cache → static）+ 账务同源。
  *  测试池 NO_PRICE_FETCH=1（禁外呼）：预置 fund:prices:v1 / fx:live:v2(rates) 已知值驱动全部断言，零外呼。
@@ -41,7 +42,7 @@ async function lastCode(email) {
 async function registerUser(email) {
   await post("/api/auth/email-code", { scene: "register", email });
   const code = await lastCode(email);
-  return await j(await post("/api/auth/register", { email, code, name: "净值测试", password: "jinrongkeji2026", risk_answers: [3, 3, 4, 3, 4], aml_consented: true }));
+  return await j(await post("/api/auth/register", { email, code, name: "净值测试", password: TEST_PASSWORD, risk_answers: [3, 3, 4, 3, 4], aml_consented: true }));
 }
 /* 测试 R2 无生产基金 JSON：静态兜底臂需真实文件（断言用到的 3 只） */
 async function seedFundJsons() {

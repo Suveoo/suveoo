@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF } from "cloudflare:test";
 
 /** 交易记录口径拆分：scope=transfers（转账记录页）/ scope=all（交易记录页）/ 缺省（历史口径，AI transaction_history 沿用）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

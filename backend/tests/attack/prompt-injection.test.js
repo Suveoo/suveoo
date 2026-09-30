@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 提示注入与参数走私：模型输出只当 SYSTEM/建议，授权字段必须走用户确认 + 污点校验。
  *  任务一后收款方须为真实 Suveoo 账户（realTarget 造真实收款人），断言语义不变。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

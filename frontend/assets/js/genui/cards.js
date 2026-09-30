@@ -25,6 +25,8 @@ S.genuiCards = {
     goal_contribute:     { title: "genui.confirmGoalContribute", icon: "wealth", field: "genui.goalName", fee: false },
     goal_adjust:         { title: "genui.confirmGoalAdjust", icon: "gear",   field: "genui.goalName", fee: false },
     goal_abandon:        { title: "genui.confirmGoalAbandon", icon: "lock",  field: "genui.goalName", fee: false },
+    /* 第五期 idle（任务 5）：对话即方案——组合方案确认卡（明细行来自服务端核验的 IR params.items） */
+    solution_package_purchase: { title: "genui.confirmSolution", icon: "wealth", field: "genui.solutionName", fee: false },
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
@@ -56,6 +58,7 @@ S.genuiCards = {
       else if (isGoalTask) subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
       else if (c.action === "goal_create") subject = p.name ?? null;
       else if (c.action === "goal_contribute" || c.action === "goal_adjust" || c.action === "goal_abandon") subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
+      else if (c.action === "solution_package_purchase") subject = p.name ?? null;
       else {
         /* REST 通道快照里的 recipient 是内部引用（self:/acct:/payee:）——回落为友好展示，不裸露 slug */
         const r0 = p.recipient_display ?? p.recipient_name ?? p.recipient ?? p.product_id ?? p.item ?? null;
@@ -65,7 +68,7 @@ S.genuiCards = {
           : r0;
       }
     }
-    const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
+    const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "solution_package_purchase" ? p.total_amount : null) ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
     /* "ALL" 全额赎回占位按文案显示；既无金额也无 ALL（退订/开关类操作）不渲染金额行——
        此前误落 genui.redeemAll 把退订确认卡显示成"全部持仓"（第六期 idle 生产实测抓出，存量 bug） */
     const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : (String(rawAmt) === "ALL" ? S.t("genui.redeemAll") : null);
@@ -78,6 +81,7 @@ S.genuiCards = {
         ...(fieldKey && subject != null ? [[S.t(fieldKey), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
         ...(p.memo != null && String(p.memo) !== "" ? [[S.t("genui.memo"), p.memo]] : []),
+        ...(c.action === "solution_package_purchase" && p.horizon_months != null ? [[S.t("genui.solutionHorizon"), S.t("tc.mFmt", p.horizon_months)]] : []),
         ...(c.action === "subscription_cancel" ? [
           ...(p.subscription_amount != null ? [[S.t("genui.subFee"), `¥${S.fmt.moneyPlain(p.subscription_amount)} / ${S.fmt.escape(p.subscription_cycle ?? "月")}`]] : []),
           ...(p.subscription_next != null ? [[S.t("genui.subNext"), S.fmt.escape(p.subscription_next)]] : []),
@@ -103,6 +107,15 @@ S.genuiCards = {
         ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
+      ${c.action === "solution_package_purchase" && Array.isArray(p.items) ? `<div class="sol-lines">
+        ${p.items.map((it) => `<div class="sol-line">
+          <span class="sol-pct mono">${S.fmt.escape(String(it.pct ?? "—"))}%</span>
+          <span class="sol-name grow">${S.fmt.escape(it.name ?? it.product_id)}<i class="muted small">${it.kind === "deposit" ? `${S.fmt.escape(String(it.rate ?? "—"))}%` : `R${S.fmt.escape(String(it.risk_level ?? "?"))}`}</i></span>
+          <span class="mono">¥${S.fmt.moneyPlain(it.amount)}</span>
+        </div>`).join("")}
+        <div class="sol-line sol-total"><span class="grow muted">${S.fmt.escape(S.t("genui.solutionTotal"))}</span><span class="mono">¥${S.fmt.moneyPlain(p.total_amount)}</span></div>
+      </div>` : ""}
+      ${c.action === "solution_package_purchase" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.solutionNote"))}</p>` : ""}
       ${isBd && amtText ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.lockNote", S.fmt.moneyPlain(rawAmt)))}</p>` : ""}
       ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
       ${c.action === "task_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.taskCancelNote"))}</p>` : ""}

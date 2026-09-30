@@ -1,6 +1,6 @@
 /* goal-planner.js — 目标储蓄计划器（target,current,years,rate）：每月需存 + 缺口分析 */
-S.router.register("goal-planner", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["goal-planner"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.goalName"))}</h1>
@@ -20,11 +20,10 @@ S.router.register("goal-planner", async () => {
       </div>
       <div class="field-err" id="tc-err" hidden>${S.fmt.escape(S.t("tc.invalid"))}</div>
       <div id="r-note" style="margin-top:var(--sp-3)"></div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const calc = () => {
-    const t = S.toolKit.num("target"), cur = S.toolKit.num("current"), y = S.toolKit.num("years"), r = S.toolKit.num("rate");
+    const t = S.toolKit.num("target", c), cur = S.toolKit.num("current", c), y = S.toolKit.num("years", c), r = S.toolKit.num("rate", c);
     if ([t, cur, y, r].some((v) => v == null) || t <= 0 || cur < 0 || y <= 0 || r < 0) {
       $("tc-err").hidden = false;
       ["r-need", "r-fv", "r-gap"].forEach((id) => ($(id).textContent = "—"));
@@ -49,5 +48,6 @@ S.router.register("goal-planner", async () => {
   };
   S.toolKit.bind([
     { id: "target", def: "500000" }, { id: "current", def: "100000" }, { id: "years", def: "5" }, { id: "rate", def: "3" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("goal-planner", async () => { await S.toolPages["goal-planner"](document.getElementById("content")); });

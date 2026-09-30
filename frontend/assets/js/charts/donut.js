@@ -14,7 +14,7 @@ S.charts.donut = function (items, { size = 200 } = {}) {
     return seg;
   }).join("");
   const legend = items.map((it) => `<div class="split-row"><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.color};margin-right:8px"></i>${S.fmt.escape(it.label)}</span><span class="mono">${Math.round((it.value / total) * 100)}%</span></div>`).join("");
-  return `<div class="row" style="align-items:center;gap:24px;flex-wrap:wrap"><svg width="${size + PAD * 2}" height="${size + PAD * 2}" viewBox="-${PAD} -${PAD} ${size + PAD * 2} ${size + PAD * 2}">${segs}
+  return `<div class="row donut-wrap" style="align-items:center;gap:24px;flex-wrap:wrap"><svg width="${size + PAD * 2}" height="${size + PAD * 2}" viewBox="-${PAD} -${PAD} ${size + PAD * 2} ${size + PAD * 2}">${segs}
     <text x="${size / 2}" y="${size / 2 + 5}" text-anchor="middle" font-size="13" fill="#666">${S.fmt.escape(S.t("common.total"))}</text></svg>
     <div style="flex:1;min-width:180px">${legend}</div></div>`;
 };

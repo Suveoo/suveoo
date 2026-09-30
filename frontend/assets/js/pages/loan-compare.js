@@ -1,6 +1,6 @@
 /* loan-compare.js — 贷款对比计算器（amount,rate,years）：等额本息 vs 等额本金 */
-S.router.register("loan-compare", async () => {
-  const c = document.getElementById("content");
+S.toolPages = S.toolPages ?? {};
+S.toolPages["loan-compare"] = async (c, opts = {}) => {
   const num = (label, id, val, lg = false) =>
     `<label class="field"><span class="lb">${S.fmt.escape(label)}</span><input class="input${lg ? " input-lg" : ""}" id="${id}" value="${val}" inputmode="decimal"></label>`;
   c.innerHTML = `<h1>${S.fmt.escape(S.t("tc.loanName"))}</h1>
@@ -34,11 +34,10 @@ S.router.register("loan-compare", async () => {
     <div class="tc-duo">
       <div class="card" id="curve-a"></div>
       <div class="card" id="curve-s"></div>
-    </div>
-    ${S.sim.footnote()}`;
-  const $ = (id) => document.getElementById(id);
+    </div>`;
+  const $ = (id) => c.querySelector("#" + id);
   const calc = () => {
-    const A = S.toolKit.num("amount"), r = S.toolKit.num("rate"), y = S.toolKit.num("years");
+    const A = S.toolKit.num("amount", c), r = S.toolKit.num("rate", c), y = S.toolKit.num("years", c);
     if ([A, r, y].some((v) => v == null) || A <= 0 || r < 0 || y <= 0) {
       $("tc-err").hidden = false;
       ["a-pay", "a-int", "a-total", "s-first", "s-last", "s-int", "s-total", "diff"].forEach((id) => ($(id).textContent = "—"));
@@ -75,5 +74,6 @@ S.router.register("loan-compare", async () => {
   };
   S.toolKit.bind([
     { id: "amount", def: "1000000" }, { id: "rate", def: "3.1" }, { id: "years", def: "30" },
-  ], calc);
-});
+  ], calc, { scope: c, params: opts.params, noSync: !!opts.embed });
+};
+S.router.register("loan-compare", async () => { await S.toolPages["loan-compare"](document.getElementById("content")); });

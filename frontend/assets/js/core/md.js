@@ -74,22 +74,37 @@ S.md = {
     return out.join("");
   },
   /* 工具深链按钮卡：匹配工具页带参 URL（Markdown 链接或裸 URL 均识别）。
-     注：整体转义后 URL 中的 & 已成 &amp;，作为 href 属性恰是合法转义，无需还原。 */
+     注：整体转义后 URL 中的 & 已成 &amp;，作为 href 属性恰是合法转义，无需还原。
+     第五期 idle：按钮卡下方追加 .tool-embed 隐藏占位（携带 slug+query），由 S.tools.hydrate
+     在消息定稿后渲染完整可交互工具（/ai 页已引入全部工具页脚本；未引入的页面占位保持隐藏、跳页能力不受影响）。 */
   toolLinkRe: /^https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?.+$/,
   toolCard(url) {
-    return `<a class="tool-open" href="${url}" target="_blank" rel="noopener noreferrer">${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>`;
+    const m = url.match(/^https:\/\/suveoo\.com\/wealth\/tools\/([a-z-]+)(?:\?([^"<]*))?$/);
+    const embed = m && S.toolPages ? `<div class="tool-embed" data-tool="${m[1]}" data-query="${m[2] ?? ""}" hidden></div>` : "";
+    return `<a class="tool-open" href="${url}" target="_blank" rel="noopener noreferrer">${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>${embed}`;
   },
-  /* 行内：代码 span → 工具深链按钮（先于普通链接）→ 链接（仅 http/s）→ 粗体 → 斜体 → 还原代码 */
+  /* 行内：代码 span → 工具深链按钮（先于普通链接；输出经 \u0000T 占位符保护，防后续裸 URL 正则嵌套命中已生成的 href）→
+     站内裸 URL（仅 suveoo.com 域；工具深链转按钮卡，其余渲染为同窗可点链接，外链裸形式不放行）→
+     Markdown 链接（站内同窗 / 外链 target=_blank）→ 粗体 → 斜体 → 还原占位符 */
   inline(s) {
     const spans = [];
     s = s.replace(/`([^`]+)`/g, (m, c) => { spans.push(c); return "\u0000C" + (spans.length - 1) + "\u0000"; });
-    s = s.replace(/\[[^\]]*\]\((https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)]+)\)/g, (m, url) => (this.toolLinkRe.test(url) ? this.toolCard(url) : m));
-    /* 裸 URL：前缀不得是 URL 字符（避免截断已有链接），“图形化页面：”全角冒号等标点后可识别 */
-    s = s.replace(/(?<![\w\/.=&,])(https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s<)）」』】]+)/g, (m, url) => (this.toolLinkRe.test(url) ? this.toolCard(url) : m));
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    const cards = [];
+    const keep = (html) => { cards.push(html); return "\u0000T" + (cards.length - 1) + "\u0000"; };
+    /* markdown 自动链接 <https://suveoo.com/...>：拆掉角括号（转义后为 &lt;/&gt;），交由下方裸 URL 统一处理——
+       否则结尾 &gt; 会被吞进 URL，深链参数带脏字符（qwen 实测会出现该格式） */
+    s = s.replace(/&lt;(https:\/\/suveoo\.com\/[^\s<)）」』】。，；、！？：]+?)&gt;/g, "$1");
+    s = s.replace(/\[[^\]]*\]\((https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)]+)\)/g, (m, url) => (this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : m));
+    /* 裸 URL：前缀不得是 URL 字符或 '('（避免截断 markdown 链接括号内的地址）；句读全角标点不入链；结尾实体剥除 */
+    s = s.replace(/(?<![\w\/.=&,(])(https:\/\/suveoo\.com\/[^\s<)）」』】。，；、！？：]+)/g, (m) => {
+      const url = m.replace(/(?:&gt;|&amp;)+$/, "");
+      return this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : `<a href="${url}">${url}</a>`;
+    });
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, url) => (url.startsWith("https://suveoo.com/") ? `<a href="${url}">${t}</a>` : `<a href="${url}" target="_blank" rel="noopener noreferrer">${t}</a>`));
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");
     s = s.replace(/\u0000C(\d+)\u0000/g, (m, k) => '<code class="md-code">' + spans[+k] + "</code>");
+    s = s.replace(/\u0000T(\d+)\u0000/g, (m, k) => cards[+k]);
     return s;
   },
 };

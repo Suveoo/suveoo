@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /** 第十一期新工具全链：site_guide / notification_list / transfer_limit_query / bill_list / report_status（GREEN 只读）
  *  + subscription_reminder_toggle（YELLOW 出卡→确认→执行→审计） + deposit_open（RED OTP→确认→执行→持仓/审计）。 */
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {

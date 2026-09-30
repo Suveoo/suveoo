@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TEST_PASSWORD, TEST_NEW_PASSWORD, TEST_WRONG_PASSWORD, makePassword } from "../helpers/test-creds.js";
 import { SELF, env } from "cloudflare:test";
 
 /**
@@ -7,7 +8,7 @@ import { SELF, env } from "cloudflare:test";
  */
 
 const BASE = "https://suveoo.com";
-const PASSWORD = "jinrongkeji2026";
+const PASSWORD = TEST_PASSWORD;
 const RISK = [3, 3, 4, 3, 4]; // → PR3
 
 async function post(path, body, token) {
@@ -155,10 +156,10 @@ describe("登录与 2FA", () => {
     const email = "lock@test.dev";
     await registerUser(email);
     for (let i = 0; i < 5; i++) {
-      const r = await post("/api/auth/login", { identifier: email, password: "wrong-pass-1" });
+      const r = await post("/api/auth/login", { identifier: email, password: TEST_WRONG_PASSWORD });
       expect(r.status).toBe(401);
     }
-    const locked = await post("/api/auth/login", { identifier: email, password: "wrong-pass-1" });
+    const locked = await post("/api/auth/login", { identifier: email, password: TEST_WRONG_PASSWORD });
     expect(locked.status).toBe(429);
     expect((await j(locked)).error.code).toBe("LOGIN_LOCKED");
   });
@@ -172,12 +173,12 @@ describe("找回密码", () => {
     const r1 = await post("/api/auth/email-code", { scene: "recovery", email });
     expect(r1.status).toBe(200);
     const code = await lastCode(email);
-    const r2 = await post("/api/auth/recover", { email, code, new_password: "newPass-2026" });
+    const r2 = await post("/api/auth/recover", { email, code, new_password: TEST_NEW_PASSWORD });
     expect(r2.status).toBe(200);
 
     const oldLogin = await post("/api/auth/login", { identifier: email, password: PASSWORD });
     expect(oldLogin.status).toBe(401);
-    const newLogin = await post("/api/auth/login", { identifier: email, password: "newPass-2026" });
+    const newLogin = await post("/api/auth/login", { identifier: email, password: TEST_NEW_PASSWORD });
     expect(newLogin.status).toBe(200);
   });
 
@@ -186,7 +187,7 @@ describe("找回密码", () => {
     const r = await post("/api/auth/email-code", { scene: "recovery", email });
     expect(r.status).toBe(200);
     expect(await env.MAIL_OUTBOX.get(`outbox:${email}`)).toBeNull();
-    const bad = await post("/api/auth/recover", { email, code: "123456", new_password: "whatever-1" });
+    const bad = await post("/api/auth/recover", { email, code: "123456", new_password: TEST_WRONG_PASSWORD });
     expect(bad.status).toBe(401);
   });
 });
