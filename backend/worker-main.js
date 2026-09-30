@@ -6257,6 +6257,50 @@ export function staticKeyCandidates(pathname) {
   if (p === "") return ["index.html"];
   return [p, `${p}/index.html`, `${p}.html`];
 }
+
+/* ================================================================
+ * ②.9 语音输入 ASR 代理（第四十一轮）：阿里云智能语音交互 NLS 实时识别
+ *    前端音频 → /api/voice/stream（Worker WS）→ 阿里 NLS WebSocket → 文本回推。
+ *    密钥只活在 wrangler secrets（ASR_ALI_KEY_ID/ASR_ALI_KEY_SECRET/ASR_APPKEY），
+ *    前端零密钥；VOICE_ASR_PROVIDER var（"ali"|"webspeech"，默认 webspeech）
+ *    一行切换底层通道（教程：for_developer/switch_suveoo_ai_voice_input_path.md）。
+ * ================================================================ */
+
+/* POP 风格 percent-encode（RFC3986：空格 %20、* %2A，保留 -_.~）——阿里云 V1.0 签名用 */
+export function aliPercentEncode(v) {
+  return encodeURIComponent(String(v)).replace(/\+/g, "%20").replace(/\*/g, "%2A").replace(/%7E/g, "~");
+}
+/** 阿里云 POP V1.0 HMAC-SHA1 签名（crypto.subtle 异步，Worker 与 vitest(node webcrypto) 通用）。
+ *  params 含全部公共参数（除 Signature）；返回 Base64 原值（入 URL 前需再 percentEncode）。
+ *  官方离线测试向量见 tests/unit/asr-voice.test.js（b924c8c3… → hHq4yNsPitlfDJ2L0nQPdugdEzM=）。 */
+export async function aliPopSignatureAsync(secretKey, method, params) {
+  const enc = new TextEncoder();
+  const cq = Object.keys(params).sort().map((k) => `${aliPercentEncode(k)}=${aliPercentEncode(params[k])}`).join("&");
+  const sts = `${method.toUpperCase()}&${aliPercentEncode("/")}&${aliPercentEncode(cq)}`;
+  const key = await crypto.subtle.importKey("raw", enc.encode(secretKey + "&"), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(sts));
+  let bin = "";
+  for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+/** NLS token：CreateToken POP API（KV 缓存至到期前 300s；纯函数签 + env 缓存读写分离便于测试） */
+export function nlsTokenParams(akId, nonce, isoTs) {
+  return {
+    AccessKeyId: akId, Action: "CreateToken", Format: "JSON", RegionId: "cn-shanghai",
+    SignatureMethod: "HMAC-SHA1", SignatureNonce: nonce, SignatureVersion: "1.0",
+    Timestamp: isoTs, Version: "2019-02-28",
+  };
+}
+/** NLS 实时识别指令帧构造（纯函数；task_id/message_id 32 位十六进制） */
+export function nlsWsDirective(name, appkey, taskId, messageId, payload = undefined) {
+  const header = { message_id: messageId, task_id: taskId, namespace: "SpeechTranscriber", name, appkey };
+  return JSON.stringify(payload ? { header, payload } : { header });
+}
+export function nlsHex32() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 export function rewriteDynamicRoutes(pathname) {
   const m = /^\/account\/card\/[^/]+\/(history|settings)\/?$/.exec(pathname);
   if (m) return `/account/card/${m[1]}`;
