@@ -4,6 +4,7 @@ dist/
 .wrangler/
 .zcode/
 .mimosa/
+.claude/
 nls/
 .dev.vars.*
 !.dev.vars.example
