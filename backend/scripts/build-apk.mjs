@@ -30,6 +30,7 @@ const walkCopy = () => {
   mkdirSync(SLIM, { recursive: true });
   const rec = (d, base = "") => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name.startsWith(".")) continue; /* 2026-10-02 教训：.mimosa 等工具缓存勿入包（同 deploy-frontend 修复） */
       const rel = base ? `${base}/${e.name}` : e.name;
       const full = path.join(d, e.name);
       if (e.isDirectory()) { rec(full, rel); continue; }
@@ -72,6 +73,6 @@ execFileSync("cmd.exe", ["/c", path.join(ANDROID, "gradlew.bat"), "assembleRelea
 const apk = path.join(ANDROID, "app/build/outputs/apk/release/app-release.apk");
 if (!existsSync(apk)) throw new Error("APK not found");
 mkdirSync(OUT, { recursive: true });
-const dest = path.join(OUT, "Suveoo-v2.5.apk");
+const dest = path.join(OUT, "Suveoo-v2.6.apk");
 cpSync(apk, dest);
 console.log(`✓ APK ${(statSync(dest).size / 1024 / 1024).toFixed(1)} MB → ${dest}`);

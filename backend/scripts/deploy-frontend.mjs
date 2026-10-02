@@ -21,7 +21,8 @@ const FRONTEND_DIR = path.resolve(HERE, "../../frontend");
 const BUCKET = "suveoo-bank-r2";
 // 直接用当前 Node 执行本地 wrangler bin（Windows 下 execFile 解析不了 npx.cmd 垫片）
 const WRANGLER_BIN = path.resolve(HERE, "../node_modules/wrangler/bin/wrangler.js");
-const runWrangler = (args, opts) => exec(process.execPath, [WRANGLER_BIN, ...args], opts);
+/* 2026-10-02：execFile 必须带 timeout——无超时下卡住的 wrangler 子进程会让 uploadOne 的 Promise 永挂（本轮实测 34 分钟） */
+const runWrangler = (args, opts) => exec(process.execPath, [WRANGLER_BIN, ...args], { timeout: 180_000, killSignal: "SIGKILL", ...opts });
 
 const args = process.argv.slice(2);
 const flag = (name, def) => {
@@ -29,7 +30,7 @@ const flag = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 const FILTER = flag("filter", null);
-const CONCURRENCY = Number(flag("concurrency", "4"));
+const CONCURRENCY = Number(flag("concurrency", "20"));
 const NO_MINIFY = args.includes("--no-minify"); // 调试逃生口
 
 /* ===== 上传前压缩（第四十五轮队长令）：仅作用于上传副本（临时文件），本地文件原样不动 =====
@@ -65,9 +66,12 @@ const CONTENT_TYPES = {
   ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8",
 };
 
+/* 2026-10-02 第六十九轮教训：walk 必须跳过点开头目录——.mimosa 工具缓存曾被当资产上传
+ * （超长 key 的 put 在 GFW 网络下无限重试挂死 34 分钟，且会话内部状态泄漏到公开桶） */
 async function walk(dir, base = "") {
   const out = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".")) continue;
     const rel = base ? `${base}/${entry.name}` : entry.name;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...await walk(full, rel));

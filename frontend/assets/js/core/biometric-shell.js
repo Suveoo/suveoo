@@ -63,6 +63,7 @@
       const j = await res.json().catch(() => null);
       if (j && j.token) {
         localStorage.setItem("suveoo_token", j.token);
+        try { localStorage.setItem("suveoo_login_hint", creds.email); } catch { /* 隐私模式忽略 */ }
         const next = new URLSearchParams(location.search).get("next");
         location.replace(next || "/home");
         return true;
@@ -90,7 +91,20 @@
       if (localStorage.getItem("suveoo_token")) return;
       const st = await Bio.isAvailable().catch(() => null);
       if (st && st.hasStored) {
-        setTimeout(() => { if (!localStorage.getItem("suveoo_token")) quickLogin(); }, 600);
+        setTimeout(() => {
+          if (localStorage.getItem("suveoo_token")) return;
+          /* 可见性徽标（第六十九轮强化）：有加密存档时按钮下方亮出一行提示——
+             用户（及验收）一眼可判断"这台设备快捷登录在位"；取消/失败后徽标仍在=机制未丢 */
+          const btn = document.getElementById("l-go");
+          if (btn && !document.getElementById("bio-avail")) {
+            const el = document.createElement("div");
+            el.id = "bio-avail";
+            el.style.cssText = "margin-top:10px;font-size:12px;color:#4a55a2;text-align:center";
+            el.textContent = t("bio.availableHint", "已启用指纹快捷登录");
+            btn.insertAdjacentElement("afterend", el);
+          }
+          quickLogin();
+        }, 600);
       }
     } catch { /* 插件异常静默——完整登录永远可用 */ }
   };

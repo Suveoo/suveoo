@@ -42,6 +42,7 @@ S.api = {
       const onPublicPage = S.router?.PUBLIC_PAGES?.has(document.body?.dataset?.page ?? "") ?? false;
       if (!onPublicPage && !path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
         sessionStorage.setItem("suveoo_redirecting", "1");
+        sessionStorage.setItem("suveoo_session_expired", "1"); /* 登录页一次性显示"已过期"提示（第六十九轮） */
         const next = encodeURIComponent(location.pathname + location.search);
         location.replace((S.router?.navPath?.("/account/login") ?? "/account/login") + `?next=${next}`);
         setTimeout(() => sessionStorage.removeItem("suveoo_redirecting"), 4000);

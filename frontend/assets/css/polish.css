@@ -855,3 +855,12 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
   .apk-grid { grid-template-columns: 1fr; }
   .apk-dl-btn { width: 100%; justify-content: center; }
 }
+
+/* ===== §42 登录过期提示 + 账户记忆（第六十九轮） ===== */
+.l-expired {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0 0 14px; padding: 9px 12px;
+  border-radius: 10px; background: rgba(234, 149, 37, 0.12); color: #8a5a10;
+  font-size: 13px; line-height: 1.45;
+}
+.l-expired svg { flex: none; }

@@ -6605,6 +6605,9 @@ function r2Response(obj, key, status = 200) {
 export async function serveStatic(env, request, url) {
   if (request.method !== "GET" && request.method !== "HEAD") return apiError("METHOD_NOT_ALLOWED", "static assets are GET/HEAD only", 405);
   const pathname = rewriteDynamicRoutes(url.pathname);
+  /* 点开头路径一律 404（第六十九轮教训纵深防御）：deploy 脚本曾把 .mimosa 工具缓存传进桶且公网可读；
+   * 即使未来再有类似对象入桶，本守卫也确保其永不可被访问 */
+  if (/^\/\./.test(url.pathname)) return withSecurityHeaders(new Response("404 Not Found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } }));
   /* /ai/s/{sid} 会话页与 /ai 同一 HTML：头部声明 noindex 防搜索引擎按会话 ID 抓出无限变体 URL */
   const extraHeaders = /^\/ai\/s\//.test(url.pathname) ? { "x-robots-tag": "noindex, nofollow" } : null;
   const inm = request.headers.get("if-none-match");
