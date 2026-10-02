@@ -30,6 +30,8 @@ S.router.register("account", async ({ user }) => {
       <h3>${S.fmt.escape(S.t("acct.prefs"))}</h3>
       <div class="list-row" style="cursor:pointer" id="pref-lang"><span class="avatar acct-pav">${S.ui.icon("globe", 14)}</span><div class="grow">${S.fmt.escape(S.t("acct.lang"))}</div>
         <span class="ah-langcur">${S.fmt.escape((S.i18n.langs.find((l) => l.code === S.i18n.lang) ?? {}).name ?? S.i18n.lang)}</span>${S.ui.icon("arrow-right", 14)}</div>
+      <div class="list-row" style="cursor:pointer" id="pref-notif"><span class="avatar acct-pav">${S.ui.icon("bell", 14)}</span><div class="grow">${S.fmt.escape(S.t("acct.notifPrefs"))}</div>
+        ${S.ui.icon("arrow-right", 14)}</div>
       <div class="list-row"><span class="avatar acct-pav">${S.ui.icon("doc", 14)}</span><div class="grow">Cookie</div>
         <button class="btn btn-sm btn-light" onclick="S.chrome.cookieModal()">${S.fmt.escape(S.t("cookie.prefs"))}</button></div>
       <button class="btn acct-logout" id="logout">${S.ui.icon("lock", 14)} ${S.fmt.escape(S.t("acct.logout"))}</button>
@@ -91,6 +93,8 @@ S.router.register("account", async ({ user }) => {
     m.el.querySelector("#lo-no").onclick = () => m.close();
     m.el.querySelector("#lo-yes").onclick = () => S.auth.logout();
   };
+  /* 偏好 · 通知设定（第五十六轮）：权限检查→类别开关弹窗（偏好跨设备同步，关闭类不弹系统通知） */
+  document.getElementById("pref-notif").onclick = () => S.notify.openPrefs();
   /* 偏好 · 语言：点击弹出三语选择（选择后即时生效） */
   document.getElementById("pref-lang").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("acct.lang"))}</h2>

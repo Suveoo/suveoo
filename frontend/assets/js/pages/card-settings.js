@@ -12,7 +12,7 @@ S.router.register("card-settings", async () => {
   const isCredit = cd.kind === "credit";
   pane.innerHTML = `
     <div class="cs-hero">
-      <img class="bc-art" src="${S.fmt.cardFront(cd)}" alt="">
+      <img class="bc-art" src="${S.fmt.cardFront(cd, [cd])}" alt="">
       <div class="cs-hero-info">
         <div class="cs-numrow">
           <b class="mono" id="cs-num">${S.fmt.escape(cd.number)}</b>

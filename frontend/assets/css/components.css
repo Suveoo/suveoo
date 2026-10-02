@@ -61,7 +61,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .table th, .table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--color-line); }
 .table th { color: var(--color-ink-2); font-weight: 500; font-size: var(--fs-12); }
 
-.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: var(--sp-4); }
+/* 遮罩磨砂玻璃（第五十九轮补：与 cal-mask blur(6px)/app-header blur(10px) 同一设计语言；
+   scrim 由 .45 微降至 .38 补偿 blur 叠加的压暗） */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.38); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: var(--sp-4); }
 /* 弹窗打开锁背景滚动（S.ui.modal 维护 body.modal-open，嵌套计数安全）+ 模态内容滚动不外溢 */
 body.modal-open { overflow: hidden; }
 .modal { background: #fff; border-radius: 16px; max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-6); box-shadow: var(--shadow); }

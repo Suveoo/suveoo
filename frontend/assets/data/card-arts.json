@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-30T17:09:26.366Z",
+  "generated_at": "2026-10-02T11:17:43.874Z",
   "debit": {
     "mastercard": [
       "assets/images/cards-front/debit-cards/mastercard/debit-card-1-front.webp",
@@ -11,9 +11,18 @@
       "assets/images/cards-front/debit-cards/mastercard/debit-card-7-front.webp",
       "assets/images/cards-front/debit-cards/mastercard/debit-card-8-front.webp"
     ],
-    "visa": [],
-    "american-express": [],
-    "unionpay": []
+    "visa": [
+      "assets/images/cards-front/debit-cards/visa/debit-card-10-front.webp",
+      "assets/images/cards-front/debit-cards/visa/debit-card-9-front.webp"
+    ],
+    "american-express": [
+      "assets/images/cards-front/debit-cards/american-express/debit-card-11-front.webp"
+    ],
+    "unionpay": [
+      "assets/images/cards-front/debit-cards/unionpay/debit-card-12-front.webp",
+      "assets/images/cards-front/debit-cards/unionpay/debit-card-13-front.webp",
+      "assets/images/cards-front/debit-cards/unionpay/debit-card-14-front.webp"
+    ]
   },
   "credit": {
     "mastercard": [

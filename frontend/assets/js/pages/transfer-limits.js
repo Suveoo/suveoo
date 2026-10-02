@@ -33,10 +33,16 @@ S.router.register("transfer-limits", async () => {
       m.el.querySelector("#ok").onclick = async () => {
         const single = m.el.querySelector("#l-single").value.trim();
         const daily = m.el.querySelector("#l-daily").value.trim();
-        const r2 = await S.api.mutate(`/api/cards/${slug}/limits`, { limit_single: single, limit_daily: daily });
-        if (r2.cancelled) return;
-        if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 700); }
-        else S.ui.toast(r2.data?.reason ?? "failed", true);
+        const okBtn = m.el.querySelector("#ok");
+        S.ui.btnBusy(okBtn, true); /* 保存按钮 loading（第六十一轮） */
+        try {
+          const r2 = await S.api.mutate(`/api/cards/${slug}/limits`, { limit_single: single, limit_daily: daily });
+          if (r2.cancelled) return;
+          if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 700); }
+          else S.ui.toast(r2.data?.reason ?? "failed", true);
+        } finally {
+          S.ui.btnBusy(okBtn, false);
+        }
       };
     };
   });

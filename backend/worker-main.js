@@ -628,6 +628,10 @@ export async function recordNonce(nonceStore, nonce) {
  * ② 安全前置（Auth）+ 邮件
  * ================================================================ */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/* 第六十七轮：邮箱身份键一律 trim+小写归一。registry 为精确匹配，此前大小写变体（Zhang@/zhang@）
+ * 可开出共用同一真实邮箱的两个账户（账户分裂、找回密码打到错误变体）。四个入口统一收口：
+ * 注册 / 登录标识 / 验证码 / 找回。 */
+const normEmail = (s) => String(s ?? "").trim().toLowerCase();
 const EMAIL_CODE_SCENES = new Set(["register", "login2fa", "recovery", "redstep", "cbunlock"]);
 const SESSION_TTL = 3600, MFA_TOKEN_TTL = 300, EMAIL_CODE_TTL = 600, LOGIN_FAIL_LIMIT = 5;
 export const maskEmail = (email) => {
@@ -722,6 +726,79 @@ function riskAssessmentMail(prLevel) {
   return { subject: title, text, html };
 }
 
+/* ===== 第六十四轮：银行邮件场景补全（对照业界 transactional email 场景大全的缺口：
+ *   欢迎开户 / 新设备登录 / 2FA 变更 / 密码变更与重置 / 转账失败回执 / 卡片冻结解冻 /
+ *   账单与信用卡还款缴费回执 / 订阅取消 / 申购赎回与存款确认 / 预约转账建单与到期结果 /
+ *   账单订阅到期摘要（含每月对账单提示）。全部沿用既有模板风格与 EMAIL_SIGNATURE，无 emoji。 ===== */
+function welcomeMail({ email }) {
+  const text = `欢迎使用 Suveoo。\n\n账户 ${email} 已成功开立，系统已为您生成 4 张借记卡与 1 张信用卡。\n\n您现在可以：\n· 行内转账与预约转账（支持常用收款人与本人互转）\n· 基金申购、定期存款与攒钱目标\n· 交给 Suveoo AI 管家：对话即可办理，高风险操作均需您在确认卡上二次确认\n\n安全建议：尽早开启两步验证，可显著降低账户被盗用风险。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">欢迎使用 Suveoo</h2><p>账户 <b>${escHtml(email)}</b> 已成功开立，系统已为您生成 4 张借记卡与 1 张信用卡。</p><p style="line-height:1.8">您现在可以：<br>· 行内转账与预约转账（支持常用收款人与本人互转）<br>· 基金申购、定期存款与攒钱目标<br>· 交给 <b>Suveoo AI 管家</b>：对话即可办理，高风险操作均需您在确认卡上二次确认</p><p>安全建议：尽早<a href="https://suveoo.com/account/security">开启两步验证</a>，可显著降低账户被盗用风险。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: "【Suveoo】账户开立成功，欢迎使用", text, html };
+}
+function newDeviceMail({ device, time }) {
+  const text = `您的 Suveoo 账户于一台新设备完成登录。\n\n设备特征：${device}\n登录时间：${time}（UTC）\n\n如非本人操作，请立即修改密码并开启两步验证。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">新设备登录提醒</h2><p>您的 Suveoo 账户于一台新设备完成登录。</p><p>设备特征：${escHtml(device)}</p><p>登录时间：${escHtml(time)}（UTC）</p><p style="color:#C0392B">如非本人操作，请立即<a href="https://suveoo.com/account/security">修改密码并开启两步验证</a>。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: "【Suveoo】新设备登录提醒", text, html };
+}
+function twofaChangedMail({ enabled }) {
+  const text = `您的账户两步验证已${enabled ? "开启" : "关闭"}。\n\n${enabled ? "此后每次登录除密码外还需输入邮箱验证码，安全性显著提升。" : "关闭后登录仅凭密码完成，安全性降低；如非本人操作，请立即修改密码。"}\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">两步验证已${enabled ? "开启" : "关闭"}</h2><p>${enabled ? "此后每次登录除密码外还需输入邮箱验证码，安全性显著提升。" : "关闭后登录仅凭密码完成，安全性降低；如非本人操作，请立即修改密码。"}</p><p><a href="https://suveoo.com/account/security">安全中心</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】两步验证已${enabled ? "开启" : "关闭"}`, text, html };
+}
+function passwordChangedMail({ via }) {
+  const viaZh = via === "reset" ? "经邮箱验证码强验证后完成密码重置" : "已修改登录密码";
+  const text = `您的账户${viaZh}，该账户全部登录会话已下线，需使用新密码重新登录。\n\n如非本人操作，请立即通过「忘记密码」找回并开启两步验证。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">密码已${via === "reset" ? "重置" : "修改"}</h2><p>您的账户${viaZh}，该账户全部登录会话已下线，需使用新密码重新登录。</p><p style="color:#C0392B">如非本人操作，请立即通过「忘记密码」找回并开启两步验证。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】密码已${via === "reset" ? "重置" : "修改"}`, text, html };
+}
+function transferFailedMail({ amount, to, reason }) {
+  const reasonZh = { INSUFFICIENT_BALANCE: "付款卡可用余额不足", CIRCUIT_LOCKED: "安全熔断已触发，写操作临时锁定", RECIPIENT_UNRESOLVED: "收款方无法解析（姓名或账号校验未通过）", LIMIT_EXCEEDED: "超出卡片交易限额", ACCOUNT_NOT_FOUND: "收款账号不存在", NAME_MISMATCH: "收款人姓名与账号不匹配", INVALID_CARD_FORMAT: "收款账号格式无效", PAYEE_NOT_FOUND: "常用收款人不存在" }[reason] ?? "系统未能完成本笔交易";
+  const text = `您发起的一笔转账未成功，资金未发生变动。\n\n金额：¥${amount}\n收款人：${to}\n失败原因：${reasonZh}\n\n您可核对信息后重试，或前往 Suveoo AI 管家对话排查。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">转账未成功</h2><p>您发起的一笔转账未成功，<b>资金未发生变动</b>。</p><p>金额：<b>¥${escHtml(String(amount))}</b></p><p>收款人：${escHtml(String(to))}</p><p>失败原因：${escHtml(reasonZh)}</p><p>您可核对信息后重试，或前往 <a href="https://suveoo.com/ai">Suveoo AI 管家</a> 对话排查。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】转账未成功 ¥${amount}（${to}）`, text, html };
+}
+function cardStatusMail({ card, frozen }) {
+  const text = `您的卡片状态已变更。\n\n卡片：${card}\n当前状态：${frozen ? "已冻结（线上支付与取现暂停，已有定期扣款可能受影响）" : "已解冻（恢复正常使用）"}\n\n如非本人操作，请立即联系支持或修改密码。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">卡片已${frozen ? "冻结" : "解冻"}</h2><p>卡片：<b>${escHtml(String(card))}</b></p><p>当前状态：${frozen ? "已冻结（线上支付与取现暂停，已有定期扣款可能受影响）" : "已解冻（恢复正常使用）"}</p><p><a href="https://suveoo.com/account/cards">卡片管理</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】卡片 ${card} 已${frozen ? "冻结" : "解冻"}`, text, html };
+}
+function billPaidMail({ billId, name, amount }) {
+  const isRepay = billId === "credit-repay";
+  const text = `您的${isRepay ? "信用卡还款" : "账单缴费"}已成功。\n\n项目：${name}${isRepay ? "（信用卡全额还款）" : ""}\n金额：¥${amount}\n\n可在「收付 → 账单与订阅」查看缴费记录。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">${isRepay ? "信用卡还款成功" : "账单缴费成功"}</h2><p>项目：<b>${escHtml(String(name))}</b>${isRepay ? "（信用卡全额还款）" : ""}</p><p>金额：<b>¥${escHtml(String(amount))}</b></p><p><a href="https://suveoo.com/pay/bills">查看缴费记录</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】${isRepay ? "信用卡还款" : "账单缴费"}成功 ¥${amount}`, text, html };
+}
+function subscriptionCancelledMail({ merchant, plan, id }) {
+  const text = `您的订阅已取消，下次扣费前不再扣款。\n\n订阅：${merchant}${plan ? `（${plan}）` : ""}\n订阅编号：${id}\n\n如属误操作，可在「收付 → 账单与订阅」重新订阅。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">订阅已取消</h2><p>订阅：<b>${escHtml(String(merchant))}</b>${plan ? `（${escHtml(String(plan))}）` : ""}</p><p>订阅编号：<code>${escHtml(String(id))}</code></p><p>下次扣费前不再扣款。如属误操作，可在<a href="https://suveoo.com/pay/subscriptions">订阅管理</a>重新订阅。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】订阅已取消：${merchant}`, text, html };
+}
+function wealthConfirmMail({ kind, name, amount, extra }) {
+  const zh = { purchase: "基金申购成功", redeem: "基金赎回成功", deposit: "定期存款开立成功" }[kind];
+  const extraTxt = kind === "redeem" ? `，按市值结算回款 ¥${extra}，资金已回到默认卡` : kind === "purchase" ? `，成交净值 ${extra}` : "，到期本息以产品条款为准（提前支取按活期计息）";
+  const text = `您的${zh}。\n\n产品：${name}\n金额：¥${amount}${extraTxt}\n\n理财有风险，投资需谨慎。这是模拟数据。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">${zh}</h2><p>产品：<b>${escHtml(String(name))}</b></p><p>金额：<b>¥${escHtml(String(amount))}</b>${escHtml(extraTxt)}</p><p><a href="https://suveoo.com/wealth/my">持仓明细</a></p><p style="color:#999;font-size:12px">理财有风险，投资需谨慎（模拟数据）。Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】${zh}：${name} ¥${amount}`, text, html };
+}
+function scheduledTransferMail({ title, amount, executeAt, repeat }) {
+  const repeatZh = { once: "单次", monthly: "每月", yearly: "每年" }[repeat] ?? "单次";
+  const text = `您的预约转账已建立。\n\n任务：${title}\n金额：¥${amount}\n执行时间：${executeAt}\n重复：${repeatZh}\n\n到期自动执行（执行结果将另行邮件通知）；可随时在长程任务中心取消，取消即不再执行。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">预约转账已建立</h2><p>任务：${escHtml(String(title))}</p><p>金额：<b>¥${escHtml(String(amount))}</b></p><p>执行时间：${escHtml(String(executeAt))}</p><p>重复：${escHtml(repeatZh)}</p><p>到期自动执行（执行结果将另行邮件通知）；可随时在<a href="https://suveoo.com/ai/tasks">长程任务中心</a>取消，取消即不再执行。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】预约转账已建立：${title} ¥${amount}`, text, html };
+}
+function scheduledExecMail({ title, ok, amount, to, txId, reason }) {
+  const text = ok
+    ? `您的预约转账已按计划执行成功。\n\n任务：${title}\n金额：¥${amount}\n收款人：${to}\n流水号：${txId}\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`
+    : `您的预约转账到期未能执行，资金未发生变动。\n\n任务：${title}\n金额：¥${amount}\n原因：${reason}\n\n可核对后在转账页重新发起，或重建预约。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">${ok ? "预约转账已执行" : "预约转账未执行"}</h2><p>任务：${escHtml(String(title))}</p><p>金额：<b>¥${escHtml(String(amount))}</b></p>${ok ? `<p>收款人：${escHtml(String(to))}</p><p>流水号：<code>${escHtml(String(txId))}</code></p>` : `<p>原因：${escHtml(String(reason))}</p><p>资金未发生变动。可核对后在<a href="https://suveoo.com/transfer/intrabank">转账页</a>重新发起。</p>`}<p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: ok ? `【Suveoo】预约转账已执行 ¥${amount}（${title}）` : `【Suveoo】预约转账未执行：${title}`, text, html };
+}
+function dueDigestMail({ lines }) {
+  const text = `Suveoo 到期提醒摘要：\n\n${lines.map((l) => "· " + l).join("\n")}\n\n可前往「收付 → 账单与订阅」处理。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">到期提醒</h2><p style="line-height:1.9">${lines.map((l) => "· " + escHtml(l)).join("<br>")}</p><p><a href="https://suveoo.com/pay/bills">前往处理</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】到期提醒（${lines.length} 项）`, text, html };
+}
+
 /* ===== AI 主动银行（第六期 idle）：提议两触点邮件（克制模板：无 emoji、含金额与入口） ===== */
 function proposalScanMail(n, lines) {
   const text = `Suveoo AI 扫描了你的账户，发现 ${n} 条可办提议：\n\n${lines}\n\n查看全部与执行（每笔均需你在确认卡上确认）：\nhttps://suveoo.com/ai/proposals\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
@@ -765,17 +842,17 @@ function taskCompensatedMail({ title, amount, reason }) {
 /* ===== 目标陪伴触点邮件（第二十二期：建目标/里程碑/达成/放弃——金额与进度全系统侧给出） ===== */
 function goalCreatedMail({ name, target, deadline, monthly, months }) {
   const text = `攒钱目标已建立。\n\n目标：${name} · 攒到 ¥${target}\n截止：${deadline}（约 ${months} 个月）\n建议每月存：¥${monthly}\n\n存入即锁定进目标桶（可用余额减少、进度增加），达成或放弃时解锁退回；不产生利息。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
-  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">攒钱目标已建立 🎯</h2><p>目标：<b>${escHtml(name)}</b> · 攒到 <b>¥${escHtml(target)}</b></p><p>截止：${escHtml(deadline)}（约 ${escHtml(String(months))} 个月）</p><p>建议每月存：<b>¥${escHtml(monthly)}</b></p><p style="color:#666">存入即锁定进目标桶（可用余额减少、进度增加），达成或放弃时解锁退回；不产生利息。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">攒钱目标已建立</h2><p>目标：<b>${escHtml(name)}</b> · 攒到 <b>¥${escHtml(target)}</b></p><p>截止：${escHtml(deadline)}（约 ${escHtml(String(months))} 个月）</p><p>建议每月存：<b>¥${escHtml(monthly)}</b></p><p style="color:#666">存入即锁定进目标桶（可用余额减少、进度增加），达成或放弃时解锁退回；不产生利息。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】目标已建立：${name}（¥${target}）`, text, html };
 }
 function goalMilestoneMail({ name, pct, saved, target, auto }) {
   const text = `目标里程碑达成 ${pct}%。\n\n目标：${name}\n已存：¥${saved} / ¥${target}（${pct}%）${auto ? "\n本笔来自月度自动存入。" : ""}\n继续加油，达成后资金将解锁回可用余额。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
-  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标进度 ${escHtml(String(pct))}% 🎉</h2><p>目标：<b>${escHtml(name)}</b></p><p>已存：<b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}（${escHtml(String(pct))}%）</p>${auto ? "<p>本笔来自月度自动存入。</p>" : ""}<p>继续加油，达成后资金将解锁回可用余额。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标进度 ${escHtml(String(pct))}%</h2><p>目标：<b>${escHtml(name)}</b></p><p>已存：<b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}（${escHtml(String(pct))}%）</p>${auto ? "<p>本笔来自月度自动存入。</p>" : ""}<p>继续加油，达成后资金将解锁回可用余额。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】「${name}」进度 ${pct}%`, text, html };
 }
 function goalAchievedMail({ name, target, saved }) {
   const text = `恭喜，攒钱目标已达成！\n\n目标：${name}\n累计存入：¥${saved} / 目标 ¥${target}\n全部锁定资金已解锁退回可用余额，可随时支取使用（模拟银行不计利息）。\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
-  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标达成，为你鼓掌 🏆</h2><p>目标：<b>${escHtml(name)}</b></p><p>累计存入：<b>¥${escHtml(saved)}</b> / 目标 ¥${escHtml(target)}</p><p>全部锁定资金<b>已解锁退回可用余额</b>，可随时支取使用（模拟银行不计利息）。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">目标达成，为你鼓掌</h2><p>目标：<b>${escHtml(name)}</b></p><p>累计存入：<b>¥${escHtml(saved)}</b> / 目标 ¥${escHtml(target)}</p><p>全部锁定资金<b>已解锁退回可用余额</b>，可随时支取使用（模拟银行不计利息）。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】目标达成：${name}（¥${target}）`, text, html };
 }
 function goalAbandonedMail({ name, saved }) {
@@ -812,29 +889,23 @@ export async function resolveTransferTarget(env, { name, account, selfUserId = n
   if (prof.profile.name !== String(name ?? "").trim()) return { ok: false, code: "NAME_MISMATCH" };
   return { ok: true, self: false, userId: r.user_id, email: prof.profile.email, name: prof.profile.name };
 }
+/* 邮件验证码（第五十七轮重写）：存储迁入 registry DO（SQLite 强一致）——Cloudflare KV 是最终
+ * 一致存储，发码后其他 colo 边缘缓存最长 60s 读不到新值，中国网络/代理出口轮换下前后请求常落
+ * 不同 colo，曾致"验证码正确却大概率转账失败"（读到空→NOT_FOUND；读到旧记录→MISMATCH 且回写
+ * 污染中心）。且 KV get 的 cacheTtl 最小 30s（cacheTtl:0 直接 400），无强制中心读手段——唯迁 DO。
+ * 明文码只在 worker 内存与邮件中，存储仅 sha256 hash（与原实现同安全水位）。 */
 async function issueEmailCode(env, scene, email) {
-  if (await env.SESSION_KV.get(`cd:${scene}:${email}`)) return { ok: false, status: 429, code: "RATE_LIMITED", message: "请 60 秒后再试" };
-  if (await kvIncr(env.SESSION_KV, `hr:${scene}:${email}`, 3600) > 5) return { ok: false, status: 429, code: "RATE_LIMITED", message: "尝试次数过多，请 1 小时后再试" };
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
   const h = await sha256Hex(`${env.JWT_SECRET ?? "dev"}:${scene}:${email}:${code}`);
-  await env.SESSION_KV.put(`code:${scene}:${email}`, JSON.stringify({ h, n: 0 }), { expirationTtl: EMAIL_CODE_TTL });
-  await env.SESSION_KV.put(`cd:${scene}:${email}`, "1", { expirationTtl: 60 });
+  const r = await ledgerOp(env, REGISTRY_INSTANCE, { op: "otp_issue", scene, email, h, ttlMs: EMAIL_CODE_TTL * 1000 });
+  if (!r?.ok) return { ok: false, status: 429, code: "RATE_LIMITED", message: r?.message ?? "请稍后再试" };
   await sendMail(env, { to: email, ...emailCodeMail(code, scene) });
   return { ok: true, expiresIn: EMAIL_CODE_TTL };
 }
 async function checkEmailCode(env, scene, email, code, { consume = true } = {}) {
-  const key = `code:${scene}:${email}`;
-  const raw = await env.SESSION_KV.get(key);
-  if (!raw) return { ok: false, reason: "CODE_NOT_FOUND" };
-  const rec = JSON.parse(raw);
-  if (rec.n >= 5) return { ok: false, reason: "CODE_TOO_MANY_ATTEMPTS" };
   const h = await sha256Hex(`${env.JWT_SECRET ?? "dev"}:${scene}:${email}:${code}`);
-  if (h !== rec.h) {
-    await env.SESSION_KV.put(key, JSON.stringify({ ...rec, n: rec.n + 1 }), { expirationTtl: EMAIL_CODE_TTL });
-    return { ok: false, reason: "CODE_MISMATCH" };
-  }
-  if (consume) await env.SESSION_KV.delete(key);
-  return { ok: true };
+  const r = await ledgerOp(env, REGISTRY_INSTANCE, { op: "otp_check", scene, email, h, consume });
+  return r?.ok ? { ok: true } : { ok: false, reason: r?.reason ?? "CODE_NOT_FOUND" };
 }
 export const calcPrLevel = (answers) => Math.min(5, Math.max(1, Math.round(answers.reduce((a, b) => a + b, 0) / answers.length)));
 
@@ -884,7 +955,7 @@ async function hEmailCode(request, env) {
   const { scene, email: bodyEmail } = await readJsonBody(request);
   if (!EMAIL_CODE_SCENES.has(scene)) throw { status: 400, code: "INVALID_SCENE" };
   /* 前端会话只拿得到掩码邮箱（/api/session 返回 maskEmail）；掩码/缺省时以 Bearer JWT 内真实邮箱为准 */
-  let email = bodyEmail;
+  let email = normEmail(bodyEmail); /* 第六十七轮：归一（大小写变体与注册口径一致） */
   if (!email || email.includes("*")) {
     const auth = request.headers.get("authorization") ?? "";
     const claims = auth.startsWith("Bearer ") ? await verifyJwt(auth.slice(7), env.JWT_SECRET).catch(() => null) : null;
@@ -1339,44 +1410,44 @@ function tgActionLines(ir, ex) {
   let title = ir.intent, facts = [];
   switch (ir.intent) {
     case "transfer_execute":
-      title = "💸 转账已执行";
+      title = "转账已执行";
       facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "收款人 " + escHtml(p.recipient_name ?? String(p.recipient ?? "—")), "流水号 <code>" + escHtml(ex?.tx_id ?? "—") + "</code>"];
       break;
     case "wealth_product_purchase":
-      title = "📈 理财申购已执行";
+      title = "理财申购已执行";
       facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"];
       break;
     case "wealth_product_redeem":
-      title = "📉 理财赎回已执行";
+      title = "理财赎回已执行";
       facts = ["产品 <code>" + escHtml(p.product_id) + "</code>", "份额 " + escHtml(p.amount === "ALL" ? "全部持仓" : "¥" + p.amount)];
       break;
     case "fx_exchange":
-      title = "💱 换汇已执行";
+      title = "换汇已执行";
       facts = [(p.direction === "buy" ? "购汇 " : "结汇 ") + escHtml(p.currency ?? "—"), "折合 <b>¥" + escHtml(p.amount_cny) + "</b>"];
       break;
-    case "card_freeze": title = "🧊 卡片已冻结"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
-    case "card_unfreeze": title = "🔓 卡片已解冻"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
+    case "card_freeze": title = "卡片已冻结"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
+    case "card_unfreeze": title = "卡片已解冻"; facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>"]; break;
     case "card_limit_adjust":
-      title = "🎚 卡片限额已调整";
+      title = "卡片限额已调整";
       facts = ["卡片 <code>" + escHtml(p.card_id) + "</code>", "单笔 ¥" + escHtml(p.new_limit ?? "—") + " / 日累计 ¥" + escHtml(p.new_daily_limit ?? "—")];
       break;
-    case "bill_pay": title = "🧾 账单已缴费"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
-    case "autopay_manage": title = "🔁 自动扣款开关变更"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
-    case "subscription_cancel": title = "❌ 订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
-    case "subscription_reminder_toggle": title = "⏰ 续费提醒开关变更"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
-    case "deposit_open": title = "🏦 存款已开立"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"]; break;
+    case "bill_pay": title = "账单已缴费"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
+    case "autopay_manage": title = "自动扣款开关变更"; facts = ["账单 <code>" + escHtml(p.bill_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
+    case "subscription_cancel": title = "订阅已取消"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>"]; break;
+    case "subscription_reminder_toggle": title = "续费提醒开关变更"; facts = ["订阅 <code>" + escHtml(p.subscription_id) + "</code>", "状态 " + (p.enabled ? "开启" : "关闭")]; break;
+    case "deposit_open": title = "存款已开立"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "产品 <code>" + escHtml(p.product_id) + "</code>"]; break;
     case "solution_package_purchase":
-      title = "📦 组合方案已执行";
+      title = "组合方案已执行";
       facts = [
         "方案 " + escHtml(p.name ?? "—"),
         "合计 <b>¥" + escHtml(p.total_amount) + "</b> · " + (Array.isArray(p.items) ? p.items.length : "?") + " 笔",
         ...(Array.isArray(p.items) ? ["明细 " + escHtml(p.items.map((i) => `${i.name} ¥${i.amount}`).join("、").slice(0, 160))] : []),
       ];
       break;
-    case "payee_manage": title = "👥 收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
-    case "funds_lock": title = "🔒 资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
+    case "payee_manage": title = "收款人变更"; facts = ["动作 " + escHtml(p.action ?? "—"), "对象 " + escHtml(p.payee?.name ?? p.payee?.id ?? "—")]; break;
+    case "funds_lock": title = "资金已锁定"; facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "用途 " + escHtml(p.reason ?? "reservation")]; break;
     case "scheduled_task_create":
-      title = "⏰ 长程任务已建立";
+      title = "长程任务已建立";
       facts = [
         "任务 " + escHtml(p.title ?? p.task_type),
         "金额 <b>¥" + escHtml(p.amount ?? "—") + "</b>",
@@ -1385,26 +1456,26 @@ function tgActionLines(ir, ex) {
       ];
       break;
     case "task_cancel":
-      title = "↩️ 长程任务已取消";
+      title = "长程任务已取消";
       facts = ["任务 " + escHtml(p.task_title ?? ("#" + String(p.task_id ?? "—"))), ex?.compensated ? "补偿 C1 ✓ 已解锁锁定资金" : "无资金动作"];
       break;
     case "goal_create":
-      title = "🎯 攒钱目标已建立";
+      title = "攒钱目标已建立";
       facts = ["目标 " + escHtml(p.name ?? "—"), "攒到 <b>¥" + escHtml(p.target_amount ?? "—") + "</b> · 截止 " + escHtml(p.deadline ?? "—"), "月计划 ¥" + escHtml(ex?.monthly ?? "—")];
       break;
     case "goal_contribute":
-      title = "🐷 目标存入已执行";
-      facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "目标 " + escHtml(p.goal_name ?? p.goal_id), "进度 " + escHtml(String(ex?.pct ?? "—")) + "%" + (ex?.achieved ? " · 🏆 已达成并解锁" : "")];
+      title = "目标存入已执行";
+      facts = ["金额 <b>¥" + escHtml(p.amount) + "</b>", "目标 " + escHtml(p.goal_name ?? p.goal_id), "进度 " + escHtml(String(ex?.pct ?? "—")) + "%" + (ex?.achieved ? " · 已达成并解锁" : "")];
       break;
     case "goal_adjust":
-      title = "🎚 攒钱目标已调整";
+      title = "攒钱目标已调整";
       facts = ["目标 " + escHtml(p.goal_name ?? p.goal_id), "新目标 ¥" + escHtml(p.target_amount ?? "—") + " · 截止 " + escHtml(p.deadline ?? "—"), "月计划 ¥" + escHtml(ex?.monthly ?? "—")];
       break;
     case "goal_abandon":
-      title = "↩️ 攒钱目标已放弃";
+      title = "攒钱目标已放弃";
       facts = ["目标 " + escHtml(p.goal_name ?? p.goal_id), "解锁退回 <b>¥" + escHtml(ex?.unlocked ?? "—") + "</b> 至可用余额"];
       break;
-    case "ecommerce_order_mock": title = "🛍 演示商户订单已执行"; facts = ["商品 " + escHtml(p.item ?? "—"), "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
+    case "ecommerce_order_mock": title = "演示商户订单已执行"; facts = ["商品 " + escHtml(p.item ?? "—"), "金额 <b>¥" + escHtml(p.amount) + "</b>"]; break;
     default: facts = ["intent <code>" + escHtml(ir.intent) + "</code>"];
   }
   return [
@@ -1416,7 +1487,8 @@ function tgActionLines(ir, ex) {
   ];
 }
 async function hRegister(request, env, waitUntil) {
-  const { email, code, name, password, risk_answers, aml_consented } = await readJsonBody(request);
+  const { email: rawEmail, code, name, password, risk_answers, aml_consented } = await readJsonBody(request);
+  const email = normEmail(rawEmail); /* 第六十七轮：大小写变体归一到同一账户键 */
   if (!EMAIL_RE.test(email ?? "")) throw { status: 400, code: "INVALID_EMAIL" };
   if (typeof password !== "string" || !/^\S{8,32}$/.test(password)) throw { status: 400, code: "INVALID_PASSWORD", message: "密码须为 8-32 位" };
   if (!Array.isArray(risk_answers) || risk_answers.length < 5 || risk_answers.length > 10 || risk_answers.some((x) => !Number.isInteger(x) || x < 1 || x > 5)) throw { status: 400, code: "INVALID_RISK_ANSWERS" };
@@ -1447,7 +1519,7 @@ async function hRegister(request, env, waitUntil) {
   {
     const cf = request.cf ?? {};
     tgFire(env, waitUntil, [
-      "🆕 <b>Suveoo 新开户</b>", "",
+      "<b>Suveoo 新开户</b>", "",
       "<b>User</b>: " + escHtml(name || "—") + "（" + escHtml(email) + "）",
       "<b>User ID</b>: <code>" + escHtml(reg.user_id) + "</code>",
       ...tgRequestLines(request),
@@ -1462,6 +1534,8 @@ async function hRegister(request, env, waitUntil) {
       "<b>Other</b>: BotScore=" + escHtml(String(cf.botManagement?.score ?? "—")) + " · Country=" + escHtml(cf.country || "—") + " · Continent=" + escHtml(cf.continent || "—") + " · Lang=" + escHtml(request.headers.get("accept-language") || "—") + " · PR=" + prLevel,
     ]);
   }
+  /* 第六十四轮：注册欢迎邮件（业界 onboarding/welcome 场景）——与验证码邮件同一收件箱到达 */
+  sendMail(env, { to: email, ...welcomeMail({ email }) }).catch(() => {});
   return json({
     user_id: reg.user_id, token, token_type: "Bearer", expires_in: SESSION_TTL, pr_level: prLevel,
     cards: cards.map(publicCard),
@@ -1471,18 +1545,38 @@ async function hRegister(request, env, waitUntil) {
 async function resolveLoginUser(env, identifier) {
   let userId = null;
   if (/^\d{16}$/.test(identifier ?? "")) userId = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "userByCard", number: identifier })).user_id ?? null;
-  else if (EMAIL_RE.test(identifier ?? "")) userId = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "findUser", email: identifier })).user_id ?? null;
+  else if (EMAIL_RE.test(identifier ?? "")) userId = (await ledgerOp(env, REGISTRY_INSTANCE, { op: "findUser", email: normEmail(identifier) })).user_id ?? null; /* 第六十七轮：登录标识归一 */
   else if (/^U\d+$/.test(identifier ?? "")) userId = identifier;
   if (!userId) return null;
   const prof = await ledgerOp(env, userInstance(userId), { op: "getProfile" });
   return prof.ok ? { userId, email: prof.profile.email, profile: prof.profile } : null;
+}
+/* 新设备登录提醒（第五十六轮）：粗粒度设备指纹（OS·浏览器）变化时发站内安全通知；
+ * 同指纹不扰民（浏览器小版本 UA 变化不触发）；首次登录只记指纹不通知 */
+function deviceFp(ua) {
+  const os = /iphone|ipad/i.test(ua) ? "iOS" : /android/i.test(ua) ? "Android" : /windows/i.test(ua) ? "Windows" : /mac os/i.test(ua) ? "Mac" : /linux/i.test(ua) ? "Linux" : "未知";
+  const br = /edg\//i.test(ua) ? "Edge" : /chrome/i.test(ua) ? "Chrome" : /firefox/i.test(ua) ? "Firefox" : /safari/i.test(ua) ? "Safari" : "浏览器";
+  return `${os}·${br}`;
+}
+async function newDeviceNotify(env, uid, request) {
+  try {
+    const fp = deviceFp(request.headers.get("user-agent") ?? "");
+    const saved = (await U(env, uid)({ op: "meta_get", k: "device_fp" }))?.v ?? null;
+    if (saved && saved !== fp) {
+      await U(env, uid)({ op: "notify", type: "SECURITY", title: "新设备登录提醒", body: `您的账户于一台${fp}设备完成登录。如非本人操作，请立即修改密码。` });
+      /* 第六十四轮：新设备登录邮件（业界 security alert 场景，与站内通知/TG 同源触发） */
+      const ndProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+      if (ndProf.email) sendMail(env, { to: ndProf.email, ...newDeviceMail({ device: fp, time: new Date().toISOString().replace("T", " ").slice(0, 19) }) }).catch(() => {});
+    }
+    if (saved !== fp) await U(env, uid)({ op: "meta_set", k: "device_fp", v: fp });
+  } catch { /* 通知缺送不阻断登录 */ }
 }
 async function hLogin(request, env, waitUntil) {
   const { identifier, password } = await readJsonBody(request);
   if (!identifier || typeof password !== "string") throw { status: 400, code: "INVALID_REQUEST" };
   const lockKey = `loginfail:${String(identifier).toLowerCase()}`;
   if (Number((await env.SESSION_KV.get(lockKey)) ?? "0") >= LOGIN_FAIL_LIMIT) {
-    tgFire(env, waitUntil, ["⛔ <b>登录已锁定</b>", "", "同一账户连续失败次数过多，已临时锁定 15 分钟。", ...tgRequestLines(request)]);
+    tgFire(env, waitUntil, ["<b>登录已锁定</b>", "", "同一账户连续失败次数过多，已临时锁定 15 分钟。", ...tgRequestLines(request)]);
     throw { status: 429, code: "LOGIN_LOCKED", message: "失败次数过多，请 15 分钟后再试" };
   }
   const user = await resolveLoginUser(env, identifier);
@@ -1502,7 +1596,8 @@ async function hLogin(request, env, waitUntil) {
   }
   const token = await signJwt(env.JWT_SECRET, { sub: user.userId, email: user.email, typ: "session", epo: Number(user.profile?.session_epoch ?? 0) }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: user.userId, action: "login", channel: "form", detail: { twofa: false } });
-  tgFire(env, waitUntil, ["🔑 <b>登录成功</b>", "", "<b>User</b>: " + escHtml(user.email), "两步验证：未启用", ...tgRequestLines(request)]);
+  tgFire(env, waitUntil, ["<b>登录成功</b>", "", "<b>User</b>: " + escHtml(user.email), "两步验证：未启用", ...tgRequestLines(request)]);
+  await newDeviceNotify(env, user.userId, request);
   return json({ mfa_required: false, token, token_type: "Bearer", expires_in: SESSION_TTL });
 }
 async function hMfa(request, env, waitUntil) {
@@ -1515,11 +1610,13 @@ async function hMfa(request, env, waitUntil) {
   const prof = await U(env, claims.sub)({ op: "getProfile" });
   const token = await signJwt(env.JWT_SECRET, { sub: claims.sub, email: claims.email, typ: "session", epo: Number(prof.profile?.session_epoch ?? 0) }, { ttlSeconds: SESSION_TTL });
   await audit(env, { user_id: claims.sub, action: "login", channel: "form", detail: { twofa: true } });
-  tgFire(env, waitUntil, ["🔑 <b>登录成功</b>", "", "<b>User</b>: " + escHtml(claims.email), "两步验证：已通过（邮箱验证码）", ...tgRequestLines(request)]);
+  tgFire(env, waitUntil, ["<b>登录成功</b>", "", "<b>User</b>: " + escHtml(claims.email), "两步验证：已通过（邮箱验证码）", ...tgRequestLines(request)]);
+  await newDeviceNotify(env, claims.sub, request);
   return json({ mfa_required: false, token, token_type: "Bearer", expires_in: SESSION_TTL });
 }
 async function hRecover(request, env, waitUntil) {
-  const { email, code, new_password } = await readJsonBody(request);
+  const { email: rawEmail, code, new_password } = await readJsonBody(request);
+  const email = normEmail(rawEmail); /* 第六十七轮：找回按归一邮箱定位账户 */
   if (!EMAIL_RE.test(email ?? "")) throw { status: 400, code: "INVALID_EMAIL" };
   if (typeof new_password !== "string" || !/^\S{8,32}$/.test(new_password)) throw { status: 400, code: "INVALID_PASSWORD" };
   const chk = await checkEmailCode(env, "recovery", email, String(code ?? ""));
@@ -1532,7 +1629,9 @@ async function hRecover(request, env, waitUntil) {
    * 找回流程本人未登录，无需返回新 token；用新密码重新登录即取新纪元令牌。 */
   await U(env, found.user_id)({ op: "bumpEpoch" });
   await audit(env, { user_id: found.user_id, action: "password_recovered", channel: "form" });
-  tgFire(env, waitUntil, ["🛡 <b>密码已重置（找回流程）</b>", "", "<b>User</b>: " + escHtml(email), "经邮箱验证码强验证后完成，该账户全部登录会话已下线。", ...tgRequestLines(request)]);
+  /* 第六十四轮：密码重置确认邮件（账户变更通知场景；"如非本人"是此类邮件的关键警示） */
+  sendMail(env, { to: email, ...passwordChangedMail({ via: "reset" }) }).catch(() => {});
+  tgFire(env, waitUntil, ["<b>密码已重置（找回流程）</b>", "", "<b>User</b>: " + escHtml(email), "经邮箱验证码强验证后完成，该账户全部登录会话已下线。", ...tgRequestLines(request)]);
   return json({ ok: true });
 }
 async function hLogout(request, env) {
@@ -1951,7 +2050,11 @@ export async function executeIntent(env, ir) {
         }
       }
       const r = await U(env, uid)({ op: "transfer", from_card: p.from_card ?? null, recipient: p.recipient, recipient_name: p.recipient_name ?? null, recipient_account: p.recipient_account ?? null, amount_cents: String(toCents(p.amount)), memo: p.memo ?? null, trace_id: ir.trace_id, channel: ir.channel, cross_target: crossTarget, sender_name: senderProf.name ?? "一位 Suveoo 用户" });
-      if (!r.ok) return { ok: false, error: r.error };
+      /* 第六十四轮：转账失败回执（业界 failed transaction notice 场景）——资金未动也要让用户知道为何失败 */
+      if (!r.ok) {
+        sendMail(env, { to: senderProf.email, ...transferFailedMail({ amount: p.amount, to: p.recipient_name ?? String(p.recipient), reason: r.error }) }).catch(() => {});
+        return { ok: false, error: r.error };
+      }
       await sendMail(env, { to: senderProf.email, ...transferReceiptMail({ amount: p.amount, to: r.to_name ?? p.recipient_name ?? String(p.recipient), txId: r.tx_id, memo: p.memo }) });
       /* 对方入账邮件：真实跨用户收款方按其注册邮箱自动送达（不再依赖前端传 recipient_email） */
       if (crossTarget) await sendMail(env, { to: crossTarget.email, ...inboundTransferMail({ amount: p.amount, from: senderProf.name ?? "一位 Suveoo 用户", txId: r.tx_id, memo: p.memo }) });
@@ -1965,6 +2068,11 @@ export async function executeIntent(env, ir) {
       const r = await U(env, uid)({ op: "setCardStatus", slug: p.card_id, status: ir.intent === "card_freeze" ? "FROZEN" : "ACTIVE" });
       await U(env, uid)({ op: "audit", action: ir.intent, detail: { card: p.card_id }, channel: ir.channel, trace_id: ir.trace_id });
       await U(env, uid)({ op: "notify", type: "SECURITY", title: ir.intent === "card_freeze" ? "卡片已冻结" : "卡片已解冻", body: `${p.card_id} 状态已更新。` });
+      /* 第六十四轮：卡片冻结/解冻确认邮件（账户变更通知场景） */
+      if (r.ok) {
+        const fzProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (fzProf.email) sendMail(env, { to: fzProf.email, ...cardStatusMail({ card: p.card_id, frozen: ir.intent === "card_freeze" }) }).catch(() => {});
+      }
       return { ok: r.ok, card: p.card_id, status: ir.intent === "card_freeze" ? "FROZEN" : "ACTIVE" };
     }
     case "card_limit_adjust": {
@@ -1981,6 +2089,12 @@ export async function executeIntent(env, ir) {
       const r = await U(env, uid)({ op: "subCancel", id: p.subscription_id });
       await U(env, uid)({ op: "audit", action: "subscription_cancel", detail: { id: p.subscription_id }, channel: ir.channel, trace_id: ir.trace_id });
       await U(env, uid)({ op: "notify", type: "SYSTEM", title: "订阅已取消", body: `订阅 ${p.subscription_id} 已取消，下次扣费前不再扣款。` });
+      /* 第六十四轮：订阅取消确认邮件 */
+      if (r.ok) {
+        const sub = ((await U(env, uid)({ op: "subs" })).subs ?? []).find((x) => String(x.id) === String(p.subscription_id));
+        const scProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (scProf.email) sendMail(env, { to: scProf.email, ...subscriptionCancelledMail({ merchant: sub?.merchant ?? String(p.subscription_id), plan: sub?.plan ?? "", id: String(p.subscription_id) }) }).catch(() => {});
+      }
       return r;
     }
     case "task_cancel": {
@@ -2010,6 +2124,12 @@ export async function executeIntent(env, ir) {
     case "bill_pay": {
       const r = await U(env, uid)({ op: "billPay", id: p.bill_id, amount_cents: centsToStr(toCents(p.amount)), trace_id: ir.trace_id, channel: ir.channel });
       await U(env, uid)({ op: "notify", type: "TRANSFER", title: "账单已缴费", body: `账单 ${p.bill_id} 缴费 ¥${p.amount} 成功。` });
+      /* 第六十四轮：缴费/信用卡还款成功回执邮件 */
+      if (r.ok) {
+        const billName = p.bill_id === "credit-repay" ? "信用卡还款" : (((await U(env, uid)({ op: "bills" })).bills ?? []).find((x) => x.id === p.bill_id)?.name ?? p.bill_id);
+        const bpProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (bpProf.email) sendMail(env, { to: bpProf.email, ...billPaidMail({ billId: p.bill_id, name: billName, amount: p.amount }) }).catch(() => {});
+      }
       await U(env, uid)({ op: "audit", action: "bill_pay", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       return r;
     }
@@ -2040,6 +2160,11 @@ export async function executeIntent(env, ir) {
       await U(env, uid)({ op: "audit", action: "scheduled_task_create", detail: { type: p.task_type, execute_at: p.execute_at, locked_cents: lockedCents > 0n ? String(lockedCents) : null }, channel: ir.channel, trace_id: ir.trace_id });
       const lockTxt = bdTask && r.ok ? `已锁定 ¥${p.amount}（执行后扣款，取消即解锁），` : "";
       await U(env, uid)({ op: "notify", type: "TASK", title: "长程任务已建立", body: `「${p.title ?? p.task_type}」${lockTxt}将于 ${p.execute_at ?? "设定时间"} 执行（可随时取消，取消即补偿）。` });
+      /* 第六十四轮：预约转账（非生日类）建单确认邮件——到期结果另行邮件（taskDue 侧） */
+      if (r.ok && !bdTask && (p.task_type ?? "scheduled_transfer") === "scheduled_transfer") {
+        const stProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (stProf.email) sendMail(env, { to: stProf.email, ...scheduledTransferMail({ title: p.title ?? "预约转账", amount: p.amount, executeAt: p.execute_at, repeat: p.repeat ?? "once" }) }).catch(() => {});
+      }
       /* 建单触点邮件（birthday）：金额/执行时间由系统给出，模型不参与 */
       if (bdTask && r.ok) {
         const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
@@ -2051,6 +2176,14 @@ export async function executeIntent(env, ir) {
       const fund = await fundMeta(env, p.product_id);
       const r = await U(env, uid)({ op: "wealthPurchase", fund: p.product_id, amount_cents: String(toCents(p.amount)), nav: fund?.nav ?? "1.00", risk_level: fund?.risk_level ?? 3 });
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "申购成功", body: `${fund?.name ?? p.product_id} 申购 ¥${p.amount}。理财有风险，这是模拟数据。` });
+      /* 第六十四轮：申购/存款开立确认邮件——同 case 双语义：fundMeta 命中=基金申购，
+         未命中=存款开立（存款产品不在基金表，REST /api/wealth/purchase 统一入口） */
+      if (r.ok) {
+        const wpProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (wpProf.email) sendMail(env, { to: wpProf.email, ...(fund
+          ? wealthConfirmMail({ kind: "purchase", name: fund.name, amount: p.amount, extra: fund.nav ?? "1.00" })
+          : wealthConfirmMail({ kind: "deposit", name: p.product_id, amount: p.amount })) }).catch(() => {});
+      }
       await U(env, uid)({ op: "audit", action: "wealth_product_purchase", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       return { ok: r.ok, ...r };
     }
@@ -2058,6 +2191,11 @@ export async function executeIntent(env, ir) {
       const fund = await fundMeta(env, p.product_id);
       const r = await U(env, uid)({ op: "wealthRedeem", fund: p.product_id, amount_cents: p.amount === "ALL" ? null : String(toCents(p.amount)), nav: fund?.nav ?? null });
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "赎回成功", body: `${fund?.name ?? p.product_id} 赎回完成，按市值结算回款 ¥${r.amount ?? "—"}，资金已回到默认卡。` });
+      /* 第六十四轮：赎回确认邮件（"ALL" 显示为"全部持仓"，回款额系统侧给出） */
+      if (r.ok) {
+        const rdProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (rdProf.email) sendMail(env, { to: rdProf.email, ...wealthConfirmMail({ kind: "redeem", name: fund?.name ?? p.product_id, amount: p.amount === "ALL" ? "全部持仓" : p.amount, extra: r.amount ?? "0.00" }) }).catch(() => {});
+      }
       await U(env, uid)({ op: "audit", action: "wealth_product_redeem", detail: { ...p, proceeds: r.amount ?? null }, channel: ir.channel, trace_id: ir.trace_id });
       return { ok: r.ok, ...r };
     }
@@ -2068,6 +2206,11 @@ export async function executeIntent(env, ir) {
       const name = obj ? (await new Response(obj.body).json()).name : p.product_id;
       const r = await U(env, uid)({ op: "wealthPurchase", fund: p.product_id, amount_cents: String(toCents(p.amount)), nav: "1.00", risk_level: 1 });
       await U(env, uid)({ op: "notify", type: "WEALTH", title: "存款开立成功", body: `${name} 开立 ¥${p.amount}，到期本息以产品条款为准（定期提前支取按活期计息）。这是模拟数据。` });
+      /* 第六十四轮：存款开立确认邮件（AI 独立 intent 通道） */
+      if (r.ok) {
+        const doProf = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
+        if (doProf.email) sendMail(env, { to: doProf.email, ...wealthConfirmMail({ kind: "deposit", name, amount: p.amount }) }).catch(() => {});
+      }
       await U(env, uid)({ op: "audit", action: "deposit_open", detail: p, channel: ir.channel, trace_id: ir.trace_id });
       return { ok: r.ok, ...r };
     }
@@ -2139,7 +2282,7 @@ export async function executeIntent(env, ir) {
       await U(env, uid)({ op: "audit", action: "goal_contribute", detail: { goal_id: p.goal_id, amount: p.amount, achieved: !!r.achieved }, channel: ir.channel, trace_id: ir.trace_id });
       const prof = (await U(env, uid)({ op: "getProfile" })).profile ?? {};
       if (r.achieved) {
-        await U(env, uid)({ op: "notify", type: "WEALTH", title: "🎉 攒钱目标已达成", body: `「${r.name}」已存满 ¥${r.saved} / ¥${r.target}，全部锁定资金已解锁退回可用余额，可支取使用（不计利息）。` });
+        await U(env, uid)({ op: "notify", type: "WEALTH", title: "攒钱目标已达成", body: `「${r.name}」已存满 ¥${r.saved} / ¥${r.target}，全部锁定资金已解锁退回可用余额，可支取使用（不计利息）。` });
         if (prof.email) await sendMail(env, { to: prof.email, ...goalAchievedMail({ name: r.name, target: r.target, saved: r.saved }) });
       } else if (r.milestone_reached) {
         await U(env, uid)({ op: "notify", type: "WEALTH", title: `目标进度 ${r.milestone_reached}%`, body: `「${r.name}」已存 ¥${r.saved} / ¥${r.target}（${r.pct}%），继续加油。` });
@@ -2190,7 +2333,7 @@ async function notifyNewProposals(env, ctxInfo, userId, r) {
   await U(env, userId)({ op: "notify", type: "SYSTEM", title: `Suveoo AI 为你发现 ${r.added} 条可办提议`, body: `${lines}\n查看全部：https://suveoo.com/ai/proposals` });
   await sendMail(env, { to: ctxInfo.email, ...proposalScanMail(r.added, lines) });
   tgFire(env, ctxInfo.waitUntil, [
-    "🤖 <b>AI 提议已生成</b>", "",
+    "<b>AI 提议已生成</b>", "",
     "<b>User</b>: <code>" + escHtml(userId) + "</code>",
     "新增 <b>" + r.added + "</b> 条：",
     ...pend.map((p) => "· " + escHtml(String(p.params?.summary ?? p.rule))),
@@ -2313,7 +2456,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
           const prof = (await UU({ op: "getProfile" })).profile ?? {};
           if (prof.email) await sendMail(env, { to: prof.email, ...taskCancelledMail({ title: t.title, compensated: !!r.compensated, unlocked: r.unlocked ?? "0.00" }) });
           tgFire(env, ctxInfo.waitUntil, [
-            "↩️ <b>长程任务已取消</b>", "",
+            "<b>长程任务已取消</b>", "",
             "任务 " + escHtml(t.title),
             r.compensated ? "补偿 C1 ✓ 已解锁 <b>¥" + escHtml(r.unlocked ?? "0.00") + "</b>" : "无资金动作",
             "<b>User</b>: <code>" + escHtml(userId) + "</code>",
@@ -2558,7 +2701,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
         await UU({ op: "notify", type: "TASK", title: "AI 提议已办妥", body: `${summ}——已经你确认执行${impactTxt}。` });
         await sendMail(env, { to: email, ...proposalSettledMail(p) });
         tgFire(env, ctxInfo.waitUntil, [
-          "✅ <b>AI 提议已办妥</b>", "",
+          "<b>AI 提议已办妥</b>", "",
           "<b>User</b>: <code>" + escHtml(userId) + "</code>",
           escHtml(summ + impactTxt),
           "<b>proposal</b>: <code>#" + mp[1] + "</code>",
@@ -2570,6 +2713,18 @@ export async function handleDataApi(request, env, url, ctxInfo) {
 
     /* ---- 通知 / 审计 / 报告 / 安全 ---- */
     if (path === "/api/notifications" && method === "GET") { const r = await UU({ op: "notifications", cursor: url.searchParams.get("cursor") ?? "0" }); return json(r); }
+    /* 通知偏好（第五十六轮）：跨设备同步（meta 表 k=notif_prefs）；关闭的类别不弹系统通知，通知中心不受影响 */
+    if (path === "/api/notifications/prefs" && method === "GET") {
+      const r = await UU({ op: "meta_get", k: "notif_prefs" });
+      let prefs = null; try { prefs = r?.v ? JSON.parse(r.v) : null; } catch { prefs = null; }
+      return json({ ok: true, prefs });
+    }
+    if (path === "/api/notifications/prefs" && method === "POST") {
+      const b = await readJsonBody(request);
+      const clean = {}; for (const k of ["TRANSFER", "SECURITY", "WEALTH", "TASK", "SYSTEM"]) if (typeof b?.[k] === "boolean") clean[k] = b[k];
+      const r = await UU({ op: "meta_set", k: "notif_prefs", v: JSON.stringify(clean) });
+      return json(r);
+    }
     if (path === "/api/notifications/read" && method === "POST") { const b = await readJsonBody(request); const r = await UU({ op: "notifRead", ids: b.ids ?? "all" }); return json(r); }
     if (path === "/api/notifications/delete" && method === "POST") { const b = await readJsonBody(request); const r = await UU({ op: "notifDelete", ids: b.ids ?? "read" }); return json(r); }
     if (path === "/api/audit/me" && method === "GET") { const r = await UU({ op: "userAudit" }); return json(r); }
@@ -2628,7 +2783,11 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       await checkEmailCode(env, "redstep", email, String(b.otp ?? ""), { consume: true });
       await UU({ op: "audit", action: "password_changed", detail: {}, channel: "form", trace_id: newTraceId() });
       const token = await signJwt(env.JWT_SECRET, { sub: userId, email, typ: "session", epo: Number(bump.session_epoch ?? 0) }, { ttlSeconds: SESSION_TTL });
-      tgFire(env, ctxInfo.waitUntil, ["🛡 <b>登录密码已修改</b>", "", "<b>User</b>: " + escHtml(email), "安全中心红级操作（已验证当前密码与邮箱验证码后生效），其他设备已全部下线。", "<b>Time</b>: " + new Date().toISOString()]);
+      tgFire(env, ctxInfo.waitUntil, ["<b>登录密码已修改</b>", "", "<b>User</b>: " + escHtml(email), "安全中心红级操作（已验证当前密码与邮箱验证码后生效），其他设备已全部下线。", "<b>Time</b>: " + new Date().toISOString()]);
+      /* 第五十六轮：站内安全通知补齐（此前只有 Telegram/邮件，通知中心无记录） */
+      await UU({ op: "notify", type: "SECURITY", title: "登录密码已修改", body: "安全中心红级操作已生效（已验证当前密码与邮箱验证码），其他设备已全部下线。如非本人操作，请立即联系客服并重置密码。" });
+      /* 第六十四轮：密码修改确认邮件（账户变更通知场景） */
+      sendMail(env, { to: email, ...passwordChangedMail({ via: "change" }) }).catch(() => {});
       return json({ ok: true, token, token_type: "Bearer", expires_in: SESSION_TTL });
     }
     if (path === "/api/security/2fa" && method === "POST") {
@@ -2644,10 +2803,12 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       }
       await UU({ op: "set2fa", enabled: b.enabled ? 1 : 0 });
       await checkEmailCode(env, "redstep", email, String(b.otp ?? ""), { consume: true });
+      /* 第六十四轮：两步验证变更确认邮件（安全设置变更场景） */
+      sendMail(env, { to: email, ...twofaChangedMail({ enabled: !!b.enabled }) }).catch(() => {});
       tgFire(env, ctxInfo.waitUntil, [
-        "🛡 <b>两步验证已" + (b.enabled ? "开启" : "关闭") + "</b>", "",
+        "<b>两步验证已" + (b.enabled ? "开启" : "关闭") + "</b>", "",
         "<b>User</b>: " + escHtml(email),
-        b.enabled ? "登录将要求邮箱验证码第二步。" : "⚠️ 关闭后登录仅凭密码，安全性降低。",
+        b.enabled ? "登录将要求邮箱验证码第二步。" : "关闭后登录仅凭密码，安全性降低。",
         "<b>Time</b>: " + new Date().toISOString(),
       ]);
       return json({ ok: true, enabled: !!b.enabled });
@@ -2663,7 +2824,7 @@ export async function handleDataApi(request, env, url, ctxInfo) {
       await UU({ op: "audit", action: "risk_reassessed", detail: { pr_level: prLevel }, channel: "form", trace_id: newTraceId() });
       await UU({ op: "notify", type: "SECURITY", title: "风险测评已更新", body: `您的风险承受等级已更新为 PR${prLevel}。` });
       await sendMail(env, { to: email, ...riskAssessmentMail(prLevel) });
-      tgFire(env, ctxInfo.waitUntil, ["📊 <b>风险承受等级已更新</b>", "", "<b>User</b>: " + escHtml(email), "新等级 <b>PR" + prLevel + "</b>（红级操作，OTP 强验证后生效）。", "<b>Time</b>: " + new Date().toISOString()]);
+      tgFire(env, ctxInfo.waitUntil, ["<b>风险承受等级已更新</b>", "", "<b>User</b>: " + escHtml(email), "新等级 <b>PR" + prLevel + "</b>（红级操作，OTP 强验证后生效）。", "<b>Time</b>: " + new Date().toISOString()]);
       return json({ ok: true, pr_level: prLevel });
     }
     if (path === "/api/ai/sessions" && method === "GET") {
@@ -4190,7 +4351,7 @@ export const SITE_GUIDE_PAGES = [
   { route: "/wealth/funds", aliases: ["全部基金", "基金列表", "选基金", "基金搜索", "风险等级"], section: "wealth", purpose: "全部基金：16 只基金（R1-R5）搜索、排序与筛选。", entry: "/wealth「查看全部基金」/ home 宫格「理财」", actions: ["搜索框实时过滤", "排序：默认/近 6 月/风险", "R1-R5 风险 tab", "基金卡：近 12 月收益率大数字 + 资产类别徽章 + NAV 实时/闭市徽标", "卡点击进详情页"], flow: "筛选 → 对比 → 进详情申购；AI 选基金推荐先 wealth_product_query（适当性：仅推荐 ≤ 用户 PR 等级）。", notes: "SimNotice banner；历史业绩不代表未来。" },
   { route: "/wealth/fx", aliases: ["外汇", "外汇牌价", "汇率", "购汇", "结汇", "换汇", "美元", "外币余额", "年度额度"], section: "wealth", purpose: "外汇牌价与兑换：10 币种实时牌价 + 兑换计算器 + 结汇购汇交易。", entry: "/wealth 外汇快览 / home 宫格「外汇」", actions: ["牌价表（USD/EUR/JPY/GBP/HKD/SGD/AUD/CAD/CHF/NZD：现汇买入/卖出/中间价 + 7 日 sparkline 按自然日逐日积累）+ 刷新按钮 + 实时徽章", "兑换计算器（购汇/结汇方向切换 + 币种 + 金额实时换算含点差说明；JPY 为每 100 日元口径）", "「结汇/购汇」按钮（黄级；折算 CNY > ¥1,000 红级 OTP）+ 结算卡选择（购汇可选信用卡信用支付）", "年度便利化额度条（模拟 $50,000/年）", "「我的外币余额」卡（空态引导）", "「现在换 USD 划算吗」AI chip"], flow: "查牌价 → 计算器试算（与成交同源同数）→ 结汇/购汇确认卡 → 成交更新外币余额；AI 通道 fx_exchange（黄/红）+ calc_fx_convert 试算 + fx_balance_query 查余额。", notes: "牌价真实市场汇率日更+15 分钟缓存，失败回退静态快照；INSUFFICIENT_FX/INSUFFICIENT_CREDIT 行内拦截。" },
   { route: "/wealth/tools", aliases: ["金融计算工具", "计算器", "理财工具", "工具集"], section: "wealth", purpose: "金融计算工具集（免登录）：10 个计算工具的导航页，支持 URL 参数直达。", entry: "/wealth 分区子页 / footer", actions: ["10 工具卡网格（每卡进独立工具页）", "URL 参数直达（如 /wealth/tools?tool=deposit&amount=50000&term=1y 自动预填计算）"], flow: "选工具 → 进子页输入参数 → 即时计算；/ai 与 GenUI 卡可生成这些深链。", notes: "免登录；纯客户端计算无 API。" },
-  { route: "/account", aliases: ["账户中心", "我的账户", "个人资料", "退出登录", "资产概要"], section: "account", purpose: "账户中心首页：个人卡 + 资产概要 + 功能宫格 + 偏好区。", entry: "header 头像 / 底部导航 Account / 侧栏", actions: ["个人卡（头像/姓名/客户等级/掩码 Email/开户日期）", "资产概要（总资产/今日收益/余额/持仓 + 外币资产折 CNY 行 + 最近 5 笔流水）", "功能宫格：我的卡片/仪表盘/安全中心/月度报告/通知/转账限额", "偏好区：语言切换/Cookie Preferences/时区（只读）", "「退出登录」（黄确认）"], flow: "总览跳转各功能；退出登录黄确认后回登录页。", notes: "SimNotice footnote。" },
+  { route: "/account", aliases: ["账户中心", "我的账户", "个人资料", "退出登录", "资产概要"], section: "account", purpose: "账户中心首页：个人卡 + 资产概要 + 功能宫格 + 偏好区。", entry: "header 头像 / 底部导航 Account / 侧栏", actions: ["个人卡（头像/姓名/客户等级/掩码 Email/开户日期）", "资产概要（总资产/今日收益/余额/持仓 + 外币资产折 CNY 行 + 最近 5 笔流水）", "功能宫格：我的卡片/仪表盘/安全中心/月度报告/通知/转账限额", "偏好区：语言切换/通知设定（第五十六轮：权限索取+五类开关弹窗，跨设备同步）/Cookie Preferences/时区（只读）", "「退出登录」（黄确认）"], flow: "总览跳转各功能；退出登录黄确认后回登录页。", notes: "SimNotice footnote。" },
   { route: "/account/login", aliases: ["登录", "登录页", "Sign in", "2FA", "两步验证登录"], section: "account", purpose: "登录页：账户/卡号/Email 三合一登录，支持 2FA 第二步。", entry: "未登录访问受限页自动跳转（?next= 回跳）/ header「登录 / 注册」", actions: ["三合一账户输入框 + 密码框（眼睛显示/隐藏）", "「登录」按钮", "「忘记密码？」→ /account/recovery", "「注册与开户」→ /account/register"], flow: "输凭证 → 登录；开了 2FA 的账户第二步输邮箱验证码（60s 重发、5 次/小时上限）。", notes: "SimNotice footnote；连续失败触发限流与熔断保护。" },
   { route: "/account/register", aliases: ["注册", "开户", "注册与开户", "风险测评问卷", "新账户"], section: "account", purpose: "注册与开户：四步流程开立模拟账户并随机发卡。", entry: "/account/login「注册与开户」", actions: ["步骤 1 身份信息：Email+验证码（scene=register）+姓名（可虚构）+护照正反面（点击即「已跳过（模拟）」）", "步骤 2 合规意愿：风险承受能力问卷（算出 PR1-PR5）+ AML 声明勾选 + 风险揭示书（不勾不可下一步）", "步骤 3 设置密码：8-32 位强度条 + 确认密码 + 眼睛切换", "步骤 4 开户执行：全屏进度动画（系统随机生成 4 张借记卡[合计余额约 ¥99.9 万-112.5 万]+1 张信用卡[额度 ¥320,000]，其中一张设默认卡）→ 卡片墙预览"], flow: "四步走完 → 「进入我的账户」；PR 等级影响后续理财适当性匹配（可在 /account/security 重测）。", notes: "每步 SimNotice footnote；16 位卡号全局唯一。" },
   { route: "/account/recovery", aliases: ["忘记密码", "找回密码", "重置密码", "密码找回"], section: "account", purpose: "忘记密码：邮箱验证码重置密码（全程无需旧密码）。", entry: "/account/login「忘记密码？」", actions: ["预留 Email + 验证码发送（护照号可留空跳过校验——演示系统刻意简化）", "新密码 + 确认密码双框（不一致本地拦截）", "提交重置"], flow: "收码 → 填新密码 → 重置成功后 bumpEpoch 全设备下线（其他会话全部失效）。", notes: "SimNotice footnote；AI 不代办改密找回（规则 6 引导到本页）。" },
@@ -6383,7 +6544,7 @@ async function handleVoiceStream(request, env, ctx) {
           const payload = {
             format: "pcm", sample_rate: 16000,
             enable_intermediate_result: true, enable_punctuation_prediction: true, enable_inverse_text_normalization: true,
-            max_sentence_silence: 800,
+            max_sentence_silence: 1000,
           };
           if (env.ASR_VOCAB_ID) payload.vocabulary_id = env.ASR_VOCAB_ID;
           ali.send(nlsWsDirective("StartTranscription", env.ASR_APPKEY, taskId, nlsHex32(), payload));
@@ -6429,6 +6590,12 @@ function r2Headers(obj, key) {
     "cache-control": cacheControlFor(key),
     etag: obj.httpEtag,
   };
+  /* 第六十八轮：APK 下载（/dl/*.apk）——显式 Android 包 MIME + 附件Disposition（浏览器/
+   * Android 直接落盘安装而非尝试内联渲染）；octet-stream 兜底升级为正规包类型 */
+  if (key.endsWith(".apk")) {
+    headers["content-type"] = "application/vnd.android.package-archive";
+    headers["content-disposition"] = `attachment; filename="${key.slice(key.lastIndexOf("/") + 1)}"`;
+  }
   if (key === "service-worker.js") headers["service-worker-allowed"] = "/";
   return headers;
 }
@@ -6462,8 +6629,31 @@ export async function serveStatic(env, request, url) {
 /* ================================================================
  * Worker 入口
  * ================================================================ */
+/* 原生壳 WebView 源白名单（CORS 仅对它们生效；Capacitor 默认 androidScheme=https → https://localhost） */
+const SHELL_ORIGINS = new Set(["https://localhost", "http://localhost", "capacitor://localhost", "https://suveoo.local"]);
 export default {
+  /* CORS 外壳（第四十五轮 Android 壳）：白名单源（Capacitor WebView）预检直答、响应注入跨源头；
+     网页版同源请求不进此分支，行为零变化。真实路由全部在 handle()。 */
   async fetch(request, env, ctx) {
+    const origin = request.headers.get("origin") ?? "";
+    if (!SHELL_ORIGINS.has(origin)) return this.handle(request, env, ctx);
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: {
+        "access-control-allow-origin": origin,
+        "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+        "access-control-allow-headers": "authorization, content-type",
+        "access-control-max-age": "86400",
+        "vary": "Origin",
+      } });
+    }
+    const original = await this.handle(request, env, ctx);
+    const out = new Response(original.body, original);
+    out.headers.set("access-control-allow-origin", origin);
+    out.headers.set("access-control-allow-headers", "authorization, content-type");
+    out.headers.set("vary", "Origin");
+    return out;
+  },
+  async handle(request, env, ctx) {
     const url = new URL(request.url);
     if (url.hostname === "www.suveoo.com") {
       const location = `https://suveoo.com${url.pathname}${url.search}`;
@@ -6585,11 +6775,28 @@ export default {
     }
     return serveStatic(env, request, url);
   },
-  /* 第九期 NAV 实时化：每 5 分钟预热（价格 KV + 汇率），用户请求永远命中热缓存——首请求不再等外网拉取 */
+  /* 第九期 NAV 实时化：每 5 分钟预热（价格 KV + 汇率），用户请求永远命中热缓存——首请求不再等外网拉取。
+   * 第五十六轮：到期提醒扫描（账单 due_day=明日未缴 / 订阅 48h 内扣费且开提醒），当日一轮防重 */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(Promise.allSettled([refreshFundPrices(env), hFxLive(env).catch(() => {})]));
+    ctx.waitUntil(Promise.allSettled([refreshFundPrices(env), hFxLive(env).catch(() => {}), dueReminders(env).catch(() => {})]));
   },
 };
+
+/* 到期提醒扫描（第五十六轮，cron 每 5 分钟驱动）：遍历全部注册用户 DO 逐个 due_scan
+ * （无到期/当日已扫时秒回）；站点受众中国时区——日期按 UTC+8 计算 */
+async function dueReminders(env) {
+  const cn = new Date(Date.now() + 8 * 3600e3);
+  const day = (d) => d.toISOString().slice(0, 10);
+  const t = new Date(cn.getTime() + 864e5);
+  const t2 = new Date(cn.getTime() + 2 * 864e5);
+  const input = {
+    date_key: day(cn), today: day(cn), tomorrow_day: t.getUTCDate(),
+    day_after_tomorrow: day(t2),
+    month_start: day(new Date(Date.UTC(cn.getUTCFullYear(), cn.getUTCMonth(), 1))),
+  };
+  const reg = await ledgerOp(env, REGISTRY_INSTANCE, { op: "listUsers" });
+  await Promise.allSettled((reg?.users ?? []).map((u) => U(env, u.user_id)({ op: "due_scan", ...input })));
+}
 
 /* ================================================================
  * ⑤ LedgerDO（registry 单例 + 每用户账本）
@@ -6616,6 +6823,9 @@ const DDL = [
   "CREATE TABLE IF NOT EXISTS holdings(fund TEXT PRIMARY KEY, amount_cents TEXT, cost_nav TEXT)",
   "CREATE TABLE IF NOT EXISTS fx_balances(currency TEXT PRIMARY KEY, amount TEXT)",
   "CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, body TEXT, read INTEGER DEFAULT 0, ts TEXT)",
+  /* 第五十七轮：邮件验证码（含 cd 冷却/hr 小时计数）——KV 最终一致跨 colo 60s 盲区曾致转账
+   * "大概率失败"，迁入 registry DO（强一致 read-your-writes）；k 形如 code:redstep:{email} */
+  "CREATE TABLE IF NOT EXISTS otp_codes(k TEXT PRIMARY KEY, h TEXT, n INTEGER DEFAULT 0, expires_at INTEGER)",
   "CREATE TABLE IF NOT EXISTS user_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT, detail TEXT, channel TEXT, trace_id TEXT, ts TEXT)",
   "CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, payload TEXT, status TEXT DEFAULT 'PENDING', next_run_at TEXT, repeat TEXT DEFAULT 'once', fail_next INTEGER DEFAULT 0, created_at TEXT)",
   /* 第二十二期：目标陪伴——goals 主表（ACTIVE→ACHIEVED/ABANDONED）+ goal_events 账本（进度唯一事实源） */
@@ -7291,7 +7501,7 @@ export class LedgerDO {
             })).then((r) => r.json());
             if (!c.ok) return json(c);
             if (c.achieved) {
-              this.#notify(sql, "WEALTH", "🎉 月度自动存入达成目标", `「${g.name}」已存满 ¥${c.saved} / ¥${c.target}，全部锁定资金已解锁退回可用余额。`);
+              this.#notify(sql, "WEALTH", "月度自动存入达成目标", `「${g.name}」已存满 ¥${c.saved} / ¥${c.target}，全部锁定资金已解锁退回可用余额。`);
               await this.#goalTouch("achieved", { name: g.name, saved: c.saved, target: c.target });
             } else if (c.milestone_reached) {
               this.#notify(sql, "WEALTH", `目标进度 ${c.milestone_reached}%`, `「${g.name}」月度自动存入 ¥${centsToStr(amt)}，已存 ¥${c.saved} / ¥${c.target}（${c.pct}%）。`);
@@ -7339,7 +7549,7 @@ export class LedgerDO {
             const from = (b.from_card ? this.#rows(sql.exec("SELECT * FROM cards WHERE slug = ? AND kind='debit' AND status='ACTIVE'", b.from_card))[0] : null)
               ?? this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
             const amt = BigInt(toCents(String(b.amount ?? "0")));
-            if (amt > BigInt(from.balance_cents)) { this.#notify(sql, "TASK", "预约转账失败", "余额不足，任务标记失败。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "INSUFFICIENT_BALANCE" }); }
+            if (amt > BigInt(from.balance_cents)) { this.#notify(sql, "TASK", "预约转账失败", "余额不足，任务标记失败。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); await this.#schedResultMail(false, { title: t.title, amount: b.amount, reason: "余额不足" }); return json({ ok: false, error: "INSUFFICIENT_BALANCE" }); }
             /* 第二十八轮资金守恒修复：此前到期只扣款记 OUT，收款方永不到账（本人其他卡/对方账户均无入账）——
                与即时转账同口径补齐：本人卡（同 DO）直接加余额；跨用户经 registry 查归属 → #crossCredit 先入账
                （credit-first：入账失败即整体失败不扣款，杜绝只扣不加）。收款方卡号在建单时已过真实性校验；
@@ -7350,6 +7560,7 @@ export class LedgerDO {
               /* 同卡自转/信用卡收款（建单校验前存量的极端个案）：直接按未执行完成，不动账 */
               this.#notify(sql, "TASK", "预约转账未执行", `「${t.title}」收款卡不可用（同卡或信用卡），任务已结束，余额未受影响。`);
               sql.exec("UPDATE tasks SET status='DONE' WHERE id=?", input.id);
+              await this.#schedResultMail(false, { title: t.title, amount: b.amount, reason: "收款卡不可用（同卡或信用卡）" });
               return json({ ok: true, outcome: "DONE", skipped: "SAME_CARD" });
             }
             let cross = null;
@@ -7364,13 +7575,14 @@ export class LedgerDO {
               if (!cross) {
                 this.#notify(sql, "TASK", "预约转账失败", `收款卡号 ${toAcct.slice(-4)} 已无法解析归属，任务标记失败，余额未受影响。`);
                 sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id);
+                await this.#schedResultMail(false, { title: t.title, amount: b.amount, reason: "收款卡号已无法解析归属" });
                 return json({ ok: false, error: "TARGET_CARD_NOT_FOUND" });
               }
               /* 幂等键=任务+执行日（日粒度）：SagaDO alarm 重投/重试时 NOW 毫秒差不再击穿幂等——
                  全量测试两轮复现"收款方 +400"双入账（trace 随毫秒变化），日粒度同任务同日至多入账一次 */
               const traceId = `sch-t${input.id}-${new Date(NOW).toISOString().slice(0, 10)}`;
               const cr = await this.#crossCredit(cross, { amount_cents: String(amt), counterparty: b.recipient_name ?? "预约转账付款方", memo: b.memo ?? null, trace_id: traceId, channel: "task" });
-              if (!cr.ok) { this.#notify(sql, "TASK", "预约转账失败", "收款方入账未成功，任务标记失败，余额未受影响。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); return json({ ok: false, error: "CREDIT_FAILED" }); }
+              if (!cr.ok) { this.#notify(sql, "TASK", "预约转账失败", "收款方入账未成功，任务标记失败，余额未受影响。"); sql.exec("UPDATE tasks SET status='FAILED' WHERE id=?", input.id); await this.#schedResultMail(false, { title: t.title, amount: b.amount, reason: "收款方入账未成功" }); return json({ ok: false, error: "CREDIT_FAILED" }); }
             }
             sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(from.balance_cents) - amt), from.slug);
             if (own) sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(own.balance_cents) + amt), own.slug);
@@ -7380,29 +7592,104 @@ export class LedgerDO {
             if (t.repeat === "monthly") {
               const nextRun = new Date(Date.now() + 30 * 86400000).toISOString();
               sql.exec("UPDATE tasks SET status='PENDING', next_run_at=? WHERE id=?", nextRun, input.id);
+              await this.#schedResultMail(true, { title: t.title, amount: b.amount, to: b.recipient_name ?? "收款人", txId });
               return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun });
             }
             if (t.repeat === "yearly") {
               /* 每年轮转：desc 承诺 repeat=yearly，此前落到 DONE 只执行一次（真实银行差距修复） */
               const nextRun = new Date(Date.now() + 365 * 86400000).toISOString();
               sql.exec("UPDATE tasks SET status='PENDING', next_run_at=? WHERE id=?", nextRun, input.id);
+              await this.#schedResultMail(true, { title: t.title, amount: b.amount, to: b.recipient_name ?? "收款人", txId });
               return json({ ok: true, outcome: "RESCHEDULED", next_run_at: nextRun });
             }
             sql.exec("UPDATE tasks SET status='DONE' WHERE id=?", input.id);
             this.#notify(sql, "TASK", "预约转账已执行", `¥${b.amount} 已转出。`);
+            await this.#schedResultMail(true, { title: t.title, amount: b.amount, to: b.recipient_name ?? "收款人", txId });
             return json({ ok: true, outcome: "DONE" });
           }
           /* 提醒类任务：无资金语义，到期发站内通知即完成（此前 generic 分支只标 DONE 不通知，
              "Netflix 续费提醒我"这类指令建单后到点是哑的） */
           if (t.type === "reminder") {
             sql.exec("UPDATE tasks SET status='DONE' WHERE id=?", input.id);
-            this.#notify(sql, "TASK", "⏰ 到期提醒", p.body ?? t.title ?? "您设置的提醒到了");
+            this.#notify(sql, "TASK", "到期提醒", p.body ?? t.title ?? "您设置的提醒到了");
             return json({ ok: true, outcome: "DONE" });
           }
           sql.exec("UPDATE tasks SET status='DONE' WHERE id=?", input.id);
           return json({ ok: true, outcome: "DONE" });
         }
         case "notify": { this.#notify(sql, input.type ?? "SYSTEM", input.title, input.body); return json({ ok: true }); }
+        /* OTP 邮件码（第五十七轮）：发码登记（cd 冷却 + hr 小时计数 + 码 hash）与验码
+         * （比对 hash/失败计数/一次性 consume）。强一致（DO 单线程），治 KV 跨 colo 盲区。 */
+        case "otp_issue": {
+          const { scene, email } = input;
+          const now = Date.now();
+          const row = (k) => this.#rows(sql.exec("SELECT h, n, expires_at FROM otp_codes WHERE k = ?", k))[0];
+          const alive = (r) => r && Number(r.expires_at) > now;
+          const put = (k, h, n, exp) => sql.exec("INSERT INTO otp_codes(k, h, n, expires_at) VALUES(?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET h = excluded.h, n = excluded.n, expires_at = excluded.expires_at", k, h, n, exp);
+          if (alive(row(`cd:${scene}:${email}`))) return json({ ok: false, reason: "COOLDOWN", message: "请 60 秒后再试" });
+          const hr = row(`hr:${scene}:${email}`);
+          const hrn = alive(hr) ? Number(hr.n ?? 0) : 0;
+          if (hrn >= 5) return json({ ok: false, reason: "HOURLY", message: "尝试次数过多，请 1 小时后再试" });
+          put(`code:${scene}:${email}`, String(input.h), 0, now + (Number(input.ttlMs) || 600000));
+          put(`cd:${scene}:${email}`, "1", 0, now + 60000);
+          put(`hr:${scene}:${email}`, "1", hrn + 1, now + 3600000);
+          return json({ ok: true });
+        }
+        case "otp_check": {
+          const { scene, email, h } = input;
+          const now = Date.now();
+          const r = this.#rows(sql.exec("SELECT h, n, expires_at FROM otp_codes WHERE k = ?", `code:${scene}:${email}`))[0];
+          if (!r || Number(r.expires_at) <= now) return json({ ok: false, reason: "CODE_NOT_FOUND" });
+          if (Number(r.n ?? 0) >= 5) return json({ ok: false, reason: "CODE_TOO_MANY_ATTEMPTS" });
+          if (String(r.h) !== String(h)) {
+            sql.exec("UPDATE otp_codes SET n = n + 1 WHERE k = ?", `code:${scene}:${email}`);
+            return json({ ok: false, reason: "CODE_MISMATCH" });
+          }
+          if (input.consume !== false) sql.exec("DELETE FROM otp_codes WHERE k = ?", `code:${scene}:${email}`);
+          return json({ ok: true });
+        }
+        /* 通用 meta 读写（第五十六轮：通知偏好/设备指纹/到期防重共用；值一律参数绑定） */
+        case "meta_get": { const r = this.#rows(sql.exec("SELECT v FROM meta WHERE k = ?", input.k))[0]; return json({ ok: true, v: r?.v ?? null }); }
+        case "meta_set": { sql.exec("INSERT INTO meta(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", input.k, String(input.v ?? "")); return json({ ok: true }); }
+        /* 到期提醒扫描（第五十六轮，cron 每 5 分钟驱动）：账单 due_day=明日且本月未缴；
+         * 订阅 next_charge_date 未来 2 天内且 reminders 开。当日一轮防重（meta due_done_{date}） */
+        case "due_scan": {
+          const doneKey = `due_done_${input.date_key}`;
+          if (this.#rows(sql.exec("SELECT v FROM meta WHERE k = ?", doneKey))[0]) return json({ ok: true, sent: 0 });
+          let sent = 0;
+          /* 第六十四轮：摘要行收集——账单到期/订阅扣费合并成一封邮件（防逐条轰炸），
+             每月 1 日追加"电子对账单已可生成"提示（业界 monthly statement 场景） */
+          const lines = [];
+          for (const b of this.#rows(sql.exec("SELECT name, due_day, amount_cents, autopay, last_paid_at FROM bills"))) {
+            const paidThisMonth = b.last_paid_at && String(b.last_paid_at).slice(0, 10) >= input.month_start;
+            if (Number(b.due_day) === Number(input.tomorrow_day) && !paidThisMonth) {
+              const line = `账单「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动扣款已开启。" : "可提前缴费。"}`;
+              this.#notify(sql, "TRANSFER", "账单明日到期", `「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动扣款已开启，届时将自动扣费。" : "可提前在「收付 → 账单与订阅」缴费。"}`);
+              lines.push(line);
+              sent++;
+            }
+          }
+          for (const s of this.#rows(sql.exec("SELECT merchant, plan, amount_cents, next_charge_date, reminders FROM subscriptions WHERE status = 'ACTIVE'"))) {
+            if (!s.reminders) continue;
+            const d = s.next_charge_date ? String(s.next_charge_date).slice(0, 10) : "";
+            if (d && d >= input.today && d <= input.day_after_tomorrow) {
+              this.#notify(sql, "SYSTEM", "订阅即将扣费", `「${s.merchant}」${s.plan ?? ""} 将于 ${d} 扣费 ¥${(Number(s.amount_cents) / 100).toFixed(2)}。如不再需要可提前取消订阅。`);
+              lines.push(`订阅「${s.merchant}」${s.plan ?? ""} 将于 ${d} 扣费 ¥${(Number(s.amount_cents) / 100).toFixed(2)}，如不再需要可提前取消。`);
+              sent++;
+            }
+          }
+          if (Number(String(input.today).slice(8, 10)) === 1) {
+            lines.push(`您本月（${String(input.today).slice(0, 7)}）的电子对账单已可在「下载中心」生成与下载。`);
+          }
+          if (lines.length) {
+            try {
+              const em = this.#rows(sql.exec("SELECT email FROM profile LIMIT 1"))[0]?.email;
+              if (em) await sendMail(this.env, { to: em, ...dueDigestMail({ lines }) });
+            } catch { /* 邮件外发失败不影响扫描结果 */ }
+          }
+          sql.exec("INSERT INTO meta(k, v) VALUES(?, '1') ON CONFLICT(k, v) DO UPDATE SET v = '1'", doneKey);
+          return json({ ok: true, sent });
+        }
         case "notifications": {
           /* 分页（通知中心"加载更多"）：cursor=已取条数，多取 1 条判 hasMore；byType=分类未读计数（chips 徽章） */
           const cur = Math.max(0, Number(input.cursor) || 0);
@@ -7801,6 +8088,17 @@ export class LedgerDO {
   }
   /* 生日链履约/补偿触点的邮件+TG 外发（站内 notify 由调用处发）：数字全部系统侧给出。
      DO 内无 waitUntil——直接 await（alarm/sweep 语境多几百毫秒可接受）；失败不抛（通知缺送不回滚账本）。 */
+  /* 预约转账到期执行结果邮件（第六十四轮）：成功回执/失败原因，挂 taskDue 全部出口 */
+  async #schedResultMail(ok, { title, amount, to = "收款人", txId = null, reason = "" }) {
+    try {
+      const prof = await this.fetch(new Request("https://ledger.internal/", {
+        method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+        body: JSON.stringify({ op: "getProfile" }),
+      })).then((r) => r.json());
+      const email = prof?.profile?.email;
+      if (email) await sendMail(this.env, { to: email, ...scheduledExecMail({ title, ok, amount, to, txId, reason }) });
+    } catch { /* 邮件缺送不影响账本结果 */ }
+  }
   async #taskTouch(kind, { title, amount, txId = null, reason = null, yearly = false, steps = [] }) {
     try {
       const prof = await this.fetch(new Request("https://ledger.internal/", {
@@ -7813,8 +8111,8 @@ export class LedgerDO {
         await sendMail(this.env, { to: email, ...m });
       }
       const lines = kind === "fulfilled"
-        ? [`🌸 <b>生日预订已履约</b>`, "", `任务 ${escHtml(title)}`, `支付 <b>¥${escHtml(amount)}</b>（从锁定资金扣款）${txId ? ` · 流水 <code>${escHtml(txId)}</code>` : ""}`, ...(yearly ? ["每年模式：明年同期自动再锁定并预订"] : [])]
-        : [`🛡 <b>生日预订失败已自动补偿</b>`, "", `任务 ${escHtml(title)}`, `解锁 <b>¥${escHtml(amount)}</b>（余额未受影响）`, `原因 ${escHtml(reason ?? "演示故障注入")}`];
+        ? [`<b>生日预订已履约</b>`, "", `任务 ${escHtml(title)}`, `支付 <b>¥${escHtml(amount)}</b>（从锁定资金扣款）${txId ? ` · 流水 <code>${escHtml(txId)}</code>` : ""}`, ...(yearly ? ["每年模式：明年同期自动再锁定并预订"] : [])]
+        : [`<b>生日预订失败已自动补偿</b>`, "", `任务 ${escHtml(title)}`, `解锁 <b>¥${escHtml(amount)}</b>（余额未受影响）`, `原因 ${escHtml(reason ?? "演示故障注入")}`];
       await tgNotify(this.env, [...lines, ...(steps.length ? ["路径 " + escHtml(steps.join(" → "))] : []), `<b>Time</b>: ` + new Date().toISOString()].join("\n"));
     } catch { /* 通知外发失败不影响账本结果 */ }
   }
@@ -7832,8 +8130,8 @@ export class LedgerDO {
         await sendMail(this.env, { to: email, ...m });
       }
       const lines = kind === "achieved"
-        ? [`🏆 <b>攒钱目标已达成</b>`, "", `目标 ${escHtml(name)}`, `累计 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)} · 已解锁退回可用余额`]
-        : [`🎯 <b>目标进度 ${escHtml(String(pct))}%</b>`, "", `目标 ${escHtml(name)}`, `已存 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}${amount ? ` · 本笔 ¥${escHtml(amount)}（月度自动存入）` : ""}`];
+        ? [`<b>攒钱目标已达成</b>`, "", `目标 ${escHtml(name)}`, `累计 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)} · 已解锁退回可用余额`]
+        : [`<b>目标进度 ${escHtml(String(pct))}%</b>`, "", `目标 ${escHtml(name)}`, `已存 <b>¥${escHtml(saved)}</b> / ¥${escHtml(target)}${amount ? ` · 本笔 ¥${escHtml(amount)}（月度自动存入）` : ""}`];
       await tgNotify(this.env, [...lines, `<b>Time</b>: ` + new Date().toISOString()].join("\n"));
     } catch { /* 通知外发失败不影响账本结果 */ }
   }

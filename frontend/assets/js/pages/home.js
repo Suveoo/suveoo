@@ -20,7 +20,7 @@ S.router.register("home", async ({ user }) => {
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
     </div>`;
   /* hero 输入条：Enter 提交 + 语音按钮（识别结果填框，不自动发送——用户核对后再回车） */
-  const go = () => { const v = document.getElementById("hero-q").value.trim(); if (v) S.router.ai(v); };
+  const go = () => { S.voice.stop({ discard: true }); const v = document.getElementById("hero-q").value.trim(); if (v) S.router.ai(v); };
   document.getElementById("hero-input").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   S.voice.bind(document.getElementById("hero-mic"), document.getElementById("hero-q"));
   /* services：多彩渐变宫格（第二十三轮 D 升级 ic-*；第二十四轮补记：未开放的跨行/跨境退役，

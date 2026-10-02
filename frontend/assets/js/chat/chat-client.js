@@ -11,7 +11,7 @@ S.chat = {
     let page = 1, totalPages = 1;
     try {
       do {
-        const r = await fetch(`/api/ai/sessions/${encodeURIComponent(sid)}/messages?page=${page}`, {
+        const r = await fetch(S.api.base + `/api/ai/sessions/${encodeURIComponent(sid)}/messages?page=${page}`, {
           headers: S.api.token ? { authorization: `Bearer ${S.api.token}` } : {},
         });
         if (!r.ok) return null;
@@ -34,7 +34,7 @@ S.chat = {
     let ended = false;
     const finish = () => { if (!ended) { ended = true; this._ctrl = null; safe(() => onDone?.()); } };
     try {
-      const res = await fetch("/api/ai/chat", {
+      const res = await fetch(S.api.base + "/api/ai/chat", {
         method: "POST",
         headers: { "content-type": "application/json", ...(S.api.token ? { authorization: `Bearer ${S.api.token}` } : {}) },
         body: JSON.stringify({ text, session_id: this.sid }),

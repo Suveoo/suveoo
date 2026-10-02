@@ -70,7 +70,7 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     box.innerHTML = debits.map((d) => `
       <label class="tf-card${d.slug === fromSlug ? " on" : ""}">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""}>
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="">
+        <img class="bc-art" src="${S.fmt.cardFront(d, allCards)}" alt="">
         <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}</span>
           <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(S.t("cards.classIc", d.class_label))}${d.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</span></span>
         <span class="tf-cright"><span class="tf-cbal">${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</span>${d.held ? `<span class="tf-cbal held">${S.fmt.escape(S.t("transfer.held", d.held))}</span>` : ""}</span>
@@ -157,11 +157,11 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("transfer.self"))}</h2><div id="pp-list"></div>`, { large: false });
     m.el.querySelector("#pp-list").innerHTML = allCards.filter((x) => x.status === "ACTIVE").map((d) => d.kind === "credit" ? `
       <a class="list-row" href="/account/cards" style="text-decoration:none;color:inherit">
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d, allCards)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(S.t("transfer.selfRepay"))}</div></div>
         ${S.ui.badge(S.t("cards.credit"), "badge-navy")}<span class="small" style="color:var(--color-navy);white-space:nowrap">${S.fmt.escape(S.t("transfer.selfRepayGo"))}</span></a>` : `
       <div class="list-row" style="cursor:pointer" data-slug="${d.slug}">
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d, allCards)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(S.t("cards.classIc", d.class_label))} · ${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</div></div>
         ${d.is_default ? S.ui.badge(S.t("cards.default"), "badge-gray") : ""}</div>`).join("");
     S.ui.$$(".list-row[data-slug]", m.el).forEach((row) => {
@@ -252,8 +252,13 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     if (!body.recipient_name || !/^\d{16}$/.test(body.recipient_account) || !/^\d+(\.\d{1,2})?$/.test(body.amount ?? "") || !body.execute_at) {
       S.ui.toast(S.t("sched.fillAll"), true); return;
     }
-    const r = await S.api.mutate("/api/schedules", body, { subject: body.recipient_name });
-    if (r.cancelled) return;
+    S.ui.btnBusy(goBtn, true);
+    try {
+      const r = await S.api.mutate("/api/schedules", body, {
+        subject: body.recipient_name,
+        proc: { key: "sched.procTitle" }, /* 执行段处理中覆盖层（第六十一轮） */
+      });
+      if (r.cancelled) return;
     if (r.data?.status === "EXECUTED") {
       S.ui.modal(`<h2>${S.ui.icon("check", 20)} ${S.fmt.escape(S.t("sch.created"))}</h2>
         <div class="genui-card" style="max-width:none">
@@ -267,6 +272,10 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
       /* 收款方真实性等结构化拒绝：行内红条（与 /transfer/intrabank 同款映射） */
       showErr(r);
       S.ui.toast(r.data?.reason ?? r.data?.error?.message ?? S.t("transfer.failed"), true);
+    }
+    } finally {
+      S.ui.btnBusy(goBtn, false);
+      goBtn.disabled = !debits.length || !samewarn.hidden;
     }
   };
 

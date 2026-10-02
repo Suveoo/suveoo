@@ -63,7 +63,7 @@ S.router.register("intrabank", async ({ user } = {}) => {
     fromBox.innerHTML = payFrom.map((d) => `
       <label class="tf-card${d.slug === fromSlug ? " on" : ""}">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""}>
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="">
+        <img class="bc-art" src="${S.fmt.cardFront(d, cards)}" alt="">
         <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}${d.kind === "credit" ? ` ${S.ui.badge(S.t("cards.creditTag"), "badge-navy")}` : ""}</span>
           <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(d.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", d.class_label))}${d.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</span></span>
         <span class="tf-cright"><span class="tf-cbal">${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(availOf(d))}</span>${d.held ? `<span class="tf-cbal held">${S.fmt.escape(S.t("transfer.held", d.held))}</span>` : ""}</span>
@@ -159,11 +159,11 @@ S.router.register("intrabank", async ({ user } = {}) => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("transfer.self"))}</h2><div id="pp-list"></div>`, { large: false });
     m.el.querySelector("#pp-list").innerHTML = cards.filter((x) => x.status === "ACTIVE").map((d) => d.kind === "credit" ? `
       <a class="list-row" href="/account/card/${d.slug}/settings" style="text-decoration:none;color:inherit">
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d, cards)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b> ${S.ui.badge(S.t("cards.credit"), "badge-navy")}<div class="muted small">${S.fmt.escape(S.t("transfer.selfRepay"))}</div></div>
         <span class="small" style="color:var(--color-navy);white-space:nowrap">${S.fmt.escape(S.t("transfer.selfRepayGo"))}</span></a>` : `
       <div class="list-row" style="cursor:pointer" data-slug="${d.slug}">
-        <img class="bc-art" src="${S.fmt.cardFront(d)}" alt="" style="width:56px;height:36px">
+        <img class="bc-art" src="${S.fmt.cardFront(d, cards)}" alt="" style="width:56px;height:36px">
         <div class="grow"><b class="mono">${S.fmt.escape(d.number)}</b><div class="muted small">${S.fmt.escape(S.t("cards.classIc", d.class_label))} · ${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</div></div>
         ${d.is_default ? S.ui.badge(S.t("cards.default"), "badge-gray") : ""}</div>`).join("");
     S.ui.$$(".list-row[data-slug]", m.el).forEach((row) => {
@@ -232,26 +232,33 @@ S.router.register("intrabank", async ({ user } = {}) => {
     const body = selfTransfer
       ? { to_card: selfTransfer, amount, memo: memo || undefined, from_card: fromSlug }
       : { recipient_name: name, recipient_account: acct, amount, memo: memo || undefined, from_card: fromSlug };
-    goBtn.disabled = true;
+    S.ui.btnBusy(goBtn, true);
     S.ga4.event("transfer_submit", { amount });
-    const r = await S.api.mutate("/api/transfers/intrabank", body);
-    goBtn.disabled = !payFrom.length || !samewarn.hidden;
-    if (r.cancelled) return;
-    if (r.data?.status === "EXECUTED" && r.data.result?.ok) {
-      S.ga4.event("transfer_confirm", { amount });
-      const res = r.data.result;
-      S.ui.modal(`<h2>${S.ui.icon("check", 20)} ${S.fmt.escape(S.t("transfer.success"))}</h2>
-        <div class="genui-card" style="max-width:none"><div class="gc-amount">¥ ${S.fmt.moneyPlain(amount)}</div>
-        <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("genui.to"))}</span><span class="v">${S.fmt.escape(res.to ?? name)}</span></div>
-        <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.txId"))}</span><span class="v mono">${S.fmt.escape(res.tx_id)}</span></div>
-        <div class="gc-kv"><span class="muted">Trace</span><span class="v mono small">${S.fmt.escape(r.data.trace_id)}</span></div></div>
-        ${S.sim.footnote()}
-        <div class="modal-actions"><a class="btn btn-ghost" href="/transfer/history">${S.fmt.escape(S.t("pay.history"))}</a>
-        <button class="btn btn-primary" onclick="location.reload()">${S.fmt.escape(S.t("common.done"))}</button></div>`);
-    } else {
-      /* 收款方真实性拦截等业务拒绝：行内红条呈现结构化原因 */
-      showErr(r);
-      S.ui.toast(S.t("transfer.failed"), true);
+    try {
+      const r = await S.api.mutate("/api/transfers/intrabank", body, {
+        /* 执行段处理中覆盖层专属文案（第六十一轮）：金额步骤条与确认卡/回执同语言 */
+        proc: { key: "transfer.procTitle", steps: ["transfer.procStep1", "transfer.procStep2", "transfer.procStep3"] },
+      });
+      if (r.cancelled) return;
+      if (r.data?.status === "EXECUTED" && r.data.result?.ok) {
+        S.ga4.event("transfer_confirm", { amount });
+        const res = r.data.result;
+        S.ui.modal(`<h2>${S.ui.icon("check", 20)} ${S.fmt.escape(S.t("transfer.success"))}</h2>
+          <div class="genui-card" style="max-width:none"><div class="gc-amount">¥ ${S.fmt.moneyPlain(amount)}</div>
+          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("genui.to"))}</span><span class="v">${S.fmt.escape(res.to ?? name)}</span></div>
+          <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.txId"))}</span><span class="v mono">${S.fmt.escape(res.tx_id)}</span></div>
+          <div class="gc-kv"><span class="muted">Trace</span><span class="v mono small">${S.fmt.escape(r.data.trace_id)}</span></div></div>
+          ${S.sim.footnote()}
+          <div class="modal-actions"><a class="btn btn-ghost" href="/transfer/history">${S.fmt.escape(S.t("pay.history"))}</a>
+          <button class="btn btn-primary" onclick="location.reload()">${S.fmt.escape(S.t("common.done"))}</button></div>`);
+      } else {
+        /* 收款方真实性拦截等业务拒绝：行内红条呈现结构化原因 */
+        showErr(r);
+        S.ui.toast(S.t("transfer.failed"), true);
+      }
+    } finally {
+      S.ui.btnBusy(goBtn, false);
+      goBtn.disabled = !payFrom.length || !samewarn.hidden;
     }
   };
 });

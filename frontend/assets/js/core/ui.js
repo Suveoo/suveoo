@@ -85,6 +85,44 @@ S.ui = {
     mask.addEventListener("click", (e) => { if (e.target === mask) close(); });
     return { el: box, close };
   },
+  /* 处理中覆盖层（第六十一轮）：mutate 执行段（确认卡已关→回执未到的静止窗口）统一反馈。
+   * 自有 proc-* 前缀；磨砂遮罩复用全局 .modal-mask；无关闭途径（处理不可中断，误关=丢回执）。
+   * steps 可选：i18n 键数组，1.3s 推进一步、到末步常亮直至 close（服务端确实按此序执行）。 */
+  proc({ key = "common.procTitle", hint = "common.procHint", steps = null } = {}) {
+    const el = S.ui.el(`<div class="modal-mask"><div class="proc-card" role="status" aria-live="polite">
+      <span class="proc-spin" aria-hidden="true"></span>
+      <div class="proc-title">${S.fmt.escape(S.t(key))}</div>
+      <div class="proc-hint">${S.fmt.escape(S.t(hint))}</div>
+      ${Array.isArray(steps) && steps.length ? `<div class="proc-steps">${steps.map((s, i) => `
+        <div class="proc-step${i === 0 ? " on" : ""}"><span class="proc-dot"></span><span>${S.fmt.escape(S.t(s))}</span></div>`).join("")}</div>` : ""}
+    </div></div>`);
+    document.body.appendChild(el);
+    S.ui._lockScroll();
+    let si = 0, t = null;
+    const rows = [...el.querySelectorAll(".proc-step")];
+    if (rows.length > 1) t = setInterval(() => {
+      if (si < rows.length - 1) { rows[si].classList.replace("on", "done"); si++; rows[si].classList.add("on"); }
+    }, 1300);
+    return { el, close() { if (t) clearInterval(t); el.remove(); S.ui._unlockScroll(); } };
+  },
+  /* 按钮 loading 态（第六十一轮）：注入小 spinner + disabled（保留原字样；恢复时还原进入前 disabled 态，
+   * 不盲目置 false——t-go 等按钮的可用性由页面条件控制）。幂等：重复置 on 不叠加。 */
+  btnBusy(btn, on) {
+    if (!btn) return;
+    if (on) {
+      if (btn.dataset.busy) return;
+      btn.dataset.busy = "1";
+      btn.dataset.prevDisabled = btn.disabled ? "1" : "0";
+      btn.dataset.prevHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="proc-spin sm" aria-hidden="true"></span>${btn.dataset.prevHtml}`;
+    } else if (btn.dataset.busy) {
+      const prev = btn.dataset.prevHtml, prevDis = btn.dataset.prevDisabled === "1";
+      delete btn.dataset.busy; delete btn.dataset.prevHtml; delete btn.dataset.prevDisabled;
+      btn.innerHTML = prev;
+      btn.disabled = prevDis;
+    }
+  },
   skeleton(rows = 3) { return Array.from({ length: rows }, () => '<div class="skeleton" style="margin-bottom:12px"></div>').join(""); },
   empty(text, actionHtml = "") {
     return `<div class="empty"><img src="/assets/images/illustrations/empty-state.svg" alt=""><p>${S.fmt.escape(text)}</p>${actionHtml}</div>`;

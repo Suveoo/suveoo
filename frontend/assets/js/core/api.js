@@ -1,5 +1,8 @@
-/* api.js — fetch 封装（JWT、错误、两段式 Consent） */
+/* api.js — fetch 封装（JWT、错误、两段式 Consent）
+ * base（第四十五轮 Android 壳）：网页版（suveoo.com 域）相对路径照旧零变化；
+ * 非 suveoo.com 源（Capacitor 壳 https://localhost / 本地开发 server）API 一律指向生产。 */
 S.api = {
+  base: /(^|\.)suveoo\.com$/.test(location.hostname) ? "" : "https://suveoo.com",
   tokenKey: "suveoo_token",
   get token() { return localStorage.getItem(this.tokenKey); },
   set token(v) { v ? localStorage.setItem(this.tokenKey, v) : localStorage.removeItem(this.tokenKey); },
@@ -12,7 +15,7 @@ S.api = {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const res = await fetch(path, { method, headers, cache: "no-store", body: body != null ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+        const res = await fetch(this.base + path, { method, headers, cache: "no-store", body: body != null ? JSON.stringify(body) : undefined, signal: ctrl.signal });
         let data = null;
         try { data = await res.json(); } catch { /* 非 JSON */ }
         return { status: res.status, ok: res.ok, data };
@@ -40,7 +43,7 @@ S.api = {
       if (!onPublicPage && !path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
         sessionStorage.setItem("suveoo_redirecting", "1");
         const next = encodeURIComponent(location.pathname + location.search);
-        location.replace(`/account/login?next=${next}`);
+        location.replace((S.router?.navPath?.("/account/login") ?? "/account/login") + `?next=${next}`);
         setTimeout(() => sessionStorage.removeItem("suveoo_redirecting"), 4000);
       }
       return { status: 401, ok: false, data: out.data };
@@ -73,7 +76,7 @@ S.api = {
   },
   /** 下载（带鉴权的 PDF 等） */
   async download(path, filename) {
-    const res = await fetch(path, { headers: this.token ? { authorization: `Bearer ${this.token}` } : {} });
+    const res = await fetch(this.base + path, { headers: this.token ? { authorization: `Bearer ${this.token}` } : {} });
     if (!res.ok) { S.ui.toast(S.t("common.downloadFailed"), true); return; }
     const blob = await res.blob();
     const a = document.createElement("a");
@@ -87,12 +90,20 @@ S.api = {
    * opts.method 指定 HTTP 方法（默认 POST）——PATCH/DELETE 路由（收款人删除、卡片别名/默认卡）
    * 必须显式传，否则首段即 501（曾致 UI 删除收款人/改别名静默失败）。
    */
-  async mutate(path, body, { onEvent = null, action = null, subject = null, method = "POST" } = {}) {
+  async mutate(path, body, { onEvent = null, action = null, subject = null, method = "POST", proc = null } = {}) {
     let r = await this.req(method, path, body === undefined ? {} : body);
     if (r.data && r.data.status === "INPUT_REQUIRED") {
       const confirmed = await S.consent.modal(r.data, { onEvent, action, subject });
       if (!confirmed) return { cancelled: true };
-      r = await this.req(method, path, { ...body, grant_hash: r.data.grant.grant_hash, otp: confirmed.otp || undefined });
+      /* 第六十一轮：执行段（带 grant 的第二次请求）统一"处理中"反馈——此前确认卡已关、
+       * 回执未到，画面完全静止（队长实测转账"像卡了"的窗口，弱网下最长 15s 超时）。
+       * proc 传 { key, steps } 定制文案/步骤（转账页），缺省通用文案。 */
+      const busy = S.ui.proc(proc ?? undefined);
+      try {
+        r = await this.req(method, path, { ...body, grant_hash: r.data.grant.grant_hash, otp: confirmed.otp || undefined });
+      } finally {
+        busy.close();
+      }
     } else if (r.data && r.data.status === "OTP_REQUIRED") {
       S.ui.toast(S.t("consent.otpToast"), true);
     }

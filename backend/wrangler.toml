@@ -44,7 +44,9 @@ name = "EMAIL"
 
 # 普通变量（非密钥）
 [vars]
-CONSENT_GRANT_TTL_SECONDS = "120"
+# 第五十七轮：120→300——红级流程用户需点"获取验证码"（60s 冷却）+ 等邮件（~30s）+ 输入，
+# 120s 窗口极易超时；5 分钟与银行惯例一致（前端确认卡倒计时读 expires_at 自动跟随）
+CONSENT_GRANT_TTL_SECONDS = "300"
 INVARIANT_STRICT_MODE = "true"
 DEMO_MODE = "true"                  # 演示模式：开启 /api/demo/seed 与故障注入（决赛后改回 "false"）
 FIDO2_RP_ID = "suveoo.com"

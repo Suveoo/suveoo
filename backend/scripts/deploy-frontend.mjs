@@ -30,6 +30,32 @@ const flag = (name, def) => {
 };
 const FILTER = flag("filter", null);
 const CONCURRENCY = Number(flag("concurrency", "4"));
+const NO_MINIFY = args.includes("--no-minify"); // 调试逃生口
+
+/* ===== 上传前压缩（第四十五轮队长令）：仅作用于上传副本（临时文件），本地文件原样不动 =====
+ * JS/MJS → esbuild minify（语义安全）；CSS → 去 /* *​/ 注释；HTML → 去 <!-- --> 注释；
+ * JSON/图片/字体等二进制与数据不动。产物写 backend/.deploy-tmp/（上传完即删）。 */
+import { writeFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+let TMP_DIR = null;
+const stripCssComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
+const stripHtmlComments = (s) => s.replace(/<!--[\s\S]*?-->/g, "");
+async function minifiedCopy({ rel, full }, esbuild) {
+  const ext = path.extname(full).toLowerCase();
+  if (NO_MINIFY || (ext !== ".js" && ext !== ".mjs" && ext !== ".css" && ext !== ".html")) return { rel, full };
+  let out;
+  if (ext === ".js" || ext === ".mjs") {
+    out = (await esbuild.transform(await readFile(full, "utf8"), { minify: true, target: "es2020", legalComments: "none" })).code;
+  } else if (ext === ".css") {
+    out = stripCssComments(await readFile(full, "utf8"));
+  } else {
+    out = stripHtmlComments(await readFile(full, "utf8"));
+  }
+  TMP_DIR ??= await mkdtemp(path.join(tmpdir(), "suveoo-deploy-"));
+  const tmp = path.join(TMP_DIR, rel.replace(/\//g, "_"));
+  await writeFile(tmp, out, "utf8");
+  return { rel, full: tmp };
+}
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript",
@@ -73,7 +99,10 @@ async function uploadOne({ rel, full }, attempt = 0) {
 async function main() {
   /* 前置：重新生成卡面清单（队长把新卡图放对应目录后部署即自动更新可用图集，第四十三轮） */
   await import("./gen-card-arts.mjs");
-  const all = (await walk(FRONTEND_DIR)).filter((f) => !FILTER || f.rel.includes(FILTER));
+  const esbuild = NO_MINIFY ? null : (await import("esbuild")).default ?? (await import("esbuild"));
+  let all = (await walk(FRONTEND_DIR)).filter((f) => !FILTER || f.rel.includes(FILTER));
+  /* 压缩副本：本地文件不动，上传走临时产物（JS esbuild/CSS·HTML 去注释） */
+  all = await Promise.all(all.map((f) => minifiedCopy(f, esbuild)));
   /* 发布顺序纪律（b151 实证教训）：资产（JS/CSS/图片）先全部就位，HTML 最后切换——
      若 HTML 先到，页面以新 ?v= 引用拉到尚未更新的旧资产，SW/CDN 会把"新参数→旧内容"缓存住 1h */
   const phases = [[], []];
@@ -81,7 +110,7 @@ async function main() {
   const files = [...phases[0], ...phases[1]];
   const total = files.length;
   const totalBytes = (await Promise.all(files.map((f) => stat(f.full).then((s) => s.size)))).reduce((a, b) => a + b, 0);
-  console.log(`上传 ${total} 个文件（${(totalBytes / 1024 / 1024).toFixed(1)} MB）至 ${BUCKET}/${FILTER ? `（过滤：${FILTER}）` : ""}`);
+  console.log(`上传 ${total} 个文件（${(totalBytes / 1024 / 1024).toFixed(1)} MB，${NO_MINIFY ? "未压缩" : "已压缩副本"}）至 ${BUCKET}/${FILTER ? `（过滤：${FILTER}）` : ""}`);
 
   let done = 0, failed = [];
   const queue = [...files];
@@ -99,6 +128,7 @@ async function main() {
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  if (TMP_DIR) await rm(TMP_DIR, { recursive: true, force: true }).catch(() => {}); // 临时压缩副本即删
 
   if (failed.length) {
     console.error(`失败 ${failed.length} 个：`);

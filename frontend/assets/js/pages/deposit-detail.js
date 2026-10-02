@@ -67,9 +67,15 @@ S.router.register("deposit-detail", async () => {
   calc();
   document.getElementById("open").onclick = async () => {
     const amount = document.getElementById("d-p").value;
-    const r = await S.api.mutate("/api/wealth/purchase", { product_id: productId, amount }, { action: "deposit", subject: fund?.name ?? `${d.name}（模拟申购）` });
-    if (r.cancelled) return;
-    S.ui.toast(r.data?.status === "EXECUTED" ? S.t("common.opOk") : r.data?.reason ?? "failed", r.data?.status !== "EXECUTED");
+    const openBtn = document.getElementById("open");
+    S.ui.btnBusy(openBtn, true); /* 开立按钮 loading（第六十一轮）；执行段覆盖层由 mutate 统一提供 */
+    try {
+      const r = await S.api.mutate("/api/wealth/purchase", { product_id: productId, amount }, { action: "deposit", subject: fund?.name ?? `${d.name}（模拟申购）` });
+      if (r.cancelled) return;
+      S.ui.toast(r.data?.status === "EXECUTED" ? S.t("common.opOk") : r.data?.reason ?? "failed", r.data?.status !== "EXECUTED");
+    } finally {
+      S.ui.btnBusy(openBtn, false);
+    }
   };
   document.getElementById("ask").onclick = () => S.router.ai(S.t("prompt.depositCompare"));
 });

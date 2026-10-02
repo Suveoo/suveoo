@@ -239,7 +239,7 @@ S.chrome = {
     if (!r.ok) { list.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
     list.innerHTML = r.data.notifications.slice(0, 8).map((n) => `
       <div class="notif-item${n.read ? "" : " unread"}">
-        <div class="grow"><div class="nt">${S.fmt.escape(n.title)}</div><div class="muted small">${S.fmt.linkify(n.body)}</div>
+        <div class="grow"><div class="nt">${S.fmt.escape(S.fmt.stripEmoji(n.title))}</div><div class="muted small">${S.fmt.linkify(n.body)}</div>
         <div class="muted small">${S.fmt.relTime(n.ts)}</div></div>
       </div>`).join("") || S.ui.empty(S.t("notif.empty"));
   },
@@ -387,10 +387,16 @@ S.purchaseModal = async (fund) => {
   m.el.querySelector("#ok").onclick = async () => {
     const amount = m.el.querySelector("#w-amt").value.trim();
     if (!/^\d+(\.\d{1,2})?$/.test(amount)) { S.ui.toast(S.t("common.badAmount"), true); return; }
-    const r = await S.api.mutate("/api/wealth/purchase", { product_id: fund.slug, amount }, { subject: fund.name });
-    if (r.cancelled) return;
-    if (r.data?.status === "EXECUTED" && r.data.result?.ok) { m.close(); S.ui.toast(S.t("common.opOk")); }
-    else S.ui.toast(r.data?.result?.error === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.reason ?? r.data?.result?.error ?? "failed", true);
+    const okBtn = m.el.querySelector("#ok");
+    S.ui.btnBusy(okBtn, true); /* 申购按钮 loading（第六十一轮）；执行段覆盖层由 mutate 统一提供 */
+    try {
+      const r = await S.api.mutate("/api/wealth/purchase", { product_id: fund.slug, amount }, { subject: fund.name });
+      if (r.cancelled) return;
+      if (r.data?.status === "EXECUTED" && r.data.result?.ok) { m.close(); S.ui.toast(S.t("common.opOk")); }
+      else S.ui.toast(r.data?.result?.error === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.reason ?? r.data?.result?.error ?? "failed", true);
+    } finally {
+      S.ui.btnBusy(okBtn, false);
+    }
   };
 };
 
@@ -398,6 +404,21 @@ S.purchaseModal = async (fund) => {
 (async function boot() {
   if (document.readyState === "loading") await new Promise((r) => document.addEventListener("DOMContentLoaded", r, { once: true }));
   try { await S.i18n.init(); } catch (e) { console.error("[boot] i18n failed", e); }
+  /* 系统通知（第四十六轮起，第五十六轮优化，第六十二轮壳内语义修正）：登录态下启动轮询（30s 检新未读 → 弹系统通知）。
+   * 权限请求：壳内每次启动只要仍是 default（弹窗被划掉≠拒绝）就再问——恢复"一打开 App 就索要"的
+   * 可预期行为（此前 localStorage 每设备一次 + 划掉折算 denied = 永不再问的怪象）；Web 保持
+   * 每设备一次（浏览器重复弹扰人）；已 granted/denied 不再问；default→granted 首次给提示（无 emoji）。 */
+  if (S.api.token) {
+    S.notify.start();
+    setTimeout(() => S.notify.checkPermission().then(async (p) => {
+      if (p !== "default") return;
+      const shell = typeof window.Capacitor !== "undefined";
+      if (!shell && localStorage.getItem("suveoo_notif_asked") === "1") return;
+      localStorage.setItem("suveoo_notif_asked", "1");
+      const np = await S.notify.requestPermission();
+      if (np === "granted") S.ui.toast(S.t("notif.enableOpen"));
+    }), 3000);
+  }
   /* 卡面清单（第四十四轮）：阻塞式加载（1.5s 超时，失败静默）——渲染点在 boot 后执行，
    * 必须保证清单先于页面控制器就位，否则组织补图后渲染仍取基座回落（竞态实证：b266 src 无组织段） */
   try {
@@ -407,8 +428,9 @@ S.purchaseModal = async (fund) => {
     ]);
   } catch { /* 清单失败：cardFront 回落基座 art，卡面不变 */ }
   try { await S.chrome.render(); } catch (e) { console.error("[boot] chrome failed", e); }
-  /* Service Worker 注册（此前从未注册——SW 的超时重试由此生效；activate 会 claim 现有标签页） */
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {});
+  /* Service Worker 注册（此前从未注册——SW 的超时重试由此生效；activate 会 claim 现有标签页）。
+     壳内（非 suveoo.com 源）不注册：资产本地已秒开，SW 反而给 WebView 增一层不确定性（第四十五轮） */
+  if ("serviceWorker" in navigator && /(^|\.)suveoo\.com$/.test(location.hostname)) navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => {});
   /* 给服务端骨架打标：boot 结束后若标记仍在 = 控制器没跑（脚本加载挂死/未注册）→ 与看门狗一同自救 */
   const markBootSkel = () => document.querySelectorAll("#content .skeleton").forEach((el) => (el.dataset.boot = "1"));
   markBootSkel();

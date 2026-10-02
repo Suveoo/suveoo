@@ -136,7 +136,7 @@ S.router.register("fx", async () => {
     cardSel = fresh;
   };
   const load = async (refresh = false) => {
-    const r = await fetch(`/api/fx${refresh ? "?refresh=1" : ""}`);
+    const r = await fetch(S.api.base + `/api/fx${refresh ? "?refresh=1" : ""}`);
     fx = (await r.json().catch(() => fx)) ?? fx;
     renderMeta();
     renderTable();

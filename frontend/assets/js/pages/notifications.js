@@ -85,7 +85,7 @@ S.router.register("notifications", async () => {
       <span class="nt-dot" aria-hidden="true"></span>
       <span class="nt-ico ${m.cls}">${S.ui.icon(m.icon, 15)}</span>
       <div class="nt-main">
-        <div class="nt-h"><b class="nt-title">${S.fmt.escape(n.title)}</b><span class="nt-time" title="${S.fmt.escape(S.fmt.datetime(n.ts))}">${S.fmt.escape(S.fmt.relTime(n.ts))}</span></div>
+        <div class="nt-h"><b class="nt-title">${S.fmt.escape(S.fmt.stripEmoji(n.title))}</b><span class="nt-time" title="${S.fmt.escape(S.fmt.datetime(n.ts))}">${S.fmt.escape(S.fmt.relTime(n.ts))}</span></div>
         <div class="nt-body">${open ? S.fmt.linkify(n.body) : S.fmt.escape(n.body)}</div>
         ${open ? `<div class="nt-acts">
           ${n.read ? "" : `<button class="mini-btn" data-act="read">${S.fmt.escape(S.t("notif.markRead"))}</button>`}

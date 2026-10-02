@@ -8,6 +8,7 @@ S.router.register("cards", async () => {
   const wall = document.getElementById("wall");
   if (!r.ok) { wall.innerHTML = S.ui.empty(S.t("common.loadFailed")); return; }
   let hidden = false;
+  const cards = r.data.cards ?? []; /* 卡面去重需全列表（第六十一轮 cardFront 第二参数） */
   const mask = (s) => (hidden ? "*****" : s);
   const render = () => {
     wall.innerHTML = (r.data.cards ?? []).map((cd) => `
@@ -15,7 +16,7 @@ S.router.register("cards", async () => {
         <div class="bc-top"><div><b class="bc-num">${S.fmt.escape(cd.number)}</b>
           <div class="muted small">${S.fmt.escape(cd.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", cd.class_label))} · ${S.fmt.escape(cd.network)}</div></div>
           <div>${cd.is_default ? S.ui.badge(S.t("cards.default"), "badge-navy") : ""} ${cd.status === "FROZEN" ? S.ui.badge("FROZEN", "badge-red") : ""}${cd.held ? `<span class="badge badge-yellow">${S.ui.icon("lock", 12)} ${S.fmt.escape(cd.held)}</span>` : ""}</div></div>
-        <div class="bc-main"><a href="/account/card/${cd.slug}/settings" title="${S.fmt.escape(S.t("cards.openSettings"))}" style="flex:none;display:block"><img class="bc-art" src="${S.fmt.cardFront(cd)}" alt="${S.fmt.escape(S.t("cards.openSettings"))}"></a>
+        <div class="bc-main"><a href="/account/card/${cd.slug}/settings" title="${S.fmt.escape(S.t("cards.openSettings"))}" style="flex:none;display:block"><img class="bc-art" src="${S.fmt.cardFront(cd, cards)}" alt="${S.fmt.escape(S.t("cards.openSettings"))}"></a>
           <div><div class="muted small">${S.fmt.escape(cd.kind === "credit" ? S.t("cards.creditLeft") : S.t("cards.balance"))}</div>
             <b class="mono" style="font-size:22px">¥ ${S.fmt.escape(mask(cd.kind === "credit" ? (cd.available ?? cd.balance) : cd.balance))}</b>
             ${cd.kind === "credit"
@@ -32,6 +33,8 @@ S.router.register("cards", async () => {
     S.ui.$$(".fz").forEach((b) => {
       b.onclick = async () => {
         const intent = b.dataset.st === "FROZEN" ? "unfreeze" : "freeze";
+        S.ui.btnBusy(b, true); /* 冻结/解冻含红级 OTP 全程较长：按钮 loading（第六十一轮） */
+        try {
         const r2 = await S.api.mutate(`/api/cards/${b.dataset.slug}/${intent}`, {});
         if (r2.cancelled) return;
         if (r2.data?.status === "OTP_REQUIRED") {
@@ -48,6 +51,9 @@ S.router.register("cards", async () => {
         }
         if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
         else S.ui.toast(r2.data?.reason ?? "failed", true);
+        } finally {
+          S.ui.btnBusy(b, false);
+        }
       };
     });
     S.ui.$$(".ai-m").forEach((b) => { b.onclick = () => S.router.ai(S.t("cards.aiPrompt", b.dataset.l4)); });

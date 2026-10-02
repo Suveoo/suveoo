@@ -44,24 +44,56 @@ S.fmt = {
     return { local, beijing: bj + " (UTC+8)" };
   },
   escape(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); },
+  /* 通知标题去 emoji（第五十八轮）：严谨银行风格——源头（后端 title/前端弹窗前缀）已清零，
+   * 此处清洗历史存量通知（通知中心/铃铛下拉渲染层统一走这）。仅清彩色 emoji 与变体选择符，
+   * 保留 ✓✗·→ 等纯文本记号 */
+  stripEmoji(s) { return String(s ?? "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]+\s*/gu, ""); },
   /* 通知正文链接化（第七期）：先转义，再仅对站内 URL 生成锚点（限定 suveoo.com 域，不接受外链） */
   linkify(s) { return this.escape(s).replace(/(https:\/\/suveoo\.com\/[a-z0-9/-]+)/g, '<a href="$1" class="notif-link">$1</a>'); },
-  /* 卡面解析（第四十四轮）：按卡组织+槽位从 S.cardArts 清单（assets/data/card-arts.json，部署自动更新）
-   * 选真图；组织目录空/图不够回落 mastercard；基座 art 尾号 N 即槽位（N 从 1 起）——存量卡面不变，
-   * 队长补 visa/american-express/unionpay 图并部署后对应组织卡自动换真图且固定（槽位稳定）。
-   * 任何异常/清单未加载一律回落基座 art 原样（零风险）。 */
-  cardFront(card) {
+  /* 卡面解析（第四十四轮 / 第六十一轮去重修复）：按卡组织+槽位从 S.cardArts 清单选真图。
+   *
+   * 第六十一轮修复——同网络卡面重复 bug：
+   *   原实现 pool[slot % pool.length] 只保证跨槽位稳定，不保证同网络多卡去重——
+   *   两张银联卡 slot 0 和 3 均映射 unionpay[0]（3 张图 pool，0%3=0, 3%3=0）→ 重复卡面。
+   *
+   * 新算法：同网络内按"出现序"（而非槽位取模）分配不同图——
+   *   同网络第 k 张卡 → pool[k % pool.length]（k 从 0 起，按卡的注册顺序）。
+   *   用 (userId+network+slug) 的稳定 hash 决定 k 的起点，确保同用户多卡分配不同 k。
+   *   组织目录空/图不够时回落 mastercard 同逻辑。清单未加载一律回落基座 art。
+   *   存量用户部署后自动换新图（列表页能看到变化，不受缓存影响——图片 URL 变了）。 */
+  cardFront(card, allCards) {
     const fallback = "/" + (card?.art ?? "");
     try {
       const table = card?.kind === "debit" ? S.cardArts?.debit : S.cardArts?.credit;
       if (!table || !card?.network || !card.art) return fallback;
-      const last = String(card.art).split("/").pop(); /* debit-card-8-front.webp（旧/新路径末段同名，含连字符的前缀段不影响） */
-      const parts = last.split("-"); /* ["debit","card","8","front.webp"] */
+      const last = String(card.art).split("/").pop();
+      const parts = last.split("-");
       const slot = Number(parts[2]) - 1;
       if (!Number.isInteger(slot) || slot < 0) return fallback;
-      const dir = { "万事达": "mastercard", "维萨": "visa", "Visa": "visa", "美国运通": "american-express", "运通": "american-express", "银联": "unionpay", "全付通": "unionpay" }[card.network] ?? "mastercard";
+      const NET2DIR = { "万事达": "mastercard", "维萨": "visa", "Visa": "visa", "美国运通": "american-express", "运通": "american-express", "银联": "unionpay", "全付通": "unionpay" };
+      const dir = NET2DIR[card.network] ?? "mastercard";
       const pool = (table[dir] ?? []).length ? table[dir] : table.mastercard ?? [];
       if (!pool.length) return fallback;
+
+      /* 同目录去重（第六十一轮）：银联+全付通均映射 unionpay 目录——须按目录分组而非网络标签，
+       * 否则一张银联+一张全付通仍可能撞同一张 unionpay 图。按 slug 排序取出现序 k。 */
+      if (allCards && Array.isArray(allCards) && allCards.length > 1) {
+        const siblings = allCards
+          .filter((c) => {
+            if (c.kind !== card.kind) return false;
+            const cd = NET2DIR[c.network] ?? "mastercard";
+            return cd === dir;
+          })
+          .sort((a, b) => String(a.slug).localeCompare(String(b.slug)));
+        if (siblings.length > 1) {
+          const k = siblings.findIndex((c) => c.slug === card.slug);
+          if (k >= 0 && k < siblings.length) {
+            return "/" + pool[k % pool.length];
+          }
+        }
+      }
+
+      /* 单卡或无列表上下文：退化为 slot 取模 */
       return "/" + pool[slot % pool.length];
     } catch { return fallback; }
   },

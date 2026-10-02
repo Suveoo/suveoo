@@ -1,0 +1,70 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "com.suveoo.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.suveoo.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 16
+        versionName "2.5"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // Suveoo 自签发布签名（第四十五轮）：keystore 在 android/suveoo-release.keystore（本地保留、勿入公开仓库）
+    // 密码不入库：优先环境变量 SUVEOO_KS_PASS，否则读 android/local.properties 的 ks.pass（该文件已 gitignore）
+    def ksProps = new Properties()
+    def ksPropsFile = rootProject.file("local.properties")
+    if (ksPropsFile.exists()) ksPropsFile.withInputStream { ksProps.load(it) }
+    def ksPass = System.getenv("SUVEOO_KS_PASS") ?: ksProps.getProperty("ks.pass")
+    signingConfigs {
+        release {
+            storeFile file('../suveoo-release.keystore')
+            storePassword ksPass
+            keyAlias 'suveoo'
+            keyPassword ksPass
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation "androidx.biometric:biometric:1.1.0" /* 第六十六轮：生物识别 */
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -15,6 +15,8 @@ nls/
 .env.*
 *.pem
 *.key
+*.keystore
+*.jks
 
 # ===== Internal strategy docs (not part of competition deliverables) =====
 for-claude-code/
@@ -45,3 +47,16 @@ $RECYCLE.BIN/
 /IMG_*.png
 /Screenshot*.png
 /from_README_5_to_end.md
+backend/android/.gradle/
+backend/android/app/build/
+backend/android/build/
+backend/android/local.properties
+backend/android/.idea/
+backend/android/capacitor-cordova-android-plugins/build/
+# 签名私钥实际位于 backend/android/（原 backend/suveoo-release.keystore 路径错误，已修正；另由 *.keystore 通配兜底）
+backend/android/suveoo-release.keystore
+# npx cap sync 生成的前端全量副本（49MB，由 build-apk.mjs 每次重建，勿入库）
+backend/android/app/src/main/assets/public/
+
+# ===== 杂项临时文件 =====
+*.tmp

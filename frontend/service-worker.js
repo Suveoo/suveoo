@@ -52,3 +52,21 @@ self.addEventListener("fetch", (e) => {
     return res || Response.error();
   })());
 });
+
+/* ===== 第四十六轮：系统通知 ===== */
+/* Web Push（将来如开通 VAPID 服务器推送可复用此 handler） */
+self.addEventListener("push", (e) => {
+  let data; try { data = e.data ? e.data.json() : {}; } catch { data = {}; }
+  e.waitUntil(self.registration.showNotification(data.title || "Suveoo", {
+    body: data.body || "", icon: "/favicon/notif-icon-192.png", badge: "/favicon/notif-icon-96.png", tag: data.tag || "suveoo-push",
+  }));
+});
+/* 通知点击 → 按通知携带的目标页打开/聚焦（第五十六轮：按类别精确跳转，无 data.url 回落通知中心） */
+self.addEventListener("notificationclick", (e) => {
+  const url = e.notification.data?.url || "/notifications";
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ("focus" in c) { c.navigate(url); return c.focus(); } }
+    return clients.openWindow(url);
+  }));
+});

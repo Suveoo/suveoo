@@ -334,7 +334,7 @@ S.router.register("ai", async ({ user }) => {
       settled = true;
       const v = input.value.trim();
       if (!v || v === (s.title ?? "")) { restore(); return; }
-      const r = await fetch(`/api/ai/sessions/${encodeURIComponent(s.id)}`, {
+      const r = await fetch(S.api.base + `/api/ai/sessions/${encodeURIComponent(s.id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json", ...(S.api.token ? { authorization: `Bearer ${S.api.token}` } : {}) },
         body: JSON.stringify({ title: v }),
@@ -366,7 +366,7 @@ S.router.register("ai", async ({ user }) => {
     m.el.querySelector("#hsd-cancel").onclick = m.close;
     m.el.querySelector("#hsd-ok").onclick = async () => {
       m.close();
-      const r = await fetch(`/api/ai/sessions/${encodeURIComponent(s.id)}`, {
+      const r = await fetch(S.api.base + `/api/ai/sessions/${encodeURIComponent(s.id)}`, {
         method: "DELETE",
         headers: S.api.token ? { authorization: `Bearer ${S.api.token}` } : {},
       });
@@ -643,9 +643,14 @@ S.router.register("ai", async ({ user }) => {
   };
   goBtn.onclick = () => {
     if (busy) { S.chat.stop(); return; }
+    submitChat();
+  };
+  /* 发送统一收口（第六十轮）：先停语音会话并丢弃回写（文字已取走——防旧指令复活/残留脉冲），再清框发送 */
+  const submitChat = () => {
+    S.voice.stop({ discard: true });
     const v = input.value; input.value = ""; send(v);
   };
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { const v = input.value; input.value = ""; send(v); } });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") submitChat(); });
   if (!user) {
     location.replace("/account/login?next=" + encodeURIComponent(location.pathname));
     return;

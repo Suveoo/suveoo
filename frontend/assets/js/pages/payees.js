@@ -29,11 +29,16 @@ S.router.register("payees", async () => {
     S.ui.$$(".go").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
     S.ui.$$(".del").forEach((b) => {
       b.onclick = async () => {
-        /* DELETE 路由（非 POST）：显式传 method，否则首段 501、确认卡流程走不通 */
-        const r2 = await S.api.mutate(`/api/payees/${b.dataset.id}`, {}, { method: "DELETE" });
-        if (r2.cancelled) return;
-        if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); render(); }
-        else S.ui.toast(r2.data?.reason ?? "failed", true);
+        S.ui.btnBusy(b, true); /* 删除按钮 loading（第六十一轮） */
+        try {
+          /* DELETE 路由（非 POST）：显式传 method，否则首段 501、确认卡流程走不通 */
+          const r2 = await S.api.mutate(`/api/payees/${b.dataset.id}`, {}, { method: "DELETE" });
+          if (r2.cancelled) return;
+          if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); render(); }
+          else S.ui.toast(r2.data?.reason ?? "failed", true);
+        } finally {
+          S.ui.btnBusy(b, false);
+        }
       };
     });
   };
@@ -73,10 +78,16 @@ S.router.register("payees", async () => {
       if (phone && !/^1\d{10}$/.test(phone)) { S.ui.toast(S.t("payees.badPhone"), true); return; }
       const body = { name: m.el.querySelector("#p-name").value.trim(), account: m.el.querySelector("#p-acct").value.replace(/\s/g, ""), group_label: group, ...(phone ? { phone } : {}) };
       if (!body.name || !/^\d{16}$/.test(body.account)) { S.ui.toast(S.t("transfer.invalidAccount"), true); return; }
-      const r2 = await S.api.mutate("/api/payees", body);
-      if (r2.cancelled) return;
-      if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); render(); }
-      else S.ui.toast(tgtErr(r2.data?.reason ?? r2.data?.error?.code) ?? r2.data?.error?.message ?? r2.data?.reason ?? "failed", true);
+      const okBtn = m.el.querySelector("#ok");
+      S.ui.btnBusy(okBtn, true); /* 添加按钮 loading（第六十一轮） */
+      try {
+        const r2 = await S.api.mutate("/api/payees", body);
+        if (r2.cancelled) return;
+        if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); render(); }
+        else S.ui.toast(tgtErr(r2.data?.reason ?? r2.data?.error?.code) ?? r2.data?.error?.message ?? r2.data?.reason ?? "failed", true);
+      } finally {
+        S.ui.btnBusy(okBtn, false);
+      }
     };
   };
   render();

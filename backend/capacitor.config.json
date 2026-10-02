@@ -1,0 +1,14 @@
+{
+  "appId": "com.suveoo.app",
+  "appName": "Suveoo",
+  "webDir": "../frontend",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https", "appStartPath": "/home/index.html" },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_suveoo",
+      "iconColor": "#1E2A78",
+      "launchMode": "singleTask"
+    }
+  }
+}

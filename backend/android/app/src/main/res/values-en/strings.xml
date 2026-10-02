@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="lock_subtitle">Locked. Verify to continue</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="bio_prompt_sub">Verify to use Suveoo</string>
+</resources>

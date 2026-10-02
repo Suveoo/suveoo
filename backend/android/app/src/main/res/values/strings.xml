@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Suveoo</string>
+    <string name="title_activity_main">Suveoo</string>
+    <string name="package_name">com.suveoo.app</string>
+    <string name="custom_url_scheme">com.suveoo.app</string>
+    <!-- 第五十三轮：返回双击退出 Toast（sc:27/28） -->
+    <string name="back_exit">再按一次退出</string>
+    <!-- 第六十六轮：生物识别锁屏文案（系统语言自动切换，values-en 为英文版） -->
+    <string name="lock_subtitle">已锁定，验证以继续</string>
+    <string name="lock_unlock">解锁</string>
+    <string name="bio_prompt_sub">验证以使用 Suveoo</string>
+</resources>
