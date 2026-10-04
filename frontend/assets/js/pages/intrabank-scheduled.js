@@ -13,7 +13,7 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
           <button class="ai-chip" id="ai-fill" type="button"><span id="ai-fill-txt">${S.fmt.escape(S.t("transfer.aiAsk"))}</span></button>
         </div>
         <label class="field" style="margin:10px 0 0"><span class="lb">${S.fmt.escape(S.t("transfer.toAccount"))}</span>
-          <input class="input mono" id="s-acct" placeholder="${S.fmt.escape(S.t("transfer.acctPh"))}" maxlength="19" inputmode="numeric" autocomplete="off"></label>
+          <input class="input mono" id="s-acct" placeholder="${S.fmt.escape(S.t('transfer.acctPh') + S.t('transfer.acctPhAppend'))}" maxlength="40" autocomplete="off"></label>
         <div class="tf-st" id="s-acctst">${S.fmt.escape(S.t("transfer.acctHint"))}</div>
         <div class="tf-quick">
           <button class="tf-qchip" id="pick-payee" type="button">${S.ui.iconC("ic-users-sky", 18)} ${S.fmt.escape(S.t("payees.title"))}</button>
@@ -71,8 +71,8 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
       <label class="tf-card${d.slug === fromSlug ? " on" : ""}">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""}>
         <img class="bc-art" src="${S.fmt.cardFront(d, allCards)}" alt="">
-        <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}</span>
-          <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(S.t("cards.classIc", d.class_label))}${d.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</span></span>
+        <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}${d.is_default ? ` <span class="tf-def">${S.fmt.escape(S.t("cards.default"))}</span>` : ""}</span>
+          <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(S.t("cards.classIc", d.class_label))}</span></span>
         <span class="tf-cright"><span class="tf-cbal">${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(d.balance)}</span>${d.held ? `<span class="tf-cbal held">${S.fmt.escape(S.t("transfer.held", d.held))}</span>` : ""}</span>
         <span class="tf-check">${S.ui.icon("check", 13)}</span>
       </label>`).join("") || S.ui.empty(S.t("common.noData"));
@@ -82,17 +82,49 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
   };
   renderFrom();
 
-  /* ---- 鲁棒收款账号（与行内转账同款：归一分组 + Luhn + 本人卡/同卡识别） ---- */
+  /* ---- 鲁棒收款账号（与行内转账同款：归一分组 + Luhn + 本人卡/同卡识别 + contact 收款） ---- */
   let selfNum = null; /* 已选本人卡完整卡号；手改偏离即清空（预约执行按卡号入账） */
+  let contactAcct = null; /* 第九十五轮补齐：contact 收款（手机号/邮箱→唯一账户默认卡；与即时转账同语义，服务端建单时钉死卡号+真名） */
   const acctEl = document.getElementById("s-acct");
   const acctSt = document.getElementById("s-acctst");
   const samewarn = document.getElementById("s-samewarn");
   const goBtn = document.getElementById("s-go");
   const acctDigits = () => S.fmt.digits16(acctEl.value);
   const setSameWarn = (on) => { samewarn.hidden = !on; goBtn.disabled = !debits.length || on; };
+  let lookupSeq = 0, lookupTimer = null;
+  const runContactLookup = async (rawV, isPhone) => {
+    const seq = ++lookupSeq;
+    const r = await S.api.get("/api/payees/lookup?contact=" + encodeURIComponent(isPhone ? S.phone.normCN(rawV) : rawV));
+    if (seq !== lookupSeq) return;
+    if (r.ok && r.data?.found) {
+      contactAcct = isPhone ? S.phone.normCN(rawV) : rawV;
+      acctSt.className = "tf-st ok";
+      acctSt.innerHTML = `${S.ui.icon("check", 13)} ${S.fmt.escape(S.t("transfer.contactFound", "已找到 Suveoo 用户"))} <b>${S.fmt.escape(r.data.name)}</b> · ${S.fmt.escape(r.data.masked)}`;
+      document.getElementById("s-name").value = r.data.name;
+      setSameWarn(false);
+    } else {
+      contactAcct = null;
+      acctSt.className = "tf-st bad";
+      acctSt.innerHTML = `${S.ui.icon("x", 13)} ${S.fmt.escape(S.t("transfer.contactNotFound", "未找到绑定该手机号/邮箱的用户"))}`;
+      setSameWarn(false);
+    }
+  };
   const syncAcct = async () => {
     const d = acctDigits();
     if (selfNum && d !== S.fmt.digits16(selfNum)) selfNum = null;
+    const rawV = acctEl.value.trim();
+    const isPhone = !!S.phone.normCN(rawV);
+    const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rawV);
+    if (isPhone || isEmail) {
+      contactAcct = null;
+      acctSt.className = "tf-st"; acctSt.innerHTML = '<span class="spin sm"></span>';
+      clearTimeout(lookupTimer);
+      lookupTimer = setTimeout(() => runContactLookup(rawV, isPhone), 250);
+      return;
+    }
+    clearTimeout(lookupTimer);
+    lookupSeq++;
+    contactAcct = null;
     if (d.length === 16) {
       if (!S.fmt.luhn16(d)) { acctSt.className = "tf-st bad"; acctSt.innerHTML = `${S.ui.icon("shield", 13)} ${S.fmt.escape(S.t("transfer.acctBad"))}`; setSameWarn(false); return; }
       if (fromSlug) {
@@ -110,26 +142,28 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     }
   };
   acctEl.addEventListener("input", () => {
-    const grouped = S.fmt.groupCard(acctEl.value);
-    if (acctEl.value !== grouped) acctEl.value = grouped;
+    /* 邮箱/手机号形态不套卡号分组（contact 收款；与即时转账页同修复） */
+    const rawV = acctEl.value;
+    const contactForm = rawV.includes("@") || !!S.phone.normCN(rawV);
+    if (!contactForm) {
+      const grouped = S.fmt.groupCard(rawV);
+      if (rawV !== grouped) acctEl.value = grouped;
+    }
     hideErr();
     syncAcct();
   });
   const showErr = (r) => {
-    const reason = r?.data?.reason ?? r?.data?.error?.code ?? null;
-    const map = {
-      ACCOUNT_NOT_FOUND: S.t("transfer.acctNotFound"),
-      NAME_MISMATCH: S.t("transfer.nameMismatch"),
-      INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
-      PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
-      INVALID_SCHEDULE_TIME: S.t("sch.pastTime"),
-      SAME_CARD: S.t("transfer.sameCard"),
-      CREDIT_TARGET_UNSUPPORTED: S.t("transfer.selfRepay"),
-      CIRCUIT_LOCKED: S.t("circuit.blockedMsg", 0),
-    };
+    if (r?.data?.reason === "CIRCUIT_LOCKED") {
+      const el0 = document.getElementById("s-err");
+      el0.style.display = "flex";
+      el0.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("circuit.blockedMsg", r?.data?.minutesLeft ?? "—"))}</div>`;
+      return;
+    }
+    /* 第一百轮：具体化失败原因（blockedMsg 映射 67 类失败码+细节提取） */
+    const msg = S.fmt.blockedMsg(r, "transfer.failed");
     const el = document.getElementById("s-err");
     el.style.display = "flex";
-    el.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(reason === "CIRCUIT_LOCKED" ? S.t("circuit.blockedMsg", r?.data?.minutesLeft ?? "—") : map[reason] ?? r?.data?.error?.message ?? S.t("transfer.failed"))}</div>`;
+    el.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(msg)}</div>`;
   };
   const hideErr = () => { const el = document.getElementById("s-err"); el.style.display = "none"; el.innerHTML = ""; };
 
@@ -242,14 +276,15 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     const whenDate = parseWhen();
     const body = {
       recipient_name: document.getElementById("s-name").value.trim(),
-      recipient_account: acctDigits(),
+      /* contact 收款（手机号/邮箱）原样上送——服务端建单时定位唯一账户默认卡并钉死卡号+真名 */
+      recipient_account: contactAcct || acctDigits(),
       amount: document.getElementById("s-amt").value.trim(),
       memo: document.getElementById("s-memo").value.trim() || undefined,
       execute_at: whenDate ? whenDate.toISOString() : null,
       repeat: repSel.value,
       from_card: fromSlug ?? undefined,
     };
-    if (!body.recipient_name || !/^\d{16}$/.test(body.recipient_account) || !/^\d+(\.\d{1,2})?$/.test(body.amount ?? "") || !body.execute_at) {
+    if (!body.recipient_name || (!contactAcct && !/^\d{16}$/.test(body.recipient_account)) || !/^\d+(\.\d{1,2})?$/.test(body.amount ?? "") || !body.execute_at) {
       S.ui.toast(S.t("sched.fillAll"), true); return;
     }
     S.ui.btnBusy(goBtn, true);
@@ -269,9 +304,9 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
         <div class="modal-actions"><a class="btn btn-ghost" href="/ai/tasks">${S.fmt.escape(S.t("tasks.title"))}</a>
         <button class="btn btn-primary" onclick="location.reload()">${S.fmt.escape(S.t("common.done"))}</button></div>`);
     } else {
-      /* 收款方真实性等结构化拒绝：行内红条（与 /transfer/intrabank 同款映射） */
+      /* 收款方真实性等结构化拒绝：行内红条具体原因（与 toast 同文案） */
       showErr(r);
-      S.ui.toast(r.data?.reason ?? r.data?.error?.message ?? S.t("transfer.failed"), true);
+      S.ui.toast(S.fmt.blockedMsg(r, "transfer.failed"), true);
     }
     } finally {
       S.ui.btnBusy(goBtn, false);

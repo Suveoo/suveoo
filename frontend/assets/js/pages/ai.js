@@ -380,7 +380,7 @@ S.router.register("ai", async ({ user }) => {
   }
   /* 历史卡片只读重放：只渲染已知组件的快照 + 服务端终态徽标（已执行/已过期/已拦截）；
      未知组件宁可不渲染（留"已收起卡片"徽标）；绝不注册 attachConfirm、不带任何可点击操作 */
-  const REPLAYABLE = ["transfer_confirmation", "split_bill_detail", "wealth_compare", "sankey_chart", "subscription_list", "scheduled_task", "card_setting_confirm", "fx_quote", "insight_card", "blocked_notice", "report_download"];
+  const REPLAYABLE = ["transfer_confirmation", "operations_package", "split_bill_detail", "wealth_compare", "sankey_chart", "subscription_list", "scheduled_task", "card_setting_confirm", "fx_quote", "insight_card", "blocked_notice", "report_download"];
   const STATUS_META = { EXECUTED: ["ai.cardExecuted", "badge-green"], EXPIRED: ["ai.cardExpired", "badge-gray"], BLOCKED: ["ai.cardBlocked", "badge-red"] };
   function replayCard(card) {
     if (!card || typeof card !== "object" || card.issuer !== "verified_ir" || !REPLAYABLE.includes(card.component)) {
@@ -555,7 +555,7 @@ S.router.register("ai", async ({ user }) => {
         flush(); /* 卡片插入前先追平当前文本，保持"文→卡"顺序自然 */
         const node = S.genui.render(card);
         if (node) { node.style.alignSelf = "flex-start"; thread.appendChild(node); scroll(); }
-        if (card && card.component === "transfer_confirmation" && card.grant_hash) attachConfirm(card, aiMsg);
+        if (card && (card.component === "transfer_confirmation" || card.component === "operations_package") && card.grant_hash) attachConfirm(card, aiMsg);
       },
       onTrust: (ev) => S.trust.onEvent(ev),
       onError: (msg) => { flush(); errored = true; aiMsg.classList.remove("thinking"); aiMsg.classList.add("err"); aiMsg.textContent = String(msg); scroll(); },
@@ -572,19 +572,49 @@ S.router.register("ai", async ({ user }) => {
   function attachConfirm(card, aiMsg) {
     const bar = S.ui.el(`<div class="gc-actions">
       <button class="btn btn-sm btn-ghost" id="gc-cancel">${S.fmt.escape(S.t("common.cancel"))}</button>
-      <button class="btn btn-sm btn-primary" id="gc-ok">${S.fmt.escape(S.t("consent.confirm"))}</button></div>`);
+      <button class="btn btn-sm btn-primary" id="gc-ok">${S.fmt.escape(S.t("consent.confirm"))}</button>
+      <span class="gc-countdown" id="gc-cd" style="margin-left:8px"></span></div>`);
     aiMsg.insertAdjacentElement("afterend", bar);
+    /* 第九十九轮（队长令）：AI 确认卡此前无任何有效期显示/过期拦截——卡开着直到 grant 过期，
+     * 点确认还能打开 OTP 弹窗白白发码。修复：确认条自带倒计时（服务端 card.expires_at 一直有下发），
+     * 归零禁确认；过期后点确认直接提示重新发起，不再打开发码弹窗。 */
+    const grantExp = Date.parse(card.expires_at ?? "") || null;
+    let expired = false;
+    if (grantExp) {
+      const cdEl = bar.querySelector("#gc-cd");
+      const tick = () => {
+        const lv = Math.floor((grantExp - Date.now()) / 1000);
+        if (lv <= 0) {
+          expired = true;
+          cdEl.textContent = S.t("consent.expired");
+          cdEl.style.color = "var(--color-red, #C4453B)";
+          const okB = bar.querySelector("#gc-ok"); if (okB) okB.disabled = true;
+          clearInterval(cv);
+          return;
+        }
+        cdEl.textContent = `${S.t("consent.expiresIn")} ${lv}s`;
+      };
+      tick();
+      const cv = setInterval(tick, 1000);
+    }
     bar.querySelector("#gc-cancel").onclick = () => bar.remove();
     bar.querySelector("#gc-ok").onclick = async () => {
+      if (expired || (grantExp && Date.now() >= grantExp)) {
+        expired = true;
+        S.ui.toast(S.t("consent.expired"), true);
+        const okB = bar.querySelector("#gc-ok"); if (okB) okB.disabled = true;
+        return;
+      }
       bar.querySelector("#gc-ok").disabled = true;
       /* AI 通道确认必须原样回传工具参数（grant 快照绑定的是工具参数，不是表单字段），直连 /mcp 不再经过模型 */
       const args = { ...(card.params ?? {}), grant_hash: card.grant_hash };
       if (card.tier === "RED") {
         const otp = await S.ctl.otp({
           email: S.auth._session?.email,
-          send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+          send: async () => await S.api.post("/api/auth/email-code", { scene: "redstep" }),
+          expiresAt: card.expires_at ?? null, /* grant 有效期透传：OTP 弹窗内同款倒计时+过期锁 */
         });
-        if (!otp) { bar.querySelector("#gc-ok").disabled = false; return; }
+        if (!otp) { const okB = bar.querySelector("#gc-ok"); if (okB && !expired) okB.disabled = false; return; }
         args.otp = otp;
       }
       const r = await S.api.post(`/mcp?sid=${S.chat.sid ?? ""}`, {
@@ -624,7 +654,7 @@ S.router.register("ai", async ({ user }) => {
             if (btn) btn.disabled = true;
             if (note) note.textContent = S.t("trust.injectedNote");
           } else {
-            S.ui.toast(r2.data?.error?.message ?? "failed", true);
+            S.ui.toast(S.fmt.blockedMsg(r2), true);
           }
         });
       }

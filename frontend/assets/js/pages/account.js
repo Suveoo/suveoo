@@ -14,6 +14,7 @@ S.router.register("account", async ({ user }) => {
         <div class="ah-txt">
           <div class="ah-name">${S.fmt.escape(user?.name ?? "")} <span class="ah-pr">PR${user?.pr_level ?? 3}</span></div>
           <div class="ah-sub">${S.fmt.escape(user?.email ?? "")}</div>
+          <div class="ah-sub">${S.fmt.escape(S.t("ph.number"))}：${user?.phone_bound ? S.fmt.escape(user.phone) : `<span style="color:#FF9E9E;font-weight:650">${S.fmt.escape(S.t("ph.unbound", "未绑定"))}</span>`}</div>
           <div class="ah-sub">${S.fmt.escape(S.t("acct.opened"))}：${S.fmt.date(user?.created_at ?? null) || "—"}</div>
         </div>
         <a class="ah-sec" href="/account/security" aria-label="${S.fmt.escape(S.t("acct.security"))}">${S.ui.icon("shield", 16)}</a>
@@ -26,12 +27,15 @@ S.router.register("account", async ({ user }) => {
     <div class="card acct-grid-card" style="margin-top:16px">
       <div class="acct-grid">${items.map(([href, ic, label]) => `<a class="quick-item" href="${href}"><span class="qi-wrap">${S.ui.icon(ic, 30)}</span><span>${S.fmt.escape(label)}</span></a>`).join("")}</div>
     </div>
+    ${!user?.phone_bound ? `<div class="ph-banner" id="ph-banner"><span>${S.ui.icon("bell", 15)}</span><div class="grow">${S.fmt.escape(S.t("ph.bannerText", "建议绑定手机号：短信接收验证码更快，还可用手机号登录与收款。"))}</div><button class="btn btn-sm btn-light" id="ph-banner-go">${S.fmt.escape(S.t("ph.bindNow", "立即绑定"))}</button></div>` : ""}
     <div class="card acct-prefs" style="margin-top:16px">
       <h3>${S.fmt.escape(S.t("acct.prefs"))}</h3>
       <div class="list-row" style="cursor:pointer" id="pref-lang"><span class="avatar acct-pav">${S.ui.icon("globe", 14)}</span><div class="grow">${S.fmt.escape(S.t("acct.lang"))}</div>
         <span class="ah-langcur">${S.fmt.escape((S.i18n.langs.find((l) => l.code === S.i18n.lang) ?? {}).name ?? S.i18n.lang)}</span>${S.ui.icon("arrow-right", 14)}</div>
       <div class="list-row" style="cursor:pointer" id="pref-notif"><span class="avatar acct-pav">${S.ui.icon("bell", 14)}</span><div class="grow">${S.fmt.escape(S.t("acct.notifPrefs"))}</div>
         ${S.ui.icon("arrow-right", 14)}</div>
+      <!-- 第七十二轮：应用内检查更新——仅 Android 壳渲染（Web 零暴露；shell-update.js 由 build-apk 注入） -->
+      ${typeof window.Capacitor !== "undefined" && window.Capacitor?.Plugins?.Update ? `<div class="list-row" style="cursor:pointer" id="pref-update"><span class="avatar acct-pav">${S.ui.icon("download", 14)}</span><div class="grow">${S.fmt.escape(S.t("upd.check"))}</div><span class="small muted" id="upd-cur"></span>${S.ui.icon("arrow-right", 14)}</div>` : ""}
       <div class="list-row"><span class="avatar acct-pav">${S.ui.icon("doc", 14)}</span><div class="grow">Cookie</div>
         <button class="btn btn-sm btn-light" onclick="S.chrome.cookieModal()">${S.fmt.escape(S.t("cookie.prefs"))}</button></div>
       <button class="btn acct-logout" id="logout">${S.ui.icon("lock", 14)} ${S.fmt.escape(S.t("acct.logout"))}</button>
@@ -95,6 +99,20 @@ S.router.register("account", async ({ user }) => {
   };
   /* 偏好 · 通知设定（第五十六轮）：权限检查→类别开关弹窗（偏好跨设备同步，关闭类不弹系统通知） */
   document.getElementById("pref-notif").onclick = () => S.notify.openPrefs();
+  /* 第八十五轮：常驻绑定提示条（勾选 7 天跳过也照常显示） */
+  const phGo = document.getElementById("ph-banner-go");
+  if (phGo) phGo.onclick = () => S.phone.bindModal({ onDone: () => setTimeout(() => location.reload(), 600) });
+  /* 偏好 · 检查更新（第七十二轮，壳内独有）：入口存在时 shell-update.js 必已注入 */
+  const updRow = document.getElementById("pref-update");
+  if (updRow) {
+    updRow.onclick = () => S.shellUpdate && S.shellUpdate.open();
+    try {
+      window.Capacitor.Plugins.Update.getInfo().then((v) => {
+        const el = document.getElementById("upd-cur");
+        if (el && v && v.versionName) el.textContent = "v" + v.versionName;
+      }).catch(() => {});
+    } catch { /* 插件异常：入口行仍可用（弹窗内再取） */ }
+  }
   /* 偏好 · 语言：点击弹出三语选择（选择后即时生效） */
   document.getElementById("pref-lang").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("acct.lang"))}</h2>

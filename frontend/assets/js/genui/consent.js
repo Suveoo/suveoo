@@ -18,7 +18,7 @@ S.consent = {
           ${card}
           ${red ? `
           <div class="field" style="margin-top:16px">
-            <span class="lb">${S.fmt.escape(S.t("consent.otp"))} <span class="muted small">(${S.fmt.escape(email ?? "")})</span></span>
+            <span class="lb">${S.fmt.escape(S.t("consent.otp"))} <span class="muted small ck-chan">(${S.fmt.escape(data.otp?.masked ?? email ?? "")})</span></span>
             <div class="gc-otp">
               <input class="input" id="ck-otp" maxlength="6" inputmode="numeric" placeholder="······">
               <button class="btn btn-light" id="ck-send" style="flex:none">${S.fmt.escape(S.t("consent.getCode"))}</button>
@@ -52,13 +52,34 @@ S.consent = {
         close({ otp });
       };
       const sendBtn = box.querySelector("#ck-send");
+      const chanLabel = box.querySelector(".ck-chan") ?? { textContent: "" };
+      let curChannel = (data.otp?.default_channel ?? data.otp?.channel) ?? "email";
+      /* 第八十五轮：红级接码通道切换（绑手机号用户默认短信；可切邮箱，二者均算数）。
+       * 第九十六轮：第一段确认卡即带 otp 描述符（服务端 INPUT_REQUIRED 附带）——首屏显示默认通道
+       * +切换条（pending 态文案"将发送至"，未点获取验证码前不谎称已发送） */
+      if (data.otp && data.otp.alt && sendBtn) {
+        const sw = S.phone.otpSwitcher(data.otp, "redstep", {}, { pending: true });
+        if (sw) { sendBtn.closest(".field")?.after(sw); sw.addEventListener("phswitch", (e) => { curChannel = e.detail.channel; }); }
+      }
       if (sendBtn) {
+        let swEl = box.querySelector(".ph-switch");
+        let expired = false; /* 第九十九轮：过期标记——重发冷却归零不得复活按钮 */
         sendBtn.onclick = async () => {
+          if (expired) return;
           sendBtn.disabled = true;
-          /* userEmail 历史上从未被赋值——回退会话邮箱，否则邮件实际发不出（400 被误报为已发送） */
+          sendBtn.textContent = S.t("ctl.sending"); /* 发送中动态反馈（第九十八轮：静止灰钮致焦虑） */
+          /* 第八十五轮：通道化发码——带 email 时服务端仍归一会话邮箱（兼容旧调用）；
+           * 登录态默认通道由服务端按绑定关系决定（绑了手机号=短信）。 */
           const to = S.consent.userEmail ?? (await S.auth.session())?.email;
-          const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: to });
-          if (!r.ok) { S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true); setTimeout(() => (sendBtn.disabled = false), 5000); return; }
+          const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: to, ...(curChannel && curChannel !== "email" ? { channel: curChannel } : {}) });
+          if (!r.ok) { sendBtn.textContent = S.t("consent.getCode"); S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true); setTimeout(() => { if (!expired) sendBtn.disabled = false; }, 5000); return; }
+          if (r.data?.masked) chanLabel.textContent = r.data.masked;
+          /* 第九十六轮：发送成功后切换条从"将发送至"翻为"已发送至"（以实际通道响应重建） */
+          if (r.data?.channel) {
+            swEl?.remove();
+            swEl = S.phone.otpSwitcher(r.data, "redstep", {});
+            if (swEl) { sendBtn.closest(".field")?.after(swEl); swEl.addEventListener("phswitch", (e) => { curChannel = e.detail.channel; }); }
+          }
           S.ui.toast(S.t("consent.codeSent"));
           /* 重发冷却倒计时（第六十一轮）：60s 禁用期间按钮文字显示剩余秒数，替代无解释的灰按钮 */
           const prevLabel = sendBtn.textContent;
@@ -66,17 +87,26 @@ S.consent = {
           sendBtn.textContent = S.t("consent.resendIn", cd);
           cdTimer = setInterval(() => {
             cd--;
-            if (cd <= 0) { clearInterval(cdTimer); sendBtn.textContent = prevLabel; sendBtn.disabled = false; return; }
+            if (cd <= 0) { clearInterval(cdTimer); sendBtn.textContent = prevLabel; if (!expired) sendBtn.disabled = false; return; }
             sendBtn.textContent = S.t("consent.resendIn", cd);
           }, 1000);
         };
       }
-      /* 倒计时（与 CONSENT_GRANT_TTL_SECONDS 一致） */
+      /* 倒计时（与 CONSENT_GRANT_TTL_SECONDS 一致）。
+       * 队长令（第九十九轮）：过期后锁定卡上一切发码入口（获取验证码/通道切换/输入框/确认）——
+       * 此前仅禁确认钮，过期卡仍可点"获取验证码"白白发码（grant 已死，码永远用不上）。 */
       let left = Math.max(0, Math.floor((Date.parse(grant.expires_at) - Date.now()) / 1000));
       const cd = box.querySelector("#ck-cd");
       const timer = setInterval(() => {
         left--;
-        if (left <= 0) { cd.textContent = S.t("consent.expired"); clearInterval(timer); box.querySelector("#ck-ok").disabled = true; }
+        if (left <= 0) {
+          cd.textContent = S.t("consent.expired"); clearInterval(timer); if (cdTimer) clearInterval(cdTimer);
+          const okB = box.querySelector("#ck-ok"); if (okB) okB.disabled = true;
+          const sd = box.querySelector("#ck-send"); if (sd) { sd.disabled = true; sd.textContent = S.t("consent.getCode"); }
+          const swb = box.querySelector(".ph-switch-btn"); if (swb) swb.disabled = true;
+          const oi = box.querySelector("#ck-otp"); if (oi) oi.disabled = true;
+          cd.style.color = "var(--color-red, #C4453B)";
+        }
         else cd.textContent = `${S.t("consent.expiresIn")} ${left}s`;
       }, 1000);
     });

@@ -3,4 +3,13 @@
     <string name="lock_subtitle">Locked. Verify to continue</string>
     <string name="lock_unlock">Unlock</string>
     <string name="bio_prompt_sub">Verify to use Suveoo</string>
+    <string name="bio_cancel">Cancel</string>
+    <string name="svc_title">Suveoo protection running</string>
+    <string name="svc_text">Monitoring account activity while signed in</string>
+    <string name="ch_transfers">Transfers</string>
+    <string name="ch_security">Security</string>
+    <string name="ch_wealth">Wealth</string>
+    <string name="ch_tasks">Tasks</string>
+    <string name="ch_general">System</string>
+    <string name="ch_svc">Background protection</string>
 </resources>

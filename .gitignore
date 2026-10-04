@@ -60,3 +60,4 @@ backend/android/app/src/main/assets/public/
 
 # ===== 杂项临时文件 =====
 *.tmp
+.deploy-state.json

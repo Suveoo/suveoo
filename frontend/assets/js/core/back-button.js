@@ -44,6 +44,19 @@
     const ctlList = q(".ctl-list:not([hidden])");
     if (ctlList) { ctlList.closest(".ctl-select")?.querySelector(".ctl-btn")?.click(); return true; }
 
+    /* sc:32 更新弹窗（第七十二轮，壳内独有 .upd-mask）：下载进行中不可关（半途关=丢安装入口，
+     * 原生层会随 close 取消下载）；其余状态返回=关（走 updclose 事件=完整解锁链路）。空态安全：
+     * .upd-mask 仅在检查更新弹窗打开时存在。
+     * 第七十五轮 sc:32 前置：强制更新阻断层 .upd-force——不可关，返回纯消费（层内已有完整说明） */
+    const updForce = q(".upd-force");
+    if (updForce) return true;
+    const updMask = q(".upd-mask");
+    if (updMask) {
+      if (updMask.querySelector(".upd-dl-ing")) { S.ui.toast(S.t("upd.dlBack", "正在下载更新，请稍候")); return true; }
+      updMask.dispatchEvent(new CustomEvent("updclose"));
+      return true;
+    }
+
     /* sc:10/11/12/13/14/15 modal 族（S.ui.modal：转账确认卡/红级 OTP/常用收款人/转入本人/
      *     月份报告确认/删除确认等，GenUI consent 同构）——优先点取消按钮走 onClose/解锁滚动的
      *     完整关闭链路（裸 remove 会泄漏 modal-open 锁滚计数与 onCancel 回调） */

@@ -66,7 +66,7 @@ S.router.register("wealth-goals", async ({ user }) => {
     const r = await S.api.mutate("/api/goals", { name, target_amount: target, deadline: newDeadline, auto_monthly: document.getElementById("gl-auto").checked }, { subject: name });
     if (r.cancelled) return;
     if (r.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-    else S.ui.toast(r.data?.message ?? r.data?.reason ?? r.data?.error?.message ?? "failed", true);
+    else S.ui.toast(r.data?.message ?? r.data?.reason ?? S.fmt.blockedMsg(r), true);
   };
 
   const r = await S.api.get("/api/goals");
@@ -176,7 +176,7 @@ S.router.register("wealth-goals", async ({ user }) => {
         const r = await S.api.mutate(`/api/goals/${f.dataset.id}/contribute`, { amount }, { subject: g?.name });
         if (r.cancelled) return;
         if (r.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-        else S.ui.toast(r.data?.message ?? r.data?.reason ?? r.data?.error?.message ?? "failed", true);
+        else S.ui.toast(r.data?.message ?? r.data?.reason ?? S.fmt.blockedMsg(r), true);
       } else {
         const target = f.querySelectorAll("input")[0].value.trim();
         const deadline = f.querySelector(".gl-adj-date").dataset.v ?? "";
@@ -190,7 +190,7 @@ S.router.register("wealth-goals", async ({ user }) => {
         const r = await S.api.mutate(`/api/goals/${f.dataset.id}`, body, { method: "PATCH", subject: g?.name });
         if (r.cancelled) return;
         if (r.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-        else S.ui.toast(r.data?.message ?? r.data?.reason ?? r.data?.error?.message ?? "failed", true);
+        else S.ui.toast(r.data?.message ?? r.data?.reason ?? S.fmt.blockedMsg(r), true);
       }
     };
   });
@@ -200,7 +200,7 @@ S.router.register("wealth-goals", async ({ user }) => {
     const r = await S.api.mutate(`/api/goals/${b.dataset.id}/abandon`, {}, { subject: b.dataset.name });
     if (r.cancelled) { b.disabled = false; return; }
     if (r.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-    else { S.ui.toast(r.data?.message ?? r.data?.reason ?? r.data?.error?.message ?? "failed", true); b.disabled = false; }
+    else { S.ui.toast(r.data?.message ?? r.data?.reason ?? S.fmt.blockedMsg(r), true); b.disabled = false; }
   });
   S.ui.$$("#gl-list .ask").forEach((b) => { b.onclick = () => S.router.ai(b.dataset.q); });
 });

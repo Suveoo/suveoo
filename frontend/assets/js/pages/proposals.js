@@ -108,7 +108,7 @@ S.router.register("ai-proposals", async ({ user }) => {
         if (r.data?.status !== "EXECUTED") {
           btn.disabled = false;
           btn.textContent = S.t("prop.act");
-          S.ui.toast(r.data?.error?.message ?? r.data?.reason ?? "failed", true);
+          S.ui.toast(S.fmt.blockedMsg(r), true);
           return;
         }
         /* 服务端核验事实后才记账（防"假装完成"）；随后就地翻卡 + 战报刷新 */
@@ -127,7 +127,7 @@ S.router.register("ai-proposals", async ({ user }) => {
     S.ui.$$("#pp-list .pp-no").forEach((btn) => {
       btn.onclick = async () => {
         const r = await S.api.post(`/api/proposals/${btn.dataset.id}/dismiss`);
-        if (!r.ok) { S.ui.toast(r.data?.error?.message ?? "failed", true); return; }
+        if (!r.ok) { S.ui.toast(S.fmt.blockedMsg(r), true); return; }
         const card = document.querySelector(`.pp-card[data-id="${btn.dataset.id}"]`);
         if (card) { card.style.transition = "opacity .3s ease"; card.style.opacity = "0"; setTimeout(() => card.remove(), 300); }
       };

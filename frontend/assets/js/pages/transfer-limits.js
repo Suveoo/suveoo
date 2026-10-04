@@ -39,7 +39,7 @@ S.router.register("transfer-limits", async () => {
           const r2 = await S.api.mutate(`/api/cards/${slug}/limits`, { limit_single: single, limit_daily: daily });
           if (r2.cancelled) return;
           if (r2.data?.status === "EXECUTED") { m.close(); S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 700); }
-          else S.ui.toast(r2.data?.reason ?? "failed", true);
+          else S.ui.toast(S.fmt.blockedMsg(r2), true);
         } finally {
           S.ui.btnBusy(okBtn, false);
         }

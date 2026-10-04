@@ -165,7 +165,7 @@ describe("desc 修复锚点（第十三期话术/语义引导，预算 ≤5600 �
     expect(MCP_TOOLS.find((t) => t.name === "goal_adjust").desc).toContain("auto_monthly");
   });
   it("scheduled_task_create 生日预订注明 execute_at 必传；transaction_history 注明 UTC→北京；site_guide 注明客服渠道防编造热线", () => {
-    expect(MCP_TOOLS.find((t) => t.name === "scheduled_task_create").desc).toContain("三项缺一会被拒绝");
+    expect(MCP_TOOLS.find((t) => t.name === "scheduled_task_create").desc).toContain("三项缺一即拒");
     expect(MCP_TOOLS.find((t) => t.name === "transaction_history").desc).toContain("北京时间");
     expect(MCP_TOOLS.find((t) => t.name === "site_guide").desc).toContain("955xx");
   });

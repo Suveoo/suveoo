@@ -43,19 +43,27 @@ S.router.register("risk-assessment", async ({ user }) => {
   /* 提交：先取 OTP（RED 级强验证），展开验证码行；再带码提交 */
   const sendBtn = document.getElementById("ra-send");
   const otpRow = document.getElementById("ra-otp-row");
-  const email = (await S.auth.session())?.email;
+  /* 第九十五轮：发码响应带实际通道/掩码/alt（绑手机号默认短信）——提示行+切换条 */
+  let raSw = null;
+  const mountSw = (d) => {
+    if (!d?.masked) return;
+    if (raSw) raSw.remove();
+    raSw = S.phone.otpSwitcher(d, "redstep", {}) ?? null;
+    if (raSw) otpRow.after(raSw);
+  };
   sendBtn.onclick = async () => {
     if (answers.some((v) => !v)) { S.ui.toast(S.t("reg.answerAll"), true); return; }
     if (otpRow.style.display === "none") {
       sendBtn.disabled = true;
       sendBtn.innerHTML = `<span class="spin"></span>${S.fmt.escape(S.t("reg.sending"))}`;
-      const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email });
+      const r = await S.api.post("/api/auth/email-code", { scene: "redstep" });
       sendBtn.disabled = false;
       if (!r.ok) { S.ui.toast(r.data?.error?.message ?? S.t("reg.sendFailed"), true); return; }
       sendBtn.innerHTML = S.fmt.escape(S.t("sec.retestSubmit"));
       otpRow.style.display = "flex";
       document.getElementById("ra-otp").focus();
-      S.ui.toast(S.t("consent.codeSent"));
+      S.ui.toast(S.t("consent.codeSent") + " " + (r.data?.masked ?? ""));
+      mountSw(r.data);
       return;
     }
     const otp = document.getElementById("ra-otp").value.trim();
@@ -84,9 +92,9 @@ S.router.register("risk-assessment", async ({ user }) => {
   if (codeBtn) {
     codeBtn.onclick = async () => {
       codeBtn.disabled = true;
-      const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email });
+      const r = await S.api.post("/api/auth/email-code", { scene: "redstep" });
       if (r.status === 429) { S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true); }
-      else S.ui.toast(S.t("consent.codeSent"));
+      else { S.ui.toast(S.t("consent.codeSent") + " " + (r.data?.masked ?? "")); mountSw(r.data); }
       let left = 60;
       const tick = setInterval(() => {
         left--;

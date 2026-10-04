@@ -12,6 +12,16 @@
 .hero-input:focus-within .voice-btn.listening { color: #ffb4b4; background: rgba(255,255,255,.12); }
 .hero-input img, .hero-input svg { width: 20px; height: 20px; flex: none; }
 .hero-input input { border: none; outline: none; flex: 1; min-width: 0; font-size: var(--fs-16); font-family: inherit; background: transparent; }
+/* 第一百零四轮：语音聆听中右侧浮现发送钮（队长设计令）——同 voice-btn 风格（同色 SVG、无外层容器），
+ * 线条用 /ai 页发送（i-send）。mic 的向左让位由发送钮展宽的布局位移天然实现：折叠态
+ * margin-left:-10px 抵消容器 gap（不占任何位、mic 位置与原设计分毫不差），展开态归零。
+ * 入场：宽度/位移 .3s 标准曲线 + 图标弹性放大（过冲贝塞尔）+ 轻延迟错峰；出场镜像回落无延迟。
+ * visibility 参与过渡保证折叠后不可聚焦（键盘 a11y），展开立即可见。 */
+.hero-input .hero-send { width: 0; margin-left: -10px; opacity: 0; visibility: hidden; overflow: hidden; pointer-events: none; transition: width .3s cubic-bezier(.4, 0, .2, 1), margin-left .3s cubic-bezier(.4, 0, .2, 1), opacity .18s ease, visibility 0s linear .3s; }
+.hero-input .hero-send .ic { opacity: 0; transform: translateX(12px) scale(.55); transition: opacity .18s ease, transform .26s cubic-bezier(.4, 0, .2, 1); }
+.hero-input .voice-btn.listening + .hero-send { width: 32px; margin-left: 0; opacity: 1; visibility: visible; pointer-events: auto; transition: width .3s cubic-bezier(.4, 0, .2, 1), margin-left .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease .08s, visibility 0s; }
+.hero-input .voice-btn.listening + .hero-send .ic { opacity: 1; transform: none; transition: opacity .2s ease .1s, transform .34s cubic-bezier(.34, 1.35, .5, 1) .1s; }
+@media (prefers-reduced-motion: reduce) { .hero-input .hero-send, .hero-input .hero-send .ic, .hero-input .voice-btn.listening + .hero-send, .hero-input .voice-btn.listening + .hero-send .ic { transition: none; } }
 .assets-block .total { font-family: var(--font-mono); font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
 .assets-block .cur { font-size: var(--fs-14); color: var(--color-ink-2); margin-left: 6px; }
 .quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); }
@@ -22,7 +32,9 @@
 /* 贴心服务大容器（第三十四轮）：单一大卡，标题卡内左上，条目无独立容器；每行个数随宽度自适应（80px 轨道） */
 .svc-card { padding-top: 16px; padding-bottom: 6px; } /* 左右继承 .card 各断点 padding——与资产总估值文本严格左对齐 */
 .svc-h { font-size: var(--fs-16); margin: 0 0 6px; }
-.svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 16px 8px; padding: 6px 0 10px; }
+.svc-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px 6px; padding: 6px 0 10px; } /* 第一百一十四轮：宽屏 1 行 6 列（12 项=2 行）；第七十八轮窄屏 4 列规则保留至移动端 */
+@media (max-width: 767px) { .svc-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 380px) { .svc-grid .svc-label { font-size: 11px; } }
 .svc-item { display: flex; flex-direction: column; align-items: center; gap: 7px; text-decoration: none; color: var(--color-ink); }
 .svc-item:active { opacity: .65; }
 .svc-label { font-size: var(--fs-12); text-align: center; line-height: 1.3; }
@@ -99,6 +111,12 @@
 /* register 完成卡墙预览 */
 .mcard { border-radius: 12px; padding: 16px; color: #fff; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between; font-family: var(--font-mono); background-size: cover; background-position: center; }
 
+/* 第七十八轮：开户成功发卡展示——图与文本分离（文本不再压卡面）；
+   容器用银行卡标准比例 1.586:1（ISO/IEC 7810 ID-1），cover 在同比例容器上零裁切 */
+.reg-card { display: flex; flex-direction: column; gap: 8px; }
+.reg-card-img { aspect-ratio: 1.586; border-radius: 12px; background-size: cover; background-position: center; box-shadow: 0 6px 18px rgba(15, 23, 42, .12); }
+.reg-card-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 0 2px; }
+
 /* tasks 时间线 */
 .task-step { display: flex; gap: 10px; align-items: center; font-family: var(--font-mono); font-size: var(--fs-12); padding: 4px 0; }
 .task-step .st { width: 18px; text-align: center; }
@@ -159,6 +177,14 @@
 
 .ab-rates thead th { background: var(--color-navy); color: #fff; font-size: 12px; }
 .ab-rate { font-size: 16px; font-weight: 700; color: #0D9488; }
+/* 第一百一十八轮：/about 存款利率表手机端免横滑——polish.css 的 .table-wrap .table{min-width:540} 是为
+   宽表（docs 类）设的；本表仅 3 短列，作用域内解除并收紧列距（10/12px→8/6px），390px 一屏看全 */
+.table-wrap table.ab-rates { min-width: 0; } /* 元素选择器抬特异性（0,2,1）压过 polish.css 后载的 .table-wrap .table（0,2,0） */
+@media (max-width: 767px) {
+  .ab-rates th, .ab-rates td { padding: 8px 6px; font-size: var(--fs-13, 13px); }
+  .ab-rates thead th { padding: 7px 6px; }
+  .ab-rate { font-size: 14px; white-space: nowrap; }
+}
 .ab-rh { margin: 16px 0 10px; }
 .ab-tl { position: relative; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
 .ab-tl::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; border-radius: 1px; background: var(--color-line); }
@@ -363,14 +389,16 @@
 /* tx-main-change（智能分析）样式第十五轮移入 polish.css 并缩小、移至柱状图之下 */
 .tx-sum-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
 /* 第十四轮：环比胶囊移到标签右侧（tx-cell-h 行内）+ 手机三格一行紧凑小字号 + 分类环比标题压空白 */
-.tx-cell { display: flex; flex-direction: column; gap: 3px; }
+.tx-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; } /* 第九十三轮：min-width 防长金额穿出 */
 .tx-cell-h { display: flex; align-items: center; gap: 6px; }
 .tx-cell-h .lb2 { font-size: var(--fs-12); color: var(--color-ink-2); white-space: nowrap; }
 .tx-cell .n { font-size: 26px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
 .tx-cat-title { margin: 16px 0 2px; font-size: 14px; font-weight: 700; } /* 第十七轮：环比区块（标题/图例/柱图/分析条）整体 +4px */
 @media (max-width: 600px) {
-  .tx-sum-row { flex-wrap: nowrap; gap: 12px; justify-content: space-between; }
-  .tx-cell .n { font-size: 15px; letter-spacing: 0; }
+  /* 第九十三轮：nowrap 改 wrap——大额数字时结余自动到次行（不穿出容器）；加 min-width 防 flex 溢出 */
+  .tx-sum-row { flex-wrap: wrap; gap: 10px 16px; }
+  .tx-cell { min-width: 0; }
+  .tx-cell .n { font-size: 15px; letter-spacing: 0; overflow-wrap: break-word; word-break: break-all; }
   .tx-cell-h { gap: 4px; }
   .tx-cell-h .lb2 { font-size: 11px; }
   .tx-cell-h .trend-pill { font-size: 10px; padding: 1px 6px; }
@@ -429,6 +457,25 @@
 .pye-gh { display: inline-block; font-size: var(--fs-12); font-weight: 700; padding: 3px 12px; border-radius: 999px; }
 .pye-row { padding: 10px 0; border-bottom: 1px dashed var(--color-line); }
 .pye-row:last-child { border-bottom: none; }
+/* ===== 第一百一十六轮：收款人卡片重设计 ===== */
+/* 头像彩色圆容器（颜色=所在分组 tint——payee-ava 原白底被 pye-ava 覆盖为分组色圆） */
+.pye-ava { background: var(--color-primary-tint, #eef1fb); color: var(--color-navy, #1E2A78); }
+.bg-tint-teal.pye-ava { background: var(--c-teal-tint); } .bg-tint-orange.pye-ava { background: var(--c-orange-tint); }
+.bg-tint-violet.pye-ava { background: var(--c-violet-tint); } .bg-tint-gold.pye-ava { background: var(--c-gold-tint); }
+.bg-tint-rose.pye-ava { background: var(--c-rose-tint); } .bg-tint-sky.pye-ava { background: var(--c-sky-tint); }
+/* 五按钮组（宽屏右端横排；窄屏整组换行到联系方式行下方） */
+.pye-ops { display: flex; align-items: center; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.pye-pinned { background: linear-gradient(0deg, rgba(30, 42, 120, .04), rgba(30, 42, 120, .04)), #fff; }
+/* 查看弹窗行（第一百一十八轮：复制钮内联紧随真值末字符——标签/值纵向排，值行内联按钮） */
+.pye-view-row { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-bottom: 1px dashed var(--color-line, #e2e8f0); }
+.pye-view-row:last-of-type { border-bottom: none; }
+.pye-cp { padding: 3px 6px; margin-left: 6px; vertical-align: middle; border-radius: 6px; }
+.pye-cp svg { width: 12px; height: 12px; }
+@media (max-width: 767px) {
+  /* 窄屏：list-row 改纵向布局——按钮组整组落到字段下方（左对齐，触达友好） */
+  .pye-row { flex-wrap: wrap; row-gap: 8px; }
+  .pye-ops { flex-basis: 100%; justify-content: flex-start; padding-left: 44px; }
+}
 
 /* ===== /account 改版（第三十九轮）：渐变 Profile Hero + num-xl 概要 + 偏好收尾 ===== */
 .acct-hero { border-radius: var(--r-card-lg); padding: 20px; color: #fff; margin-bottom: 16px; animation: rise-in .28s cubic-bezier(.25,.6,.3,1) both; }
@@ -643,6 +690,15 @@
 .tf-cright { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 46%; }
 .tf-cbal { font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
 .tf-cbal.held, .tf-cbal .held { font-family: var(--font-sans); font-size: 11px; color: var(--color-ink-2); white-space: nowrap; }
+/* 第一百零八轮：付款卡窄屏防溢出/防重叠（队长双机实测两形态）——tf-cinfo 恒 min-width:0 已有，
+ * 溢出根因=右列 max-width:46% 在窄屏挤占左列致 nowrap meta 撑破容器 → 右列改 flex 收缩+左列 flex:1 主导；
+ * meta 与右列重叠根因=左右列独立 nowrap 无收缩 → 左列允许换行（tf-cmeta 去 nowrap），右列限制不再硬编码。 */
+.tf-cright { max-width: none; flex: 0 1 auto; }
+.tf-cinfo { flex: 1 1 auto; }
+.tf-cmeta { white-space: normal; overflow: visible; text-overflow: clip; }
+.tf-cright .tf-cbal { max-width: 100%; }
+/* 自定义"默认卡"标签（卡号行内、与信用支付徽章同排；窄屏自动换行到卡号下方——tf-cnum flex-wrap 已有） */
+.tf-def { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 600; line-height: 16px; padding: 0 7px; border-radius: 999px; background: rgba(30, 42, 120, .08); color: var(--color-navy); vertical-align: middle; }
 .tf-check { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-navy); color: #fff; display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(30, 42, 120, .35); }
 .tf-card.on .tf-check { display: inline-flex; }
 .tf-whenrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
@@ -655,9 +711,12 @@
 @media (max-width: 767px) {
   .tf-cards { grid-template-columns: 1fr; }
   .tf-whenrow { grid-template-columns: 1fr; }
-  .tf-card { padding: 10px 12px; gap: 10px; }
+  .tf-card { padding: 10px 12px; gap: 10px; max-width: 100%; }
   .tf-card .bc-art { width: 46px; height: 30px; }
-  .tf-cnum { font-size: 13.5px; }
+  .tf-cnum { font-size: 13.5px; row-gap: 1px; column-gap: 6px; }
+  .tf-cnum .badge { padding: 1px 8px; font-size: 11px; }
+  .tf-def { font-size: 10px; line-height: 15px; padding: 0 6px; }
+  .tf-cmeta { margin-top: 1px; }
   .tf-cbal { font-size: 12.5px; }
   .tf-namerow .ai-chip { padding: 6px 10px; }
 }
@@ -779,12 +838,45 @@
   .dc-tbl thead { display: none; }
   .dc-tbl tr { border: 1px solid var(--color-line); border-radius: 10px; padding: 10px 12px 8px; margin-bottom: 8px; }
   .dc-tbl td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0; border: none; }
+  .dc-tbl td.dc-name { flex-wrap: wrap; align-items: center; } /* 第一百零八轮：方案名+徽章窄屏换行（默认 nowrap 致一字一行/挤压） */
   .dc-tbl td[data-lb]::before { content: attr(data-lb); color: var(--color-ink-2); font-size: 12px; flex: none; }
-  .dc-tbl .dc-name { align-items: center; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed var(--color-line); }
-  .dc-tbl .dc-name b { font-size: 14px; }
+  .dc-tbl .dc-name { align-items: center; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed var(--color-line); column-gap: 6px; row-gap: 3px; }
+  .dc-tbl .dc-name b { font-size: 12.5px; } /* 第一百零八轮：方案名（活期存款/7 天通知存款…）窄屏一字一行根因=14px+nowrap 徽章挤占 */
+  .dc-tbl .dc-name .badge { font-size: 11px; padding: 1px 8px; max-width: 5em; white-space: normal; text-align: center; line-height: 1.35; } /* 符合期限/期限超出 → 窄屏可断成两字一行 */
   /* 第三十八轮：结果两行卡 label 与 value 同行紧贴（gap 0）——加 6px 呼吸缝+字号降档（队长手机端反馈） */
   /* grid 两列（左 1fr 右 42% 定比例）：两行列边界严格同线、间隙恒等（flex space-between 内容异宽致行间间距肉眼不均；右列 auto 会随内容浮动，定比例防之——队长第四十轮抓出） */
   .tk-reco { display: grid; grid-template-columns: 1fr 42%; column-gap: 6px; row-gap: 2px; align-items: baseline; }
   .tk-reco .muted { font-size: 12px; }
   .tk-reco .v { font-size: 14px !important; white-space: normal; justify-self: end; text-align: right; }
 }
+
+/* ===== 第一百零八轮：/wealth/deposits 存款对比表窄屏卡片化（≤768px；≥769px 桌面/平板零变化）=====
+   病灶：裸 .table 四列在窄屏挤压 → 方案列（活期存款/7 天通知存款…）一字一行。
+   方案：与 deposit-compare 工具页 dc-tbl 同款卡片化（行→卡、td→kv 行）；
+   方案名字号 12.5px + 符合期限/期限超出徽章可断两行（一行两字）。 */
+@media (max-width: 768px) {
+  .dp-cmp, .dp-cmp tbody, .dp-cmp tr, .dp-cmp td { display: block; width: 100%; }
+  .dp-cmp thead { display: none; }
+  .dp-cmp tr { border: 1px solid var(--color-line); border-radius: 10px; padding: 10px 12px 8px; margin-bottom: 8px; }
+  .dp-cmp td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0; border: none; }
+  .dp-cmp td.mono::before, .dp-cmp td.total::before { color: var(--color-ink-2); font-size: 12px; font-family: var(--font-sans); flex: none; }
+  .dp-cmp td.mono::before { content: attr(data-lb-r) "："; }
+  .dp-cmp td.total::before { content: attr(data-lb-m) "："; }
+  .dp-cmp .dp-name { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-start; column-gap: 6px; row-gap: 3px; font-size: 12.5px; font-weight: 600; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed var(--color-line); } /* justify 覆写 td 的 space-between——徽章紧贴名尾字 */
+  /* 第一百零九轮（队长微调）：徽章紧贴方案名尾字（dp-badge-m 双渲染方案的移动端副本）；不分行 */
+  .dp-cmp td.dp-fit { display: none; }
+  .dp-cmp .dp-badge-m .badge { font-size: 11px; padding: 1px 8px; white-space: nowrap; flex: none; margin-left: 2px; }
+  .dp-cmp td.mono { padding-bottom: 1px; } /* 年利率→到期本息行距收紧约 5px（3+3 → 1+0） */
+  .dp-cmp td.total { padding-top: 1px; } /* 行距收紧至 ~1px（原 6px） */
+}
+
+/* 第一百零九轮：桌面/平板（≥769px）隐藏方案名内的移动端徽章副本——第 4 列原样 */
+@media (min-width: 769px) { .dp-name .dp-badge-m { display: none; } }
+
+/* ===== 第一百一十二轮：收款人弹窗 hint 间距（贴账号框 + 手机端两行行距收紧） ===== */
+.ph-hint { margin-top: 1px; }
+@media (max-width: 767px) { .ph-hint { line-height: 1.3; } }
+
+/* ===== 第一百一十三轮：收款人联系方式锁定态（readonly+视觉锁——disabled 不派发 click，点击提示无法生效的根因） ===== */
+.input.ph-locked { background: var(--color-surface, #f1f5f9); color: var(--color-ink-2, #64748b); cursor: not-allowed; box-shadow: none; }
+.input.ph-locked:focus { border-color: var(--color-line, #e2e8f0); }

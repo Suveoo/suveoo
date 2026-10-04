@@ -46,24 +46,34 @@ S.router.register("pay", async () => {
   const showDis = () => S.ui.modal(`<h2>${S.fmt.escape(S.t("common.more"))}</h2><p class="muted">${S.fmt.escape(S.t("home.crossDisabled"))}</p>${S.sim.footnote()}`);
   document.getElementById("dis-cross").onclick = showDis;
   document.getElementById("dis-border").onclick = showDis;
-  const pr = await S.api.get("/api/payees");
-  if (pr.ok) {
-    setAiTry((pr.data.payees ?? []).map((p) => p.name)); /* 收款人数据到位后升级为数据驱动句 */
-    const el = document.getElementById("payees");
-    const TINTS = ["teal", "orange", "violet", "gold", "rose", "sky"];
-    el.className = "hscroll payees";
-    /* 手机端（≤767）首屏含添加卡后右上角不缺位：收款人 6→5；桌面不受影响 */
-    const showN = window.matchMedia("(max-width: 767px)").matches ? 5 : 6;
-    el.innerHTML = `<a class="payee-card payee-add" href="/transfer/payees?add=1"><span class="pc-plus">${S.ui.icon("plus", 18)}</span><span>${S.fmt.escape(S.t("pay.addPayee"))}</span></a>` + (pr.data.payees ?? []).slice(0, showN).map((p, i) => `
-      <div class="payee-card bg-tint-${TINTS[i % TINTS.length]}">
-        <div class="row" style="gap:8px;min-width:0"><span class="payee-ava">${S.fmt.escape(p.name.slice(0, 1))}</span><b class="pye-nm">${S.fmt.escape(p.name)}</b><span class="payee-badge">${S.fmt.escape(p.group_label ?? "")}</span></div>
-        <div class="muted small mono" style="margin-top:6px">**** ${S.fmt.escape(String(p.account).slice(-4))}</div>
-        <button class="btn btn-sm btn-light pay-now" data-id="${p.id}" data-name="${S.fmt.escape(p.name)}">${S.fmt.escape(S.t("payees.transfer"))}</button>
-      </div>`).join("") || S.ui.empty(S.t("common.noData"));
-    S.ui.$$(".pay-now").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
-  }
-  const tr = await S.api.get("/api/transfers?scope=all");
-  if (tr.ok) {
+  /* 第一百一十七轮：两请求并行——此前 payees→transfers 串行，「最近交易」被重量级 /api/payees 拖累
+   * （慢时 15s 超时+重试 30s > 20s boot 看门狗 = 「页面加载出错」的放大链路）。失败不再骨架永挂：错误小卡+重试 */
+  const errCard = (sel, retry) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="padding:14px"><p class="muted small">${S.fmt.escape(S.t("common.loadFailed"))}</p><button class="btn btn-sm btn-light" style="margin-top:8px">${S.fmt.escape(S.t("common.retry"))}</button></div>`;
+    el.querySelector("button").onclick = retry;
+  };
+  const load = () => Promise.all([S.api.get("/api/payees"), S.api.get("/api/transfers?scope=all")]).then(([pr, tr]) => {
+    if (pr.ok) {
+      setAiTry((pr.data.payees ?? []).map((p) => p.name)); /* 收款人数据到位后升级为数据驱动句 */
+      const el = document.getElementById("payees");
+      const TINTS = ["teal", "orange", "violet", "gold", "rose", "sky"];
+      el.className = "hscroll payees";
+      /* 手机端（≤767）首屏含添加卡后右上角不缺位：收款人 6→5；桌面不受影响 */
+      const showN = window.matchMedia("(max-width: 767px)").matches ? 5 : 6;
+      el.innerHTML = `<a class="payee-card payee-add" href="/transfer/payees?add=1"><span class="pc-plus">${S.ui.icon("plus", 18)}</span><span>${S.fmt.escape(S.t("pay.addPayee"))}</span></a>` + (pr.data.payees ?? []).slice(0, showN).map((p, i) => `
+        <div class="payee-card bg-tint-${TINTS[i % TINTS.length]}">
+          <div class="row" style="gap:8px;min-width:0"><span class="payee-ava">${S.fmt.escape(p.name.slice(0, 1))}</span><b class="pye-nm">${S.fmt.escape(p.name)}</b><span class="payee-badge">${S.fmt.escape(p.group_label ?? "")}</span></div>
+          <div class="muted small mono" style="margin-top:6px">**** ${S.fmt.escape(String(p.account).slice(-4))}</div>
+          <button class="btn btn-sm btn-light pay-now" data-id="${p.id}" data-name="${S.fmt.escape(p.name)}">${S.fmt.escape(S.t("payees.transfer"))}</button>
+        </div>`).join("") || S.ui.empty(S.t("common.noData"));
+      S.ui.$$(".pay-now").forEach((b) => { b.onclick = () => (location.href = `/transfer/intrabank?payee=${b.dataset.id}`); });
+    } else errCard("#payees", load);
+    if (tr.ok) renderRecent(tr);
+    else errCard("#recent", load);
+  }).catch(() => { errCard("#payees", load); errCard("#recent", load); }); /* 网络 throw（非 Abort）兜底，防骨架永挂 */
+  const renderRecent = (tr) => {
     /* 分类 → 彩色 squircle 图标（未知分类回退 doc/navy），日期分组：今天/昨天/更早 */
     const CAT_ICON = {
       "转账": "ic-pay-sky", "餐饮": "ic-star-orange", "购物": "ic-card-rose", "交通": "ic-exchange-teal",
@@ -93,5 +103,6 @@ S.router.register("pay", async () => {
         <div style="text-align:right"><div class="amt mono">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain((Number(t.amount_cents) / 100).toFixed(2))}</div>
         <div class="muted small">${S.fmt.escape(t.status ?? "")}</div></div>
       </div>`).join("")}`).join("") || S.ui.empty(S.t("common.emptyTx"));
-  }
+  };
+  load();
 });

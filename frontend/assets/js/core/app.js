@@ -147,11 +147,31 @@ S.chrome = {
       </footer>`);
     document.body.appendChild(footer);
     footer.querySelector("#foot-cookie").onclick = () => S.chrome.cookieModal();
-    /* 移动端 footer 手风琴：点击一级项展开/收起二级列表（桌面按钮无感——body 恒开、chevron 隐藏） */
+    /* 移动端 footer 手风琴：点击一级项展开/收起二级列表（桌面按钮无感——body 恒开、chevron 隐藏）。
+     * 第一百零三轮修复：页底展开时子项会被 fixed 底部导航（不透明 64px+safe-area）遮挡甚至跑出视口
+     * ——展开后做滚动补偿，把新内容滚进「视口减导航高度」的可见区。
+     * 双段瞬时（behavior:auto）而非 smooth：Blink 的平滑滚动与 0.32s 高度动画并发布局变化时会被
+     * 截短（实测多开场景差 14-55px）；瞬时滚动按"最终几何"落位无竞态。测量法不依赖动画结束：
+     * body 的 top 在 0fr→1fr 生长期间稳定、内层 ul.scrollHeight 在轨道折叠时仍返回自然内容高
+     * （overflow:hidden 收纳），rAF 一帧即可算出最终 bottom；450ms 复查段兜底（布局落定后重算，
+     * 已可见则零动作）。收起不补偿（文档变矮由浏览器钳制滚动）。 */
     footer.querySelectorAll(".fcol-head button").forEach((btn) => {
       btn.onclick = () => {
-        const open = btn.closest(".fcol").classList.toggle("open");
+        const fcol = btn.closest(".fcol");
+        const open = fcol.classList.toggle("open");
         btn.setAttribute("aria-expanded", open);
+        if (!open) return;
+        const compensate = () => {
+          const body = fcol.querySelector(".fcol-body");
+          const ul = body ? body.querySelector("ul") : null;
+          if (!body || !ul || !fcol.classList.contains("open")) return;
+          const finalBottom = body.getBoundingClientRect().top + ul.scrollHeight;
+          const navH = document.querySelector(".bottom-nav")?.offsetHeight ?? 0;
+          const overflow = finalBottom - (window.innerHeight - navH);
+          if (overflow > 0) window.scrollBy({ top: overflow, behavior: "auto" });
+        };
+        requestAnimationFrame(compensate);
+        setTimeout(compensate, 450);
       };
     });
     /* 通知下拉 */
@@ -410,6 +430,8 @@ S.purchaseModal = async (fund) => {
    * 每设备一次（浏览器重复弹扰人）；已 granted/denied 不再问；default→granted 首次给提示（无 emoji）。 */
   if (S.api.token) {
     S.notify.start();
+    /* 第八十五轮：未绑定手机号引导弹窗（7 天可跳；账户页另有常驻提示） */
+    try { S.phone?.promptIfNeeded(); } catch { /* phone 组件异常不影响 boot */ }
     setTimeout(() => S.notify.checkPermission().then(async (p) => {
       if (p !== "default") return;
       const shell = typeof window.Capacitor !== "undefined";

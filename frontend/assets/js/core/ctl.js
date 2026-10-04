@@ -217,19 +217,25 @@ S.ctl = {
   },
   /**
    * Promise 化 OTP 弹窗（复用 consent 弹窗视觉）。
-   * opts = { email（展示用）, send: async () => {...}（发码，抛错或返回 falsy 视为失败） }
+   * opts = { email（展示用）, send: async () => {...}（发码；返回 api 响应对象或布尔，
+   *   响应带 channel/masked/alt 时按实际通道更新提示并挂 S.phone 切换条）,
+   *   scene/extra（切换条重发参数，透传 otpSwitcher）,
+   *   expiresAt（可选 ISO——grant 型红级确认（AI 确认卡等）传入：弹窗内显示有效剩余，
+   *   归零锁定输入/发码/切换/确认，杜绝"卡已过期还能发码"） }
    * resolve(6 位码) 或 resolve(null)（取消）。发送按钮三态：待发 → 60s 倒计时 → 可重发。
    */
-  otp({ email, send } = {}) {
+  otp({ email, send, scene = "redstep", extra = {}, expiresAt = null } = {}) {
+    const grantExp = expiresAt ? Date.parse(expiresAt) : null;
     return new Promise((resolve) => {
       const box = S.ui.el(`
         <div class="modal-mask"><div class="modal">
           <h2>${S.fmt.escape(S.t("consent.otp"))}</h2>
-          <p class="muted small" style="margin-top:4px">${S.fmt.escape(S.t("ctl.otpHint"))} <span class="mono">${S.fmt.escape(email ?? "")}</span></p>
+          <p class="muted small" style="margin-top:4px" id="ctl-otp-hint">${S.fmt.escape(S.t("ctl.otpHint"))} <span class="mono">${S.fmt.escape(email ?? "")}</span></p>
           <div class="gc-otp" style="margin-top:12px">
             <input class="input" id="ctl-otp" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="······">
             <button class="btn btn-light" id="ctl-send" style="flex:none">${S.fmt.escape(S.t("consent.getCode"))}</button>
           </div>
+          ${grantExp ? `<div class="gc-countdown" id="ctl-cd"></div>` : ""}
           <div class="modal-actions">
             <button class="btn btn-ghost" id="ctl-no">${S.fmt.escape(S.t("common.cancel"))}</button>
             <button class="btn btn-primary" id="ctl-ok">${S.fmt.escape(S.t("consent.confirm"))}</button>
@@ -239,8 +245,27 @@ S.ctl = {
       S.ui._lockScroll();
       const input = box.querySelector("#ctl-otp");
       const sendBtn = box.querySelector("#ctl-send");
-      const close = (v) => { clearInterval(timer); box.remove(); S.ui._unlockScroll(); resolve(v); };
+      const close = (v) => { clearInterval(timer); clearInterval(expTimer); box.remove(); S.ui._unlockScroll(); resolve(v); };
       input.focus();
+      /* 队长令（第九十六轮）：打开即按会话默认接码通道显示接收方（绑手机号=短信掩码；
+       * 未绑/偏好邮箱=邮箱掩码）——不再静态写死"邮箱 (xxx@gmail.com)"误导短信用户。
+       * 第九十八轮（队长实测 AI 确认卡弹窗缺失切换按钮）：双通道齐全时直接预挂切换条
+       * （pending 态"将发送至"）——此前切换条只在首次发码后才出现。 */
+      (async () => {
+        try {
+          const sess = S.auth._session !== undefined ? S.auth._session : await S.auth.session();
+          const hint = box.querySelector("#ctl-otp-hint");
+          if (!hint || !sess) return;
+          const desc = S.phone?.otpDescFromSession?.(sess);
+          if (desc) {
+            const sw = S.phone.otpSwitcher(desc, scene, extra, { pending: true });
+            if (sw) { hint.replaceWith(sw); return; }
+          }
+          const tgt = sess.otp_channel === "phone" && sess.phone ? sess.phone : (sess.email ?? email ?? "");
+          const mono = hint.querySelector(".mono");
+          if (tgt && mono) mono.textContent = tgt;
+        } catch { /* 会话不可得时保持调用方传入的展示 */ }
+      })();
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") box.querySelector("#ctl-ok").click(); });
       box.querySelector("#ctl-no").onclick = () => close(null);
       box.addEventListener("click", (e) => { if (e.target === box) close(null); });
@@ -249,21 +274,61 @@ S.ctl = {
         if (!/^\d{6}$/.test(code)) { S.ui.toast(S.t("consent.otpNeeded"), true); return; }
         close(code);
       };
+      /* 第九十九轮：grant 型弹窗的有效期倒计时——归零锁死输入/发码/切换/确认
+       * （grant 已过期则验证码无处可用，杜绝"过期后还能获取验证码白白发码"）。 */
+      let expired = false;
+      let expTimer = null;
+      const lockAll = () => {
+        expired = true;
+        clearInterval(timer);
+        const cdEl = box.querySelector("#ctl-cd");
+        if (cdEl) { cdEl.textContent = S.t("consent.expired"); cdEl.style.color = "var(--color-red, #C4453B)"; }
+        input.disabled = true;
+        sendBtn.disabled = true; sendBtn.textContent = S.t("consent.getCode");
+        const swb = box.querySelector(".ph-switch-btn"); if (swb) swb.disabled = true;
+        const okB = box.querySelector("#ctl-ok"); if (okB) okB.disabled = true;
+      };
+      if (grantExp) {
+        const cdEl = box.querySelector("#ctl-cd");
+        const tick = () => {
+          const lv = Math.floor((grantExp - Date.now()) / 1000);
+          if (lv <= 0) { clearInterval(expTimer); lockAll(); return; }
+          if (cdEl) cdEl.textContent = `${S.t("consent.expiresIn")} ${lv}s`;
+        };
+        tick();
+        expTimer = setInterval(tick, 1000);
+        if (Date.parse(expiresAt) <= Date.now()) lockAll(); /* 打开即已过期（防御：调用方应已拦截） */
+      }
       /* 发送三态：待发 → 倒计时（禁用）→ 可重发 */
       let timer = null;
       sendBtn.onclick = async () => {
+        if (expired) return;
         sendBtn.disabled = true;
         sendBtn.textContent = S.t("ctl.sending");
-        let ok = false;
-        try { ok = !!(await send()); } catch { ok = false; }
-        if (!ok) { sendBtn.disabled = false; sendBtn.textContent = S.t("consent.getCode"); return; }
+        let res = null, ok = false;
+        try {
+          res = await send();
+          ok = res && typeof res === "object" ? res.ok === true : !!res;
+        } catch { ok = false; }
+        if (!ok) { if (!expired) { sendBtn.disabled = false; sendBtn.textContent = S.t("consent.getCode"); } return; }
         S.ui.toast(S.t("consent.codeSent"));
+        /* 第九十五轮：通道描述符（redstep 默认按绑定通道分流后，响应带 channel/masked/alt）——
+         * 提示行改显实际接收方；绑手机号用户挂切换条（两通道码均算数）。
+         * 第九十八轮：首次发码前已预挂 pending 切换条——发送后以实际响应重建（翻"已发送至"） */
+        const d = res && typeof res === "object" && res.data && res.data.channel ? res.data : null;
+        if (d && d.masked && !expired) {
+          const anchor = box.querySelector("#ctl-otp-hint") ?? box.querySelector(".ph-switch");
+          if (anchor) {
+            const sw = S.phone?.otpSwitcher?.(d, scene, extra);
+            if (sw) anchor.replaceWith(sw);
+          }
+        }
         let left = 60;
         sendBtn.textContent = S.t("ctl.resendIn", left);
         timer = setInterval(() => {
           left--;
-          if (left <= 0) { clearInterval(timer); sendBtn.disabled = false; sendBtn.textContent = S.t("consent.getCode"); }
-          else sendBtn.textContent = S.t("ctl.resendIn", left);
+          if (left <= 0) { clearInterval(timer); if (!expired) { sendBtn.disabled = false; sendBtn.textContent = S.t("consent.getCode"); } return; }
+          sendBtn.textContent = S.t("ctl.resendIn", left);
         }, 1000);
       };
     });

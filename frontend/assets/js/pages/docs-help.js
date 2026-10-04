@@ -9,6 +9,7 @@ S.HELP_DOCS = {
       { t: "管理卡片", a: "别名、默认卡、单笔/单日限额与冻结；冻结为红色操作，需 OTP。", href: "/account/cards", cta: "我的卡片" },
       { t: "理财与计算", a: "8 只模拟基金 + 6 类存款 + 10 款图形化计算工具（URL 参数可分享）。", href: "/wealth", cta: "财富总览" },
       { t: "安全中心", a: "两步验证开关、风险测评重测、登录密码修改与审计记录。", href: "/account/security", cta: "安全中心" },
+      { t: "手机号、通知与 App 更新", a: "手机号可在账户页提示条/安全中心/开户第一步绑定（+86 可选）；绑定享短信接码、手机号登录与收款。通知中心集中看消息，安全中心可按五类开关系统通知。App 支持启动自动检查更新与手动检查（偏好→检查更新），也可经 /download 下载最新包。", href: "/account/security", cta: "去绑定" },
     ],
     cats: [
       {
@@ -96,6 +97,7 @@ S.HELP_DOCS = {
       { t: "管理卡片", a: "別名、預設卡、單筆/單日限額與凍結；凍結為紅色操作，需 OTP。", href: "/account/cards", cta: "我的卡片" },
       { t: "理財與計算", a: "8 隻模擬基金 + 6 類存款 + 10 款圖形化計算工具（URL 參數可分享）。", href: "/wealth", cta: "財富總覽" },
       { t: "安全中心", a: "兩步驗證開關、風險測評重測、登入密碼修改與稽核記錄。", href: "/account/security", cta: "安全中心" },
+      { t: "手機號、通知與 App 更新", a: "手機號可在帳戶頁提示條/安全中心/開戶第一步綁定（+86 可選）；綁定享簡訊接碼、手機號登入與收款。通知中心集中看訊息，安全中心可按五類開關系統通知。App 支援啟動自動檢查更新與手動檢查（偏好→檢查更新），也可經 /download 下載最新包。", href: "/account/security", cta: "去綁定" },
     ],
     cats: [
       {
@@ -183,6 +185,7 @@ S.HELP_DOCS = {
       { t: "Manage cards", a: "Aliases, default card, single/daily limits and freezing; freezing is RED and needs an OTP.", href: "/account/cards", cta: "My cards" },
       { t: "Wealth & calculators", a: "8 simulated funds + 6 deposit plans + 10 visual calculators with shareable URL parameters.", href: "/wealth", cta: "Wealth" },
       { t: "Security Center", a: "2FA toggle, risk-assessment retake, password change and audit trail.", href: "/account/security", cta: "Security" },
+      { t: "Phone, notifications & app updates", a: "Bind your +86 number via the account banner, Security Center, or sign-up (optional) for SMS codes, phone sign-in and receiving. View all messages in the Notification Center; toggle system popups per category in Security Center. The app auto-checks updates at launch plus manual check under Preferences; latest package also at /download.", href: "/account/security", cta: "Bind now" },
     ],
     cats: [
       {

@@ -31,10 +31,12 @@ S.router.register("fund-detail", async () => {
   /* 归一化对比：以区间起点为 1，看相对表现 */
   const norm = (arr) => { const b = arr[0] || 1; return arr.map((v) => +(v / b).toFixed(4)); };
 
-  c.innerHTML = `<div class="row between wrap"><h1>${S.fmt.escape(f.name)}</h1>${S.ui.badge("R" + f.risk_level, "risk-R" + f.risk_level)}</div>
+  /* 第八十一轮：R3 徽标并入标题文本流（inline）——长名折行时徽标紧跟末字（此前是 flex 独立项，
+   * 长名占满整行宽度后徽标被挤到"第三行"）；仅当末字恰在行尾时徽标才自然到下一行（inline 排版语义） */
+  c.innerHTML = `<h1 class="fd-h1">${S.fmt.escape(f.name)}<span class="badge risk-R${f.risk_level} fd-risk">${S.fmt.escape("R" + f.risk_level)}</span></h1>
     <div class="banner" role="note">${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("funds.riskWarn"))}</div></div>
     <div class="card">
-      <div class="row between"><div><div class="muted small">${S.fmt.escape(S.t("funds.nav"))}</div>
+      <div class="row between fd-navrow"><div><div class="muted small">${S.fmt.escape(S.t("funds.nav"))}</div>
         <div class="total mono" style="font-size:32px;font-weight:700">${f.nav}</div>
         <div class="small" style="color:${up ? "var(--color-green)" : "var(--color-red)"}">${up ? "+" : ""}${f.day_change}% · ${S.fmt.escape(S.t("fd.dayChange"))}</div>
         <div style="margin-top:4px">${S.fundLiveMeta(lvThis, lv?.as_of)}</div></div>

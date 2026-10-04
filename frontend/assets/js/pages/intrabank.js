@@ -15,7 +15,7 @@ S.router.register("intrabank", async ({ user } = {}) => {
           <button class="ai-chip" id="ai-fill" type="button"><span id="ai-fill-txt">${S.fmt.escape(S.t("transfer.aiAsk"))}</span></button>
         </div>
         <label class="field" style="margin:10px 0 0"><span class="lb">${S.fmt.escape(S.t("transfer.toAccount"))}</span>
-          <input class="input mono" id="t-acct" placeholder="${S.fmt.escape(S.t("transfer.acctPh"))}" maxlength="19" inputmode="numeric" autocomplete="off"></label>
+          <input class="input mono" id="t-acct" placeholder="${S.fmt.escape(S.t('transfer.acctPh') + S.t('transfer.acctPhAppend'))}" maxlength="40" autocomplete="off"></label>
         <div class="tf-st" id="t-acctst">${S.fmt.escape(S.t("transfer.acctHint"))}</div>
         <div class="tf-quick">
           <button class="tf-qchip" id="pick-payee" type="button">${S.ui.iconC("ic-users-sky", 18)} ${S.fmt.escape(S.t("payees.title"))}</button>
@@ -64,8 +64,8 @@ S.router.register("intrabank", async ({ user } = {}) => {
       <label class="tf-card${d.slug === fromSlug ? " on" : ""}">
         <input type="radio" name="from" value="${d.slug}" ${d.slug === fromSlug ? "checked" : ""}>
         <img class="bc-art" src="${S.fmt.cardFront(d, cards)}" alt="">
-        <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}${d.kind === "credit" ? ` ${S.ui.badge(S.t("cards.creditTag"), "badge-navy")}` : ""}</span>
-          <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(d.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", d.class_label))}${d.is_default ? ` · ${S.fmt.escape(S.t("cards.default"))}` : ""}</span></span>
+        <span class="tf-cinfo"><span class="tf-cnum">${S.fmt.escape(d.number)}${d.kind === "credit" ? ` ${S.ui.badge(S.t("cards.creditTag"), "badge-navy")}` : ""}${d.is_default ? ` <span class="tf-def">${S.fmt.escape(S.t("cards.default"))}</span>` : ""}</span>
+          <span class="tf-cmeta">${S.fmt.escape(d.network)} · ${S.fmt.escape(d.kind === "credit" ? S.t("cards.credit") : S.t("cards.classIc", d.class_label))}</span></span>
         <span class="tf-cright"><span class="tf-cbal">${S.fmt.escape(S.t("transfer.available"))} ¥${S.fmt.escape(availOf(d))}</span>${d.held ? `<span class="tf-cbal held">${S.fmt.escape(S.t("transfer.held", d.held))}</span>` : ""}</span>
         <span class="tf-check">${S.ui.icon("check", 13)}</span>
       </label>`).join("");
@@ -77,33 +77,68 @@ S.router.register("intrabank", async ({ user } = {}) => {
   const goBtn = document.getElementById("t-go");
   if (!payFrom.length) goBtn.disabled = true;
 
-  /* 收款方真实性错误的行内提示（服务端结构化 code → i18n；不再笼统 toast） */
+  /* 收款方真实性错误的行内提示（第一百轮：具体化——blockedMsg 映射 67 类失败码，
+   * 余额/PR/冻结尾号等从响应细节提取；拒绝泛泛"转账失败"） */
   const showErr = (r) => {
-    const reason = r?.data?.reason ?? r?.data?.error?.code ?? null;
-    const map = {
-      ACCOUNT_NOT_FOUND: S.t("transfer.acctNotFound"),
-      NAME_MISMATCH: S.t("transfer.nameMismatch"),
-      INVALID_CARD_FORMAT: S.t("transfer.invalidAccount"),
-      PAYEE_NOT_FOUND: S.t("transfer.acctNotFound"),
-      INSUFFICIENT_CREDIT: S.t("transfer.insufficientCredit"),
-      CIRCUIT_LOCKED: (r?.data?.minutesLeft ?? "?") + "",
-    };
+    if (r?.data?.reason === "CIRCUIT_LOCKED") {
+      const box0 = document.getElementById("t-err");
+      box0.style.display = "flex";
+      box0.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(S.t("circuit.blockedMsg", r?.data?.minutesLeft ?? "—"))}</div>`;
+      return;
+    }
+    const msg = S.fmt.blockedMsg(r, "transfer.failed");
     const box = document.getElementById("t-err");
     box.style.display = "flex";
-    box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(reason === "CIRCUIT_LOCKED" ? S.t("circuit.blockedMsg", r?.data?.minutesLeft ?? "—") : map[reason] ?? r?.data?.error?.message ?? S.t("transfer.failed"))}</div>`;
+    box.innerHTML = `${S.ui.icon("shield", 16)}<div>${S.fmt.escape(msg)}</div>`;
   };
   const hideErr = () => { const b = document.getElementById("t-err"); b.style.display = "none"; b.innerHTML = ""; };
 
   /* ---- 收款账号鲁棒输入：全角/空格归一 → 16 位 → 4 位分组展示；Luhn 即时校验 + 本人卡/同卡识别 ---- */
   let selfTransfer = null; /* 已选本人卡 slug；账号被手改偏离即失效回落 acct: 通道 */
+  let contactAcct = null; /* 第八十六轮：contact 收款（手机号/邮箱→唯一账户默认卡）；账号偏离即失效 */
   const acctEl = document.getElementById("t-acct");
   const acctSt = document.getElementById("t-acctst");
   const samewarn = document.getElementById("t-samewarn");
   const acctDigits = () => S.fmt.digits16(acctEl.value);
   const setSameWarn = (on) => { samewarn.hidden = !on; goBtn.disabled = !payFrom.length || on; };
+  /* contact lookup 防抖 + 竞态守卫（连续输入只认最后一次） */
+  let lookupSeq = 0, lookupTimer = null;
+  const runContactLookup = async (rawV, isPhone) => {
+    const seq = ++lookupSeq;
+    const r = await S.api.get("/api/payees/lookup?contact=" + encodeURIComponent(isPhone ? S.phone.normCN(rawV) : rawV));
+    if (seq !== lookupSeq) return; /* 过期响应丢弃 */
+    if (r.ok && r.data?.found) {
+      contactAcct = isPhone ? S.phone.normCN(rawV) : rawV;
+      acctSt.className = "tf-st ok";
+      acctSt.innerHTML = `${S.ui.icon("check", 13)} ${S.fmt.escape(S.t("transfer.contactFound", "已找到 Suveoo 用户"))} <b>${S.fmt.escape(r.data.name)}</b> · ${S.fmt.escape(r.data.masked)}`;
+      document.getElementById("t-name").value = r.data.name; /* 户名自动填（与卡号通道同体验） */
+      setSameWarn(false);
+    } else {
+      contactAcct = null;
+      acctSt.className = "tf-st bad";
+      acctSt.innerHTML = `${S.ui.icon("x", 13)} ${S.fmt.escape(S.t("transfer.contactNotFound", "未找到绑定该手机号/邮箱的用户"))}`;
+      setSameWarn(false);
+    }
+  };
   const syncAcct = async () => {
     const d = acctDigits();
     if (selfTransfer && fullNums[selfTransfer] && d !== S.fmt.digits16(fullNums[selfTransfer])) selfTransfer = null;
+    /* 第八十六轮：contact 收款分流——输入为手机号/邮箱形态时走 lookup 核实（spinner→用户名回填+勾），跳过 16 位卡号链路。
+     * 第九十五轮修复：原 "!d && (...)" 恒 false（手机号 digits16 非空→分支不可达；邮箱含数字同理），
+     * 改为纯形态判定 + 250ms 防抖；卡号 BIN（62/4/5/3）与 11 位手机号无交集，互不误伤 */
+    const rawV = acctEl.value.trim();
+    const isPhone = !!S.phone.normCN(rawV);
+    const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rawV);
+    if (isPhone || isEmail) {
+      contactAcct = null;
+      acctSt.className = "tf-st"; acctSt.innerHTML = '<span class="spin sm"></span>';
+      clearTimeout(lookupTimer);
+      lookupTimer = setTimeout(() => runContactLookup(rawV, isPhone), 250);
+      return;
+    }
+    clearTimeout(lookupTimer);
+    lookupSeq++; /* 使在途 lookup 过期 */
+    contactAcct = null;
     if (d.length === 16) {
       if (!S.fmt.luhn16(d)) { acctSt.className = "tf-st bad"; acctSt.innerHTML = `${S.ui.icon("shield", 13)} ${S.fmt.escape(S.t("transfer.acctBad"))}`; setSameWarn(false); return; }
       /* 同卡精确比对：与付款卡完整卡号（按需 reveal）逐一对照 */
@@ -122,10 +157,16 @@ S.router.register("intrabank", async ({ user } = {}) => {
     }
   };
   acctEl.addEventListener("input", () => {
-    /* 每 4 位自动分组：粘贴 "6222880177757477"/"6222 8801 7775 7477" 同样归一 */
-    const d = S.fmt.digits16(acctEl.value);
-    const grouped = S.fmt.groupCard(d);
-    if (acctEl.value !== grouped) acctEl.value = grouped;
+    /* 每 4 位自动分组：粘贴 "6222880177757477"/"6222 8801 7775 7477" 同样归一。
+     * 第九十五轮修复：邮箱/手机号形态不套卡号分组——此前 groupCard 按数字重写输入框，
+     * 邮箱首字符即被清空（contact 收款从未可输入） */
+    const rawV = acctEl.value;
+    const contactForm = rawV.includes("@") || !!S.phone.normCN(rawV);
+    if (!contactForm) {
+      const d = S.fmt.digits16(rawV);
+      const grouped = S.fmt.groupCard(d);
+      if (rawV !== grouped) acctEl.value = grouped;
+    }
     hideErr();
     syncAcct();
   });
@@ -228,10 +269,10 @@ S.router.register("intrabank", async ({ user } = {}) => {
     const memo = document.getElementById("t-memo").value.trim();
     hideErr();
     if (!name || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) { S.ui.toast(S.t("transfer.fillNameAmount"), true); return; }
-    if (!selfTransfer && !/^\d{16}$/.test(acct)) { showErr({ data: { reason: "INVALID_CARD_FORMAT" } }); return; }
+    if (!selfTransfer && !contactAcct && !/^\d{16}$/.test(acct)) { showErr({ data: { reason: "INVALID_CARD_FORMAT" } }); return; }
     const body = selfTransfer
       ? { to_card: selfTransfer, amount, memo: memo || undefined, from_card: fromSlug }
-      : { recipient_name: name, recipient_account: acct, amount, memo: memo || undefined, from_card: fromSlug };
+      : { recipient_name: name, recipient_account: contactAcct || acct, amount, memo: memo || undefined, from_card: fromSlug };
     S.ui.btnBusy(goBtn, true);
     S.ga4.event("transfer_submit", { amount });
     try {
@@ -252,9 +293,9 @@ S.router.register("intrabank", async ({ user } = {}) => {
           <div class="modal-actions"><a class="btn btn-ghost" href="/transfer/history">${S.fmt.escape(S.t("pay.history"))}</a>
           <button class="btn btn-primary" onclick="location.reload()">${S.fmt.escape(S.t("common.done"))}</button></div>`);
       } else {
-        /* 收款方真实性拦截等业务拒绝：行内红条呈现结构化原因 */
+        /* 收款方真实性拦截等业务拒绝：行内红条呈现具体结构化原因（与 toast 同文案） */
         showErr(r);
-        S.ui.toast(S.t("transfer.failed"), true);
+        S.ui.toast(S.fmt.blockedMsg(r, "transfer.failed"), true);
       }
     } finally {
       S.ui.btnBusy(goBtn, false);

@@ -9,6 +9,7 @@ S.router.register("home", async ({ user }) => {
       <img src="/assets/images/suveoo-ai-logo.svg?v=${S.ui.v()}" alt="">
       <input id="hero-q" placeholder="${S.fmt.escape(S.t("home.heroPlaceholder"))}">
       <button class="voice-btn" id="hero-mic" type="button">${S.ui.icon("mic", 16)}</button>
+      <button class="voice-btn hero-send" id="hero-send" type="button" aria-label="${S.fmt.escape(S.t("ai.send"))}" title="${S.fmt.escape(S.t("ai.send"))}">${S.ui.icon("send", 16)}</button>
     </div>
     <div id="promo" style="margin-top:16px"></div>
     <div class="card assets-block" style="margin-top:16px" id="assets"><div id="assets-main"><div class="skeleton" style="width:38%;height:14px;margin-bottom:10px"></div><div class="skeleton" style="width:60%;height:34px;margin-bottom:10px"></div><div class="skeleton" style="width:44%;height:12px"></div></div><div id="cashflow"></div></div>
@@ -19,9 +20,11 @@ S.router.register("home", async ({ user }) => {
       <div class="bb-text"><h2>Suveoo</h2><p>${S.fmt.escape(S.t("about.intro"))}</p>
       <a class="btn btn-light" href="/about">${S.fmt.escape(S.t("home.aboutBtn"))}</a></div>
     </div>`;
-  /* hero 输入条：Enter 提交 + 语音按钮（识别结果填框，不自动发送——用户核对后再回车） */
+  /* hero 输入条：Enter 提交 + 语音按钮（识别结果填框，不自动发送——用户核对后再回车）
+   * 第一百零四轮：语音聆听中右侧浮现发送钮（点击=stop 收口后走同一 go()——语音输入不再依赖键盘回车） */
   const go = () => { S.voice.stop({ discard: true }); const v = document.getElementById("hero-q").value.trim(); if (v) S.router.ai(v); };
   document.getElementById("hero-input").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  document.getElementById("hero-send").onclick = () => go();
   S.voice.bind(document.getElementById("hero-mic"), document.getElementById("hero-q"));
   /* services：多彩渐变宫格（第二十三轮 D 升级 ic-*；第二十四轮补记：未开放的跨行/跨境退役，
      补预约转账（赛题核心场景）与交易记录；七族轮转同族不相邻，按使用频率排序） */

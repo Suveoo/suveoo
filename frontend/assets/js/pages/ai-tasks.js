@@ -43,7 +43,7 @@ S.router.register("ai-tasks", async () => {
     b.onclick = async () => {
       const r2 = await S.api.post(`/api/tasks/${b.dataset.id}/cancel`, {});
       if (r2.data?.ok) { S.ui.toast(S.t("tasks.compensated")); setTimeout(() => location.reload(), 800); }
-      else S.ui.toast(r2.data?.error?.message ?? "failed", true);
+      else S.ui.toast(S.fmt.blockedMsg(r2), true);
     };
   });
   S.ui.$$(".inject").forEach((b) => {
@@ -51,7 +51,7 @@ S.router.register("ai-tasks", async () => {
       const r2 = await S.api.post("/api/demo/inject-failure", { task_id: Number(b.dataset.id) });
       /* 注入成功：toast + 刷新列表（此前 fail_next 已置位但 UI 只看 status，点了"毫无变化"——组员报告） */
       if (r2.data?.ok) { S.ui.toast(S.t("tasks.injected")); setTimeout(() => location.reload(), 700); }
-      else S.ui.toast(r2.data?.error?.message ?? "failed", true);
+      else S.ui.toast(S.fmt.blockedMsg(r2), true);
     };
   });
   /* 立即演示执行（§5.3）：复用 taskDue 原语义（幂等/状态机/fail_next 全生效）——决赛演示不用改 execute_at */
@@ -64,7 +64,7 @@ S.router.register("ai-tasks", async () => {
         setTimeout(() => location.reload(), 900);
       } else {
         b.disabled = false;
-        S.ui.toast(r2.data?.error?.message ?? "failed", true);
+        S.ui.toast(S.fmt.blockedMsg(r2), true);
       }
     };
   });

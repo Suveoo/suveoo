@@ -79,7 +79,7 @@ S.router.register("contact", async () => {
     } else {
       go.disabled = false;
       go.textContent = S.t("contact.submit");
-      S.ui.toast(r.data?.error?.message ?? "failed", true);
+      S.ui.toast(S.fmt.blockedMsg(r), true);
     }
   };
   /* 再写一条：整卡回到表单态（清留言，保留姓名/邮箱/类别） */

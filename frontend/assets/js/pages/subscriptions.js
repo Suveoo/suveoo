@@ -50,7 +50,7 @@ S.router.register("subscriptions", async () => {
       const r2 = await S.api.mutate(`/api/subscriptions/${btn.dataset.id}/cancel`, {});
       if (r2.cancelled) { btn.disabled = false; return; }
       if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 900); }
-      else { S.ui.toast(r2.data?.reason ?? "failed", true); btn.disabled = false; }
+      else { S.ui.toast(S.fmt.blockedMsg(r2), true); btn.disabled = false; }
     };
   });
   S.ui.$$("[data-rm]").forEach((sw) => {

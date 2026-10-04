@@ -13,7 +13,7 @@ S.router.register("recovery", async () => {
           <div class="rec-step" data-step="${i + 1}"><span class="rs-dot">${i + 1}</span><span class="rs-label">${S.fmt.escape(s)}</span></div>`).join("")}
       </div>
       <div id="rec-form">
-        <label class="field"><span class="lb">Email</span><input class="input" id="v-email" type="email"></label>
+        <label class="field"><span class="lb">${S.fmt.escape(S.t("ph.idLabel", "绑定邮箱或手机号"))}</span><input class="input" id="v-email" autocomplete="username"></label>
         <label class="field"><span class="lb">${S.fmt.escape(S.t("rec.passport"))}</span><input class="input" id="v-pass">
           <div class="field-hint">${S.fmt.escape(S.t("rec.passportHint"))}</div></label>
         <label class="field"><span class="lb">${S.fmt.escape(S.t("reg.code"))}</span>
@@ -43,10 +43,21 @@ S.router.register("recovery", async () => {
   S.ui.bindEyes(c);
   document.getElementById("v-email").addEventListener("input", () => setStep(document.getElementById("v-email").value && document.getElementById("v-code").value ? 2 : 1));
   document.getElementById("v-send").onclick = async () => {
-    const email = document.getElementById("v-email").value.trim();
-    const r = await S.api.post("/api/auth/email-code", { scene: "recovery", email });
+    /* 第八十五轮：支持手机号找回——标识按形态分流（裸 11 位手机号→phone 通道；其余按邮箱）。
+     * 第九十五轮：服务端按账户默认通道分流（绑手机号且偏好短信→邮箱标识也发短信），
+     * 响应带 channel/masked/alt——提示实际接收方并挂切换条（两通道码均算数）。 */
+    const ident = document.getElementById("v-email").value.trim();
+    const isPhone = /^1[3-9]\d{9}$/.test(ident.replace(/[\s-]/g, "").replace(/^(\+86|0086)/, ""));
+    const r = await S.api.post("/api/auth/email-code", isPhone ? { scene: "recovery", channel: "phone", phone: ident } : { scene: "recovery", email: ident });
     S.ui.toast(r.status === 429 ? (r.data?.error?.message ?? "too fast") : S.t("consent.codeSent"), r.status === 429);
-    if (r.ok) { document.getElementById("v-send").disabled = true; setTimeout(() => (document.getElementById("v-send").disabled = false), 60000); }
+    if (r.ok) {
+      const holder = document.getElementById("v-send").closest(".row");
+      document.querySelector(".ph-switch[data-rec]")?.remove();
+      const sw = S.phone.otpSwitcher(r.data, "recovery", { email: ident });
+      if (sw) { sw.dataset.rec = "1"; holder.after(sw); }
+      document.getElementById("v-send").disabled = true;
+      setTimeout(() => (document.getElementById("v-send").disabled = false), 60000);
+    }
   };
   document.getElementById("v-go").onclick = async () => {
     const pw = document.getElementById("v-pw").value;
@@ -57,6 +68,8 @@ S.router.register("recovery", async () => {
     setStep(2);
     const r = await S.api.post("/api/auth/recover", {
       email: document.getElementById("v-email").value.trim(),
+      /* 手机号找回：服务端按绑定账户双通道校验（hRecover 已支持 phone 字段） */
+      ...(S.phone.normCN(document.getElementById("v-email").value) ? { phone: S.phone.normCN(document.getElementById("v-email").value) } : {}),
       code: document.getElementById("v-code").value.trim(),
       new_password: pw,
     });
@@ -64,6 +77,6 @@ S.router.register("recovery", async () => {
       setStep(3);
       document.getElementById("rec-form").hidden = true;
       document.getElementById("rec-done").hidden = false;
-    } else S.ui.toast(r.data?.error?.message ?? r.data?.error?.code ?? "failed", true);
+    } else S.ui.toast(r.data?.error?.message ?? r.data?.error?.code ?? S.t("common.opFailed"), true);
   };
 });

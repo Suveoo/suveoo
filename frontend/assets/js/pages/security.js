@@ -16,14 +16,75 @@ S.router.register("security", async ({ user }) => {
         <div class="grow"><b>${S.fmt.escape(S.t("sec.pr"))}</b><div class="muted small">${S.fmt.escape(S.t("wealth.prLevel"))}：PR${user?.pr_level ?? 3}（${S.fmt.escape(S.t("wealth.riskMatch"))}）</div></div>
         <a class="btn btn-sm btn-ghost" id="retest" href="/account/risk-assessment">${S.fmt.escape(S.t("sec.retest"))}</a></div>
     </div>
+    <div class="section-title"><h2>${S.fmt.escape(S.t("sec.phoneTitle", "手机号管理"))}</h2></div>
+    <div class="card" id="ph-sec-card">${S.ui.skeleton(2)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("sec.audit"))}</h2></div>
     <div class="card" id="audit">${S.ui.skeleton(4)}</div>
     <div class="section-title"><h2>${S.fmt.escape(S.t("circuit.title"))}</h2></div>
     <div class="card" id="cb-card">${S.ui.skeleton(2)}</div>`;
+  /* ===== 第八十五轮：手机号管理（绑定/换绑/解绑/默认接码通道） ===== */
+  (async () => {
+    const box = document.getElementById("ph-sec-card");
+    if (!box) return;
+    const r = await S.api.get("/api/security");
+    const d = r.data ?? {};
+    const masked = d.phone_masked || "";
+    const render = () => {
+      box.innerHTML = `
+        <div class="row between" style="gap:12px;flex-wrap:wrap">
+          <div class="grow"><b>${S.fmt.escape(S.t("sec.phoneCur", "当前绑定"))}</b>
+            <div class="muted small">${masked ? S.fmt.escape(masked) : S.fmt.escape(S.t("ph.unbound", "未绑定"))}</div></div>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-light" id="ph-bind">${S.fmt.escape(masked ? S.t("sec.phoneChange", "更换绑定") : S.t("ph.bindNow", "立即绑定"))}</button>
+            ${masked ? `<button class="btn btn-sm btn-light" id="ph-unbind">${S.fmt.escape(S.t("sec.phoneUnbind", "解除绑定"))}</button>` : ""}
+          </div>
+        </div>
+        ${masked ? `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--color-line)">
+          <b class="small">${S.fmt.escape(S.t("sec.otpChannel", "默认接收验证码方式"))}</b>
+          <div class="row" style="gap:14px;margin-top:6px">
+            <label class="row small" style="gap:6px;cursor:pointer"><input type="radio" name="otpch" value="phone" ${d.otp_channel === "phone" ? "checked" : ""}>${S.fmt.escape(S.t("ph.sms", "短信") + " " + masked)}</label>
+            <label class="row small" style="gap:6px;cursor:pointer"><input type="radio" name="otpch" value="email" ${d.otp_channel === "email" ? "checked" : ""}>${S.fmt.escape(S.t("ph.emailCh", "邮箱"))}</label>
+          </div>
+          <p class="muted small" style="margin:6px 0 0">${S.fmt.escape(S.t("sec.otpChannelNote", "红级操作、两步验证、找回密码与解冻默认经此通道接收验证码（操作时仍可单次切换）。"))}</p>
+        </div>` : ""}`;
+      box.querySelector("#ph-bind").onclick = () => S.phone.bindModal({ onDone: () => setTimeout(() => location.reload(), 600) });
+      const ub = box.querySelector("#ph-unbind");
+      if (ub) ub.onclick = () => {
+        const m2 = S.ui.modal(`<h3 style="font-size:16px">${S.fmt.escape(S.t("sec.phoneUnbind", "解除绑定"))}</h3>
+          <p class="muted small" style="line-height:1.6">${S.fmt.escape(S.t("sec.unbindWhy", "为保护账户安全，解绑需验证邮箱验证码。解绑后该手机号将被释放，可绑定其他账户；验证码将改由邮箱接收。"))}</p>
+          <label class="field"><span class="lb">${S.fmt.escape(S.t("ph.code"))}</span>
+            <div class="row" style="gap:8px"><input class="input grow mono" id="ub-code" inputmode="numeric" maxlength="6" placeholder="······">
+            <button type="button" class="btn btn-light" id="ub-send" style="flex:none">${S.fmt.escape(S.t("ph.send"))}</button></div></label>
+          <div class="modal-actions"><button class="btn" id="ub-no">${S.fmt.escape(S.t("common.cancel"))}</button>
+          <button class="btn btn-primary" id="ub-ok">${S.fmt.escape(S.t("sec.phoneUnbind", "解除绑定"))}</button></div>`);
+        m2.el.querySelector("#ub-no").onclick = () => m2.close();
+        m2.el.querySelector("#ub-send").onclick = async () => {
+          const b = m2.el.querySelector("#ub-send"); b.disabled = true;
+          const rr = await S.api.post("/api/auth/email-code", { scene: "phoneunbind" });
+          if (!rr.ok) { b.disabled = false; S.ui.toast(rr.data?.error?.message ?? S.t("ph.sendFail"), true); return; }
+          S.ui.toast(S.t("ph.sent") + " " + (rr.data?.masked ?? ""));
+        };
+        m2.el.querySelector("#ub-ok").onclick = async () => {
+          const rr = await S.api.post("/api/account/phone", { action: "unbind", code: m2.el.querySelector("#ub-code").value.trim() });
+          if (!rr.ok) { S.ui.toast(rr.data?.error?.message ?? S.t("common.opFail"), true); return; }
+          m2.close(); S.ui.toast(S.t("sec.unbound", "已解除绑定")); setTimeout(() => location.reload(), 600);
+        };
+      };
+      box.querySelectorAll('input[name="otpch"]').forEach((radio) => {
+        radio.onchange = async () => {
+          const rr = await S.api.post("/api/account/phone", { action: "set_channel", channel: radio.value });
+          if (!rr.ok) { S.ui.toast(rr.data?.error?.message ?? S.t("common.opFail"), true); location.reload(); return; }
+          S.ui.toast(S.t("common.opOk"));
+        };
+      });
+    };
+    render();
+  })();
+
   document.getElementById("chg").onclick = () => {
     const m = S.ui.modal(`<h2>${S.fmt.escape(S.t("sec.changePass"))}</h2>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.curPass"))}</span>${pwInput("cp-cur", "current-password")}</label>
-      <label class="field"><span class="lb">${S.fmt.escape(S.t("consent.otp"))}</span>
+      <label class="field"><span class="lb">${S.fmt.escape(S.t("consent.otp"))} <span class="muted small ck-chan" id="cp-chan"></span></span>
         <div class="gc-otp"><input class="input mono" id="cp-otp" maxlength="6"><button class="btn btn-light" id="cp-send" style="flex:none">${S.fmt.escape(S.t("consent.getCode"))}</button></div></label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("sec.newPass"))}（8-32）</span>${pwInput("cp-pw")}</label>
       <label class="field"><span class="lb">${S.fmt.escape(S.t("common.confirmPass"))}</span>${pwInput("cp-pw2")}</label>
@@ -31,9 +92,33 @@ S.router.register("security", async ({ user }) => {
       <button class="btn btn-primary" id="ok">${S.fmt.escape(S.t("common.save"))}</button></div>`);
     S.ui.bindEyes(m.el);
     m.el.querySelector("#cx").onclick = m.close;
+    /* 打开即显示默认接码通道接收方（绑手机号=短信掩码），与发送后一致；
+     * 第九十八轮：双通道齐全直接预挂 pending 切换条（队长令：打开即可见切换按钮） */
+    { const dsc = S.phone?.otpDescFromSession?.(user);
+      if (dsc) { cpSw = S.phone.otpSwitcher(dsc, "redstep", {}, { pending: true }); if (cpSw) m.el.querySelector("#cp-otp").closest(".gc-otp").after(cpSw); }
+      else if (user?.otp_channel === "phone" && user?.phone) m.el.querySelector("#cp-chan").textContent = user.phone; }
     m.el.querySelector("#cp-send").onclick = async () => {
-      const r = await S.api.post("/api/auth/email-code", { scene: "redstep", email: user?.email?.includes("*") ? undefined : user?.email });
-      S.ui.toast(r.status === 429 ? S.t("consent.tooFast") : S.t("consent.codeSent"), r.status === 429);
+      const btn = m.el.querySelector("#cp-send");
+      const prev = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = S.t("ctl.sending"); /* 发送中动态反馈（第九十八轮） */
+      const r = await S.api.post("/api/auth/email-code", { scene: "redstep" });
+      if (!r.ok) { btn.disabled = false; btn.textContent = prev; S.ui.toast(r.data?.error?.message ?? S.t("consent.tooFast"), true); return; }
+      /* 响应带实际通道/掩码/alt——按绑定默认通道发码（绑手机号=短信），以实际响应重建切换条 */
+      if (r.data?.masked) {
+        const chan = m.el.querySelector("#cp-chan");
+        if (chan) chan.textContent = r.data.masked;
+        if (cpSw) cpSw.remove();
+        cpSw = S.phone.otpSwitcher(r.data, "redstep", {}) ?? null;
+        if (cpSw) m.el.querySelector("#cp-otp").closest(".gc-otp").after(cpSw);
+      }
+      S.ui.toast(S.t("consent.codeSent"));
+      let cd = 60;
+      const tick = setInterval(() => {
+        cd--;
+        if (cd <= 0) { clearInterval(tick); btn.disabled = false; btn.textContent = prev; return; }
+        btn.textContent = S.t("consent.resendIn", cd);
+      }, 1000);
     };
     m.el.querySelector("#ok").onclick = async () => {
       const cur = m.el.querySelector("#cp-cur").value;
@@ -70,7 +155,8 @@ S.router.register("security", async ({ user }) => {
     const revert = () => { e.target.checked = !enabling; };
     const otp = await S.ctl.otp({
       email: user?.email,
-      send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+      /* 第九十五轮：send 返回完整响应——S.ctl.otp 据此显示实际通道并挂切换条 */
+      send: async () => await S.api.post("/api/auth/email-code", { scene: "redstep" }),
     });
     if (!otp) { revert(); return; }
     let body = { enabled: enabling, otp };
@@ -91,7 +177,7 @@ S.router.register("security", async ({ user }) => {
   const r2msg = (r) => {
     const code = r?.data?.error?.code;
     if (code === "WRONG_OLD_PASSWORD") return S.t("sec.curPassBad");
-    return r?.data?.error?.message ?? r?.data?.error?.code ?? "failed";
+    return r?.data?.error?.message ?? r?.data?.error?.code ?? S.t("common.opFailed");
   };
   const a = await S.api.get("/api/audit/me");
   document.getElementById("audit").innerHTML = (a.data?.audit ?? []).map((x) => `
@@ -120,14 +206,35 @@ S.router.register("security", async ({ user }) => {
       card.innerHTML = `
         <div class="banner" style="background:var(--color-red-bg);color:var(--color-red)">${S.ui.icon("lock", 14)}<div><b>${S.fmt.escape(S.t("circuit.locked", d.minutesLeft))}</b><div class="small" style="margin-top:4px">${S.fmt.escape(S.t("circuit.lockedNote"))}</div></div></div>
         <p class="muted small" style="margin:8px 0">${S.fmt.escape(S.t("circuit.counters"))}：${S.fmt.escape(counters || "—")}</p>
+        <div id="cb-sw"></div>
         <div class="row" style="gap:8px;flex-wrap:wrap">
           <input class="input mono" id="cb-code" maxlength="6" inputmode="numeric" placeholder="${S.fmt.escape(S.t("consent.otp"))}" style="max-width:160px">
           <button class="btn btn-light" id="cb-send">${S.fmt.escape(S.t("consent.getCode"))}</button>
           <button class="btn btn-primary" id="cb-unlock">${S.ui.icon("unlock", 14)} ${S.fmt.escape(S.t("circuit.unlock"))}</button>
         </div>`;
+      /* 第九十八轮：锁定态即预挂 pending 切换条（安全中心页首屏 /api/security 已有 phone_masked/otp_channel；
+       * 队长令：打开即可见切换按钮，不必先点一次获取验证码） */
+      { const dsc = S.phone?.otpDescFromSession?.({ phone: sec.phone_masked || null, email: user?.email, otp_channel: sec.otp_channel });
+        if (dsc) { const sw0 = S.phone.otpSwitcher(dsc, "cbunlock", {}, { pending: true }); if (sw0) document.getElementById("cb-sw").appendChild(sw0); } }
       document.getElementById("cb-send").onclick = async () => {
-        const r2 = await S.api.post("/api/security/circuit", { action: "send" });
-        S.ui.toast(r2.ok ? S.t("circuit.codeSent") : r2msg(r2), !r2.ok);
+        /* 第九十五轮：统一走 email-code（cbunlock 场景）——服务端按绑定默认通道分流（绑手机号=短信），
+         * 响应带 channel/masked/alt，挂切换条（与改密/风险测评同体验）；解锁校验双通道均算数不变 */
+        const sb = document.getElementById("cb-send");
+        const prev = sb.textContent;
+        sb.disabled = true; sb.textContent = S.t("ctl.sending");
+        const r2 = await S.api.post("/api/auth/email-code", { scene: "cbunlock" });
+        if (!r2.ok) { sb.disabled = false; sb.textContent = prev; S.ui.toast(r2.data?.error?.message ?? r2msg(r2), true); return; }
+        const holder = document.getElementById("cb-sw");
+        holder.replaceChildren();
+        const sw = S.phone.otpSwitcher(r2.data, "cbunlock", {});
+        if (sw) holder.appendChild(sw);
+        S.ui.toast(S.t("circuit.codeSent"));
+        let cd2 = 60;
+        const tk = setInterval(() => {
+          cd2--;
+          if (cd2 <= 0) { clearInterval(tk); sb.disabled = false; sb.textContent = prev; return; }
+          sb.textContent = S.t("consent.resendIn", cd2);
+        }, 1000);
       };
       document.getElementById("cb-unlock").onclick = async () => {
         const code = document.getElementById("cb-code").value.trim();

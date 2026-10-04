@@ -41,7 +41,7 @@ label.field .lb { display: block; font-weight: 500; margin-bottom: 6px; font-siz
 .section-title { display: flex; align-items: baseline; justify-content: space-between; margin: var(--sp-8) 0 var(--sp-3); }
 .section-title .more { font-size: var(--fs-14); }
 
-.badge { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-12); border-radius: 999px; padding: 2px 10px; font-weight: 500; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-12); border-radius: 999px; padding: 2px 10px; font-weight: 500; white-space: nowrap; flex: none; } /* 第八十轮：徽标永不内断（确认卡顶栏逐字断词根因之一） */
 .badge-green { background: var(--color-green-bg); color: var(--color-green); }
 .badge-yellow { background: var(--color-yellow-bg); color: var(--color-yellow); }
 .badge-red { background: var(--color-red-bg); color: var(--color-red); }
@@ -63,7 +63,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 
 /* 遮罩磨砂玻璃（第五十九轮补：与 cal-mask blur(6px)/app-header blur(10px) 同一设计语言；
    scrim 由 .45 微降至 .38 补偿 blur 叠加的压暗） */
-.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.38); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: var(--sp-4); }
+.modal-mask { position: fixed; top: 0; right: 0; bottom: 0; left: 0; /* 第八十四轮：inset 为 Chrome87+ 简写，旧华为内核（荣耀 V10 实测）不识别致 absolute 元素失去铺满——三点按钮偏左/全屏遮罩失效的根因 */ background: rgba(0,0,0,.38); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: var(--sp-4); }
 /* 弹窗打开锁背景滚动（S.ui.modal 维护 body.modal-open，嵌套计数安全）+ 模态内容滚动不外溢 */
 body.modal-open { overflow: hidden; }
 .modal { background: #fff; border-radius: 16px; max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; padding: var(--sp-6); box-shadow: var(--shadow); }
@@ -102,7 +102,7 @@ body.modal-open { overflow: hidden; }
 
 .switch { position: relative; width: 44px; height: 24px; flex: none; }
 .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
-.switch .tk { position: absolute; inset: 0; background: var(--color-line); border-radius: 999px; transition: background .15s; }
+.switch .tk { position: absolute; top: 0; right: 0; bottom: 0; left: 0; /* 第八十四轮：inset 为 Chrome87+ 简写，旧华为内核（荣耀 V10 实测）不识别致 absolute 元素失去铺满——三点按钮偏左/全屏遮罩失效的根因 */ background: var(--color-line); border-radius: 999px; transition: background .15s; }
 .switch .tk::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left .15s; }
 .switch input:checked + .tk { background: var(--color-primary); }
 .switch input:checked + .tk::after { left: 23px; }

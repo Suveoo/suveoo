@@ -50,6 +50,11 @@ const walkCopy = () => {
           const tag2 = '<script src="/assets/js/core/biometric-shell.js?v=1" defer></script>';
           t = /<\/body>/i.test(t) ? t.replace(/<\/body>/i, tag2 + "</body>") : t + tag2;
         }
+        /* 第七十二轮：检查更新（壳内「我的账户→偏好」入口由 account.js isCapacitor 分支渲染） */
+        if (!t.includes("shell-update.js")) {
+          const tag3 = '<script src="/assets/js/core/shell-update.js?v=1" defer></script>';
+          t = /<\/body>/i.test(t) ? t.replace(/<\/body>/i, tag3 + "</body>") : t + tag3;
+        }
         writeFileSync(dst, t);
         continue;
       }
@@ -73,6 +78,6 @@ execFileSync("cmd.exe", ["/c", path.join(ANDROID, "gradlew.bat"), "assembleRelea
 const apk = path.join(ANDROID, "app/build/outputs/apk/release/app-release.apk");
 if (!existsSync(apk)) throw new Error("APK not found");
 mkdirSync(OUT, { recursive: true });
-const dest = path.join(OUT, "Suveoo-v2.6.apk");
+const dest = path.join(OUT, "Suveoo-v2.57.apk");
 cpSync(apk, dest);
 console.log(`✓ APK ${(statSync(dest).size / 1024 / 1024).toFixed(1)} MB → ${dest}`);

@@ -34,7 +34,7 @@ S.router.register("bills", async () => {
       const r2 = await S.api.mutate(`/api/bills/${btn.dataset.id}/pay`, {}, { subject: btn.dataset.name });
       if (r2.cancelled) { btn.disabled = false; return; }
       if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 900); }
-      else { S.ui.toast(r2.data?.error?.message ?? r2.data?.reason ?? "failed", true); btn.disabled = false; }
+      else { S.ui.toast(S.fmt.blockedMsg(r2), true); btn.disabled = false; }
     };
   });
   S.ui.$$("[data-ap]").forEach((sw) => {
@@ -42,7 +42,7 @@ S.router.register("bills", async () => {
       /* autopay 路由为 PATCH（mutate 默认 POST 会 501，开关永远弹回） */
       const r2 = await S.api.mutate(`/api/bills/${sw.dataset.ap}/autopay`, { enabled: sw.checked }, { method: "PATCH" });
       if (r2.cancelled) { sw.checked = !sw.checked; return; }
-      if (r2.data?.status !== "EXECUTED") { sw.checked = !sw.checked; S.ui.toast(r2.data?.reason ?? "failed", true); }
+      if (r2.data?.status !== "EXECUTED") { sw.checked = !sw.checked; S.ui.toast(S.fmt.blockedMsg(r2), true); }
     };
   });
 });

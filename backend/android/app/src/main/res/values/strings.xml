@@ -10,4 +10,13 @@
     <string name="lock_subtitle">已锁定，验证以继续</string>
     <string name="lock_unlock">解锁</string>
     <string name="bio_prompt_sub">验证以使用 Suveoo</string>
+    <string name="bio_cancel">取消</string>
+    <string name="svc_title">Suveoo 安全守护运行中</string>
+    <string name="svc_text">保持登录期间为你监测账户动态</string>
+    <string name="ch_transfers">转账</string>
+    <string name="ch_security">安全</string>
+    <string name="ch_wealth">理财</string>
+    <string name="ch_tasks">任务</string>
+    <string name="ch_general">系统</string>
+    <string name="ch_svc">后台守护</string>
 </resources>

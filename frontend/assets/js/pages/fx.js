@@ -169,7 +169,7 @@ S.router.register("fx", async () => {
       const reason = r.data?.reason ?? r.data?.error?.code ?? null;
       showErr(reason === "INSUFFICIENT_FX" ? S.t("fx.insufficientFx")
         : reason === "INSUFFICIENT_CREDIT" ? S.t("transfer.insufficientCredit")
-        : reason === "INSUFFICIENT_BALANCE" ? S.t("common.insufficient") : r.data?.error?.message ?? S.t("common.opFailed"));
+        : S.fmt.blockedMsg(r));
     }
   };
   /* 初始化：牌价 + 结算卡选择（购汇含信用卡信用支付；结汇仅借记）+ 外币余额 */

@@ -17,7 +17,7 @@ describe("demo mogul 种子剖面", () => {
     const creditSum = seed.txs.filter((t) => t.card === "credit-card-1" && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents), 0);
     expect(seed.credit_debt_cents).toBe(String(creditSum));
     expect(seed.tasks.filter((t) => t.title.includes("每月")).every((t) => Number.isInteger(t.day_of_month))).toBe(true);
-    expect(seed.payees.every((p) => /^13\d{9}$/.test(p.phone ?? ""))).toBe(true);
+    expect(seed.payees.every((p) => !p.phone || /^13\d{9}$/.test(p.phone))).toBe(true); /* 第一百一十轮：假号退役允许空 */
   });
 
   it("竞赛锚点全保留（火锅 860 / 注入 memo / 生日订花 / 女儿 200 / 物业 412.70 / 工资 / 报销）", () => {
@@ -56,9 +56,17 @@ describe("demo mogul 种子剖面", () => {
       expect(seed.payees.some((p) => p.name === overseas)).toBe(true);
       expect(txN.has(overseas)).toBe(true);
     }
+    /* 海外消费池 5 商户按周日随机命中（seededRng 固定序列但周日集合随真实日期轮换——
+       曾在 2026-10-05 假红：当日无 Amazon 命中）。断言不变量：外币消费恒挂信用卡+原币标注；
+       Amazon 命中时再校验其字段 */
+    const fxCards = seed.txs.filter((t) => /信用卡外币消费/.test(t.memo ?? ""));
+    expect(fxCards.length).toBeGreaterThan(0);
+    expect(fxCards.every((t) => t.card === "credit-card-1")).toBe(true);
     const fxTx = seed.txs.find((t) => t.counterparty === "Amazon.com");
-    expect(fxTx?.card).toBe("credit-card-1");
-    expect(fxTx?.memo).toContain("USD");
+    if (fxTx) {
+      expect(fxTx.card).toBe("credit-card-1");
+      expect(fxTx.memo).toContain("USD");
+    }
   });
 
   it("海外订阅折算金额口径（USD≈7.18）与订阅组合", () => {

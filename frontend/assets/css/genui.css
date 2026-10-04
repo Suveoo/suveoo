@@ -1,7 +1,12 @@
 /* genui.css — Verified GenUI 卡片（11 种）与确认弹窗 */
 .genui-card { border: 1px solid var(--color-line); border-radius: var(--r-card); background: #fff; box-shadow: var(--shadow); padding: var(--sp-4); max-width: 560px; margin: 6px 0; font-size: var(--fs-14); }
-.genui-card .gc-head { display: flex; align-items: center; gap: 8px; margin-bottom: var(--sp-3); font-weight: 600; }
+.genui-card .gc-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: var(--sp-3); font-weight: 600; }
+/* 第八十轮：顶栏窄屏断词修复——标题包 .gc-title 永不内断；放不下时徽标组整块换行（wrap），
+   绝不逐字断行；两徽标成组掉行时不再 individually 贴右 */
+.genui-card .gc-head .gc-title { white-space: nowrap; }
 .genui-card .gc-head .badge { margin-left: auto; }
+.genui-card .gc-head .badge ~ .badge { margin-left: 0; }
+@media (max-width: 400px) { .genui-card .gc-head { font-size: 13.5px; } }
 .gc-kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--color-line); }
 .gc-kv:last-of-type { border-bottom: none; }
 .gc-kv .v { font-weight: 600; }
@@ -28,7 +33,7 @@
 .ai-quick-bar { display: flex; align-items: center; gap: 10px; border: 1px solid var(--color-line); border-radius: var(--r-pill); padding: 10px 18px; cursor: pointer; background: #fff; margin-bottom: var(--sp-4); color: var(--color-ink-2); }
 .ai-quick-bar:hover { border-color: var(--color-navy); }
 .ai-quick-bar svg, .ai-quick-bar img { width: 18px; height: 18px; flex: none; }
-.ai-quick-bar .go { margin-left: auto; color: var(--color-navy); }
+.ai-quick-bar .go { margin-left: auto; color: var(--color-navy); display: inline-flex; align-items: center; } /* 第七十轮：inline svg 坐基线视觉偏上，转 flex 后严格纵向居中 */
 .insight-card { display: flex; gap: 12px; align-items: flex-start; }
 .insight-card img, .insight-card svg { width: 28px; height: 28px; flex: none; }
 
@@ -37,3 +42,28 @@
 .tool-open:hover { box-shadow: 0 4px 12px rgba(30, 42, 120, .16); text-decoration: none; }
 .tool-open svg { flex: none; }
 .tool-open svg:last-child { margin-left: auto; }
+
+/* ===== 第一百零五/一百零六轮：操作组合确认卡（operations_package）——精致表单式 ===== */
+.op-pkg-list { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; }
+.op-pkg-item { border: 1px solid var(--color-line, #e2e8f0); border-radius: 12px; overflow: hidden; background: #fff; }
+.op-pkg-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 12px; background: rgba(30, 42, 120, .04); border-bottom: 1px solid var(--color-line, #e2e8f0); }
+.op-pkg-idx { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--color-navy, #1E2A78); color: #fff; font-size: 11px; }
+.op-pkg-name { font-size: 13.5px; }
+.op-pkg-amt { margin-left: auto; font-size: 15px; font-weight: 700; color: var(--color-navy, #1E2A78); font-variant-numeric: tabular-nums; }
+.op-pkg-body { padding: 2px 12px 6px; }
+.op-pkg-body .gc-kv { font-size: 12.5px; padding: 5px 0; }
+.op-pkg-body .gc-kv .v { max-width: 62%; text-align: right; word-break: break-word; }
+@media (max-width: 767px) {
+  .op-pkg-head { padding: 8px 10px; gap: 6px; }
+  .op-pkg-amt { font-size: 14px; }
+  .op-pkg-body { padding: 0 10px 4px; }
+  .op-pkg-body .gc-kv .v { max-width: 58%; }
+}
+@media (prefers-reduced-motion: reduce) { .op-pkg-item { animation: none; } }
+
+/* ===== 第一百零七轮：组合卡项级风险色点（混级设计——只标风险不标确认动作） ===== */
+.op-tier-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-left: 2px; display: inline-block; }
+.op-tier-dot.t-YELLOW { background: #D99A00; box-shadow: 0 0 0 3px rgba(217, 154, 0, .14); }
+.op-tier-dot.t-RED { background: #C0392B; box-shadow: 0 0 0 3px rgba(192, 57, 43, .14); }
+.op-tier-dot.t-GREEN { background: var(--color-green, #16A34A); box-shadow: 0 0 0 3px rgba(22, 163, 74, .14); }
+@media (prefers-contrast: more) { .op-tier-dot { outline: 1px solid currentColor; } }

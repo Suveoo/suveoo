@@ -153,7 +153,7 @@ describe("确定性与不变量", () => {
       const sum = s.txs.filter((t) => t.card === "credit-card-1" && t.direction === "OUT").reduce((a, t) => a + Number(t.amount_cents), 0);
       expect(s.credit_debt_cents, tier).toBe(String(sum));
       expect(sum, tier).toBeLessThanOrEqual(Math.floor(Number(s.summary.credit_limit_cents) * 0.8) + 1);
-      expect(s.payees.every((p) => /^1\d{10}$/.test(p.phone ?? ""))).toBe(true);
+      expect(s.payees.every((p) => !p.phone || /^1\d{10}$/.test(p.phone))).toBe(true); /* 第一百一十轮：假号退役允许空 */
     }
   });
   it("卡片计划：4 张借记余额=档位总额（全正）；月度任务 day_of_month 锚定；高净值外币 3-5 种", () => {

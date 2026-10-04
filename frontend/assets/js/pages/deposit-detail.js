@@ -72,7 +72,7 @@ S.router.register("deposit-detail", async () => {
     try {
       const r = await S.api.mutate("/api/wealth/purchase", { product_id: productId, amount }, { action: "deposit", subject: fund?.name ?? `${d.name}（模拟申购）` });
       if (r.cancelled) return;
-      S.ui.toast(r.data?.status === "EXECUTED" ? S.t("common.opOk") : r.data?.reason ?? "failed", r.data?.status !== "EXECUTED");
+      S.ui.toast(r.data?.status === "EXECUTED" ? S.t("common.opOk") : S.fmt.blockedMsg(r), r.data?.status !== "EXECUTED");
     } finally {
       S.ui.btnBusy(openBtn, false);
     }

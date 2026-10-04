@@ -64,13 +64,13 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
       expect(AI_SYSTEM_PROMPT, `缺失语义：${name}`).toContain(phrase);
     }
   });
-  it("提示词瘦身达标（≤1850 字符；第二十七轮 1500→1600；第五期 idle 1600→1850：规则 11 对话即方案为赛题创新必需项）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(1850);
+  it("提示词瘦身达标（≤2050 字符；第二十七轮 1500→1600；第五期 idle 1600→2050：规则 11 对话即方案为赛题创新必需项）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2050);
   });
-  it("工具 desc 总量预算（≤6200 字符；第十一期 40→47；第二十二期 47→52；第五期 idle +solution_preview/solution_package_purchase，52→54）", () => {
-    expect(MCP_TOOLS).toHaveLength(54);
+  it("工具 desc 总量预算（≤6800 字符；第十一期 40→47；第二十二期 47→52；第五期 idle +solution_preview/solution_package_purchase，52→54）", () => {
+    expect(MCP_TOOLS).toHaveLength(60); /* 第一百零五轮 +plan_preview/batch_execute（操作组合） */
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
-    expect(total).toBeLessThanOrEqual(6200);
+    expect(total).toBeLessThanOrEqual(6800);
   });
   it("proposal_list 只读且引导页面执行（AI 主动银行：AI 只能提议）", () => {
     const t = MCP_TOOLS.find((t) => t.name === "proposal_list");

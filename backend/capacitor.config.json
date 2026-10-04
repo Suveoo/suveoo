@@ -9,6 +9,9 @@
       "smallIcon": "ic_stat_suveoo",
       "iconColor": "#1E2A78",
       "launchMode": "singleTask"
+    },
+    "SystemBars": {
+      "insetsHandling": "disable"
     }
   }
 }

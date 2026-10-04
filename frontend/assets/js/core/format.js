@@ -97,4 +97,37 @@ S.fmt = {
       return "/" + pool[slot % pool.length];
     } catch { return fallback; }
   },
+
+  /** 写操作失败响应 → 具体化文案（第一百轮·队长令：拒绝泛泛"转账失败/操作失败"）。
+   * 优先级：err.<REASON> i18n 映射（可带 {0} 参数，金额/尾号等从响应细节提取）
+   * → 服务端 error.message（多数 BIZ_REJECT 自带中文说明）
+   * → fallbackKey 泛化文案（最后手段）。
+   * 金额类细节：INVARIANT_BALANCE 从 stages.INVARIANTS.detail 提取可用余额；金额统一 moneyPlain。 */
+  blockedMsg(r, fallbackKey = "common.opFailed") {
+    const t = (k, fb) => { try { return S.t(k, fb); } catch { return fb; } };
+    const d = r?.data ?? {};
+    const reason = d.reason ?? d.error?.code ?? null;
+    if (!reason) return t(fallbackKey, "操作失败");
+    /* 细节提取：INVARIANTS 明细（余额/PR）与卡片尾号 */
+    const invStage = (d.stages ?? []).find((x) => x && x.stage === "INVARIANTS" && Array.isArray(x.detail));
+    const inv = invStage ? invStage.detail : [];
+    const balTxt = String((inv.find((v) => v.code === "INVARIANT_BALANCE") ?? {}).detail ?? "");
+    const balM = balTxt.match(/balance=(-?[\d.]+)/);
+    const prTxt = String((inv.find((v) => v.code === "INVARIANT_PR_MISMATCH") ?? {}).detail ?? "");
+    const prM = prTxt.match(/product R(\d) > user PR(\d)/);
+    const last4 = d.error?.card_last4 ?? d.card_last4 ?? null;
+    const k = "err." + reason;
+    let txt = k;
+    try { txt = S.t(k); } catch { /* 保持 = k 视为无映射 */ }
+    if (txt === k) {
+      /* 无专用映射：服务端 message 或泛化 */
+      const svr = d.error?.message;
+      return typeof svr === "string" && svr && svr !== reason ? svr : t(fallbackKey, "操作失败");
+    }
+    /* 参数注入（按需） */
+    if ((reason === "INVARIANT_BALANCE" || reason === "INSUFFICIENT_BALANCE") && balM) return S.t(k, this.moneyPlain(balM[1]));
+    if (reason === "INVARIANT_PR_MISMATCH" && prM) return S.t(k, prM[1], prM[2]);
+    if (reason === "RECIPIENT_CARD_FROZEN" && last4) return S.t(k, String(last4));
+    return txt;
+  },
 };

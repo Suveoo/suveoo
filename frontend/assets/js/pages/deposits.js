@@ -40,15 +40,19 @@ S.router.register("deposits", async () => {
     const err = document.getElementById("d-cmp-err");
     if (P <= 0 || M < 1) { err.hidden = false; document.getElementById("d-cmp-tbl").innerHTML = ""; return; }
     err.hidden = true;
-    document.getElementById("d-cmp-tbl").innerHTML = `<table class="table"><thead><tr>
+    /* 第一百零八轮：窄屏卡片化钩子（dp-cmp）+首列语义类（dp-name）——桌面/平板 ≥769px 零变化（CSS 媒体查询隔离） */
+    document.getElementById("d-cmp-tbl").innerHTML = `<table class="table dp-cmp"><thead><tr>
       <th>${S.fmt.escape(S.t("tc.plan"))}</th><th>${S.fmt.escape(S.t("deps.rate"))}</th><th>${S.fmt.escape(S.t("tc.maturity"))}</th><th></th></tr></thead><tbody>
       ${deps.map((d) => {
         const T = TERM_M[d.slug] ?? 0;
         const fits = T <= M;
         const hv = horizonValue(d, P, M);
-        return `<tr><td>${S.fmt.escape(d.name)}</td><td class="mono">${d.rate}%</td>
-          <td class="mono total">${fits && hv != null ? S.fmt.moneyPlain(hv) : "—"}</td>
-          <td>${fits ? `<span class="badge" style="background:var(--color-green-bg);color:var(--color-green)">${S.fmt.escape(S.t("tc.fitsIn"))}</span>` : `<span class="badge" style="background:var(--color-surface);color:var(--color-ink-2)">${S.fmt.escape(S.t("tc.overTerm"))}</span>`}</td></tr>`;
+        /* 第一百零九轮：徽章双渲染——dp-name 内 .dp-badge-m 供手机端紧贴方案名尾字（桌面隐藏），
+           原 dp-fit 第 4 列保留供桌面（手机隐藏）——两端零互扰 */
+        const badgeHtml = fits ? `<span class="badge" style="background:var(--color-green-bg);color:var(--color-green)">${S.fmt.escape(S.t("tc.fitsIn"))}</span>` : `<span class="badge" style="background:var(--color-surface);color:var(--color-ink-2)">${S.fmt.escape(S.t("tc.overTerm"))}</span>`;
+        return `<tr><td class="dp-name">${S.fmt.escape(d.name)}<span class="dp-badge-m">${badgeHtml}</span></td><td class="mono" data-lb-r="${S.fmt.escape(S.t("deps.rate"))}">${d.rate}%</td>
+          <td class="mono total" data-lb-m="${S.fmt.escape(S.t("tc.maturity"))}">${fits && hv != null ? S.fmt.moneyPlain(hv) : "—"}</td>
+          <td class="dp-fit">${badgeHtml}</td></tr>`;
       }).join("")}</tbody></table>`;
   };
   document.getElementById("d-cmp-p").oninput = calc;

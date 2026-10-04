@@ -15,6 +15,7 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>
@@ -33,6 +34,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+        <!-- 第七十四轮：后台通知前台轮询服务（App 后台期间 WebView 定时器暂停，通知只能原生发）。
+             specialUse：不上架 Play，竞赛演示用途（保持登录期间监测账户动态）。 -->
+        <service
+            android:name=".NotifyService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Polls banking notifications while the signed-in session is active in background" />
+        </service>
     </application>
 
     <!-- Permissions -->
@@ -43,4 +54,11 @@
          RECORD_AUDIO + MODIFY_AUDIO_SETTINGS 且"任一未授予即 deny"；后者未声明时系统
          直接返回拒绝（无弹窗），导致麦克风"系统已允许仍报 NotAllowedError"。 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- 第七十二轮：应用内检查更新——下载完成后唤起系统安装器（Android 8+ 须用户授予
+         「安装未知应用」；插件检测未授权时先跳授权设置页，用户开启后返回重试） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 第七十四轮：后台通知服务 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

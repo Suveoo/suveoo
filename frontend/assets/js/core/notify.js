@@ -22,6 +22,10 @@ S.notify = (() => {
   let permission = "default";
   let prefs = null; /* null=未设置（全开）；{TYPE:false} 关闭该类系统弹窗 */
   const isCapacitor = typeof window.Capacitor !== "undefined";
+  /* 第七十四轮后台通知服务：token 每轮同步给原生（MainActivity.onPause 据此启动 NotifyService）；
+   * 服务的已读基准 svc_seen 回前台时合并（后台已弹过的 web 不重弹；本地通知同 id=覆盖去重）。 */
+  const NB = isCapacitor ? window.Capacitor.Plugins.NativeBridge : null;
+  const syncToken = (tok) => { if (NB) NB.saveToken({ token: tok ?? "" }).catch?.(() => {}); };
 
   /* Android：清除本应用已发到通知栏的通知（登出/会话过期后的隐私——通知含金额收款方，
    * 不应留在无主设备的通知栏）。id 来自 show() 的记录（上限 10 条，cancel 不存在的 id 为无害空操作）。
@@ -177,8 +181,10 @@ S.notify = (() => {
     if (!S.api.token) {
       lastSeenId = null;
       try { localStorage.removeItem(SEEN_KEY); } catch { /* ignore */ }
+      syncToken(null); /* 登出/过期：原生侧同清（双保险，服务自身 401 也会自停自清） */
       return;
     }
+    syncToken(S.api.token); /* 30s 幂等刷新——token 轮换/续期原生侧即跟随 */
     if (!isCapacitor && "Notification" in window && Notification.permission !== permission) permission = Notification.permission;
     if (permission !== "granted") return;
     try {
@@ -197,10 +203,19 @@ S.notify = (() => {
 
   function start() {
     if (timer) clearInterval(timer);
-    if (!S.api.token) return;
-    /* 恢复跨标签共享的已读基准（同账号多标签去重；换账号/过期已被 poll 清除） */
+    if (!S.api.token) { syncToken(null); return; }
+    syncToken(S.api.token); /* 启动即同步：onPause 起服务依赖它 */
+    /* 恢复跨标签共享的已读基准（同账号多标签去重；换账号/过期已被 poll 清除）。
+     * 壳内（第七十四轮）：与后台通知服务的 svc_seen 取大者——后台期间服务已弹过的通知
+     * 回前台不重弹（本地通知 id=服务器 id，覆盖语义本就不堆叠，此处防的是重复提示音/震动）。 */
     const seen = Number(localStorage.getItem(SEEN_KEY));
     lastSeenId = Number.isFinite(seen) && seen > 0 ? seen : null;
+    if (NB) {
+      NB.getSyncState().then?.((st) => {
+        const svc = Number(st?.seenId ?? 0);
+        if (svc > 0 && svc > (lastSeenId ?? 0)) { lastSeenId = svc; try { localStorage.setItem(SEEN_KEY, String(svc)); } catch {} }
+      }).catch?.(() => {});
+    }
     /* 启动三件：恢复真实权限（根因修复）→ 建 Android 通道 → 拉偏好；随后首轮基准 + 30s 轮询 */
     checkPermission().then(() => { ensureChannels(); loadPrefs(); });
     poll();
@@ -211,6 +226,7 @@ S.notify = (() => {
     if (timer) { clearInterval(timer); timer = null; }
     lastSeenId = null;
     try { localStorage.removeItem(SEEN_KEY); } catch { /* ignore */ }
+    syncToken(null); /* 手动登出：服务随之失去凭据（隐私律：登出态零通知） */
   }
 
   /* 通知点击精确跳转：壳端（Web SW 点击在 service-worker.js，用 data.url） */

@@ -60,7 +60,7 @@ describe("第十一期新工具", () => {
     expect(lim.cards.length).toBeGreaterThanOrEqual(4);
     expect(lim.ai_channel.single).toBe("5000.00");
     expect(lim.form_channel.daily).toBe("100000.00");
-    expect(lim.tiers.red).toContain("OTP");
+    expect(lim.tiers.red).toContain("验证码强验证"); /* 第九十六轮：site_guide 红级描述由"邮箱 OTP"改为通道无关的"验证码（短信/邮箱）" */
 
     /* bill_list：水费金额 + autopay 态；credit-repay 金额=当前欠款（新户 0 → NO_DEBT 注记） */
     const bl = await call(5, "bill_list");

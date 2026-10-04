@@ -36,6 +36,11 @@ describe("收款人手机号闭环", () => {
     const H = { authorization: `Bearer ${out.token}` };
     const toDebit = (await cardsOf(to.user_id)).find((c) => c.kind === "debit");
     const PHONE = "13800001234";
+    /* 第一百一十轮：联系方式从属门控——目标用户先绑定该手机号（DO 直写模拟绑定） */
+    await env.LEDGER.get(env.LEDGER.idFromName(`u:${to.user_id}`)).fetch("https://x/", {
+      method: "POST", headers: { "content-type": "application/json", "x-suveoo-internal": "1" },
+      body: JSON.stringify({ op: "setPhone", phone: PHONE }),
+    });
 
     /* 1. REST 添加收款人带手机号：黄级两段式 */
     const body = { name: "手机号乙", account: toDebit.number, group_label: "朋友", phone: PHONE };
@@ -45,11 +50,13 @@ describe("收款人手机号闭环", () => {
     const s2 = await j(await post("/api/payees", { ...body, grant_hash: s1.grant.grant_hash }, out.token));
     expect(s2.status).toBe("EXECUTED");
 
-    /* 2. DO 落库含 phone；/api/payees 返回该字段 */
+    /* 2. DO 落库含 phone；/api/payees 返回该字段。第一百一十七轮：contact_ok 落库——
+       写时计算（门控通过即 MATCHED）→ GET 直读列（不再每次全量反查 owner DO） */
     const payees = (await j(await SELF.fetch(BASE + "/api/payees", { headers: H }))).payees;
     const added = payees.find((p) => p.name === "手机号乙");
     expect(added?.phone).toBe(PHONE);
     expect(added?.verified).toBe(true);
+    expect(added?.contact_ok).toBe(true);
 
     /* 3. contacts_search 手机号命中（全号与尾号）——AI"给手机号 xxx 转 1 元"的解析入口 */
     const call = async (id, params) => j(await SELF.fetch(`${BASE}/mcp?sid=pp1`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params }) }));

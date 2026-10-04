@@ -81,7 +81,7 @@ S.router.register("card-settings", async () => {
   };
   document.getElementById("cs-alias-go").onclick = async () => {
     const r2 = await S.api.mutate(`/api/cards/${slug}`, { alias: document.getElementById("cs-alias").value.trim() || undefined }, { method: "PATCH" });
-    if (!r2.cancelled) S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("common.opOk") : r2.data?.reason ?? "failed", r2.data?.status !== "EXECUTED");
+    if (!r2.cancelled) S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("common.opOk") : S.fmt.blockedMsg(r2), r2.data?.status !== "EXECUTED");
   };
   const def = document.getElementById("cs-default");
   if (def) def.onclick = async () => {
@@ -92,7 +92,7 @@ S.router.register("card-settings", async () => {
   if (geo) geo.onchange = async () => {
     const r2 = await S.api.mutate(`/api/cards/${slug}/limits`, { limit_single: "3500.00", limit_daily: "3500.00" });
     if (r2.cancelled) { geo.checked = !geo.checked; return; }
-    S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("cs.geoOn") : r2.data?.reason ?? "failed", r2.data?.status !== "EXECUTED");
+    S.ui.toast(r2.data?.status === "EXECUTED" ? S.t("cs.geoOn") : S.fmt.blockedMsg(r2), r2.data?.status !== "EXECUTED");
     if (r2.data?.status !== "EXECUTED") geo.checked = !geo.checked;
   };
   document.getElementById("cs-fz").onclick = async () => {
@@ -102,7 +102,7 @@ S.router.register("card-settings", async () => {
     const r2 = await S.api.mutate(`/api/cards/${slug}/${intent}`, {}, { action: `card_${intent === "freeze" ? "freeze" : "unfreeze"}`, subject: cd.number });
     if (r2.cancelled) return;
     if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-    else S.ui.toast(r2.data?.reason ?? r2.data?.error?.message ?? "failed", true);
+    else S.ui.toast(S.fmt.blockedMsg(r2), true);
   };
   /* 立即还款：走 credit-repay 账单缴费（黄级确认卡），金额=当前欠款全额（服务端动态取） */
   const repayBtn = document.getElementById("cs-repay");
@@ -111,6 +111,6 @@ S.router.register("card-settings", async () => {
     const r2 = await S.api.mutate("/api/bills/credit-repay/pay", {}, { action: "bill_pay", subject: S.t("cards.repaySubject") });
     if (r2.cancelled) { repayBtn.disabled = false; return; }
     if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("cards.repaid", r2.data.result?.repaid ?? "")); setTimeout(() => location.reload(), 900); }
-    else { S.ui.toast(r2.data?.error?.message ?? r2.data?.reason ?? "failed", true); repayBtn.disabled = false; }
+    else { S.ui.toast(S.fmt.blockedMsg(r2), true); repayBtn.disabled = false; }
   };
 });

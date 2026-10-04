@@ -67,7 +67,12 @@ describe("③ hardPolicyDenials 硬拒绝", () => {
    ¥1131.27 预约也出 YELLOW（队长实测报告） */
 describe("预约转账三色分级（执行日口径）", () => {
   it("今日执行（含 X 分钟后）：今日累计+本笔 >¥1000 → RED", () => {
-    const in30min = new Date(Date.now() + 30 * 60000).toISOString();
+    /* 北京日界保持构造：now+30min 若跨北京午夜则回退到当日 23:30（+08:00）——分级只比日历日不校验未来，
+       否则北京时间 23:30-24:00 间跑本用例必假红（once 触发过的午夜边界 flaky） */
+    const bjDay = (ms) => new Date(ms + 8 * 3600_000).toISOString().slice(0, 10);
+    const nowMs = Date.now();
+    const in30ms = nowMs + 30 * 60000;
+    const in30min = (bjDay(in30ms) === bjDay(nowMs) ? new Date(in30ms) : new Date(bjDay(nowMs) + "T23:30:00+08:00")).toISOString();
     expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "1131.27", execute_at: in30min }, { dailyAccumulatedCents: 0n }).tier).toBe(RISK.RED);
     expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "300", execute_at: in30min }, { dailyAccumulatedCents: 80000n }).tier).toBe(RISK.RED);
     expect(classifyRisk("scheduled_task_create", { task_type: "scheduled_transfer", amount: "300", execute_at: in30min }, { dailyAccumulatedCents: 0n }).tier).toBe(RISK.YELLOW);

@@ -10,7 +10,7 @@ S.router.register("register", async () => {
   const pane = document.getElementById("pane");
   const steps = document.querySelectorAll(".steps i");
   const setStep = (n) => steps.forEach((s, i) => s.classList.toggle("on", i < n));
-  const state = { email: "", name: "", password: "", answers: Array(8).fill(0) };
+  const state = { email: "", name: "", password: "", phone: "", phoneCode: "", answers: Array(8).fill(0) };
   const field = (lb, id, attrs = "", hint = "") => `<label class="field"><span class="lb">${S.fmt.escape(lb)}</span><input class="input" id="${id}" ${attrs}>${hint ? `<div class="field-hint">${S.fmt.escape(hint)}</div>` : ""}</label>`;
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +21,18 @@ S.router.register("register", async () => {
       <label class="field"><span class="lb">${S.fmt.escape(S.t("reg.code"))}</span>
         <div class="row"><input class="input mono" id="r-code" maxlength="6" inputmode="numeric"><button class="btn btn-light" id="r-send" style="flex:none;min-width:132px">${S.fmt.escape(S.t("reg.getCode"))}</button></div></label>
       ${field(S.t("reg.name"), "r-name", "", S.t("reg.nameHint"))}
+      <!-- 第八十五轮：可选手机号绑定（开户第一步；跳过则开户后在安全中心/账户页绑定） -->
+      <div class="field"><span class="lb">${S.fmt.escape(S.t("ph.number"))} <span class="muted small">${S.fmt.escape(S.t("ph.optional", "（可选）"))}</span></span>
+        <div class="row" style="gap:8px">
+          <span class="input ph-cc">+86</span>
+          <input class="input grow" id="r-phone" inputmode="numeric" maxlength="13" placeholder="138 1234 5678">
+        </div>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <input class="input grow mono" id="r-phone-code" inputmode="numeric" maxlength="6" placeholder="${S.fmt.escape(S.t('ph.codePh', '短信验证码（选填）'))}">
+          <button type="button" class="btn btn-light" id="r-phone-send" style="flex:none">${S.fmt.escape(S.t("ph.send"))}</button>
+        </div>
+        <p class="muted small" style="margin:6px 0 0">${S.fmt.escape(S.t("ph.regHint", "建议绑定：短信接收验证码更快，还可用手机号登录与收款。暂时跳过可开户后在安全中心绑定。"))}</p>
+      </div>
       <div class="grid grid-2">
         <div class="upload-box" id="r-pass1">${S.fmt.escape(S.t("reg.passport"))}<div class="small">${S.fmt.escape(S.t("reg.passportHint"))}</div></div>
         <div class="upload-box" id="r-pass2">${S.fmt.escape(S.t("reg.passportBack"))}<div class="small">${S.fmt.escape(S.t("reg.passportHint"))}</div></div>
@@ -63,11 +75,33 @@ S.router.register("register", async () => {
       document.getElementById("r-code").focus();
     };
 
+    /* 第八十五轮：可选手机号——格式化+发码（60s 冷却）；提交时校验（填了号必须带码） */
+    const rphInput = document.getElementById("r-phone"), rphSend = document.getElementById("r-phone-send");
+    if (rphInput) {
+      rphInput.addEventListener("input", (e) => {
+        const d = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
+        e.target.value = d.length > 7 ? d.slice(0, 3) + " " + d.slice(3, 7) + " " + d.slice(7) : d.length > 3 ? d.slice(0, 3) + " " + d.slice(3) : d;
+      });
+      rphSend.onclick = async () => {
+        const num = S.phone.normCN(rphInput.value);
+        if (!num) { S.ui.toast(S.t("ph.invalid"), true); return; }
+        rphSend.disabled = true; let left = 60; const prev = rphSend.textContent;
+        const cd = setInterval(() => { left--; if (left <= 0) { clearInterval(cd); rphSend.disabled = false; rphSend.textContent = prev; } else rphSend.textContent = left + "s"; }, 1000);
+        const r = await S.api.post("/api/auth/email-code", { scene: "phonebind", channel: "phone", phone: num });
+        if (!r.ok) { clearInterval(cd); rphSend.disabled = false; rphSend.textContent = prev; S.ui.toast(r.data?.error?.message ?? S.t("ph.sendFail"), true); return; }
+        S.ui.toast(S.t("ph.sent"));
+      };
+    }
     document.getElementById("r-go").onclick = () => {
       state.email = document.getElementById("r-email").value.trim();
       state.code = document.getElementById("r-code").value.trim();
-      state.name = document.getElementById("r-name").value.trim() || "Suveoo User";
+      /* 第七十九轮：姓名必填（此前空名静默兜底"Suveoo User"，开户后才发现名字不对） */
+      state.name = document.getElementById("r-name").value.trim();
+      if (!state.name) { S.ui.toast(S.t("reg.nameRequired"), true); document.getElementById("r-name").focus(); return; }
       if (!EMAIL_RE.test(state.email) || !/^\d{6}$/.test(state.code)) { S.ui.toast(S.t("reg.fillEmailCode"), true); return; }
+      state.phone = S.phone.normCN(rphInput ? rphInput.value : "") ?? "";
+      state.phoneCode = document.getElementById("r-phone-code") ? document.getElementById("r-phone-code").value.trim() : "";
+      if (state.phone && !/^\d{6}$/.test(state.phoneCode)) { S.ui.toast(S.t("ph.codeHint"), true); return; }
       step2();
     };
   }
@@ -143,6 +177,7 @@ S.router.register("register", async () => {
       <p class="muted small">${S.fmt.escape(S.t("reg.provisionNote"))}</p></div>`;
     const r = await S.api.post("/api/auth/register", {
       email: state.email, code: state.code, name: state.name, password: state.password,
+        ...(state.phone ? { phone: state.phone, phone_code: state.phoneCode } : {}),
       risk_answers: state.answers, aml_consented: true,
     });
     if (!r.ok) {
@@ -157,8 +192,13 @@ S.router.register("register", async () => {
     pane.innerHTML = `<div class="center"><img src="/assets/images/illustrations/security-shield.svg" width="90" alt="">
       <h2>${S.fmt.escape(S.t("reg.done"))}</h2><p class="muted small">${S.fmt.escape(r.data.notice ?? "")}</p></div>
       <div class="grid grid-2" style="margin:16px 0">
-        ${r.data.cards.map((cd) => `<div class="mcard" style="background-image:url(${S.fmt.cardFront(cd)})"><b>${S.fmt.escape(cd.number)}</b>
-          <div class="row between"><span class="small">${S.fmt.escape(cd.network)}</span><span class="small mono">${cd.kind === "credit" ? "¥320,000" : "¥" + cd.balance}</span></div></div>`).join("")}
+        ${r.data.cards.map((cd) => `<div class="reg-card">
+          <div class="reg-card-img" style="background-image:url(${S.fmt.cardFront(cd)})" role="img" aria-label="${S.fmt.escape(cd.network)}"></div>
+          <div class="reg-card-meta">
+            <span class="small">${S.fmt.escape(cd.network)} · ${S.fmt.escape(cd.kind === "credit" ? S.t("reg.cardCredit") : S.t("reg.cardDebit"))}</span>
+            <span class="small mono">**** ${S.fmt.escape(String(cd.number).slice(-4))} · ${cd.kind === "credit" ? "¥320,000" : "¥" + cd.balance}</span>
+          </div>
+        </div>`).join("")}
       </div>
       <button class="btn btn-primary btn-block" id="r-in">${S.fmt.escape(S.t("reg.enter"))}</button>`;
     document.getElementById("r-in").onclick = () => (location.href = "/home");

@@ -38,19 +38,19 @@ S.router.register("cards", async () => {
         const r2 = await S.api.mutate(`/api/cards/${b.dataset.slug}/${intent}`, {});
         if (r2.cancelled) return;
         if (r2.data?.status === "OTP_REQUIRED") {
-          /* 红级：自绘验证码弹窗取码后重试（邮箱以后端会话为准，前端只有掩码） */
+          /* 红级：自绘验证码弹窗取码后重试（通道按绑定默认分流，绑手机号=短信，可切换；双通道码均算数） */
           const otp = await S.ctl.otp({
             email: (await S.auth.session())?.email,
-            send: async () => (await S.api.post("/api/auth/email-code", { scene: "redstep" })).ok,
+            send: async () => await S.api.post("/api/auth/email-code", { scene: "redstep" }),
           });
           if (!otp) return;
           const r3 = await S.api.post(`/api/cards/${b.dataset.slug}/${intent}`, { otp });
-          S.ui.toast(r3.data?.status === "EXECUTED" ? S.t("common.opOk") : r3.data?.reason ?? "failed", r3.data?.status !== "EXECUTED");
+          S.ui.toast(r3.data?.status === "EXECUTED" ? S.t("common.opOk") : S.fmt.blockedMsg(r3), r3.data?.status !== "EXECUTED");
           if (r3.data?.status === "EXECUTED") setTimeout(() => location.reload(), 800);
           return;
         }
         if (r2.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-        else S.ui.toast(r2.data?.reason ?? "failed", true);
+        else S.ui.toast(S.fmt.blockedMsg(r2), true);
         } finally {
           S.ui.btnBusy(b, false);
         }

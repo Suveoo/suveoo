@@ -598,7 +598,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
     background-color .26s ease, box-shadow .3s ease;
 }
 .ch-more-face {
-  all: unset; cursor: pointer; position: absolute; inset: 0;
+  all: unset; cursor: pointer; position: absolute; top: 0; right: 0; bottom: 0; left: 0; /* 第八十四轮：inset 为 Chrome87+ 简写，旧华为内核（荣耀 V10 实测）不识别致 absolute 元素失去铺满——三点按钮偏左/全屏遮罩失效的根因 */
   display: flex; align-items: center; justify-content: center;
   transition: opacity .16s ease .08s, transform .26s cubic-bezier(.5, 0, .75, .2) .08s;
 }
@@ -719,7 +719,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .pp-count, .pp-bubble { animation: none !important; } .pp-bubble.pp-out { transition: none; } }
 
 /* ===== 日历选择器（第二十三期 /wealth/goals 截止日期）：模糊遮罩 + 锁滚 + 年月可键入 ===== */
-.cal-mask { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, .32); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cal-in .2s ease both; }
+.cal-mask { position: fixed; top: 0; right: 0; bottom: 0; left: 0; /* 第八十四轮：inset 为 Chrome87+ 简写，旧华为内核（荣耀 V10 实测）不识别致 absolute 元素失去铺满——三点按钮偏左/全屏遮罩失效的根因 */ z-index: 320; display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, .32); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cal-in .2s ease both; }
 @keyframes cal-in { from { opacity: 0; } to { opacity: 1; } }
 .cal { width: min(316px, calc(100vw - 48px)); background: #fff; border-radius: 16px; box-shadow: 0 16px 44px rgba(16, 24, 81, .24); padding: 14px 16px 16px; animation: cal-pop .26s cubic-bezier(.22, 1.18, .36, 1) both; }
 @keyframes cal-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
@@ -849,7 +849,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .apk-sec p { margin: 0; font-size: 13.5px; line-height: 1.8; }
 @media (max-width: 820px) {
   .apk-hero-in { flex-direction: column; text-align: center; padding: 28px 20px; gap: 18px; }
-  .apk-hero-txt p { margin-inline: auto; }
+  .apk-hero-txt p { margin-left: auto; margin-right: auto; } /* 第八十四轮：margin-inline 同为逻辑简写，旧内核兜底 */
   .apk-hero-txt h1 { font-size: 22px; }
   .apk-icon { width: 76px; height: 76px; }
   .apk-grid { grid-template-columns: 1fr; }
@@ -859,8 +859,62 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 /* ===== §42 登录过期提示 + 账户记忆（第六十九轮） ===== */
 .l-expired {
   display: flex; align-items: center; gap: 7px;
-  margin: 0 0 14px; padding: 9px 12px;
+  margin: -10px 0 14px; padding: 9px 12px; /* 上提 10px：吃掉 h2 的 --sp-6(24px) 下边距，标题→提示行视觉距 14px */
   border-radius: 10px; background: rgba(234, 149, 37, 0.12); color: #8a5a10;
   font-size: 13px; line-height: 1.45;
 }
 .l-expired svg { flex: none; }
+
+/* ===== §43 检查更新弹窗（第七十二轮，壳内独有；.upd-card 挂 .modal 复用白卡/磨砂/入场动画） ===== */
+.upd-card { max-width: 360px; }
+.upd-h { font-size: 17px; margin: 0 0 16px; }
+.upd-checking { display: flex; align-items: center; gap: 10px; justify-content: center; min-height: 72px; color: var(--color-ink-2, #475569); font-size: 14px; }
+.upd-ok { display: flex; align-items: center; gap: 14px; padding: 4px 0; }
+.upd-ok-ico { flex: none; width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(34, 154, 22, .12); color: #1F7A14; }
+.upd-ok-t { font-weight: 650; font-size: 15px; margin-bottom: 3px; }
+.upd-found { background: linear-gradient(135deg, rgba(30, 42, 120, .06), rgba(53, 71, 158, .10)); border: 1px solid rgba(30, 42, 120, .14); border-radius: 14px; padding: 14px 16px; }
+.upd-badge { display: inline-block; font-size: 11px; font-weight: 650; letter-spacing: .4px; color: var(--color-navy, #1E2A78); background: rgba(30, 42, 120, .10); border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+.upd-ver { font-size: 24px; font-weight: 700; line-height: 1.2; margin-bottom: 10px; }
+.upd-kv { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 12.5px; }
+.upd-kv span:nth-child(odd) { color: var(--color-ink-2, #64748b); }
+.upd-err { background: rgba(234, 149, 37, .12); color: #8a5a10; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.55; }
+.upd-actions { display: flex; gap: 10px; margin-top: 18px; }
+.upd-actions .btn { flex: 1; }
+.upd-dl-top { display: flex; align-items: center; justify-content: space-between; gap: 9px; font-size: 14px; font-weight: 600; margin-bottom: 14px; } /* 第一百零一轮：标题文本顶格左对齐（与 .upd-dl-meta 首列百分比首字符同 x 起点），spinner 移行尾 */
+.upd-bar { height: 8px; border-radius: 999px; background: rgba(30, 42, 120, .10); overflow: hidden; }
+.upd-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, #1E2A78, #35479E); transition: width .25s linear; }
+.upd-dl-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--color-ink-2, #64748b); font-variant-numeric: tabular-nums; }
+.upd-dl-meta #upd-pct { font-weight: 700; color: var(--color-navy, #1E2A78); font-size: 13px; }
+
+/* §43 扩展（第七十五轮）：自动更新询问弹窗复用 upd-*；强制更新全屏阻断层 */
+.upd-force { position: fixed; top: 0; right: 0; bottom: 0; left: 0; /* 第八十四轮：inset 为 Chrome87+ 简写，旧华为内核（荣耀 V10 实测）不识别致 absolute 元素失去铺满——三点按钮偏左/全屏遮罩失效的根因 */ z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: linear-gradient(160deg, rgba(16, 24, 81, .97), rgba(30, 42, 120, .97)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.upd-force-card { background: #fff; border-radius: 18px; max-width: 380px; width: 100%; padding: 26px 22px 22px; box-shadow: 0 24px 64px rgba(6, 10, 40, .5); }
+.upd-force-ico { display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 54px; border-radius: 16px;
+  background: rgba(30, 42, 120, .10); color: var(--color-navy, #1E2A78); margin-bottom: 12px; }
+.upd-force-card h3 { font-size: 19px; margin: 0 0 8px; }
+.upd-force-card p { font-size: 13.5px; line-height: 1.65; margin: 0 0 14px; }
+.upd-force-card .upd-kv { background: rgba(30, 42, 120, .05); border-radius: 12px; padding: 10px 12px; }
+
+/* ===== §44 第八十一轮：基金详情三处 + AI 三点居中 + 生物识别等待 ===== */
+/* R3 徽标随标题文本流（长名折行时紧跟末字，不再整块掉到第三行） */
+.fd-h1 { margin: 0 0 var(--sp-4); }
+.fd-h1 .fd-risk { margin-left: 8px; vertical-align: 3px; }
+/* 净值区左右布局加固：锁 nowrap（多机型右侧四行被挤到下方的根治），左块可收缩、右块限宽防内字换行挤压 */
+.fd-navrow { flex-wrap: nowrap !important; }
+.fd-navrow > div:first-child { min-width: 0; }
+.fd-navrow > div:last-child { flex: none; max-width: 54%; font-size: 12.5px; line-height: 1.55; }
+@media (max-width: 380px) {
+  .fd-navrow > div:last-child { font-size: 11.5px; max-width: 50%; }
+  .fd-navrow .total { font-size: 26px !important; }
+}
+/* AI 页三点按钮：svg 由 inline 转 block——旧内核（荣耀 V10 实测）inline svg 坐行盒基线致三点偏左，
+   与第八十轮 wealth 箭头同族问题；block 后 flex center 精确居中（新旧内核一致） */
+.ch-more-face svg { display: block; }
+
+/* ===== §45 第八十五轮：手机号体系 ===== */
+.ph-cc { flex: none; width: 58px; text-align: center; background: var(--color-bg-2, #F1F5F9); color: var(--color-ink-2, #64748b); font-size: 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.ph-banner { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(234, 90, 37, .08); border: 1px solid rgba(234, 90, 37, .25); color: #B54708; font-size: 13px; }
+.ph-banner svg { flex: none; color: #C2410C; }
+.ph-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 8px; padding: 8px 10px; border-radius: 10px; background: rgba(30, 42, 120, .05); } /* 第九十四轮补：margin 上移收紧与标题间距 */
+.ph-switch-btn { border: none; background: none; color: var(--color-navy, #1E2A78); font-weight: 600; cursor: pointer; font-size: 12.5px; text-decoration: underline; padding: 0; }

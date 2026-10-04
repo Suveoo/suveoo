@@ -76,7 +76,7 @@ S.router.register("wealth-my", async ({ user }) => {
         const r = await S.api.mutate("/api/wealth/redeem", { product_id: b.dataset.id, amount: "ALL" }, { subject: b.dataset.name });
         if (r.cancelled) { b.disabled = false; return; }
         if (r.data?.status === "EXECUTED") { S.ui.toast(S.t("common.opOk")); setTimeout(() => location.reload(), 800); }
-        else { S.ui.toast(r.data?.reason ?? r.data?.error?.message ?? "failed", true); b.disabled = false; }
+        else { S.ui.toast(S.fmt.blockedMsg(r), true); b.disabled = false; }
       };
     });
   } else box.innerHTML = S.ui.empty(S.t("common.loadFailed"));

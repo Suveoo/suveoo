@@ -30,6 +30,49 @@ S.genuiCards = {
     /* 未逐一列举的守卫操作（收款人/自动缴费/订阅退订等）走通用标题，不再误称"确认转账" */
     generic:             { title: "genui.confirmAction",   icon: "shield",   field: null,             fee: false },
   },
+  /* 第一百零五/一百零六轮：操作组合确认卡——精致表单式（项头=意图+徽章+主数值大字；
+   * 项体=label/value 行，复用 .gc-kv 虚线行样式，与转账确认卡同语言）。 */
+  operations_package(c) {
+    const p = { ...(c.snapshot?.params ?? {}), ...(c.params ?? {}) };
+    const items = Array.isArray(p.items) ? p.items : [];
+    const INTENT_ZH = {
+      transfer_execute: "转账", scheduled_task_create: "预约转账", card_freeze: "冻结卡片", card_unfreeze: "解冻卡片",
+      card_limit_adjust: "调整限额", wealth_product_purchase: "基金申购", wealth_product_redeem: "基金赎回",
+      deposit_open: "存入存款", subscription_cancel: "取消订阅", subscription_reminder_toggle: "订阅提醒",
+      payee_manage: "收款人管理", bill_pay: "缴纳账单", funds_lock: "锁定资金", task_cancel: "取消任务",
+      goal_create: "创建目标", goal_contribute: "目标存入", goal_abandon: "放弃目标", fx_exchange: "换汇",
+      phone_manage: "手机号管理", notify_prefs: "通知偏好", autopay_manage: "自动缴费", solution_package_purchase: "组合方案",
+    };
+    /* 第一百零七轮：混级设计——项级弃完整徽章（"YELLOW 需确认"会误导"该项还需单独确认"）改纯色圆点
+     * （只标示固有风险，不带确认动作语义）；卡头徽章=整卡实际验证口径（最高项）。混级时计数行
+     * 追加"按最高级别一次验证"说明（用户看到黄级项却被要求红级验码时的自解释）。 */
+    const TIER_ZH = { YELLOW: S.t("tier.YELLOW"), RED: S.t("tier.RED"), GREEN: S.t("tier.GREEN") };
+    const rows = items.map((it) => {
+      const kvs = (it.fields ?? []).map(([k, v]) => `
+            <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("op.f." + k, k))}</span><span class="v">${S.fmt.escape(v)}</span></div>`).join("");
+      const dot = `<span class="op-tier-dot t-${S.fmt.escape(String(it.tier ?? "YELLOW"))}" title="${S.fmt.escape(TIER_ZH[it.tier] ?? it.tier ?? "")}" aria-label="${S.fmt.escape(TIER_ZH[it.tier] ?? it.tier ?? "")}"></span>`;
+      return `
+        <div class="op-pkg-item">
+          <div class="op-pkg-head">
+            <span class="op-pkg-idx mono">${Number(it.idx ?? 0) + 1}</span>
+            <b class="op-pkg-name">${S.fmt.escape(INTENT_ZH[it.intent] ?? it.intent)}</b>
+            ${dot}
+            ${it.amount_text ? `<span class="op-pkg-amt mono">${S.fmt.escape(it.amount_text)}</span>` : ""}
+          </div>
+          <div class="op-pkg-body">${kvs}</div>
+        </div>`;
+    }).join("");
+    const tiers = new Set(items.map((it) => it.tier));
+    const countTxt = tiers.size > 1
+      ? S.t("genui.opPkgCountMixed", items.length)
+      : S.t("genui.opPkgCount", items.length);
+    return `<div class="genui-card">
+      <div class="gc-head">${S.ui.icon("shield", 16)}<span class="gc-title">${S.fmt.escape(S.t("genui.opPkgTitle", "操作组合"))}</span>${S.ui.tierBadge(c.tier)}<span class="muted small">${S.fmt.escape(countTxt)}</span></div>
+      <div class="op-pkg-list">${rows}</div>
+      <div class="gc-grant">grant ${S.fmt.escape(String(c.grant_hash ?? "").slice(0, 12))}…</div>
+    </div>`;
+  },
+
   transfer_confirmation(c) {
     /* 外层 params（genuiCardFor：完整 IR params + 展示字段）全量覆盖 snapshot（仅 authFields）——
        display/memo/execute_at 等非授权字段一律以服务端展开的外层为准 */
@@ -75,7 +118,7 @@ S.genuiCards = {
     /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
     const verifiedBadge = c.action == null || c.action === "transfer_execute" ? (c.params?.verified ? ` ${S.ui.badge(S.t("genui.verified"), "badge-green")}` : "") : "";
     return `<div class="genui-card">
-      <div class="gc-head">${S.ui.icon(meta.icon, 16)} ${S.t(titleKey)} ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
+      <div class="gc-head">${S.ui.icon(meta.icon, 16)} <span class="gc-title">${S.t(titleKey)}</span> ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
       ${amtText ? `<div class="gc-amount">${amtText}</div>` : ""}
       ${S.genuiCards.kv([
         ...(fieldKey && subject != null ? [[S.t(fieldKey), subject]] : []),
@@ -127,25 +170,25 @@ S.genuiCards = {
   },
   split_bill_detail(c) {
     const rows = (c.splits ?? []).map((s) => `<div class="split-row"><span>${S.fmt.escape(s.name)}</span><span class="mono">¥${s.amount}</span></div>`).join("");
-    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("pay", 16)} ${S.t("genui.splitTitle")}</div>${rows}
+    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("pay", 16)} <span class="gc-title">${S.t("genui.splitTitle")}</span></div>${rows}
       <div class="split-sum"><span>${S.t("genui.total")}</span><span class="mono">¥${c.total ?? "—"}</span></div></div>`;
   },
   wealth_compare(c) {
-    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("wealth", 16)} ${S.t("genui.wealthTitle")} ${S.ui.tierBadge(c.tier)}</div>
+    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("wealth", 16)} <span class="gc-title">${S.t("genui.wealthTitle")}</span> ${S.ui.tierBadge(c.tier)}</div>
       ${S.genuiCards.kv([[S.t("genui.product"), c.snapshot?.params?.product_id], [S.t("genui.amount"), "¥" + (c.snapshot?.params?.amount ?? "0")]])}
       <p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.riskNote"))}</p></div>`;
   },
   sankey_chart(c) {
-    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("chart", 16)} ${S.t("genui.sankeyTitle")}</div>
+    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("chart", 16)} <span class="gc-title">${S.t("genui.sankeyTitle")}</span></div>
       ${(c.rows ?? []).map((r) => `<div class="split-row"><span>${S.fmt.escape(r.category ?? r.name)}</span><span class="mono">¥${r.total}</span></div>`).join("")}
       <p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.anomalyNote"))}</p></div>`;
   },
   subscription_list(c) {
-    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("star", 16)} ${S.t("genui.subsTitle")}</div>
+    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("star", 16)} <span class="gc-title">${S.t("genui.subsTitle")}</span></div>
       ${(c.subscriptions ?? []).map((s) => `<div class="split-row"><span>${S.fmt.escape(s.merchant)}<span class="usage-bar"><i style="width:${s.usage_score ?? 0}%"></i></span></span><span class="mono">¥${s.amount}</span></div>`).join("")}</div>`;
   },
   scheduled_task(c) {
-    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("clock", 16)} ${S.t("genui.taskTitle")} ${S.ui.tierBadge(c.tier)}</div>
+    return `<div class="genui-card"><div class="gc-head">${S.ui.icon("clock", 16)} <span class="gc-title">${S.t("genui.taskTitle")}</span> ${S.ui.tierBadge(c.tier)}</div>
       ${(c.steps ?? [`T1 ${S.ui.icon("check", 12)} ${S.t("genui.stepLock")}`, `T2 … ${S.t("genui.stepOrder")}`, `C1 … ${S.t("genui.stepBackup")}`]).map((s) => `<div class="task-step"><span class="st">•</span>${s}</div>`).join("")}
       ${S.genuiCards.kv([[S.t("genui.budget"), c.snapshot?.params?.amount ? "¥" + c.snapshot.params.amount : null]])}</div>`;
   },

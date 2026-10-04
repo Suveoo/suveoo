@@ -53,21 +53,43 @@ S.router.register("login", async () => {
     busy(btn, true, "login.working");
     const r = await S.auth.login(id, document.getElementById("l-pw").value);
     if (!r.ok) { busy(btn, false); S.ui.toast(r.data?.error?.message ?? S.t("login.failed"), true); return; }
-    if (r.data.mfa_required) { twoFa(r.data.mfa_token, id); return; } /* spinner 保持到 2FA 表单就位自然替换 */
+    if (r.data.mfa_required) { twoFa(r.data.mfa_token, id, r.data.otp); return; } /* spinner 保持到 2FA 表单就位自然替换 */
     remember(id);
     S.ui.toast(S.t("common.opOk"));
     location.replace(next);
   };
   /* 表单化提交：Enter（账户/密码框内）与按钮点击统一走原生 submit（第六十九轮前是密码框专属 keydown） */
   document.getElementById("l-form").addEventListener("submit", (e) => { e.preventDefault(); go(); });
-  function twoFa(mfaToken, idf) {
+  /* 第八十三轮：壳内指纹快捷重登（2FA 账户）——biometric-shell 的 quickLogin 已消费登录第一步
+   * （mfa_token 在手），派发 suveoo:mfa-ready 让本页直接进入第二步输码；此前只预填账密，用户
+   * 手动点登录=60s 内第二次请求撞服务端冷却（红色「请 60 秒后再试」）。Web 无事件源=零影响。
+   * 具名+先移除：i18n 即时切换会重跑本 controller，防监听器叠加。 */
+  if (window.__svMfaReady) window.removeEventListener("suveoo:mfa-ready", window.__svMfaReady);
+  window.__svMfaReady = (e) => {
+    const d = e.detail ?? {};
+    if (d.mfaToken) twoFa(String(d.mfaToken), String(d.email ?? document.getElementById("l-id")?.value.trim() ?? ""), d.otp ?? null);
+  };
+  window.addEventListener("suveoo:mfa-ready", window.__svMfaReady);
+  function twoFa(mfaToken, idf, otpInfo = null) {
+    /* 第九十四轮：提示文本动态化（此前硬编码"已发送至邮箱"——手机号通道时显示错误） */
+    const hintTxt = otpInfo && otpInfo.masked
+      ? S.t("ph.sentTo") + " " + otpInfo.masked + "（10 " + S.t("ph.minutes") + "）"
+      : S.t("login.2faHint");
     c.querySelector(".card").innerHTML = `
       <h2>${S.fmt.escape(S.t("login.2faTitle"))}</h2>
-      <p class="muted small">${S.fmt.escape(S.t("login.2faHint"))}</p>
+      <p class="muted small" id="l-2fa-hint">${S.fmt.escape(hintTxt)}</p>
       <form id="l-form2" novalidate>
         <label class="field"><span class="lb">Code</span><input class="input mono" id="l-otp" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="${S.fmt.escape(S.t("login.otpPh"))}"></label>
         <button type="submit" class="btn btn-primary btn-block" id="l-go2">${S.fmt.escape(S.t("login.submit"))}</button>
       </form>`;
+    /* 第九十四轮：切换条直接替换静态提示行（一处信息源，不再"邮箱+手机号"两条叠加混淆） */
+    if (otpInfo && otpInfo.alt) {
+      const sw = S.phone.otpSwitcher(otpInfo, "login2fa", { mfa_token: mfaToken });
+      if (sw) {
+        const hintP = c.querySelector("#l-2fa-hint");
+        if (hintP) hintP.replaceWith(sw); else c.querySelector(".card").prepend(sw);
+      }
+    }
     const go2 = async () => {
       const btn2 = document.getElementById("l-go2");
       busy(btn2, true, "login.verifying");
