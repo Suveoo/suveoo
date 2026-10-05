@@ -23,7 +23,6 @@ for-claude-code/
 
 for_developer/
 notes/
-/for_developer/
 
 # ===== OS Generated =====
 Thumbs.db
@@ -47,6 +46,7 @@ $RECYCLE.BIN/
 /IMG_*.png
 /Screenshot*.png
 /from_README_5_to_end.md
+/from_README_start_to_4.md
 backend/android/.gradle/
 backend/android/app/build/
 backend/android/build/
