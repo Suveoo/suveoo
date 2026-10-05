@@ -23,6 +23,7 @@ S.router.register("pay", async () => {
         <a class="svc-item" href="/account/transactions"><span class="qi-wrap">${S.ui.icon("ic-doc-violet", 30)}</span><span class="svc-label">${S.fmt.escape(S.t("pay.txHistory"))}</span></a>
         <a class="svc-item" href="/transfer/limits"><span class="qi-wrap">${S.ui.icon("ic-lock-gold", 30)}</span><span class="svc-label">${S.fmt.escape(S.t("pay.limits"))}</span></a>
         <a class="svc-item" href="/pay/bills"><span class="qi-wrap">${S.ui.icon("ic-doc-orange", 30)}</span><span class="svc-label">${S.fmt.escape(S.t("pay.billsEntry"))}</span></a>
+        <a class="svc-item" href="/pay/subscriptions"><span class="qi-wrap">${S.ui.icon("ic-exchange-teal", 30)}</span><span class="svc-label">${S.fmt.escape(S.t("pay.subsEntry"))}</span></a>
       </div>
     </div>
     <div class="section-title pay-sec"><h2>${S.fmt.escape(S.t("pay.payees"))}</h2><a class="more" href="/transfer/payees">${S.fmt.escape(S.t("common.viewAll"))} →</a></div>

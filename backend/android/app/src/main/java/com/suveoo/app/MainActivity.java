@@ -1,6 +1,7 @@
 package com.suveoo.app;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -111,7 +112,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         Bridge bridge = this.getBridge();
         if (bridge != null && bridge.getWebView() != null) {
-            bridge.setWebViewClient(new MpaWebViewClient(bridge));
+            bridge.setWebViewClient(new MpaWebViewClient(this, bridge));
             /* 第一百零二轮：键盘/系统栏 insets 统一接管（修复"键盘唤起后输入框跑出屏幕"）。
              *
              * 根因：Capacitor SystemBars 插件在 WebView≥140 + viewport-fit=cover 的 passthrough 路径里，
@@ -299,14 +300,206 @@ public class MainActivity extends BridgeActivity {
         }).authenticate(info);
     }
 
-    /** 返回键统一入口：先问 JS（浮层/AI 特殊态），未消费则历史回退，栈底双击退出 */
+    /** 返回键统一入口：内嵌浏览器优先，再问 JS（浮层/AI 特殊态），未消费则历史回退，栈底双击退出 */
     private void handleBack(Bridge bridge) {
+        if (browserSheet != null && browserSheet.isOpen()) { browserSheet.onBack(); return; } /* 第一百二十二轮：sheet 内先于页面 JS */
         WebView w = bridge.getWebView();
         w.evaluateJavascript("(window.__suveooBack ? window.__suveooBack() : false)", result -> {
             if (Boolean.parseBoolean(result)) return; /* sc:9-26 JS 已消费（关浮层/停流/清输入等） */
             if (w.canGoBack()) { w.goBack(); return; } /* sc:1-7 页面级返回 */
             exitTwice(); /* sc:27/28 */
         });
+    }
+
+    /* ===== 第一百二十二轮：站外链接 App 内嵌浏览器（BrowserSheet） =====
+     * 纯程序化 View（零新依赖，老华为无 GMS 亦可），叠在 android.R.id.content 顶层：
+     * 工具栏（✕ 关闭 + 域名/页题 + ⋮ 菜单：系统浏览器打开/复制链接）+ 顶部进度条 + WebView。
+     * sheet 内点出 suveoo.com 站内链接 → 关 sheet 映射回主 WebView 原生打开（内外一致）。
+     * 返回键：sheet 历史回退 → 关闭。下载（DownloadListener）→ 交系统处理。 */
+    private BrowserSheet browserSheet = null;
+
+    void openBrowserSheet(String url) {
+        runOnUiThread(() -> {
+            if (browserSheet == null) browserSheet = new BrowserSheet();
+            browserSheet.show(url);
+        });
+    }
+
+    private class BrowserSheet {
+        private final android.widget.FrameLayout root;
+        private final WebView wv;
+        private final TextView title;
+        private final android.widget.ProgressBar progress;
+        private boolean open = false;
+        private String currentUrl = "";
+
+        BrowserSheet() {
+            root = new android.widget.FrameLayout(MainActivity.this);
+            root.setBackgroundColor(Color.WHITE);
+
+            LinearLayout toolbar = new LinearLayout(MainActivity.this);
+            toolbar.setOrientation(LinearLayout.HORIZONTAL);
+            toolbar.setGravity(Gravity.CENTER_VERTICAL);
+            toolbar.setBackgroundColor(Color.WHITE);
+
+            TextView close = new TextView(MainActivity.this);
+            close.setText("✕");
+            close.setTextSize(18);
+            close.setTextColor(0xFF1E2A78);
+            close.setPadding(dp(16), dp(12), dp(16), dp(12));
+            close.setOnClickListener(v -> hide());
+
+            title = new TextView(MainActivity.this);
+            title.setTextSize(14);
+            title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            title.setTextColor(0xFF000000);
+            title.setSingleLine(true);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+            TextView menu = new TextView(MainActivity.this);
+            menu.setText("⋮");
+            menu.setTextSize(20);
+            menu.setTextColor(0xFF1E2A78);
+            menu.setPadding(dp(16), dp(8), dp(16), dp(12));
+            menu.setOnClickListener(v -> showMenu(menu));
+
+            LinearLayout.LayoutParams tbLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            toolbar.addView(close);
+            toolbar.addView(title, tbLp);
+            toolbar.addView(menu);
+
+            View hairline = new View(MainActivity.this);
+            hairline.setBackgroundColor(0xFFE5E5E5);
+
+            progress = new android.widget.ProgressBar(MainActivity.this, null, android.R.attr.progressBarStyleHorizontal);
+            progress.setMax(100);
+            progress.setVisibility(View.GONE);
+
+            wv = new WebView(MainActivity.this);
+            android.webkit.WebSettings st = wv.getSettings();
+            st.setJavaScriptEnabled(true);
+            st.setDomStorageEnabled(true);
+            wv.setWebViewClient(new android.webkit.WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    Uri u = request.getUrl();
+                    String h = u.getHost() == null ? "" : u.getHost().toLowerCase();
+                    String p = u.getPath() == null ? "" : u.getPath();
+                    if (("suveoo.com".equals(h) || "www.suveoo.com".equals(h)) && !p.startsWith("/api/")) {
+                        /* 站内链接：关 sheet，映射回主 WebView 原生打开 */
+                        hide();
+                        Uri mapped = u.buildUpon().scheme("https").authority("localhost").build();
+                        Bridge b = getBridge();
+                        if (b != null && b.getWebView() != null) b.getWebView().loadUrl(mapped.toString());
+                        return true;
+                    }
+                    return false; /* 站外（含 /api/）在 sheet 内继续 */
+                }
+            });
+            wv.setWebChromeClient(new android.webkit.WebChromeClient() {
+                @Override
+                public void onProgressChanged(WebView view, int newProgress) {
+                    progress.setProgress(newProgress);
+                    progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                }
+                @Override
+                public void onReceivedTitle(WebView view, String t) {
+                    Uri u = Uri.parse(currentUrl);
+                    String host = u.getHost() == null ? "" : u.getHost();
+                    title.setText(t == null || t.isEmpty() ? host : t + " · " + host);
+                }
+            });
+            wv.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+                /* 下载产物（apk/pdf 等）交系统浏览器/下载链路处理 */
+                try {
+                    startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, getString(R.string.browser_no_app), Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            android.widget.FrameLayout.LayoutParams tbFl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            android.widget.FrameLayout.LayoutParams lineFl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1)));
+            lineFl.topMargin = 0;
+            android.widget.FrameLayout.LayoutParams pgFl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(3));
+            pgFl.topMargin = dp(52);
+            android.widget.FrameLayout.LayoutParams wvFl = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            wvFl.topMargin = dp(55);
+
+            root.addView(wv, wvFl);
+            root.addView(toolbar, tbFl);
+            root.addView(hairline, lineFl);
+            root.addView(progress, pgFl);
+
+            /* edge-to-edge 适配：≥144 分支 DecorView 不 pad，sheet 自身 pad 系统栏（<144 分支 insets 已被
+             * decor 监听归零，此处 pad 0，DecorView 已 pad 过——两分支净效果均正确） */
+            ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+                Insets sb = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                v.setPadding(sb.left, sb.top, sb.right, sb.bottom);
+                return insets;
+            });
+
+            root.setVisibility(View.GONE);
+            ((ViewGroup) findViewById(android.R.id.content)).addView(root, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
+        boolean isOpen() { return open; }
+
+        void show(String url) {
+            currentUrl = url;
+            Uri u = Uri.parse(url);
+            title.setText(u.getHost() == null ? url : u.getHost());
+            open = true;
+            wv.setVisibility(View.VISIBLE);
+            if (wv.getUrl() == null) wv.loadUrl(url); else { wv.loadUrl(url); wv.clearHistory(); }
+            wv.onResume();
+            root.setVisibility(View.VISIBLE);
+            root.setAlpha(0f);
+            root.setTranslationY(dp(24));
+            root.animate().alpha(1f).translationY(0f).setDuration(200).start();
+        }
+
+        void hide() {
+            if (!open) return;
+            open = false;
+            wv.onPause();
+            root.animate().alpha(0f).translationY(dp(24)).setDuration(160)
+                .withEndAction(() -> root.setVisibility(View.GONE)).start();
+        }
+
+        void onBack() {
+            if (wv.canGoBack()) wv.goBack();
+            else hide();
+        }
+
+        private void showMenu(View anchor) {
+            android.widget.PopupMenu pm = new android.widget.PopupMenu(MainActivity.this, anchor);
+            pm.getMenu().add(getString(R.string.browser_open_system));
+            pm.getMenu().add(getString(R.string.browser_copy_link));
+            pm.setOnMenuItemClickListener(item -> {
+                String label = String.valueOf(item.getTitle());
+                if (label.equals(getString(R.string.browser_open_system))) {
+                    try {
+                        startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(currentUrl)));
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, getString(R.string.browser_no_app), Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    try {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("url", currentUrl));
+                        Toast.makeText(MainActivity.this, getString(R.string.browser_copied), Toast.LENGTH_SHORT).show();
+                    } catch (Exception ignored) { }
+                }
+                return true;
+            });
+            pm.show();
+        }
     }
 
     /** sc:27/28 再按一次退出：2 秒窗口内第二次返回才 finish；Toast 只在栈底出现（有浮层时到不了这里） */
@@ -349,15 +542,58 @@ public class MainActivity extends BridgeActivity {
     }
 
     static class MpaWebViewClient extends BridgeWebViewClient {
+        private final MainActivity act;
         private final Bridge bridge;
         private final AssetManager assets;
         /* 目录路由缓存（path → asset 或 ""表示无解）；APK 内资产不可变，可安全常驻 */
         private final Map<String, String> routeCache = new ConcurrentHashMap<>();
 
-        MpaWebViewClient(Bridge bridge) {
+        MpaWebViewClient(MainActivity act, Bridge bridge) {
             super(bridge);
+            this.act = act;
             this.bridge = bridge;
             this.assets = bridge.getContext().getAssets();
+        }
+
+        /* ===== 第一百二十二轮：链接路由总管（替换 Capacitor launchIntent 的"外域一律跳系统浏览器"） =====
+         * 根因：壳 origin = https://localhost（本地资产），AI 回答/通知正文里的 https://suveoo.com/...
+         * 绝对链接 host≠localhost → ACTION_VIEW 跳系统浏览器（跳出 App + 浏览器无登录态）。
+         * 现路由：
+         *   站内（suveoo.com/www）→ 改写为 https://localhost+path+query 在主 WebView 原生加载
+         *     （目录补全三 pass 就绪；登录态在 localhost localStorage，同源可用）；
+         *     /api/ 例外（XHR 直连生产，永不导航进壳）；/dl/ 例外（下载产物，交内嵌浏览器）。
+         *   站外 http(s) → App 内嵌浏览器 BrowserSheet（不跳出 App）。
+         *   mailto:/tel:/intent: 等其他 scheme → 系统 App（try/catch，无应用 Toast）。
+         * data:/blob: 维持 WebView 内加载（Capacitor 原语义）。 */
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            Uri url = request.getUrl();
+            String scheme = url.getScheme() == null ? "" : url.getScheme().toLowerCase();
+            if ("data".equals(scheme) || "blob".equals(scheme)) return false;
+            if ("http".equals(scheme) || "https".equals(scheme)) {
+                String host = url.getHost() == null ? "" : url.getHost().toLowerCase();
+                if ("localhost".equals(host)) return false; /* 壳内导航（相对链接解析归宿） */
+                if ("suveoo.com".equals(host) || "www.suveoo.com".equals(host)) {
+                    String path = url.getPath() == null ? "/" : url.getPath();
+                    if (path.startsWith("/api/")) return false; /* API 永不映射进壳 */
+                    if (path.startsWith("/dl/")) { /* 下载产物：内嵌浏览器（DownloadListener→系统接管） */
+                        act.openBrowserSheet(url.toString());
+                        return true;
+                    }
+                    Uri mapped = url.buildUpon().scheme("https").authority("localhost").build();
+                    view.loadUrl(mapped.toString());
+                    return true;
+                }
+                act.openBrowserSheet(url.toString()); /* 站外：App 内嵌浏览器 */
+                return true;
+            }
+            /* mailto:/tel:/intent:/market: 等 → 系统分发 */
+            try {
+                act.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, url));
+            } catch (Exception e) {
+                Toast.makeText(act, act.getString(R.string.browser_no_app), Toast.LENGTH_SHORT).show();
+            }
+            return true;
         }
 
         @Override

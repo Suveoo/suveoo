@@ -128,7 +128,7 @@ S.router.register("transactions", async () => {
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("contact.category"))}</span><span class="v">${S.fmt.escape(t.category ?? "")}</span></div>
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.amount"))}</span><span class="v mono">¥${S.fmt.moneyPlain(yuan(t.amount_cents))}</span></div>
       <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.note"))}</span><span class="v">${S.fmt.escape(t.memo ?? "—")}</span></div>
-      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.channel"))}</span><span class="v">${S.fmt.escape(t.channel === "ai" ? S.t("channel.ai") : t.channel === "task" ? S.t("channel.task") : t.channel === "mcp" ? "MCP" : S.t("channel.form"))}</span></div>
+      <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("common.channel"))}</span><span class="v">${S.fmt.escape(t.channel === "ai" ? S.t("channel.ai") : t.channel === "task" ? S.t("channel.task") : t.channel === "auto" ? S.t("channel.auto") : t.channel === "mcp" ? "MCP" : S.t("channel.form"))}</span></div>
       ${t.trace_id ? `<div class="gc-kv"><span class="muted">Trace</span><span class="v mono small">${S.fmt.escape(t.trace_id)}</span></div>` : ""}`);
   const renderList = () => {
     const list = all.filter(match);
@@ -142,7 +142,7 @@ S.router.register("transactions", async () => {
       <div class="list-row tx-row pay-tx" data-tx='${S.fmt.escape(JSON.stringify(t))}'>
         <span class="qi-wrap" style="width:34px;height:34px;flex:none">${S.ui.icon(CAT_ICON[t.category] ?? "ic-doc-navy", 26)}</span>
         <div class="grow"><b>${S.fmt.escape(t.counterparty ?? "—")}</b>
-          <div class="muted small">${S.fmt.datetime(t.ts)} · ${S.fmt.escape(t.category ?? "")}${t.channel === "ai" ? " · " + S.fmt.escape(S.t("channel.ai")) : ""}${t.channel === "task" ? " · " + S.fmt.escape(S.t("history.taskTag")) : ""}</div></div>
+          <div class="muted small">${S.fmt.datetime(t.ts)} · ${S.fmt.escape(t.category ?? "")}${t.channel === "ai" ? " · " + S.fmt.escape(S.t("channel.ai")) : ""}${t.channel === "task" ? " · " + S.fmt.escape(S.t("history.taskTag")) : ""}${t.channel === "auto" ? " · " + S.fmt.escape(S.t("channel.auto")) : ""}</div></div>
         <div style="text-align:right"><div class="amt" style="color:${t.direction === "IN" ? "var(--color-green)" : "inherit"}">${t.direction === "IN" ? "+" : "-"}¥${S.fmt.moneyPlain(yuan(t.amount_cents))}</div>
         <div class="muted small">${S.fmt.escape(t.status ?? "")}</div></div>
       </div>`;

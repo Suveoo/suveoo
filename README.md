@@ -502,7 +502,16 @@ D:\suveoo\
 │   │   └── favicon.webp
 │   ├── flags/
 │   │   ├── cn.svg
-│   │   └── us.svg
+│   │   ├── us.svg
+│   │   ├── eu.svg
+│   │   ├── jp.svg
+│   │   ├── gb.svg
+│   │   ├── hk.svg
+│   │   ├── sg.svg
+│   │   ├── au.svg
+│   │   ├── ca.svg
+│   │   ├── ch.svg
+│   │   └── nz.svg
 │   ├── help/
 │   │   └── index.html
 │   ├── home/

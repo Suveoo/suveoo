@@ -229,6 +229,13 @@ body.tc-open { overflow: hidden; }
   .trust-console .tc-events { padding-bottom: 12px; }
 }
 
+/* ===== 第一百二十四轮：/ai 头栏抬到抽屉层之上——铃铛/语言下拉被历史层遮挡修复 =====
+ * 根因：下拉挂在 .app-header 的 icon-btn 内（app.js dropdown()），而 header 是 z:100 的栈上下文
+ * ——下拉自身 z:200 被封顶在 header 层内；/ai「历史」打开后 hist-drawer(250 移动)/hist-drop(200 桌面)
+ * 在 root 层直接盖住整个 header 子树（含下拉）。与底导航同法同档：/ai 头栏抬到 drawer+10(260)，
+ * 仍低于模态(300)/日历(320)/toast(400)/强制更新(9999)——弹窗盖下拉语义不变。 */
+body[data-page="ai"] .app-header { z-index: calc(var(--z-drawer) + 10); }
+
 /* ===== 14. （第二十三轮：预测问题 chip 体系已退役，原间距规则删除） ===== */
 
 /* ===== 15. 登录页：标题与表单间距 + 密码可见性切换 ===== */

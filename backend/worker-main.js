@@ -839,11 +839,18 @@ function cardStatusMail({ card, frozen }) {
   const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">卡片已${frozen ? "冻结" : "解冻"}</h2><p>卡片：<b>${escHtml(String(card))}</b></p><p>当前状态：${frozen ? "已冻结（线上支付与取现暂停，已有定期扣款可能受影响）" : "已解冻（恢复正常使用）"}</p><p><a href="https://suveoo.com/account/cards">卡片管理</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
   return { subject: `【Suveoo】卡片 ${card} 已${frozen ? "冻结" : "解冻"}`, text, html };
 }
-function billPaidMail({ billId, name, amount }) {
+function billPaidMail({ billId, name, amount, auto }) {
   const isRepay = billId === "credit-repay";
-  const text = `您的${isRepay ? "信用卡还款" : "账单缴费"}已成功。\n\n项目：${name}${isRepay ? "（信用卡全额还款）" : ""}\n金额：¥${amount}\n\n可在「收付 → 账单与订阅」查看缴费记录。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
-  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">${isRepay ? "信用卡还款成功" : "账单缴费成功"}</h2><p>项目：<b>${escHtml(String(name))}</b>${isRepay ? "（信用卡全额还款）" : ""}</p><p>金额：<b>¥${escHtml(String(amount))}</b></p><p><a href="https://suveoo.com/pay/bills">查看缴费记录</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
-  return { subject: `【Suveoo】${isRepay ? "信用卡还款" : "账单缴费"}成功 ¥${amount}`, text, html };
+  const zh = auto ? "自动缴费" : isRepay ? "信用卡还款" : "账单缴费";
+  const text = `您的${zh}已成功。\n\n项目：${name}${isRepay ? "（信用卡全额还款）" : ""}\n金额：¥${amount}\n${auto ? "扣款方式：默认借记卡自动扣款\n" : ""}\n可在「收付 → 账单与订阅」查看缴费记录。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">${zh}成功</h2><p>项目：<b>${escHtml(String(name))}</b>${isRepay ? "（信用卡全额还款）" : ""}</p><p>金额：<b>¥${escHtml(String(amount))}</b></p>${auto ? "<p>扣款方式：默认借记卡自动扣款</p>" : ""}<p><a href="https://suveoo.com/pay/bills">查看缴费记录</a></p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】${zh}成功 ¥${amount}`, text, html };
+}
+/* 第一百一十九轮：自动缴费失败通知（余额不足等）——不动账转人工 */
+function autoBillFailMail({ name, amount, reason }) {
+  const text = `您的账单自动缴费未能完成。\n\n项目：${name}\n应付金额：¥${amount}\n原因：${reason ?? "默认借记卡余额不足"}\n\n本期账单仍未缴，请前往「收付 → 账单与订阅」手动缴费。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
+  const html = `<div style="font-family:sans-serif;max-width:480px"><h2 style="margin:0 0 12px">自动缴费失败</h2><p>项目：<b>${escHtml(String(name))}</b></p><p>应付金额：<b>¥${escHtml(String(amount))}</b></p><p>原因：${escHtml(String(reason ?? "默认借记卡余额不足"))}</p><p>本期账单仍未缴，请前往<a href="https://suveoo.com/pay/bills">账单缴费</a>手动缴费。</p><p style="color:#999;font-size:12px">Suveoo · 这是模拟银行系统，不涉及真实资金行为。</p></div>`;
+  return { subject: `【Suveoo】自动缴费失败：${name} ¥${amount}`, text, html };
 }
 function subscriptionCancelledMail({ merchant, plan, id }) {
   const text = `您的订阅已取消，下次扣费前不再扣款。\n\n订阅：${merchant}${plan ? `（${plan}）` : ""}\n订阅编号：${id}\n\n如属误操作，可在「收付 → 账单与订阅」重新订阅。\n\n—— Suveoo（这是模拟银行系统，不涉及真实资金行为。）`;
@@ -3238,6 +3245,13 @@ export async function handleDataApi(request, env, url, ctxInfo) {
           const debt = BigInt(cred?.balance_cents ?? "0");
           if (debt <= 0n) return json({ status: "BLOCKED", reason: "NO_DEBT", error: { code: "NO_DEBT", message: "当前无待还信用卡欠款" } }, 409);
           amount = centsToStr(debt);
+        } else {
+          /* 第一百一十九轮：本期已缴预检（出确认卡前拒——省一次无谓的黄卡确认）；DO 层 billPay 另有同口径守卫（纵深） */
+          const cnP = new Date(Date.now() + 8 * 3600e3);
+          const msP = new Date(Date.UTC(cnP.getUTCFullYear(), cnP.getUTCMonth(), 1)).toISOString().slice(0, 10);
+          if (bill.last_paid_at && String(bill.last_paid_at).slice(0, 10) >= msP) {
+            return json({ status: "BLOCKED", reason: "ALREADY_PAID_THIS_PERIOD", error: { code: "ALREADY_PAID_THIS_PERIOD", message: `本期账单已于 ${String(bill.last_paid_at).slice(0, 10)} 缴费，下期出账后可再缴` } }, 409);
+          }
         }
         const g = await runGuarded(env, ctxInfo, { intent: "bill_pay", args: { bill_id: mm[1], amount }, grantHash: b.grant_hash });
         return guardResponse(g);
@@ -8279,6 +8293,13 @@ export class LedgerDO {
               txId, NOW, String(debt), "OUT", "信用卡还款", `全额还款 · 清欠 ¥${centsToStr(debt)}`, input.channel, input.trace_id, card.slug);
             return json({ ok: true, tx_id: txId, repaid: centsToStr(debt) });
           }
+          /* 第一百一十九轮：本期重复缴费守卫——last_paid_at 落在北京本月内即拒（与 due_scan paidThisMonth
+           * 同口径）；credit-repay 特例在上方 NO_DEBT 天然防重。此前零守卫：已缴账单可无限重复扣款记账 */
+          const cnNow = new Date(Date.now() + 8 * 3600e3);
+          const monthStart = new Date(Date.UTC(cnNow.getUTCFullYear(), cnNow.getUTCMonth(), 1)).toISOString().slice(0, 10);
+          if (b.last_paid_at && String(b.last_paid_at).slice(0, 10) >= monthStart) {
+            return json({ ok: false, error: "ALREADY_PAID_THIS_PERIOD", message: `本期账单已于 ${String(b.last_paid_at).slice(0, 10)} 缴费，下期出账后可再缴` });
+          }
           const amt = BigInt(b.amount_cents);
           if (amt > BigInt(card.balance_cents)) return json({ ok: false, error: "INSUFFICIENT_BALANCE" });
           sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(card.balance_cents) - amt), card.slug);
@@ -8780,6 +8801,42 @@ export class LedgerDO {
             sql.exec("DELETE FROM notifications WHERE title IN ('账单明日到期','订阅即将扣费') AND id NOT IN (SELECT MAX(id) FROM notifications WHERE title IN ('账单明日到期','订阅即将扣费') GROUP BY title)");
             sql.exec("INSERT INTO meta(k, v) VALUES('due_spam_cleaned', '1') ON CONFLICT(k) DO UPDATE SET v = '1'");
           }
+          /* 第一百一十九轮：自动缴费引擎（真·autopay，队长定稿）——到期日当天从默认借记卡自动扣款。
+           * 独立防重键（与提醒扫描 due_done 解耦）：当天中途才开开关的用户，下个 5 分钟扫描仍可触发当日扣款。
+           * 守卫：本期已缴（last_paid_at>=北京月初）跳过（手动缴费后不双扣）；credit-repay 动态欠款特例排除
+           * （与提议引擎同口径）；月末并档：今日为当月最后一天时 due_day>今日 的账单（如 31 号单在小月）也触发。
+           * 余额不足：不动账，通知+邮件转人工。 */
+          const apKey = `autopay_done_${input.date_key}`;
+          if (!this.#rows(sql.exec("SELECT v FROM meta WHERE k = ?", apKey))[0]) {
+            const todayDay = Number(String(input.today).slice(8, 10));
+            const isMonthEnd = Number(input.tomorrow_day) === 1;
+            for (const b of this.#rows(sql.exec("SELECT id, name, category, amount_cents, due_day, autopay, last_paid_at FROM bills"))) {
+              if (!Number(b.autopay) || b.id === "credit-repay") continue;
+              if (b.last_paid_at && String(b.last_paid_at).slice(0, 10) >= input.month_start) continue;
+              if (!(Number(b.due_day) === todayDay || (isMonthEnd && Number(b.due_day) > todayDay))) continue;
+              const amount = (Number(b.amount_cents) / 100).toFixed(2);
+              const card = this.#rows(sql.exec("SELECT * FROM cards WHERE is_default = 1 AND kind='debit'"))[0];
+              if (!card || BigInt(b.amount_cents) > BigInt(card.balance_cents)) {
+                this.#notify(sql, "TRANSFER", "自动缴费失败", `账单「${b.name}」今日到期，默认借记卡余额不足（应付 ¥${amount}），未能自动扣款，请手动缴费。`);
+                try {
+                  const emF = this.#rows(sql.exec("SELECT email FROM profile LIMIT 1"))[0]?.email;
+                  if (emF) await sendMail(this.env, { to: emF, ...autoBillFailMail({ name: b.name, amount }) });
+                } catch { /* 邮件外发失败不影响扣款扫描 */ }
+                continue;
+              }
+              sql.exec("UPDATE cards SET balance_cents = ? WHERE slug = ?", String(BigInt(card.balance_cents) - BigInt(b.amount_cents)), card.slug);
+              sql.exec("UPDATE bills SET last_paid_at = ? WHERE id = ?", NOW, b.id);
+              const txIdA = this.#txId();
+              sql.exec("INSERT INTO tx(id, ts, amount_cents, direction, counterparty, memo, status, channel, trace_id, category, card) VALUES(?,?,?,'OUT',?,'自动缴费','SUCCESS','auto',?,?,?)",
+                txIdA, NOW, b.amount_cents, b.name, null, b.category, card.slug);
+              this.#notify(sql, "TRANSFER", "自动缴费成功", `账单「${b.name}」已自动从默认借记卡扣款 ¥${amount}，本期账单已缴清。`);
+              try {
+                const emS = this.#rows(sql.exec("SELECT email FROM profile LIMIT 1"))[0]?.email;
+                if (emS) await sendMail(this.env, { to: emS, ...billPaidMail({ billId: b.id, name: b.name, amount, auto: true }) });
+              } catch { /* 邮件外发失败不影响扣款扫描 */ }
+            }
+            sql.exec("INSERT INTO meta(k, v) VALUES(?, '1') ON CONFLICT(k) DO UPDATE SET v = '1'", apKey);
+          }
           if (this.#rows(sql.exec("SELECT v FROM meta WHERE k = ?", doneKey))[0]) return json({ ok: true, sent: 0 });
           let sent = 0;
           /* 第六十四轮：摘要行收集——账单到期/订阅扣费合并成一封邮件（防逐条轰炸），
@@ -8788,8 +8845,8 @@ export class LedgerDO {
           for (const b of this.#rows(sql.exec("SELECT name, due_day, amount_cents, autopay, last_paid_at FROM bills"))) {
             const paidThisMonth = b.last_paid_at && String(b.last_paid_at).slice(0, 10) >= input.month_start;
             if (Number(b.due_day) === Number(input.tomorrow_day) && !paidThisMonth) {
-              const line = `账单「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动扣款已开启。" : "可提前缴费。"}`;
-              this.#notify(sql, "TRANSFER", "账单明日到期", `「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动扣款已开启，届时将自动扣费。" : "可提前在「收付 → 账单与订阅」缴费。"}`);
+              const line = `账单「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动缴费已开启。" : "可提前缴费。"}`;
+              this.#notify(sql, "TRANSFER", "账单明日到期", `「${b.name}」明日为缴费日，应付 ¥${(Number(b.amount_cents) / 100).toFixed(2)}。${b.autopay ? "自动缴费已开启，明日将从默认借记卡自动扣款。" : "可提前在「收付 → 账单与订阅」缴费。"}`);
               lines.push(line);
               sent++;
             }

@@ -48,8 +48,17 @@ S.fmt = {
    * 此处清洗历史存量通知（通知中心/铃铛下拉渲染层统一走这）。仅清彩色 emoji 与变体选择符，
    * 保留 ✓✗·→ 等纯文本记号 */
   stripEmoji(s) { return String(s ?? "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]+\s*/gu, ""); },
-  /* 通知正文链接化（第七期）：先转义，再仅对站内 URL 生成锚点（限定 suveoo.com 域，不接受外链） */
-  linkify(s) { return this.escape(s).replace(/(https:\/\/suveoo\.com\/[a-z0-9/-]+)/g, '<a href="$1" class="notif-link">$1</a>'); },
+  /* 通知正文链接化（第七期）：先转义，再仅对站内 URL 生成锚点（限定 suveoo.com 域，不接受外链）。
+   * 第一百二十二轮：①壳内（S.api.base 非空）剥 origin → 相对路径（App 内原生打开，Java 路由兜底）；
+   * ②正则扩支持 query——旧类 [a-z0-9/-]+ 遇 ? 即断（带参 URL 在通知里被截成半截链接）；
+   * 转义文本里 & 为 &amp;，故 query 字符类含 ; 。 */
+  linkify(s) {
+    const inShell = !!(S.api && S.api.base);
+    return this.escape(s).replace(/(https:\/\/suveoo\.com\/[a-z0-9/_-]*(?:\?[a-zA-Z0-9=&.%_~:;-]*)?)/g, (m, url) => {
+      const href = inShell ? url.slice("https://suveoo.com".length) : url;
+      return `<a href="${href}" class="notif-link">${url}</a>`;
+    });
+  },
   /* 卡面解析（第四十四轮 / 第六十一轮去重修复）：按卡组织+槽位从 S.cardArts 清单选真图。
    *
    * 第六十一轮修复——同网络卡面重复 bug：

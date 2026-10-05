@@ -78,10 +78,20 @@ S.md = {
      第五期 idle：按钮卡下方追加 .tool-embed 隐藏占位（携带 slug+query），由 S.tools.hydrate
      在消息定稿后渲染完整可交互工具（/ai 页已引入全部工具页脚本；未引入的页面占位保持隐藏、跳页能力不受影响）。 */
   toolLinkRe: /^https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?.+$/,
+  /* 第一百二十二轮：壳内（S.api.base 非空 = APK https://localhost origin）站内绝对链接剥 origin → 相对路径。
+   * WebView 把相对链接解析回 localhost → 壳内原生加载（Java shouldOverrideUrlLoading 映射为二道兜底）。
+   * Web（base=""）原样返回，行为零变化。 */
+  siteHref(url) {
+    if (!S.api || !S.api.base) return url;
+    const m = url.match(/^https:\/\/(www\.)?suveoo\.com(\/[^\s?#]*)?([?#][^\s]*)?$/i);
+    return m ? (m[2] || "/") + (m[3] || "") : url;
+  },
   toolCard(url) {
     const m = url.match(/^https:\/\/suveoo\.com\/wealth\/tools\/([a-z-]+)(?:\?([^"<]*))?$/);
     const embed = m && S.toolPages ? `<div class="tool-embed" data-tool="${m[1]}" data-query="${m[2] ?? ""}" hidden></div>` : "";
-    return `<a class="tool-open" href="${url}" target="_blank" rel="noopener noreferrer">${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>${embed}`;
+    /* 壳内去 target=_blank：无多窗口支持本就同窗导航，剥 origin 后相对直达，返回手势可回聊天 */
+    const tgt = !S.api || !S.api.base ? ' target="_blank" rel="noopener noreferrer"' : "";
+    return `<a class="tool-open" href="${this.siteHref(url)}"${tgt}>${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>${embed}`;
   },
   /* 行内：代码 span → 工具深链按钮（先于普通链接；输出经 \u0000T 占位符保护，防后续裸 URL 正则嵌套命中已生成的 href）→
      站内裸 URL（仅 suveoo.com 域；工具深链转按钮卡，其余渲染为同窗可点链接，外链裸形式不放行）→
@@ -98,9 +108,15 @@ S.md = {
     /* 裸 URL：前缀不得是 URL 字符或 '('（避免截断 markdown 链接括号内的地址）；句读全角标点不入链；结尾实体剥除 */
     s = s.replace(/(?<![\w\/.=&,(])(https:\/\/suveoo\.com\/[^\s<)）」』】。，；、！？：]+)/g, (m) => {
       const url = m.replace(/(?:&gt;|&amp;)+$/, "");
-      return this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : `<a href="${url}">${url}</a>`;
+      return this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : `<a href="${this.siteHref(url)}">${url}</a>`;
     });
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, url) => (url.startsWith("https://suveoo.com/") ? `<a href="${url}">${t}</a>` : `<a href="${url}" target="_blank" rel="noopener noreferrer">${t}</a>`));
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, url) => {
+      if (/^https:\/\/(www\.)?suveoo\.com\//i.test(url)) return `<a href="${this.siteHref(url)}">${t}</a>`;
+      /* 外链：Web 新标签；壳内同窗（Java 路由进 App 内嵌浏览器，_blank 无多窗口支持本就同窗） */
+      return !S.api || !S.api.base
+        ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${t}</a>`
+        : `<a href="${url}">${t}</a>`;
+    });
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");
     s = s.replace(/\u0000C(\d+)\u0000/g, (m, k) => '<code class="md-code">' + spans[+k] + "</code>");

@@ -96,7 +96,13 @@
         fill.style.width = pc + "%";
         pct.textContent = pc + "%";
         mbEl.textContent = mb(p.bytes) + " / " + mb(p.total > 0 ? p.total : p.bytes) + " MB";
-        if (speed > 0 && pc < 100) eta.textContent = mb((p.total - p.bytes) / Math.max(speed, 1)) + "s · " + mb(speed) + " MB/s";
+        /* 第一百二十三轮修复：剩余时间曾误用 mb()（除以 1048576 的 MB 格式化器）格式化秒数——
+         * 任何现实秒数（几秒~几百秒）都被压成 "0.0s"。现按秒数人性化：<60s 一位小数，≥60s 分秒。 */
+        if (speed > 0 && pc < 100) {
+          const sec = (p.total - p.bytes) / Math.max(speed, 1);
+          const etaTxt = sec >= 60 ? Math.floor(sec / 60) + "m" + Math.round(sec % 60) + "s" : sec.toFixed(1) + "s";
+          eta.textContent = etaTxt + " · " + mb(speed) + " MB/s";
+        }
       });
     } catch { /* 事件桥异常：进度条停在不确定态，下载本身仍会完成 */ }
     Upd.download({ url: info.url }).then((r) => { /* info.url 已由 fetchState 归一为绝对地址（白名单校验后） */

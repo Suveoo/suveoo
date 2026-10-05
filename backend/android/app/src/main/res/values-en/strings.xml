@@ -12,4 +12,9 @@
     <string name="ch_tasks">Tasks</string>
     <string name="ch_general">System</string>
     <string name="ch_svc">Background protection</string>
+    <!-- Round 122: in-app browser sheet for external links -->
+    <string name="browser_open_system">Open in system browser</string>
+    <string name="browser_copy_link">Copy link</string>
+    <string name="browser_copied">Link copied</string>
+    <string name="browser_no_app">No app can handle this link</string>
 </resources>

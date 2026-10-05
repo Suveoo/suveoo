@@ -53,4 +53,24 @@ S.router.register("download", async () => {
     copyBtn.textContent = ok ? S.t("apk.copied") : S.t("apk.copy");
     setTimeout(() => (copyBtn.textContent = S.t("apk.copy")), 2000);
   };
+  /* 第一百二十二轮：壳内（Capacitor Update 插件可用）下载按钮走原生下载+安装——
+   * 不再 href 导航（壳内 /dl/ 相对路径会落到本地资产 404；绝对路径则进内嵌浏览器跳系统链路，
+   * 均劣于原生：Update 插件带进度回执+FileProvider 直唤安装器）。Web 版保持默认 href 下载。 */
+  const apkGo = document.getElementById("apk-go");
+  if (apkGo && window.Capacitor?.Plugins?.Update) {
+    apkGo.onclick = (e) => {
+      e.preventDefault();
+      const Upd = window.Capacitor.Plugins.Update;
+      const url = ((S.api && S.api.base) || "") + m.url;
+      if (!/^https:\/\/([\w-]+\.)?suveoo\.com\//.test(url)) { S.ui.toast(S.t("apk.updFail"), true); return; }
+      let lastToast = 0;
+      const li = Upd.addListener("update-progress", (p) => {
+        const now = Date.now();
+        if (p?.percent != null && now - lastToast > 1500) { lastToast = now; S.ui.toast(S.t("apk.updProg", String(Math.floor(p.percent)) + "%")); }
+      });
+      S.ui.toast(S.t("apk.updStart"));
+      Upd.download({ url }).then((r) => { li?.remove?.(); return Upd.install({ fileUri: r.fileUri }); })
+        .catch(() => { li?.remove?.(); S.ui.toast(S.t("apk.updFail"), true); });
+    };
+  }
 });

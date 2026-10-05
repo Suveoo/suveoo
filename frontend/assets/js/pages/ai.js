@@ -533,10 +533,15 @@ S.router.register("ai", async ({ user }) => {
       else if (raw) renderAt();
       /* 工具按钮卡下的内嵌工具在消息定稿后注水（打字机期间每帧重建 innerHTML，注水必须等最终稿） */
       if (raw) S.tools?.hydrate?.(aiMsg);
-      /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 新标签直达（一次为限） */
+      /* 自动打开工具链接：开关开启且回答含且仅含一个工具 URL → 直达（一次为限）。
+       * 壳内（第一百二十二轮）：剥 origin 相对导航=App 内原生打开（返回手势可回聊天）；
+       * Web：新标签页。 */
       if (raw && localStorage.getItem("suveoo.aiAutoOpen") !== "off") {
         const urls = [...raw.matchAll(/https:\/\/suveoo\.com\/wealth\/tools\/[a-z-]+\?[^\s)）<」』】]+/g)].map((m) => m[0]);
-        if (urls.length === 1) window.open(urls[0], "_blank", "noopener");
+        if (urls.length === 1) {
+          if (S.api && S.api.base) location.href = S.md.siteHref(urls[0]);
+          else window.open(urls[0], "_blank", "noopener");
+        }
       }
       if (wasNew) setHeaderTitle(text.slice(0, 30));
       updateLastCache();

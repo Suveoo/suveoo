@@ -19,4 +19,9 @@
     <string name="ch_tasks">任务</string>
     <string name="ch_general">系统</string>
     <string name="ch_svc">后台守护</string>
+    <!-- 第一百二十二轮：站外链接内嵌浏览器（BrowserSheet） -->
+    <string name="browser_open_system">在系统浏览器打开</string>
+    <string name="browser_copy_link">复制链接</string>
+    <string name="browser_copied">链接已复制</string>
+    <string name="browser_no_app">未找到可处理该链接的应用</string>
 </resources>
