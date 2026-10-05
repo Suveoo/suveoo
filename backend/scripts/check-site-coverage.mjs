@@ -23,10 +23,15 @@ const walk = (dir, prefix) => {
 };
 walk(root, "/");
 routes.add("/404");
+/* /download（第六十八轮）：noindex 无任何站内入口的 APK 直达页——AI 无引导场景，不入知识库（v3.109 后本脚本未跑，此处收口漂移） */
+routes.delete("/download");
+/* 动态卡路由折叠为模板（frontend 物理目录 account/card/{settings|history|report-loss} 对应 URL /account/card/{slug}/xxx） */
 routes.delete("/account/card/history");
 routes.delete("/account/card/settings");
+routes.delete("/account/card/report-loss");
 routes.add("/account/card/{slug}/history");
 routes.add("/account/card/{slug}/settings");
+routes.add("/account/card/{slug}/report-loss");
 
 const kb = new Set(SITE_GUIDE_PAGES.map((p) => p.route));
 const missing = [...routes].filter((r) => !kb.has(r));
@@ -34,8 +39,8 @@ const extra = [...kb].filter((r) => !routes.has(r));
 console.log(`前端页面路由: ${routes.size} | 知识库路由: ${SITE_GUIDE_PAGES.length}`);
 if (missing.length) console.log("MISSING（前端有、知识库无）:", missing);
 if (extra.length) console.log("EXTRA（知识库有、前端无）:", extra);
-if (routes.size !== 75 || missing.length || extra.length || kb.size !== 75) {
-  console.error("覆盖度不达标（须 75/75、差集为 0）");
+if (routes.size !== 76 || missing.length || extra.length || kb.size !== 76) {
+  console.error("覆盖度不达标（须 76/76、差集为 0）");
   process.exit(1);
 }
-console.log("覆盖度 75/75，双向差集为 0 ✓");
+console.log("覆盖度 76/76，双向差集为 0 ✓");

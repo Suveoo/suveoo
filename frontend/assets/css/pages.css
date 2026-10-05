@@ -494,6 +494,37 @@
   .bl-ops { margin-top: 0; margin-left: auto; }
 }
 
+/* ===== 第一百二十六轮：卡片挂失页（/account/card/{slug}/report-loss） ===== */
+.cl-card { display: flex; align-items: center; gap: 14px; }
+.cl-card .bc-art { width: 128px; flex: none; border-radius: 10px; box-shadow: var(--shadow); display: block; }
+.cl-num { font-size: var(--fs-16); letter-spacing: .04em; }
+.cl-banner { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; padding: 10px 12px; border-radius: var(--r-btn); background: rgba(225, 29, 72, .06); border: 1px solid rgba(225, 29, 72, .18); color: #9F1239; font-weight: 600; font-size: var(--fs-13); flex-wrap: wrap; }
+.cl-banner .muted { font-weight: 400; }
+.cl-warn { background: var(--color-primary-tint); border-color: rgba(30, 42, 120, .18); color: var(--color-navy); }
+.cl-replace { margin: 14px 0 0; padding: 12px; border: 1px dashed var(--color-line); border-radius: var(--r-btn); cursor: pointer; }
+.cl-mail { margin-top: 10px; display: block; }
+.cl-mail .input { width: 100%; font-family: inherit; resize: vertical; }
+.cl-total b { font-size: var(--fs-16); }
+.loss-m.on { color: #9F1239; border-color: rgba(225, 29, 72, .35); }
+/* 第一百二十七轮：自绘付款卡选择器（替代系统原生 select）+ 表单排版打磨 */
+.cl-paylb { display: flex; flex-direction: column; gap: 2px; margin: 14px 0 6px; }
+.cl-paylb .lb { font-size: var(--fs-13); font-weight: 600; }
+.cl-sel { position: relative; }
+.cl-sel-btn { width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-btn); font-size: var(--fs-14); cursor: pointer; transition: border-color .12s ease; }
+.cl-sel-btn:hover { border-color: var(--color-navy); }
+.cl-sel-btn .ic { color: var(--color-ink-2); flex: none; }
+.cl-sel-cur { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-sel-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid var(--color-line); border-radius: var(--r-btn); box-shadow: var(--shadow-lg); overflow: hidden; animation: fade-in .12s ease-out both; max-height: 264px; overflow-y: auto; }
+.cl-sel-opt { width: 100%; display: flex; align-items: center; gap: 8px; padding: 11px 12px; background: none; border: none; border-bottom: 1px solid var(--color-line); font-size: var(--fs-13); cursor: pointer; text-align: left; }
+.cl-sel-opt:last-child { border-bottom: none; }
+.cl-sel-opt:hover { background: #FAFBFC; }
+.cl-sel-opt.on { background: var(--color-primary-tint); }
+.cl-sel-opt.on::after { content: "✓"; color: var(--color-navy); font-weight: 700; flex: none; }
+.cl-sel-kind { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--color-navy); }
+.cl-sel-kind.credit { background: #D97706; }
+.cl-sel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-sel-bal { flex: none; color: var(--color-ink-2); font-size: var(--fs-12); }
+
 /* ===== /account 改版（第三十九轮）：渐变 Profile Hero + num-xl 概要 + 偏好收尾 ===== */
 .acct-hero { border-radius: var(--r-card-lg); padding: 20px; color: #fff; margin-bottom: 16px; animation: rise-in .28s cubic-bezier(.25,.6,.3,1) both; }
 .ah-top { display: flex; align-items: center; gap: 14px; }

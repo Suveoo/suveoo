@@ -45,7 +45,10 @@ S.router.register("card-settings", async () => {
     <div class="gc-kv"><span class="muted">${S.fmt.escape(S.t("limits.daily"))}</span><span class="v mono">¥ ${cd.limit_daily}</span></div>
     <a class="btn btn-ghost btn-sm" style="margin-top:12px" href="/transfer/limits">${S.fmt.escape(S.t("limits.adjust"))}</a>`}
     <div class="section-title cs-sec"><h3>${S.fmt.escape(S.t("cs.security"))}</h3></div>
-    <button class="btn btn-danger" id="cs-fz">${S.ui.icon("snow", 14)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}（RED）</button>`;
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-danger" id="cs-fz">${S.ui.icon("snow", 14)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}（RED）</button>
+      <a class="btn btn-ghost" href="/account/card/${slug}/report-loss">${S.ui.icon("shield", 14)} ${S.fmt.escape(cd.loss ? S.t("cards.lossActive") : S.t("cs.lossBtn"))}${cd.loss ? "" : "（RED）"}</a>
+    </div>`;
   /* 完整卡号：默认掩码；点击眼睛才调用 reveal 端点取完整 16 位，展开后可复制，再点收回 */
   const numEl = document.getElementById("cs-num");
   const eyeBtn = document.getElementById("cs-eye");

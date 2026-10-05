@@ -26,6 +26,7 @@ S.router.register("cards", async () => {
           <a class="bc-btn" href="/account/card/${cd.slug}/history">${S.ui.icon("list", 13)} ${S.fmt.escape(S.t("cards.history"))}</a>
           <a class="bc-btn" href="/transfer/intrabank?from=${cd.slug}">${S.ui.icon("send", 13)} ${S.fmt.escape(S.t("cards.transfer"))}</a>
           <button class="bc-btn fz" data-slug="${cd.slug}" data-st="${cd.status}">${S.ui.icon("snow", 13)} ${S.fmt.escape(cd.status === "FROZEN" ? S.t("cards.unfreeze") : S.t("cards.freeze"))}</button>
+          <a class="bc-btn loss-m${cd.loss ? " on" : ""}" href="/account/card/${cd.slug}/report-loss">${S.ui.icon("shield", 13)} ${S.fmt.escape(cd.loss ? S.t("cards.lossActive") : S.t("cards.lossBtn"))}</a>
           <a class="bc-btn" href="/account/card/${cd.slug}/settings">${S.ui.icon("gear", 13)} ${S.fmt.escape(S.t("cards.more"))}</a>
           <button class="bc-btn ai-m" data-slug="${cd.slug}" data-l4="${S.fmt.escape(String(cd.number).replace(/\D/g, "").slice(-4))}">${S.ui.icon("ai", 13)} ${S.fmt.escape(S.t("cards.aiManage"))}</button>
         </div>

@@ -16,6 +16,8 @@ S.genuiCards = {
     card_limit_adjust:   { title: "genui.confirmLimit",    icon: "gear",     field: "genui.card",     fee: false },
     card_freeze:         { title: "genui.confirmFreeze",   icon: "lock",     field: "genui.card",     fee: false },
     card_unfreeze:       { title: "genui.confirmUnfreeze", icon: "lock",     field: "genui.card",     fee: false },
+    card_loss_report:    { title: "genui.confirmLoss",     icon: "shield",   field: "genui.card",     fee: false },
+    card_loss_activate:  { title: "genui.confirmLossAct",  icon: "check",    field: "genui.card",     fee: false },
     subscription_cancel: { title: "genui.confirmSubCancel", icon: "star",    field: "genui.merchant",  fee: false },
     subscription_reminder_toggle: { title: "genui.confirmSubReminder", icon: "clock", field: "genui.merchant", fee: false },
     deposit_open:        { title: "genui.confirmDeposit",  icon: "bank",     field: "genui.product",   fee: false },
@@ -37,6 +39,7 @@ S.genuiCards = {
     const items = Array.isArray(p.items) ? p.items : [];
     const INTENT_ZH = {
       transfer_execute: "转账", scheduled_task_create: "预约转账", card_freeze: "冻结卡片", card_unfreeze: "解冻卡片",
+      card_loss_report: "卡片挂失", card_loss_activate: "签收激活",
       card_limit_adjust: "调整限额", wealth_product_purchase: "基金申购", wealth_product_redeem: "基金赎回",
       deposit_open: "存入存款", subscription_cancel: "取消订阅", subscription_reminder_toggle: "订阅提醒",
       payee_manage: "收款人管理", bill_pay: "缴纳账单", funds_lock: "锁定资金", task_cancel: "取消任务",
@@ -90,7 +93,7 @@ S.genuiCards = {
     let subject = c.subject ?? null;
     if (!subject) {
       if (c.action === "bill_pay" || (c.action == null && p.bill_id != null)) subject = p.bill_id != null ? S.t("genui.billNo", p.bill_id) : null;
-      else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze") subject = p.card_id ?? null;
+      else if (c.action === "card_limit_adjust" || c.action === "card_freeze" || c.action === "card_unfreeze" || c.action === "card_loss_report" || c.action === "card_loss_activate") subject = p.card_display ?? p.card_id ?? null;
       else if (c.action === "subscription_cancel") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
       else if (c.action === "subscription_reminder_toggle") subject = p.subscription_merchant ?? ("#" + (p.subscription_id ?? "—"));
       else if (c.action === "deposit_open") subject = p.product_display ?? p.product_id ?? null;
@@ -111,7 +114,7 @@ S.genuiCards = {
           : r0;
       }
     }
-    const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "solution_package_purchase" ? p.total_amount : null) ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
+    const rawAmt = p.amount_cny ?? (c.action === "subscription_cancel" ? p.subscription_amount : undefined) ?? p.amount ?? (c.action === "solution_package_purchase" ? p.total_amount : null) ?? (c.action === "card_loss_report" ? (p.replace_new ? "53" : "20") : null) ?? (c.action === "card_limit_adjust" ? p.new_limit : null);
     /* "ALL" 全额赎回占位按文案显示；既无金额也无 ALL（退订/开关类操作）不渲染金额行——
        此前误落 genui.redeemAll 把退订确认卡显示成"全部持仓"（第六期 idle 生产实测抓出，存量 bug） */
     const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : (String(rawAmt) === "ALL" ? S.t("genui.redeemAll") : null);
@@ -123,6 +126,12 @@ S.genuiCards = {
       ${S.genuiCards.kv([
         ...(fieldKey && subject != null ? [[S.t(fieldKey), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
+        ...(c.action === "card_loss_report" ? [
+          [S.t("genui.lossReplace"), p.replace_new ? S.t("genui.lossRepYes") : S.t("genui.lossRepNo")],
+          ...(p.mail_to != null ? [[S.t("genui.lossMailTo"), p.mail_to]] : []),
+          [S.t("genui.lossFees"), p.replace_new ? "¥20.00 + ¥15.00 + ¥18.00" : "¥20.00"],
+          [S.t("genui.lossPayCard"), p.pay_card_display ?? p.pay_card ?? "—"],
+        ] : []),
         ...(p.memo != null && String(p.memo) !== "" ? [[S.t("genui.memo"), p.memo]] : []),
         ...(c.action === "solution_package_purchase" && p.horizon_months != null ? [[S.t("genui.solutionHorizon"), S.t("tc.mFmt", p.horizon_months)]] : []),
         ...(c.action === "subscription_cancel" ? [

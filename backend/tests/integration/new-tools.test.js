@@ -88,7 +88,7 @@ describe("第十一期新工具", () => {
     const g = await call(1, "site_guide", { query: "转账记录导出" });
     expect(g.matches[0].route).toBe("/transfer/history");
     const ov = await call(2, "site_guide");
-    expect(ov.total_pages).toBe(75);
+    expect(ov.total_pages).toBe(76); /* 第一百二十六轮：+ /account/card/{slug}/report-loss 挂失页 */
   }, 30000);
 
   it("subscription_reminder_toggle（YELLOW）：不存在拒绝 → 真实订阅出卡 → 确认执行 → 状态翻转 + 审计", async () => {

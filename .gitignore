@@ -61,3 +61,7 @@ backend/android/app/src/main/assets/public/
 # ===== 杂项临时文件 =====
 *.tmp
 .deploy-state.json
+
+# ===== 第一百二十五轮：安全审计临时产物（含会话令牌/APK 大件，永不入库） =====
+.apkaudit/
+.audit9/

@@ -4,10 +4,10 @@ import { SITE_GUIDE_PAGES, siteGuideLookup } from "../../worker-main.js";
 /* 第十一期 site_guide：知识库结构锁定 + 查询行为。
  *  路由集 vs 前端 75 页的差集比对在 backend/scripts/check-site-coverage.mjs（node 直跑——workerd 池无宿主文件系统）。 */
 
-describe("site_guide 覆盖度（75 页）", () => {
-  it("知识库恰为 75 页、路由唯一（与前端差集由 scripts/check-site-coverage.mjs 锁定）", () => {
-    expect(SITE_GUIDE_PAGES).toHaveLength(75);
-    expect(new Set(SITE_GUIDE_PAGES.map((p) => p.route)).size).toBe(75);
+describe("site_guide 覆盖度（76 页）", () => {
+  it("知识库恰为 76 页、路由唯一（与前端差集由 scripts/check-site-coverage.mjs 锁定；第一百二十六轮 +report-loss 挂失页）", () => {
+    expect(SITE_GUIDE_PAGES).toHaveLength(76);
+    expect(new Set(SITE_GUIDE_PAGES.map((p) => p.route)).size).toBe(76);
   });
 
   it("每页知识字段完整（purpose/entry/actions/flow/notes/section/aliases 非空）", () => {
@@ -24,12 +24,12 @@ describe("site_guide 覆盖度（75 页）", () => {
 });
 
 describe("site_guide 查询行为", () => {
-  it("不带 query → 全站概览（含 75 页总数与分区）", () => {
+  it("不带 query → 全站概览（含 76 页总数与分区）", () => {
     const out = siteGuideLookup(undefined);
-    expect(out.total_pages).toBe(75);
+    expect(out.total_pages).toBe(76);
     expect(out.sections.length).toBeGreaterThanOrEqual(5);
     const routes = out.sections.flatMap((s) => s.pages.map((p) => p.route));
-    expect(new Set(routes).size).toBe(75);
+    expect(new Set(routes).size).toBe(76);
   });
 
   it("「转账记录导出 CSV」→ /transfer/history 居首", () => {

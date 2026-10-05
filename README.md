@@ -1,708 +1,222 @@
-# Suveoo — Agentic Banking Control Plane
+<div align="center">
 
-> **银行 AI 智能体。这是模拟银行系统，不涉及真实资金行为。**
+# Suveoo · AI Banking Agent
 
-**简介**：Suveoo 把 AI 的概率性智能与金融授权的确定性彻底分离：**LLM 只能"提议"，提议必须编译为 BankAction IR，并通过 Suveoo Verification Runtime 五道确定性验证（策略分级 · 同意绑定 · 来源污染追踪 · 金融不变量 · 幂等重放），`VERIFIED` 后才允许触达资金。** 经典表单与 AI 通道走同一条验证流水线——系统不存在绕过验证的特权通道。
+**说话就能办业务 —— 但每一分钱都先过五道确定性验证。**
 
-## 1. 相关资讯
+*Agentic Banking Control Plane：把概率性智能与确定性金融授权彻底分离。*
 
-### 1.1 站点
+![Tests](https://img.shields.io/badge/tests-411%20passing-brightgreen) ![Tools](https://img.shields.io/badge/AI%20tools-63%20(MCP)-blue) ![Risk Tiers](https://img.shields.io/badge/permission%20tiers-GREEN%2FYELLOW%2FRED-success) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%974-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20DO-orange)
 
-`https://suveoo.com`（www.suveoo.com 自动跳转裸域 suveoo.com）
+<!-- 插图 1：全设备 Hero Mockup（手机 + 平板 + 电脑同框） -->
+![Suveoo across devices](docs/images/readme/hero-devices.png)
 
-### 1.2 演示账户
+[60 秒看懂](#-60-秒看懂-suveoo) · [安全内核](#-安全内核bankaction-ir--五道确定性验证) · [Suveoo AI](#-suveoo-ai说话就能办业务) · [六大场景](#-六大官方场景全覆盖) · [快速开始](#-快速开始) · [测试与评测](#-测试与评测我们测了才敢说) · [文档地图](#-文档地图)
 
-`demo@suveoo.com` / `jinrongkeji2026`（需先执行下方种子命令；登录含邮箱验证码 2FA）
+</div>
 
-### 1.3 竞赛指定的六大场景入口
+---
 
-Suveoo AI 对话页（AA 分账 / 账单归因 / 理财推荐 / 卡片围栏 / 订阅治理 / 生日订花 Saga + 故障注入）
+> **一句话**：大模型只能"提议"，提议必须编译为 **BankAction IR** 并通过 **Suveoo Verification Runtime 五道确定性验证**，VERIFIED 之后才触达账本。换任何模型，授权、合规、审计规则一行不改。
+>
+> **一个数字**：自动化的确定性测试 **411 条全绿**（含红队攻击 22 条）；安全向指标（注入/越权/重放/篡改）实测拦截记录见[测试章](#-测试与评测我们测了才敢说)。
 
-## 2. 架构概览
+Suveoo 是一个运行在 Cloudflare 边缘的**模拟银行 + AI 智能体**：1 个 Worker + 2 类 Durable Object（账本/长程任务）+ 2 KV + R2，前端零构建 MPA，Android 端 Capacitor 壳原生集成。用户用自然语言（文字或语音）办理转账、账单、理财、卡片、订阅、跨场景长程任务；AI 通道、REST 表单、MCP 三通道**同一套验证管线**。
 
-### 2.1 逻辑
+<!-- 插图 2：架构总览图（Figma 绘制，含 LLM→IR→五道→DO 链路） -->
+![Architecture](docs/images/readme/architecture.png)
 
+---
+
+## 📖 60 秒看懂 Suveoo
+
+**它解决什么**：AI Agent 从"回答问题"跨到"替我办业务"的最后一公里信任问题——不是"能不能听懂用户"，而是**凭什么敢把转账权限交给一个概率系统**。
+
+**怎么解决**：LLM 输出永远不直接碰钱。每次工具调用被编译成类型化的金融行动 IR（含来源追踪、DAG 步骤、风险分级、补偿声明），连过五道确定性验证：
+
+| # | 验证器 | 一句话 | 对应风险 |
+|---|---|---|---|
+| ① | **Policy** | 三色分级：绿自动 / 黄确认卡 / 红 OTP 强验证；日累计 ¥1,000 动态升红；AI 通道硬上限单笔 ¥5,000/日 ¥10,000 | 越权操作 |
+| ② | **Consent Binding** | 用户确认的是 SHA256 哈希绑定的**精确参数快照**——确认后改一个数字，grant 立即失效 | "确认后 AI 偷改参数" |
+| ③ | **Provenance / Taint** | 账单备注等外部文本标 `EXTERNAL_UNTRUSTED`，可影响认知、**永不能成为收款人/金额** | 间接提示词注入 |
+| ④ | **Invariants** | bigint 整数分单位的守恒/适当性/余额断言——纯函数，不是"AI 觉得没问题" | 金融数学错误 |
+| ⑤ | **Replay / Idempotency** | trace_id+nonce 查重，重放即拒 | 重复扣款 |
+
+<!-- 插图 3：五道验证流程图（五道闸门 + VERIFIED/BLOCKED 分叉） -->
+![Five Gates](docs/images/readme/five-gates.png)
+
+**为什么可信**：不说"我们更安全"，只说"我们测了"——红队攻击、参数篡改、重放、注入共 ⟨待测·S3/S4⟩ 条用例实测拦截记录 + Ablation 消融实验证明接入 Runtime 后不安全操作率趋近于 0（⟨待测·板块二⟩，看板 `/ai/benchmark`）。
+
+---
+
+## 🔐 安全内核：BankAction IR + 五道确定性验证
+
+**BankAction IR**（自研中间表示）——LLM 的"方言"与账本的"方言"之间的译码层：
+
+```json
+{
+  "trace_id": "bai_8f7a29e1",
+  "intent": "transfer_execute",
+  "facts": [{ "value": "张三", "provenance": "user_input", "trust": "TRUSTED" }],
+  "steps": [{ "op": "transfer_execute", "params": { "recipient": "payee:42", "amount": "500.00" }, "dep": ["contacts_search"] }],
+  "risk": { "tier": "YELLOW", "reasons": [] },
+  "preconditions": ["balance >= amount", "recipient.status == ACTIVE"],
+  "compensation": ["unlock_funds"]
+}
 ```
-自然语言/表单 → Agent Planner(LLM, Key 仅在服务端)
-   → BankAction IR（facts 带 provenance/trust）
-   → Suveoo Verification Runtime（五道确定性验证）
-   → VERIFIED → LedgerDO/SagaDO（SQLite 账本 + Saga 补偿）
-```
 
-### 2.2 基础设施
+- **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
+- **Verified GenUI**：确认卡上渲染的金额/收款人/费用**只来自已验证的 IR 快照**（`issuer === "verified_ir"`），"界面显示 ¥500、后端转 ¥5000"从架构上被堵死。13 个验证组件覆盖全部写操作形态。
+- **红级强验证**：短信 + 邮箱双通道 OTP、生物识别（Android）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
+- **全程审计**：每笔写操作 `user_audit` 五字段落库 + Trust Console 实时五盏灯（评委可在演示里亲眼看 POLICY→CONSENT→PROVENANCE→INVARIANTS→REPLAY 逐门亮起）。
 
-Cloudflare 1 Worker + 2 KV + 1 R2 + 2 Durable Object class + Email Service + Telegram 运维通知（tgFire，waitUntil 生命周期保障）。前端为无构建 MPA + PWA（三语 zh-CN/zh-TW/en-US）。
+<!-- 插图 4：Consent Binding 现场演示截图（确认卡 + 改金额后 BLOCKED 提示，带高级边框） -->
+![Consent Binding Demo](docs/images/readme/consent-binding.png)
 
-## 3. 架构和部署简介
+<details>
+<summary><b>🔧 验证器实现细节（点开）</b></summary>
 
-### 3.1 本地运行
+- `compileToIR()` / `verify()` / `runGuarded()` —— `backend/worker-main.js`
+- Grant：SHA256(intent + authFields + user_id + expires_at + nonce)，KV 存储 TTL 300s，服务端消费一次
+- Taint 检查先于 Consent；GREEN 工具轻量通道（仅 Provenance 标注）
+- 金额内核：十进制字符串 → bigint 分单位，全程无浮点（`toCents/centsToStr/marketValueCents/navScaled4`）
+- 单测锁定：`tests/unit/{ir-compiler,consent-binding,taint-check,invariants,idempotency,policy-engine,money-math}.test.js`
+
+</details>
+
+---
+
+## 🤖 Suveoo AI：说话就能办业务
+
+**63 个 MCP 工具**（GREEN 26 / YELLOW 24 / RED 13）覆盖查询、转账、账单、理财、卡片、订阅、任务、计算器、站点指南——全部走同一 IR→五道管线。
+
+<!-- 插图 5：AI 对话界面截图（深色/浅色对话 + 内嵌计算器 + 确认卡同框） -->
+![AI Chat](docs/images/readme/ai-chat.png)
+
+### 代表性能力（均生产实测）
+
+- **模糊表达与反问澄清**：说"挂失尾号 6792 的卡，帮我补办"→ AI 核对卡片 → **反问邮寄地址并明言"我不能代填"**（服务端结构化拒绝兜底）→ 报费用三项合计 ¥53 → 预告验证码流程。
+- **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
+- **对话即方案（动态产品拼装）**："5 万闲钱半年后买车"→ 服务端**确定性拼装**存款阶梯 + 期限封顶基金层 + 货币基金流动性层（非模型自由推荐）→ 一键组合购买（两段式 grant + PR 适当性 + 部分失败按成本回退）。
+- **组合操作 DAG**："冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 组合方案卡（整卡=最高级别、金额合计判红、**红级一次 OTP**）→ `batch_execute` 逐项执行、失败即停。
+- **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 ✓ → T2 商户下单 → C1 解锁补偿`、**现场故障注入按钮**给评委看真实回滚。
+- **AI 主动银行**：规则引擎扫描沉睡订阅/周期转账/自动扣款/还款/闲钱理财 → 提议清单 + **站内/Android 推送/Email 三路提醒**；洞察行整行点击直发 AI。
+- **真自动缴费**：cron 引擎（每 5 分钟扫描、北京时区、月末并档、防重键）——生产部署后首个 cron 真实自动扣款两笔（¥286.40 / ¥28,453.27），流水 `channel=auto` 可查。
+- **语音输入**：阿里云实时 ASR + Web Speech 双通道，无 GMS 的老华为真机可用。
+- **全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
+
+<!-- 插图 6：对话内嵌计算器（tool-embed）特写截图 -->
+![Tool Embed](docs/images/readme/tool-embed.png)
+<!-- 插图 7：对话即方案（solution_preview 组合方案卡）截图 -->
+![Solution Preview](docs/images/readme/solution-preview.png)
+<!-- 插图 8：组合操作卡（冻结+挂失两项、风险圆点、一次 OTP）截图 -->
+![Operations Package](docs/images/readme/operations-package.png)
+<!-- 插图 9：生日订花 Saga + Trust Console 五盏灯截图 -->
+![Saga Trust Console](docs/images/readme/saga-trust-console.png)
+
+---
+
+## 🎯 六大官方场景全覆盖
+
+| 场景 | Suveoo 实现 | 证据 |
+|---|---|---|
+| ① 智能转账 | 按人名/手机号/邮箱/卡号收款、AA 分账（¥860/3→286.67/286.67/286.66）、预约转账、跨用户双记 | transfer-flow 10 用例 |
+| ② 账单分析 | 分类统计、异常归因、月度 PDF 报告（pdf-lib 矢量品牌） | 对账三 bug 根治记录 |
+| ③ 理财操作 | 16 基金 + 5 存款档、PR 分级适当性、一键申赎、**对话即方案**、攒钱目标五件套 | solution-package 集成测试 + 生产 ¥10 真实执行 |
+| ④ 卡片管理 | 状态/限额/冻结解冻、**卡片挂失全链**（三态页/红级打包费用/签收激活/LOSS_ACTIVE 防绕过） | card-loss 4 用例 + 生产双通道闭环 |
+| ⑤ 订阅代扣 | 订阅扫描/退订/提醒、**真自动缴费引擎** | bills-autopay 3 用例 + 生产 cron 实扣 |
+| ⑥ 跨场景联动 | 生日锁定+订花 Saga、月度自动攒、组合 DAG | birthday-chain / saga-compensation + 故障注入 |
+
+---
+
+## 📱 一套代码，全平台
+
+- **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1531 键恒等**、SEO 三方友善。
+- **Android**（Capacitor 8）：本地资产秒载、生物识别四场景、**后台原生通知服务**、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；**站内链接 100% App 内原生打开 + 站外链接内嵌浏览器**（无 GMS 设备可用——荣耀 V10 真机长期在测试矩阵）。
+
+<!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
+![Multi Platform](docs/images/readme/multi-platform.png)
+
+---
+
+## 🧪 测试与评测：我们测了，才敢说
+
+**自动化测试 411 条全绿**（vitest + @cloudflare/vitest-pool-workers，unit 23 / integration 30 / attack 4 文件）：
+
+- **红队攻击**：提示注入 5 + 越权 7 + 篡改 5 + 重放 5 = 22 条，全部结构化 BLOCKED（⟨待测·S3 v2⟩ 变体族扩至 80 条：角色扮演/跨语言/Unicode 同形/长上下文稀释…）
+- **越权拦截**：伪造/篡改/过期 grant、红黄错位、跨用户访问 + 状态守卫族（重复冻结 ALREADY_FROZEN / 挂失中解冻 LOSS_ACTIVE…）全部前置拦截
+- **数学正确性**：金额 bigint 内核、分账守恒、守恒断言单测锁定
+- **SuveooBench**：512 用例评测看板（`/ai/benchmark`，12 指标 + 三模型消融柱状图）——数字将以实测回填（⟨待测·板块二⟩）
+- **生产 E2E**：真实账户全流程（挂失→冻结→邮件/通知→签收激活→恢复）+ AI 通道全流程（发起→查进度→激活"操作成功"），终态零残留
+
+| 安全指标 | 用例数 | 拦截/通过 | 状态 |
+|---|---|---|---|
+| 提示注入拦截 | 14 → ⟨待测·S3 v2 80⟩ | 14/14 | ✅ 实测 / 扩容待测 |
+| 越权与篡改拦截 | 17+6 → ⟨待测·S4 31⟩ | 23/23 | ✅ 实测 / 扩容待测 |
+| 幻觉防护（数值/执行一致） | ⟨待测·S1/S2 52⟩ | ⟨待测⟩ | ⏳ 计划 |
+| 消融（裸模型 vs +Runtime） | ⟨待测·Ablation⟩ | Unsafe→≈0 | ⏳ 计划 |
+
+> 完整方案：`for_developer/testing_20261002.md`（v1.1，~276 条新增用例 + 消融实验设计）。
+
+---
+
+## 🚀 快速开始
 
 ```bash
-cd backend
+git clone https://github.com/Suveoo/suveoo.git && cd suveoo/backend
 npm install
-npx wrangler dev          # http://127.0.0.1:8787（需先 wrangler login；R2 走远端桶）
-npm test                  # 287 用例（真实 workerd 运行时）
+npx wrangler dev        # 本地起 Worker + DO + KV + R2 模拟
+# → http://localhost:8787
+npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 ```
 
-### 3.2 部署简要说明
+**演示账户**：`demo@suveoo.com` / `jinrongkeji2026`（模拟银行系统，不涉及真实资金；登录含邮箱验证码 2FA；可用 `/api/demo/seed` 重灌演示数据——DEMO_MODE 门控）。
 
-```bash
-cd backend
-npx wrangler deploy                     # Worker（路由 suveoo.com/* 已配置）
-node scripts/deploy-frontend.mjs        # 前端全量上传 R2（put+get 回验）
-# 注入演示种子（DEMO_MODE=true 且 x-admin-token 与 secret ADMIN_TOKEN 匹配，fail-closed；
-# 可选 body {"email":"..."} 为任意已注册账户灌全板块仿真数据、{"inspect":true} 只读巡检查收款人合法性）
-curl -X POST -H "x-admin-token: <ADMIN_TOKEN>" https://suveoo.com/api/demo/seed
-```
+完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建）。
 
-详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+---
 
-### 3.3 仓库结构
+## 📁 仓库结构
 
 ```
-backend/   单文件 Worker（worker-main.js，七大区块）+ tests（unit/integration/attack/bench，53 个测试文件）
-frontend/  无构建 MPA（74 页面 + 60 控制器 + i18n 四包 1263 键 + 数据 JSON + 自研 SVG 图表）→ 整目录上传 R2
-docs/      architecture / core-algorithms / security-self-assessment / test-cases
-```
-
-### 3.4 文档
-
-**架构**：[docs/architecture.md](./docs/architecture.md)
-
-**核心算法**：[docs/core-algorithms.md](./docs/core-algorithms.md)
-
-**安全自评**（权限分级 + 已知风险）：[docs/security-self-assessment.md](./docs/security-self-assessment.md)
-
-**测试用例**：[docs/test-cases.md](./docs/test-cases.md)
-
-**部署**：[DEPLOYMENT.md](./DEPLOYMENT.md)
-
-### 3.5 安全要點速览
-
-**三色权限**：绿自动 / 黄确认（grant_hash 参数级绑定，120s）/ 红强验证（+邮箱 OTP）
-
-**防注入**：授权字段必须 TRUSTED 来源；商户备注等外部文本不能产生授权（先于授权请求拦截）
-
-**防幻觉**：结果只来自账本；GenUI 卡片数据只来自已验证快照；金额 bigint 分杜绝浮点
-
-**防重放**：IR nonce 幂等集
-
-**Saga**：T1✓→T2✗→C1✓ 补偿（生日订花现场可注入故障演示）
-
-### 3.6 Project Directory Tree
-
-```
-D:\suveoo\
-├── .github/
-│   └── workflows/
-│       ├── deploy.yml                        # CI/CD：测试 → wrangler deploy → R2 前端上传
-│       └── test.yml                          # PR/push：unit + integration + attack 全量测试
+suveoo/
 ├── backend/
-│   ├── bench/
-│   │   ├── glm-baseline-20260921-long.json
-│   │   ├── glm-baseline-20260921.json
-│   │   ├── quality-matrix-2026-09-20.json
-│   │   ├── quality-matrix-output.txt
-│   │   └── quality-matrix-progress.txt
-│   ├── scripts/
-│   │   ├── ai-bench-baseline.json
-│   │   ├── ai-bench-long.json
-│   │   ├── ai-bench-post1.json
-│   │   ├── ai-bench-post2.json
-│   │   ├── ai-bench-post3.json
-│   │   ├── ai-bench-post4.json
-│   │   ├── ai-bench.mjs
-│   │   ├── ai-confirm.mjs
-│   │   ├── ai-diag.mjs
-│   │   ├── check-site-coverage.mjs
-│   │   ├── deploy-frontend.mjs               # 前端两阶段上传 R2（资产先就位、HTML 最后切换）
-│   │   ├── gen-fund-data.mjs
-│   │   ├── gen-tool-pages.mjs
-│   │   ├── i18n-add-tc.mjs
-│   │   ├── i18n-add.mjs
-│   │   ├── i18n-keys-round22-a.json
-│   │   ├── i18n-keys-round22-b.json
-│   │   ├── i18n-keys-round22-c.json
-│   │   ├── i18n-keys-task1.json
-│   │   ├── i18n-keys-task2.json
-│   │   ├── i18n-keys-task4.json
-│   │   ├── i18n-phase3-add.mjs
-│   │   ├── i18n-r35-add.mjs
-│   │   ├── i18n-r7-update.mjs
-│   │   ├── measure-payload.mjs
-│   │   ├── noto-sans-sc-report.ttf
-│   │   ├── pdf-repro.mjs
-│   │   ├── quality-matrix.mjs
-│   │   ├── r8-desc-budget-check.cjs
-│   │   ├── r8-i18n-update.mjs
-│   │   ├── r8-strip-sim-banner.mjs
-│   │   ├── seed-demo-data.mjs
-│   │   ├── subset-cjk.mjs.py                 # 报告 PDF 中文字体预子集（fontTools）
-│   │   └── verify-payee-phone.mjs
-│   ├── tests/
-│   │   ├── attack/                           # 攻击测试（提示注入/越权/重放/同意篡改）
-│   │   │   ├── authorization-bypass.test.js
-│   │   │   ├── consent-mutation.test.js
-│   │   │   ├── prompt-injection.test.js
-│   │   │   └── replay-attack.test.js
-│   │   ├── bench/                            # 评测集（红队矩阵/长会话基准）
-│   │   │   └── generate-benchmark.js
-│   │   ├── helpers/
-│   │   │   └── test-creds.js
-│   │   ├── integration/                      # 集成测试（转账/预约/通知/理财/生日链等 40+ 文件）
-│   │   │   ├── birthday-chain.test.js
-│   │   │   ├── card-ledger.test.js
-│   │   │   ├── card-reveal.test.js
-│   │   │   ├── chat-history.test.js
-│   │   │   ├── circuit-breaker.test.js
-│   │   │   ├── contact-mail.test.js
-│   │   │   ├── dashboard-ext.test.js
-│   │   │   ├── demo-admin.test.js
-│   │   │   ├── dimensional-seed.test.js
-│   │   │   ├── funds-nav.test.js
-│   │   │   ├── fx-exchange.test.js
-│   │   │   ├── goals-chain.test.js
-│   │   │   ├── new-tools.test.js
-│   │   │   ├── notifications-center.test.js
-│   │   │   ├── payee-phone.test.js
-│   │   │   ├── proposals-flow.test.js
-│   │   │   ├── redteam-guard.test.js
-│   │   │   ├── registration-provisioning.test.js
-│   │   │   ├── saga-compensation.test.js
-│   │   │   ├── scheduled-tasks.test.js
-│   │   │   ├── security-credential.test.js
-│   │   │   ├── self-seed.test.js
-│   │   │   ├── solution-package.test.js
-│   │   │   ├── static-routing.test.js
-│   │   │   ├── transfer-flow.test.js
-│   │   │   ├── tx-scope.test.js
-│   │   │   └── wealth-redeem.test.js
-│   │   └── unit/                             # 单元测试（LLM 流/IR/安全语义锁定等）
-│   │       ├── auth-crypto.test.js
-│   │       ├── calc-tools.test.js
-│   │       ├── card-plan.test.js
-│   │       ├── chat-history.test.js
-│   │       ├── consent-binding.test.js
-│   │       ├── fund-data.test.js
-│   │       ├── fund-nav-live.test.js
-│   │       ├── goals.test.js
-│   │       ├── idempotency.test.js
-│   │       ├── invariants.test.js
-│   │       ├── ir-compiler.test.js
-│   │       ├── llm-stream.test.js
-│   │       ├── money-math.test.js
-│   │       ├── policy-engine.test.js
-│   │       ├── proposal-engine.test.js
-│   │       ├── reminder-task.test.js
-│   │       ├── schema-migration.test.js
-│   │       ├── seed-dimensional.test.js
-│   │       ├── seed-mogul.test.js
-│   │       ├── site-guide.test.js
-│   │       └── taint-check.test.js
-│   ├── .dev.vars.example
-│   ├── package-lock.json
-│   ├── package.json                          # agents/@modelcontextprotocol/zod/pdf-lib/vitest/wrangler
-│   ├── reports
-│   ├── vitest.config.js                      # cloudflareTest 插件（真实 workerd）
-│   ├── worker-main.js                        # ★ 唯一 Worker 入口（路由/LedgerDO/SagaDO/IR 五道验证/LLM/MCP 54 工具/报告 PDF/site_guide）
-│   ├── wrangler.test.toml                    # vitest-pool-workers 测试环境（+MAIL_OUTBOX）
-│   └── wrangler.toml                         # 1 Worker + 2 KV + R2 + 2 DO + send_email 绑定
-├── docs/
-│   ├── architecture.md                       # 系统架构图（五层拓扑、转账时序）
-│   ├── core-algorithms.md                    # 核心算法（IR 编译、五道验证、Saga、分账数学）
-│   ├── design-language.md
-│   ├── security-self-assessment.md           # 安全自评（权限分级 + 已知风险）
-│   └── test-cases.md                         # 测试用例说明
-├── frontend/
-│   ├── .well-known/
-│   │   └── security.txt
-│   ├── about/
-│   │   └── index.html
-│   ├── account/
-│   │   ├── card/
-│   │   │   ├── history/
-│   │   │   │   └── index.html
-│   │   │   └── settings/
-│   │   │       └── index.html
-│   │   ├── cards/
-│   │   │   └── index.html
-│   │   ├── dashboard/
-│   │   │   └── index.html
-│   │   ├── downloads/
-│   │   │   └── index.html
-│   │   ├── login/
-│   │   │   └── index.html
-│   │   ├── recovery/
-│   │   │   └── index.html
-│   │   ├── register/
-│   │   │   └── index.html
-│   │   ├── risk-assessment/
-│   │   │   └── index.html
-│   │   ├── security/
-│   │   │   └── index.html
-│   │   ├── transactions/
-│   │   │   └── index.html
-│   │   └── index.html
-│   ├── ai/
-│   │   ├── benchmark/
-│   │   │   └── index.html
-│   │   ├── proposals/
-│   │   │   └── index.html
-│   │   ├── tasks/
-│   │   │   └── index.html
-│   │   └── index.html
-│   ├── assets/
-│   │   ├── css/
-│   │   │   ├── base.css                      # 基础重置
-│   │   │   ├── components.css                # 组件库（btn/card/table/modal…）
-│   │   │   ├── genui.css                     # GenUI 确认卡
-│   │   │   ├── layout.css                    # 全局框架（header/侧栏/footer）
-│   │   │   ├── pages.css                     # 页面级系统（tf-*/nt-*/cs-*/dc-tbl…）
-│   │   │   ├── polish.css                    # 光学精修层（最后加载，覆盖型规则置此）
-│   │   │   ├── tokens.css                    # 设计令牌
-│   │   │   └── trust-console.css             # Trust Console
-│   │   ├── data/                             # 公共数据 JSON（理财/汇率/公告，R2 直读）
-│   │   │   ├── deposits/
-│   │   │   │   ├── demand.json
-│   │   │   │   ├── notice-7d.json
-│   │   │   │   ├── term-1y.json
-│   │   │   │   ├── term-3m.json
-│   │   │   │   ├── term-3y.json
-│   │   │   │   └── term-6m.json
-│   │   │   ├── funds/
-│   │   │   │   ├── ai-semi.json
-│   │   │   │   ├── apac-tech.json
-│   │   │   │   ├── cn-dividend.json
-│   │   │   │   ├── consumer-staples.json
-│   │   │   │   ├── em-gov-bond.json
-│   │   │   │   ├── esg-bond.json
-│   │   │   │   ├── global-equity-index.json
-│   │   │   │   ├── global-mixed-1.json
-│   │   │   │   ├── global-mixed-2.json
-│   │   │   │   ├── global-money-1.json
-│   │   │   │   ├── global-short-bond.json
-│   │   │   │   ├── gold-index.json
-│   │   │   │   ├── healthcare-bio.json
-│   │   │   │   ├── new-energy.json
-│   │   │   │   ├── quant-neutral.json
-│   │   │   │   └── reit-global.json
-│   │   │   ├── announcements.json
-│   │   │   ├── benchmark.json
-│   │   │   ├── faq.json
-│   │   │   └── fx.json
-│   │   ├── fonts/                            # 报告 PDF 中文子集字体
-│   │   │   ├── inter-variable.ttf
-│   │   │   ├── noto-sans-mono.ttf
-│   │   │   ├── noto-sans-sc-report.ttf
-│   │   │   ├── noto-sans-sc.ttf
-│   │   │   └── noto-sans-tc.ttf
-│   │   ├── icons/
-│   │   │   └── sprite.svg                    # 线性图标雪碧图
-│   │   ├── images/                           # 插画/卡面/og 等素材
-│   │   │   ├── cards-front/
-│   │   │   │   ├── credit-cards/
-│   │   │   │   │   ├── credit-card-1-front.jpg
-│   │   │   │   │   ├── credit-card-1-front.svg
-│   │   │   │   │   ├── credit-card-1-front.webp
-│   │   │   │   │   ├── credit-card-2-front.jpg
-│   │   │   │   │   ├── credit-card-2-front.svg
-│   │   │   │   │   ├── credit-card-2-front.webp
-│   │   │   │   │   ├── credit-card-3-front.jpg
-│   │   │   │   │   ├── credit-card-3-front.svg
-│   │   │   │   │   ├── credit-card-3-front.webp
-│   │   │   │   │   ├── credit-card-4-front.jpg
-│   │   │   │   │   ├── credit-card-4-front.svg
-│   │   │   │   │   └── credit-card-4-front.webp
-│   │   │   │   ├── debit-cards/
-│   │   │   │   │   ├── debit-card-1-front.jpg
-│   │   │   │   │   ├── debit-card-1-front.svg
-│   │   │   │   │   ├── debit-card-1-front.webp
-│   │   │   │   │   ├── debit-card-2-front.jpg
-│   │   │   │   │   ├── debit-card-2-front.svg
-│   │   │   │   │   ├── debit-card-2-front.webp
-│   │   │   │   │   ├── debit-card-3-front.jpg
-│   │   │   │   │   ├── debit-card-3-front.svg
-│   │   │   │   │   ├── debit-card-3-front.webp
-│   │   │   │   │   ├── debit-card-4-front.jpg
-│   │   │   │   │   ├── debit-card-4-front.svg
-│   │   │   │   │   ├── debit-card-4-front.webp
-│   │   │   │   │   ├── debit-card-5-front.jpg
-│   │   │   │   │   ├── debit-card-5-front.svg
-│   │   │   │   │   ├── debit-card-5-front.webp
-│   │   │   │   │   ├── debit-card-6-front.jpg
-│   │   │   │   │   ├── debit-card-6-front.svg
-│   │   │   │   │   ├── debit-card-6-front.webp
-│   │   │   │   │   ├── debit-card-7-front.jpg
-│   │   │   │   │   ├── debit-card-7-front.svg
-│   │   │   │   │   ├── debit-card-7-front.webp
-│   │   │   │   │   ├── debit-card-8-front.jpg
-│   │   │   │   │   ├── debit-card-8-front.svg
-│   │   │   │   │   └── debit-card-8-front.webp
-│   │   │   │   ├── credit-card-1-front.webp
-│   │   │   │   ├── credit-card-2-front.webp
-│   │   │   │   ├── credit-card-3-front.webp
-│   │   │   │   ├── credit-card-4-front.webp
-│   │   │   │   ├── debit-card-1-front.webp
-│   │   │   │   ├── debit-card-2-front.webp
-│   │   │   │   ├── debit-card-3-front.webp
-│   │   │   │   ├── debit-card-4-front.webp
-│   │   │   │   ├── debit-card-5-front.webp
-│   │   │   │   ├── debit-card-6-front.webp
-│   │   │   │   ├── debit-card-7-front.webp
-│   │   │   │   └── debit-card-8-front.webp
-│   │   │   ├── illustrations/
-│   │   │   │   ├── ai-deco.svg
-│   │   │   │   ├── ai-hero.svg
-│   │   │   │   ├── assets-coins.svg
-│   │   │   │   ├── badge-achievement.svg
-│   │   │   │   ├── badge-perk.svg
-│   │   │   │   ├── bill-due.svg
-│   │   │   │   ├── card-repay.svg
-│   │   │   │   ├── cat-deposit.svg
-│   │   │   │   ├── cat-fund.svg
-│   │   │   │   ├── cat-insurance.svg
-│   │   │   │   ├── dca-auto.svg
-│   │   │   │   ├── empty-state.svg
-│   │   │   │   ├── error-404.svg
-│   │   │   │   ├── offline.svg
-│   │   │   │   ├── product-card-perks.svg
-│   │   │   │   ├── README.md
-│   │   │   │   ├── security-shield.svg
-│   │   │   │   └── wallet-cashflow.svg
-│   │   │   ├── about-banner.webp
-│   │   │   ├── home-banner.webp
-│   │   │   ├── og-image.jpg
-│   │   │   ├── og-image.png
-│   │   │   ├── og-image.webp
-│   │   │   ├── suveoo-ai-logo.png
-│   │   │   ├── suveoo-ai-logo.svg
-│   │   │   ├── suveoo-logo-circular.png
-│   │   │   ├── suveoo-logo-circular.svg
-│   │   │   ├── suveoo-logo-long.png
-│   │   │   ├── suveoo-logo-long.svg
-│   │   │   ├── suveoo-logo-square.png
-│   │   │   └── suveoo-logo-square.svg
-│   │   └── js/
-│   │       ├── charts/                       # 自研 SVG 图表（line/bar/donut/sparkline/sankey）
-│   │       │   ├── bar.js
-│   │       │   ├── donut.js
-│   │       │   ├── line.js
-│   │       │   ├── sankey.js
-│   │       │   └── sparkline.js
-│   │       ├── chat/                         # AI 对话客户端 + Trust Console
-│   │       │   ├── chat-client.js
-│   │       │   └── trust-console.js
-│   │       ├── core/                         # 核心运行时（app/router/api/auth/i18n/md/ctl/ui/fmt/insights…）
-│   │       │   ├── api.js
-│   │       │   ├── app.js
-│   │       │   ├── auth.js
-│   │       │   ├── ctl.js
-│   │       │   ├── format.js
-│   │       │   ├── ga4.js
-│   │       │   ├── i18n.js
-│   │       │   ├── insights.js
-│   │       │   ├── md.js
-│   │       │   ├── prefetch.js
-│   │       │   ├── router.js
-│   │       │   ├── sim-notice.js
-│   │       │   ├── ui.js
-│   │       │   └── voice.js
-│   │       ├── genui/                        # 确认卡渲染/两段式 consent/OTP
-│   │       │   ├── cards.js
-│   │       │   ├── consent.js
-│   │       │   └── renderer.js
-│   │       ├── pages/                        # 75 页控制器（S.toolPages 双用=页面+AI 内嵌）
-│   │       │   ├── about.js
-│   │       │   ├── account.js
-│   │       │   ├── ai-benchmark.js
-│   │       │   ├── ai-tasks.js
-│   │       │   ├── ai.js
-│   │       │   ├── bills.js
-│   │       │   ├── budget-allocator.js
-│   │       │   ├── card-history.js
-│   │       │   ├── card-settings.js
-│   │       │   ├── cards.js
-│   │       │   ├── contact.js
-│   │       │   ├── credit-payoff.js
-│   │       │   ├── dashboard.js
-│   │       │   ├── demo-lab.js
-│   │       │   ├── deposit-compare.js
-│   │       │   ├── deposit-detail.js
-│   │       │   ├── deposits.js
-│   │       │   ├── docs-about.js
-│   │       │   ├── docs-cookie.js
-│   │       │   ├── docs-en-pri.js
-│   │       │   ├── docs-en-tm.js
-│   │       │   ├── docs-help.js
-│   │       │   ├── docs-tw-pri.js
-│   │       │   ├── docs-tw-tm.js
-│   │       │   ├── docs-zh-pri.js
-│   │       │   ├── docs-zh-tm.js
-│   │       │   ├── downloads.js
-│   │       │   ├── fund-detail.js
-│   │       │   ├── funds.js
-│   │       │   ├── fx-convert.js
-│   │       │   ├── fx.js
-│   │       │   ├── goal-planner.js
-│   │       │   ├── help.js
-│   │       │   ├── home.js
-│   │       │   ├── inflation-calculator.js
-│   │       │   ├── intrabank-scheduled.js
-│   │       │   ├── intrabank.js
-│   │       │   ├── legal-docs.js
-│   │       │   ├── legal.js
-│   │       │   ├── loan-compare.js
-│   │       │   ├── login.js
-│   │       │   ├── notifications.js
-│   │       │   ├── pay.js
-│   │       │   ├── payees.js
-│   │       │   ├── proposals.js
-│   │       │   ├── recovery.js
-│   │       │   ├── register.js
-│   │       │   ├── retirement.js
-│   │       │   ├── risk-assessment.js
-│   │       │   ├── savings-compound.js
-│   │       │   ├── security.js
-│   │       │   ├── split-bill-plus.js
-│   │       │   ├── subscriptions.js
-│   │       │   ├── tools.js
-│   │       │   ├── transactions.js
-│   │       │   ├── transfer-history.js
-│   │       │   ├── transfer-limits.js
-│   │       │   ├── wealth-goals.js
-│   │       │   ├── wealth-my.js
-│   │       │   ├── wealth.js
-│   │       │   └── download.js
-│   │       └── tools/
-│   │           └── tool-kit.js
-│   ├── contact/
-│   │   └── index.html
-│   ├── cookie-privacy/
-│   │   └── index.html
-│   ├── demo-lab/
-│   │   └── index.html
-│   ├── favicon/                              # 站点图标
-│   │   ├── android-chrome-512x512.png
-│   │   ├── apple-touch-icon.png
-│   │   ├── favicon-1024x1024.png
-│   │   ├── favicon-128x128.png
-│   │   ├── favicon-144x144.png
-│   │   ├── favicon-16x16.png
-│   │   ├── favicon-180x180.png
-│   │   ├── favicon-192x192.png
-│   │   ├── favicon-2048x2048.png
-│   │   ├── favicon-256x256.png
-│   │   ├── favicon-32x32.png
-│   │   ├── favicon-48x48.png
-│   │   ├── favicon-512x512.png
-│   │   ├── favicon-96x96.png
-│   │   ├── favicon.ico
-│   │   ├── favicon.png
-│   │   ├── favicon.svg
-│   │   └── favicon.webp
-│   ├── flags/
-│   │   ├── cn.svg
-│   │   ├── us.svg
-│   │   ├── eu.svg
-│   │   ├── jp.svg
-│   │   ├── gb.svg
-│   │   ├── hk.svg
-│   │   ├── sg.svg
-│   │   ├── au.svg
-│   │   ├── ca.svg
-│   │   ├── ch.svg
-│   │   └── nz.svg
-│   ├── help/
-│   │   └── index.html
-│   ├── home/
-│   │   └── index.html
-│   ├── i18n/                                 # 四语言包（zh-CN/en-US/zh-TW/fallback，键集恒等）
-│   │   ├── en-US.json
-│   │   ├── fallback.json
-│   │   ├── zh-CN.json
-│   │   └── zh-TW.json
-│   ├── notifications/
-│   │   └── index.html
-│   ├── offline/
-│   │   └── index.html                        # PWA 离线兜底页
-│   ├── pay/
-│   │   ├── bills/
-│   │   │   └── index.html
-│   │   ├── subscriptions/
-│   │   │   └── index.html
-│   │   └── index.html
-│   ├── privacy-policy/
-│   │   └── index.html
-│   ├── terms/
-│   │   └── index.html
-│   ├── transfer/
-│   │   ├── history/
-│   │   │   └── index.html
-│   │   ├── intrabank/
-│   │   │   └── index.html
-│   │   ├── intrabank-scheduled/
-│   │   │   └── index.html
-│   │   ├── limits/
-│   │   │   └── index.html
-│   │   └── payees/
-│   │       └── index.html
-│   ├── wealth/
-│   │   ├── deposits/
-│   │   │   ├── demand/
-│   │   │   │   └── index.html
-│   │   │   ├── notice-7d/
-│   │   │   │   └── index.html
-│   │   │   ├── term-1y/
-│   │   │   │   └── index.html
-│   │   │   ├── term-3m/
-│   │   │   │   └── index.html
-│   │   │   ├── term-3y/
-│   │   │   │   └── index.html
-│   │   │   ├── term-6m/
-│   │   │   │   └── index.html
-│   │   │   └── index.html
-│   │   ├── funds/
-│   │   │   ├── ai-semi/
-│   │   │   │   └── index.html
-│   │   │   ├── apac-tech/
-│   │   │   │   └── index.html
-│   │   │   ├── cn-dividend/
-│   │   │   │   └── index.html
-│   │   │   ├── consumer-staples/
-│   │   │   │   └── index.html
-│   │   │   ├── em-gov-bond/
-│   │   │   │   └── index.html
-│   │   │   ├── esg-bond/
-│   │   │   │   └── index.html
-│   │   │   ├── global-equity-index/
-│   │   │   │   └── index.html
-│   │   │   ├── global-mixed-1/
-│   │   │   │   └── index.html
-│   │   │   ├── global-mixed-2/
-│   │   │   │   └── index.html
-│   │   │   ├── global-money-1/
-│   │   │   │   └── index.html
-│   │   │   ├── global-short-bond/
-│   │   │   │   └── index.html
-│   │   │   ├── gold-index/
-│   │   │   │   └── index.html
-│   │   │   ├── healthcare-bio/
-│   │   │   │   └── index.html
-│   │   │   ├── new-energy/
-│   │   │   │   └── index.html
-│   │   │   ├── quant-neutral/
-│   │   │   │   └── index.html
-│   │   │   ├── reit-global/
-│   │   │   │   └── index.html
-│   │   │   └── index.html
-│   │   ├── fx/
-│   │   │   └── index.html
-│   │   ├── goals/
-│   │   │   └── index.html
-│   │   ├── my/
-│   │   │   └── index.html
-│   │   ├── tools/
-│   │   │   ├── budget-allocator/
-│   │   │   │   └── index.html
-│   │   │   ├── credit-payoff/
-│   │   │   │   └── index.html
-│   │   │   ├── deposit-compare/
-│   │   │   │   └── index.html
-│   │   │   ├── fx-convert/
-│   │   │   │   └── index.html
-│   │   │   ├── goal-planner/
-│   │   │   │   └── index.html
-│   │   │   ├── inflation-calculator/
-│   │   │   │   └── index.html
-│   │   │   ├── loan-compare/
-│   │   │   │   └── index.html
-│   │   │   ├── retirement/
-│   │   │   │   └── index.html
-│   │   │   ├── savings-compound/
-│   │   │   │   └── index.html
-│   │   │   ├── split-bill-plus/
-│   │   │   │   └── index.html
-│   │   │   └── index.html
-│   │   └── index.html
-│   ├── 404.html
-│   ├── index.html
-│   ├── llms.txt
-│   ├── manifest.json                         # PWA 清单
-│   ├── robots.txt
-│   ├── service-worker.js                     # PWA SW（network-first+缓存版本 v=bNNN）
-│   └── sitemap.xml
-├── .editorconfig                             # 统一缩进/换行/编码
-├── .gitignore                                # 密钥/内部资料/构建产物排除
-├── DEPLOYMENT.md                             # 部署手册
-└── README.md                                 # 竞赛仓库入口（§15 变更记录=全量迭代史）
+│   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9700 行）
+│   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
+│   ├── tests/                  # 411 用例（unit / integration / attack / bench）
+│   └── scripts/                # 部署/APK 构建/AI 基准/导航验证
+├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA
+├── docs/                       # 架构 / 核心算法 / 安全自评 / 设计语言 / 测试说明
+├── for_developer/              # 内部文档（测试方案 / 特性全景 / 运维教程）
+├── DEPLOYMENT.md               # 部署手册
+└── README.md
 ```
 
-## 4. 页面简介
+---
 
-### 4.1 页面总目录（Canonical Page Registry）
+## 🗺 文档地图
 
-所有页面 URL 末尾加 `/` 等价可访问（Worker 静态处理器统一规范化）。URL 一律小写、连字符分词。
+| 文档 | 内容 |
+|---|---|
+| [from_README_start_to_4.md](./from_README_start_to_4.md) + [from_README_5_to_end.md](./from_README_5_to_end.md) | 全量开发实录（155 版 changelog，每一版含根因分析） |
+| [docs/architecture.md](./docs/architecture.md) · [docs/core-algorithms.md](./docs/core-algorithms.md) | 系统架构 / 核心算法（注意：写于早期，数字以本 README 为准） |
+| [docs/security-self-assessment.md](./docs/security-self-assessment.md) | 安全自评（权限分级实现 + 已知风险清单） |
+| [for_developer/suveoo_ai_features.md](./for_developer/suveoo_ai_features.md) | 特性全景母本（20 章，技术+叙事双文体） |
+| [for_developer/testing_20261002.md](./for_developer/testing_20261002.md) | 多指标测试体系 + Ablation 实验方案 v1.1 |
 
-**分区页**（Side Drawer / 底部导航五大分区）：
+---
 
-| ID | URL | 名称 | 需登录 | 主要风险交互 |
-|----|-----|------|--------|--------------|
-| P01 | `/home` | 主页 | 否（登录后数据增强） | — |
-| P02 | `/pay` | 收付总览 | 是 | 转账入口（黄/红） |
-| P03 | `/ai` | Suveoo AI 对话 + Trust Console | 是 | 全部三色 |
-| P04 | `/wealth` | 财富总览 | 是 | 申购/赎回（红） |
-| P05 | `/account` | 账户中心 | 是 | 密码/2FA（红） |
+## 🛡 诚实披露
 
-**分区子页**：
+- 模拟银行系统，全部数据虚构，不涉及真实资金。
+- 已知取舍如实列：Consent Grant KV 消费为原子近似（加固方向=DO 事务）；JWT 1h 无 refresh；个别 demo 重灌用例偶发 flaky。
+- 我们不使用没有跑通的技术名词（规则引擎为内联类型化规则表；未实现的能力不写入特性清单）。
 
-| ID | URL | 名称 | 需登录 | 风险交互 |
-|----|-----|------|--------|----------|
-| P06 | `/pay/bills` | 账单支付 | 是 | 缴费（黄）、自动扣款开关（黄） |
-| P07 | `/pay/subscriptions` | 订阅管理 | 是 | 解约（黄） |
-| P08 | `/transfer/intrabank` | 行内转账 | 是 | 转账（黄 ≤¥1,000 日累计 / 红 >¥1,000） |
-| P09 | `/transfer/intrabank-scheduled` | 预约转账（行内） | 是 | 建立预约（黄） |
-| P10 | `/transfer/history` | 转账记录（仅转账类流水） | 是 | — |
-| P11 | `/transfer/limits` | 转账限额 | 是 | 调整限额（黄） |
-| P12 | `/transfer/payees` | 常用收款人管理 | 是 | 增删改（黄） |
-| P13 | `/ai/tasks` | 长程任务中心 | 是 | 取消任务（触发补偿） |
-| P14 | `/ai/benchmark` | SuveooBench 评测看板 | 否 | — |
-| P15 | `/wealth/funds` | 全部基金 | 是 | 申购（红） |
-| P16 | `/wealth/funds/{slug}` | 基金详情（16 个静态页） | 是 | 申购/赎回（红） |
-| P17 | `/wealth/deposits` | 全部存款方案 | 是 | 开立定期（红） |
-| P18 | `/wealth/deposits/{slug}` | 存款方案详情（6 个静态页） | 是 | 开立（红） |
-| P19 | `/wealth/fx` | 外汇牌价与兑换 | 是 | 结汇/购汇（黄/红） |
-| P20 | `/wealth/tools` | 金融计算工具 | 否 | — |
-| P21 | `/account/login` | 登录 | 否 | — |
-| P37 | `/account/transactions` | 交易记录（全量收支） | 是 | — |
-| L01 | `/demo-lab` | 数据注入实验室（队员隐藏入口 · noindex · 密码门 suveoo_data_injection） | 是 | 维度化注入（四维×三模式，DEMO_MODE 门，仅本人账户） |
-| P22 | `/account/register` | 注册与开户 | 否 | — |
-| P23 | `/account/recovery` | 忘记密码 | 否 | — |
-| P24 | `/account/cards` | 卡片管理 | 是 | 冻结/解冻（红）、限额（黄） |
-| P25 | `/account/card/{card-slug}/history` | 单卡交易明细 | 是 | — |
-| P26 | `/account/card/{card-slug}/settings` | 单卡设置 | 是 | 限额（黄）、冻结（红） |
-| P27 | `/account/dashboard` | 仪表盘 | 是 | — |
-| P28 | `/account/downloads` | 月度报告下载 | 是 | — |
-| P29 | `/account/security` | 安全中心 | 是 | 改密（红，须当前密码+OTP，成功全设备下线）、2FA（红，关闭须当前密码） |
+<div align="center">
 
-**门户、法律与系统页**：
+**Suveoo makes autonomous banking verifiable.**
 
-| ID | URL | 名称 | 需登录 |
-|----|-----|------|--------|
-| P30 | `/notifications` | 全部通知 | 是 |
-| P31 | `/about` | 关于 Suveoo（简介/公告/利率） | 否 |
-| P32 | `/help` | 帮助中心（FAQ/防诈骗/AI 安全说明） | 否 |
-| P33 | `/contact` | 联系我们 | 否 |
-| P34 | `/privacy-policy` | 隐私政策 | 否 |
-| P35 | `/cookie-privacy` | Cookie 政策 | 否 |
-| P36 | `/terms` | 服务条款 | 否 |
-| S01 | `/` | 根路径 → 302 `/home` | 否 |
-| S02 | `/404`（任意未知路径） | 404 页 | 否 |
-| S03 | `/offline` | PWA 离线兜底页 | 否 |
+<!-- 插图 11：四幕演示叙事拼图（AA 分账 / Consent Binding 失效 / Saga 故障注入 / 攻防看板，四格拼图） -->
+![Demo Story](docs/images/readme/demo-story.png)
 
-**card-slug 取值域**：开户时由系统分配固定 slug——`debit-card-1` … `debit-card-4`、`credit-card-1`。这 5 个 slug 在账户生命周期内不变，因此 P25/P26 是**动态路由静态模板**：Worker 将 `/account/card/{任意段}/history` 重写到 R2 对象 `account/card/history/index.html`，`/settings` 同理；页面 JS 从 `location.pathname` 解析 card-slug 后调 API 取数。
-
-**fund-slug 取值域（16 个）**：`global-money-1`、`global-short-bond`、`esg-bond`、`cn-dividend`、`consumer-staples`、`quant-neutral`、`em-gov-bond`、`global-mixed-1`、`reit-global`、`global-mixed-2`、`global-equity-index`、`gold-index`、`healthcare-bio`、`new-energy`、`apac-tech`、`ai-semi`（风险 R1-R5 全梯度；数据规格见 §12.2）。
-
-**deposit-slug 取值域（6 个）**：`demand`、`notice-7d`、`term-3m`、`term-6m`、`term-1y`、`term-3y`。
-
-—— Suveoo（源自爱沙尼亚语 suveöö，夏夜）
+</div>
