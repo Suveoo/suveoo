@@ -4643,7 +4643,7 @@ export const MCP_TOOLS = [
   { name: "transaction_history", desc: "查询交易流水（ts 为 UTC；向用户展示日期/时间须换算为北京时间 +8 小时）", args: { days: { type: "number" }, category: { type: "string" } } },
   { name: "bill_analysis", desc: "账单分类统计与异常识别；支出归因按流水的 card 字段区分付款卡（by_card，含信用卡消费）", args: { period: { type: "string" } } },
   { name: "wealth_product_query", desc: "查询理财产品目录（可传 risk_level/min_duration 过滤；返回含您的当前风险承受等级 user_pr_level）。适当性硬规则：推荐、对比与申购建议仅限风险等级不高于 user_pr_level 的产品；更高等级产品只能客观陈列并明确提示超出用户风险承受等级，不得推荐", args: { risk_level: { type: "number" }, min_duration: { type: "number" } } },
-  { name: "wealth_holdings_query", desc: "查询用户当前理财持仓（名称、风险等级、净值、成本、市值、redeem_value 预计赎回回款、unrealized_pnl 浮动盈亏）。赎回按市值结算", args: {} },
+  { name: "wealth_holdings_query", desc: "查询用户当前理财持仓（名称、风险等级、净值、成本、市值、redeem_value 预计赎回回款、unrealized_pnl 浮动盈亏）。赎回按市值结算。当日总收益以 account_query 返回的 today_pnl 为准直接引用，勿按日涨幅自行估算", args: {} },
   { name: "card_status_query", desc: "查卡状态/限额/欠款。借记卡 balance=可用余额；信用卡 balance=欠款、available=总额度−欠款；recent_txs 为各卡最近消费（按流水 card 字段挂卡）。完整卡号不经 AI 通道返回——引用返回的 full_number_hint 设置页链接引导用户自查，不得编造卡号。", args: { card_id: { type: "string" } } },
   { name: "subscription_scan", desc: "扫描订阅扣费与使用评分", args: { lookback_days: { type: "number" } } },
   { name: "split_bill_calculate", desc: "AA 分账精确计算", args: { total: { type: "string" }, participants: { type: "array" }, adjustments: { type: "object" } } },

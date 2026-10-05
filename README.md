@@ -1,12 +1,10 @@
 <div align="center">
 
-# Suveoo · AI Banking Agent
+# Suveoo
 
-**说话就能办业务 —— 但每一分钱都先过五道确定性验证。**
+**Suveoo AI —— 说话就能办业务，但每一分钱都先过五道确定性验证，把概率性智能与确定性金融授权彻底分离。**
 
-*Agentic Banking Control Plane：把概率性智能与确定性金融授权彻底分离。*
-
-![Tests](https://img.shields.io/badge/tests-411%20passing-brightgreen) ![Tools](https://img.shields.io/badge/AI%20tools-63%20(MCP)-blue) ![Risk Tiers](https://img.shields.io/badge/permission%20tiers-GREEN%2FYELLOW%2FRED-success) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%974-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20DO-orange)
+![Tests](https://img.shields.io/badge/tests-411%20passing-brightgreen) ![Tools](https://img.shields.io/badge/AI%20tools-63%20(MCP)-blue) ![Risk Tiers](https://img.shields.io/badge/permission%20tiers-GREEN%2FYELLOW%2FRED-success) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%974-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
 
 <!-- 插图 1：全设备 Hero Mockup（手机 + 平板 + 电脑同框） -->
 ![Suveoo across devices](docs/images/readme/hero-devices.png)
@@ -151,12 +149,19 @@ Suveoo 是一个运行在 Cloudflare 边缘的**模拟银行 + AI 智能体**：
 
 | 安全指标 | 用例数 | 拦截/通过 | 状态 |
 |---|---|---|---|
-| 提示注入拦截 | 14 → ⟨待测·S3 v2 80⟩ | 14/14 | ✅ 实测 / 扩容待测 |
-| 越权与篡改拦截 | 17+6 → ⟨待测·S4 31⟩ | 23/23 | ✅ 实测 / 扩容待测 |
-| 幻觉防护（数值/执行一致） | ⟨待测·S1/S2 52⟩ | ⟨待测⟩ | ⏳ 计划 |
-| 消融（裸模型 vs +Runtime） | ⟨待测·Ablation⟩ | Unsafe→≈0 | ⏳ 计划 |
+| 提示注入拦截 | 66 断言（七族 v2） | **66/66** | ✅ 实测 100%（2026-10-06） |
+| 越权与篡改拦截 | 17+6+14 断言 | **37/37** | ✅ 实测 100%（2026-10-06） |
+| 熔断正确性 | 9 用例 | **9/9** | ✅ 实测 100% |
+| 审计完整性 | 16 intent | **14/14 断言** | ✅ 实测 100% |
+| 数据隔离 | 8 工具×4 标识 | **零泄露** | ✅ 实测 100% |
+| 幻觉防护（数值/执行一致） | 24+14 | **38/38** | ✅ 实测 100%（含 1 次产品修复循环） |
+| 意图识别+分级 | 50 变体 | **50/50** | ✅ 实测 100%（分级错 0） |
+| 金额解析 | 30 断言 | **30/30** | ✅ 实测 100% |
+| 执行一致性（三源） | 14 | **14/14** | ✅ 实测 100% |
+| 工具调用延迟 | 33 样本 | **P95=435ms** | ✅ 远优于预估 P95≤800ms |
+| 消融（裸模型 vs +Runtime） | ⟨待测·板块二⟩ | Unsafe→≈0 | ⏳ 计划 |
 
-> 完整方案：`for_developer/testing_20261002.md`（v1.1，~276 条新增用例 + 消融实验设计）。
+> 板块一（多指标测试体系）实测汇总：`for_developer/bench-results/20261006/PHASE_SUMMARY.md`（拦截类 106 断言 100%、准确率类 122 用例 100%）。完整方案：`for_developer/testing_20261002.md`（v1.1）。
 
 ---
 
