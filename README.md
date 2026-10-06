@@ -7,19 +7,19 @@
 
 ![Tests](https://img.shields.io/badge/tests-463%20passing-brightgreen) ![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Risk Tiers](https://img.shields.io/badge/permission%20tiers-GREEN%2FYELLOW%2FRED-success) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%97%203%20langs-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
 
-[60 秒看懂](#60-秒看懂-suveoo) · [安全内核](#安全内核bankaction-ir-与五道确定性验证) · [Suveoo AI](#suveoo-ai自然语言驱动全行业务) · [六大场景](#六大官方场景全覆盖) · [快速开始](#快速开始) · [测试与评测体系](#测试与评测体系) · [文档地图](#文档地图)
+[Suveoo AI 概览](#Suveoo AI 概览) · [安全内核](#安全内核bankaction-ir-与五道确定性验证) · [Suveoo AI](#suveoo-ai自然语言驱动全行业务) · [六大场景](#六大官方场景全覆盖) · [快速开始](#快速开始) · [测试与评测体系](#测试与评测体系) · [文档地图](#文档地图)
 
 </div>
 
 ---
 
-> **核心命题**：大模型只能"提议"。任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime 的五道确定性验证**，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改。
->
-> **核心证据**：确定性自动化测试 **463 条全绿**（vitest，63 文件）；安全与准确率指标在生产环境实测 **228/228 通过**（拦截类 106 断言 + 准确率类 122 用例，2026-10-06）；**四模型消融实验**（GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3）在全部核心指标上 **100% 一致**——安全能力由 Runtime 架构保证，与底层 LLM 无关。
+**Suveoo** 是一个运行在全球边缘的完整模拟银行系统。1 个 Worker + 2 类 Durable Object（账本、长程任务）+ 2 KV + R2，前端零构建 MPA，Web 版（`suveoo.com`）全平台兼容，Android 端 Capacitor 壳原生集成。
 
-Suveoo 是一个运行在全球边缘的**模拟银行系统**，Suveoo AI 是内嵌的 **AI 智能体**：1 个 Worker + 2 类 Durable Object（账本 / 长程任务）+ 2 KV + R2，前端零构建 MPA，Android 端 Capacitor 壳原生集成。用户用自然语言（文字或语音）办理转账、账单、理财、卡片、订阅与跨场景长程任务；AI 通道、REST 表单、MCP 三通道收敛到**同一套验证管线**。
+**Suveoo AI** 是 Suveoo 内嵌的 AI 智能体。Suveoo AI 允许用户用自然语言（文字或语音）办理转账、账单、理财、卡片、订阅与跨场景长程任务；AI 通道、REST 表单、MCP 三通道收敛到同一套验证管线。
 
-Suveoo AI —— 说话就能办业务，但每一分钱都先过五道确定性验证：把概率性智能与确定性金融授权彻底分离。
+**Suveoo AI 核心命题**：说话就能办业务，但大模型只能"提议"。任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
+
+**核心证据**：确定性自动化测试 463 条全绿；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；四模型消融实验（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关。
 
 ### 技术栈
 
@@ -41,7 +41,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 ---
 
-## 60 秒看懂 Suveoo
+## Suveoo AI 概览
 
 **它解决什么**：AI Agent 从"回答问题"跨到"替我办业务"的最后一公里是信任问题——不是"能不能听懂用户"，而是**凭什么敢把转账权限交给一个概率系统**。
 
