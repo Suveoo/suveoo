@@ -45,7 +45,7 @@
 |------|------|------|
 | Worker | `suveoo-bank-main` | 唯一入口：静态资源（R2 回源）/ REST `/api/*` / MCP `/mcp` / AI SSE 代理 / IR 编译 + 五道验证 / Email / pdf-lib 报告 |
 | R2 | `suveoo-bank-r2` | 前端静态资源（无构建 MPA，URL 即对象键）+ 公共数据 `assets/data/*` + 月度报告 PDF |
-| KV | `suveoo-session-kv` | JWT 黑名单、邮箱验证码（哈希）、登录锁定计数、Consent Grant（`grant:{uid}:{hash}`，TTL 120s）、AI 会话历史 |
+| KV | `suveoo-session-kv` | JWT 黑名单、邮箱验证码（哈希）、登录锁定计数、Consent Grant（`grant:{uid}:{hash}`，TTL 300s 生产/120s 默认）、AI 会话历史 |
 | KV | `suveoo-audit-index-kv` | 审计索引（`audit:{date}:{trace_id}`） |
 | DO | `LedgerDO` | registry 单例（邮箱/卡号全局唯一索引）+ 每用户账本（profile/cards/tx/payees/bills/subs/holdings/tasks/nonces/audit，SQLite） |
 | DO | `SagaDO` | 长程任务闹钟（alarm）+ 取消/补偿触发；读路径 `sweepDue` 兜底扫描 |

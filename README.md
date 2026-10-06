@@ -21,6 +21,21 @@ Suveoo 是一个运行在全球边缘的**模拟银行系统**，Suveoo AI 是�
 
 Suveoo AI —— 说话就能办业务，但每一分钱都先过五道确定性验证：把概率性智能与确定性金融授权彻底分离。
 
+### 技术栈
+
+Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计算、持久化存储、渐进式 Web 应用、AI API 及开放协议，为应用提供高性能、可扩展且跨平台的运行环境。
+
+[![Cloudflare Workers][CloudflareWorkers]][CloudflareWorkers-url]
+[![Durable Objects · SQLite][DurableObjects]][DurableObjects-url]
+[![Cloudflare R2][CloudflareR2]][CloudflareR2-url]
+[![JavaScript ES2022][JavaScript]][JavaScript-url]
+[![PWA][PWA]][PWA-url]
+[![MCP · JSON-RPC 2.0][MCP]][MCP-url]
+[![Anthropic Messages API][Anthropic]][Anthropic-url]
+[![Vitest][Vitest]][Vitest-url]
+[![Capacitor 8][Capacitor]][Capacitor-url]
+[![Android · Java][Android]][Android-url]
+
 <!-- 插图 2：架构总览图（Figma 绘制，含 LLM→IR→五道→DO 链路） -->
 ![Architecture](docs/images/readme/architecture.png)
 
@@ -74,7 +89,7 @@ Suveoo AI —— 说话就能办业务，但每一分钱都先过五道确定性
 <b>验证器实现细节</b>：
 
 - `compileToIR()` / `verify()` / `runGuarded()` —— `backend/worker-main.js`
-- Grant：SHA256(intent + authFields + user_id + expires_at + nonce)，KV 存储 TTL 120s（`CONSENT_GRANT_TTL_SECONDS` 可覆写），服务端消费一次
+- Grant：SHA256(intent + authFields + user_id + expires_at + nonce)，KV 存储 TTL 300s（生产 `CONSENT_GRANT_TTL_SECONDS`；代码默认 120s），服务端消费一次
 - Taint 检查先于 Consent；GREEN 工具轻量通道（仅 Provenance 标注）
 - 金额内核：十进制字符串 → bigint 分单位，全程无浮点（`toCents/centsToStr/marketValueCents/navScaled4`）
 - 单测锁定：`tests/unit/{ir-compiler,consent-binding,taint-check,invariants,idempotency,policy-engine,money-math}.test.js`
@@ -383,3 +398,36 @@ suveoo/
 ![Demo Story](docs/images/readme/demo-story.png)
 
 </div>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+
+[CloudflareWorkers]: https://img.shields.io/badge/Cloudflare%20Workers-F6821F?style=for-the-badge&logo=cloudflareworkers&logoColor=white
+[CloudflareWorkers-url]: https://developers.cloudflare.com/workers/
+
+[DurableObjects]: https://img.shields.io/badge/Durable%20Objects%20%C2%B7%20SQLite-F6821F?style=for-the-badge&logo=cloudflare&logoColor=white
+[DurableObjects-url]: https://developers.cloudflare.com/durable-objects/
+
+[CloudflareR2]: https://img.shields.io/badge/Cloudflare%20R2-F6821F?style=for-the-badge&logo=cloudflare&logoColor=white
+[CloudflareR2-url]: https://developers.cloudflare.com/r2/
+
+[JavaScript]: https://img.shields.io/badge/JavaScript%20ES2022-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black
+[JavaScript-url]: https://developer.mozilla.org/docs/Web/JavaScript
+
+[PWA]: https://img.shields.io/badge/PWA-5A0FC8?style=for-the-badge&logoColor=white
+[PWA-url]: https://web.dev/learn/pwa/
+
+[MCP]: https://img.shields.io/badge/MCP%20%C2%B7%20JSON--RPC%202.0-111111?style=for-the-badge&logoColor=white
+[MCP-url]: https://modelcontextprotocol.io/
+
+[Anthropic]: https://img.shields.io/badge/Anthropic%20Messages%20API-191919?style=for-the-badge&logo=anthropic&logoColor=white
+[Anthropic-url]: https://platform.claude.com/docs/en/api/messages
+
+[Vitest]: https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white
+[Vitest-url]: https://vitest.dev/
+
+[Capacitor]: https://img.shields.io/badge/Capacitor%208-119EFF?style=for-the-badge&logo=capacitor&logoColor=white
+[Capacitor-url]: https://capacitorjs.com/
+
+[Android]: https://img.shields.io/badge/Android%20%C2%B7%20Java-3DDC84?style=for-the-badge&logo=android&logoColor=black
+[Android-url]: https://developer.android.com/
