@@ -34,7 +34,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![Capacitor 8][Capacitor]][Capacitor-url]
 [![Android · Java][Android]][Android-url]
 
-![Architecture](docs/images/readme/architecture.png)
+![Architecture](docs/images/readme/suveoo_system_architecture.svg)
 
 ---
 
