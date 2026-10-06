@@ -1,0 +1,23 @@
+{
+  "phase": "Phase 1 · L0 本地确定性",
+  "date": "2026-10-06T12:47+08:00",
+  "suite": "新增 6 文件 52 用例（vitest + @cloudflare/vitest-pool-workers），全量回归 63 文件 / 463 用例全绿",
+  "duration_seconds": 7.66,
+  "metrics": {
+    "S3": { "file": "tests/attack/prompt-injection-v2.test.js", "cases": 7, "assertions": 66, "families": ["角色扮演12", "指令覆盖10", "提示词不外泄10", "跨语言12", "间接注入数据面10", "Unicode6", "长上下文6"], "result": "拦截/中性化 66/66 = 100%", "note": "模型层泄露/角色扮演归 L1；此处静态面+参数走私+数据面等价覆盖" },
+    "S4": { "file": "tests/attack/grant-forgery.test.js", "cases": 6, "assertions": 14, "result": "拦截 14/14 = 100%", "note": "伪造 grant 也计入熔断（第 4 条起 CIRCUIT_LOCKED，防扫行为，同样计拦截）；301s 过期以 GRANT_NOT_FOUND+GRANT_ALREADY_USED 等价覆盖" },
+    "S5": { "file": "tests/integration/circuit-breaker-v2.test.js", "cases": 6, "result": "6/6 行为符合", "detail": "grant 篡改×3→CIRCUIT_LOCKED(带分钟)；锁内 GREEN 直答；登录错 5 次→429 LOGIN_LOCKED；OTP 连错 5→熔断且卡未动；cbunlock 邮箱码解锁闭环；minutesLeft>0" },
+    "S6": { "file": "tests/integration/audit-coverage.test.js", "cases": 4, "intents": 16, "audit_asserted": 14, "result": "断言 14/14 通过（action/channel/trace_id/ts ISO/detail 非空）", "note": "财富市场类四 intent（purchase/redeem/deposit_open/ecommerce）留 L1 生产补测；红级链按邮箱 60s 冷却物理约束拆四账户各一码" },
+    "S7": { "file": "tests/integration/data-isolation-ai.test.js", "cases": 1, "assertions": 32, "result": "8 工具 × 4 标识（邮箱/UID/姓名/卡尾号）零泄露 = 100%" },
+    "B2": { "file": "tests/unit/money-parse-cases.test.js", "cases": 28, "assertions": 30, "result": "合法 20/20 精确 + 非法 10/10 拒绝 = 100%", "note": "中文数字归模型侧，划 L1/B1" }
+  },
+  "cumulative": { "before": "57 files / 411 tests", "after": "63 files / 463 tests", "new_files": ["prompt-injection-v2", "grant-forgery", "circuit-breaker-v2", "audit-coverage", "data-isolation-ai", "money-parse-cases"] },
+  "calibration_findings": [
+    "登录字段为 identifier（非 email）；错误 401 INVALID_CREDENTIALS、锁态 429 LOGIN_LOCKED",
+    "OTP 错码真名 OTP_CODE_MISMATCH；未发码先错码为 OTP_CODE_NOT_FOUND",
+    "redstep 与 register 场景分池（无 60s 互斥）；同邮箱同场景 60s 冷却确认存在",
+    "userAudit op 返回 .audit 数组",
+    "payee add 姓名必须与卡号户名一致（NAME_MISMATCH 守卫生效）",
+    "伪造 grant 连续 4 次触发熔断（计数含伪造）"
+  ]
+}

@@ -3,18 +3,19 @@
 > Agentic Banking Control Plane（银行智能体可信执行中间层）
 > 这是模拟银行系统，不涉及真实资金行为。
 >
+> 2026-10-06 更新：多指标测试体系与四模型消融落地——63 个 MCP 工具、vitest 63 文件 463 用例全绿；生产黑盒评测（拦截类 106 断言 + 准确率类 122 用例）全部通过；MODEL_PROFILES 多模型注册表（glm-5.3-flash / glm-5.3-max / qwen3.8-flash / deepseek-v4.1-flash / kimi-k3）支持零代码换模，四模型消融全部核心指标 100% 一致（证据库 docs/benchmarks/）。测试 463 项全绿。
 > 2026-09-17 更新：转账与收款人真实化（Luhn+registry+户名三重校验，REST 与 AI 同规）与跨用户双记（对方 DO credit 先行，资金守恒）；13 个演示人物落户为真实账户；演示种子端点加管理员令牌双门（fail-closed + 审计）；卡片完整卡号 reveal（属主隔离）；理财赎回按市值结算（整数运算，显示值=回款额）；换汇按服务端实时牌价结算（JPY 每 100 口径、可选结算卡、外币余额可见）。测试 186 项全绿。
 > 2026-09-16 更新：财富产品 v2（16 只基金，数据由锚定真实市场史的多因子模型生成）；外汇实时牌价（er-api + KV 缓存 + 静态回退）；Telegram 运维通知（注册/登录/全部 EXECUTED 写操作，waitUntil 生命周期保障）；种子端点支持任意已注册账户（DEMO_MODE 守卫不变）；测试 159 项全绿。
 
 ## 1. 核心主张
 
-把 AI 的概率性智能与金融授权的确定性彻底分离：**LLM 只能"提议"一次操作；提议必须被编译成结构化 BankAction IR，并通过 Suveoo Verification Runtime 的五道确定性验证，才允许真正触达资金。** 银行可以更换底层模型（Claude/Qwen/GPT），但授权、合规、事务、审计规则不跟着模型换。
+把 AI 的概率性智能与金融授权的确定性彻底分离：**LLM 只能"提议"一次操作；提议必须被编译成结构化 BankAction IR，并通过 Suveoo Verification Runtime 的五道确定性验证，才允许真正触达资金。** 银行可以更换底层模型（GLM / Qwen / DeepSeek / Kimi，经 `MODEL_PROFILE` 单变量切换，已四模型消融实测验证），但授权、合规、事务、审计规则不跟着模型换。
 
 ```
 用户自然语言 / 经典表单
         │
         ▼
-┌────────────────┐   Anthropic mcp_servers 连接器（claude-haiku-4.5）
+┌────────────────┐   Anthropic 协议 mcp_servers 连接器（MODEL_PROFILES）
 │  Agent Planner │◄──────────────────────────────────────┐
 └───────┬────────┘        Key 仅存 Worker 侧             │
         │ 提议（工具调用）                                │
@@ -58,7 +59,7 @@
 | `/api/auth/*` | 注册发卡 / 登录 2FA / 找回（公开） |
 | `/api/**` | 数据 API：全部写操作经 `runGuarded()` → IR → 五道验证 → `executeIntent()` |
 | `/api/ai/chat` | SSE 流式 LLM 代理（服务端持 Key；mcp_servers 自指 /mcp；trust_event/genui_event 事件流） |
-| `/mcp` | MCP Tool Gateway（JSON-RPC 2.0，23 工具，JWT Bearer） |
+| `/mcp` | MCP Tool Gateway（JSON-RPC 2.0，63 工具，JWT Bearer） |
 
 ## 4. 关键数据流：转账（表单与 AI 同规）
 
@@ -75,4 +76,4 @@
 
 ## 6. 前端（无构建 MPA + PWA）
 
-原生 ES2022 + Web Components 风格命名空间（`S.*`），51 个页面壳 + 34 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。
+原生 ES2022 + Web Components 风格命名空间（`S.*`），76 个页面壳 + 62 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback，1531 键恒等）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。

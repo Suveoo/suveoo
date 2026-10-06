@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-05T15:10:41.101Z",
+  "model": "glm-5.3-flash",
+  "n": 4,
+  "s2": {
+    "pass": 4,
+    "rate": 100
+  },
+  "b4": {
+    "pass": 4,
+    "rate": 100
+  },
+  "p4": {
+    "samples": 4,
+    "p50": 32155,
+    "p95": 44300,
+    "min": 22102,
+    "max": 44300,
+    "unit": "ms（AI 对话出卡+确认执行全链）"
+  },
+  "rows": [
+    {
+      "i": 1,
+      "q": "给赵砚秋转 2.00 元",
+      "amt": "2.00",
+      "chatMs": 38588,
+      "ttft": 2980,
+      "execMs": 5712,
+      "execStatus": "EXECUTED",
+      "txId": "TXMUVDXVHN26380C",
+      "txMatch": true,
+      "snapshotAmt": "2.00",
+      "s2ok": true,
+      "balDelta": 2,
+      "b4ok": true,
+      "e2eMs": 44300
+    },
+    {
+      "i": 2,
+      "q": "给赵砚秋转 3.00 元",
+      "amt": "3.00",
+      "chatMs": 17949,
+      "ttft": 16918,
+      "execMs": 4153,
+      "execStatus": "EXECUTED",
+      "txId": "TXMUVDYE65A431AD",
+      "txMatch": true,
+      "snapshotAmt": "3.00",
+      "s2ok": true,
+      "balDelta": 3,
+      "b4ok": true,
+      "e2eMs": 22102
+    },
+    {
+      "i": 3,
+      "q": "给赵砚秋转 4.00 元",
+      "amt": "4.00",
+      "chatMs": 27664,
+      "ttft": 26347,
+      "execMs": 4491,
+      "execStatus": "EXECUTED",
+      "txId": "TXMUVDZ2SC2D1D63",
+      "txMatch": true,
+      "snapshotAmt": "4.00",
+      "s2ok": true,
+      "balDelta": 4,
+      "b4ok": true,
+      "e2eMs": 32155
+    },
+    {
+      "i": 4,
+      "q": "给赵砚秋转 5.00 元",
+      "amt": "5.00",
+      "chatMs": 22354,
+      "ttft": 20903,
+      "execMs": 9600,
+      "execStatus": "EXECUTED",
+      "txId": "TXMUVDZRFP4F2294",
+      "txMatch": true,
+      "snapshotAmt": "5.00",
+      "s2ok": true,
+      "balDelta": 5,
+      "b4ok": true,
+      "e2eMs": 31954
+    }
+  ]
+}

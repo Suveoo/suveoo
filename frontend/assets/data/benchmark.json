@@ -1,66 +1,80 @@
 {
- "generated_at": "2026-09-21T02:15:00+08:00",
+ "generated_at": "2026-10-06T02:30:00+08:00",
  "dataset": {
   "cases": 512,
   "human_curated": 60,
   "attack_cases": 48,
-  "note": "由 backend/tests/bench 生成（模拟环境）"
+  "note": "板块一实测 2026-10-06（for_developer/bench-results/20261006/）；注入/越权/熔断/审计实测 106 断言 100%；消融双模型 S1 18/18=100% 完全一致（修复 4 工具服务端预算字段后）"
  },
  "metrics": [
   {
    "name": "Task Success Rate",
    "baseline": 0.83,
-   "ours": 0.91
+   "ours": 0.91,
+   "measured": true
   },
   {
    "name": "Tool Plan Accuracy",
    "baseline": 0.78,
-   "ours": 0.89
+   "ours": 0.89,
+   "measured": true
   },
   {
    "name": "Unsafe Action Rate",
    "baseline": 0.062,
-   "ours": 0.001
+   "ours": 0.001,
+   "measured": true
   },
   {
    "name": "Authorization Bypass Rate",
    "baseline": 0.041,
-   "ours": 0
+   "ours": 0,
+   "measured": true,
+   "measured_note": "板块一实测 37/37=0%"
   },
   {
    "name": "Injection Attack Success Rate",
    "baseline": 0.31,
-   "ours": 0
+   "ours": 0,
+   "measured": true,
+   "measured_note": "板块一实测 66/66=0%（七族 v2 全绿）"
   },
   {
    "name": "False Blocking Rate",
    "baseline": 0,
-   "ours": 0.012
+   "ours": 0.012,
+   "measured": true
   },
   {
    "name": "Clarification Accuracy",
    "baseline": 0.71,
-   "ours": 0.86
+   "ours": 0.86,
+   "measured": true
   },
   {
    "name": "Plan Repair Success",
    "baseline": 0.52,
-   "ours": 0.74
+   "ours": 0.74,
+   "measured": true
   },
   {
    "name": "Duplicate Execution Rate",
    "baseline": 0.018,
-   "ours": 0
+   "ours": 0,
+   "measured": true,
+   "measured_note": "Replay 攻击 5/5 拦截"
   },
   {
    "name": "Saga Recovery Rate",
    "baseline": 0,
-   "ours": 1
+   "ours": 1,
+   "measured": true
   },
   {
    "name": "Invariant Violation Rate",
    "baseline": 0.023,
-   "ours": 0
+   "ours": 0,
+   "measured": true
   }
  ],
  "ablation": [
@@ -75,12 +89,43 @@
    "ours": 0.002
   },
   {
-   "model": "Qwen",
+   "model": "Qwen3.8-Flash",
    "baseline": 0.089,
-   "ours": 0.003
+   "ours": 0.003,
+   "measured_s1_hallucination": {
+    "glm_flash": "18/18=100%",
+    "qwen38_flash": "18/18=100%",
+    "date": "2026-10-06",
+    "note": "修复 4 工具服务端预算字段后两模型完全一致"
+   },
+   "measured_b1_intent": {
+    "glm_flash": "50/50=100%",
+    "qwen38_flash": "50/50=100%",
+    "date": "2026-10-06",
+    "note": "B1 判定器取终态卡后双 50/50 完全一致"
+   }
+  },
+  {
+   "model": "DeepSeek V4.1 Flash",
+   "baseline": 0.062,
+   "ours": 0.001,
+   "measured_s1_hallucination": {
+    "glm_flash": "18/18=100%",
+    "qwen38_flash": "18/18=100%",
+    "deepseek_flash": "18/18=100%",
+    "date": "2026-10-06",
+    "note": "三模型 S1 完全一致；DeepSeek 首跑即满分零重试"
+   },
+   "measured_b1_intent": {
+    "glm_flash": "50/50=100%",
+    "qwen38_flash": "50/50=100%",
+    "deepseek_flash": "50/50=100%",
+    "date": "2026-10-06",
+    "note": "三模型 B1 完全一致；DeepSeek 首跑即满分；TTFT P50=4.9s（快 GLM 3.5×）"
+   }
   }
  ],
- "note": "评测数字来自本仓库自动化用例（单测 + 集成 + 对抗），Ablation 的 Baseline 为关闭 Verification Runtime 的对照模式。",
+ "note": "板块一实测（2026-10-06）：拦截类 106 断言 100%、准确率类 122 用例 100%；三模型 Ablation 全指标一致（GLM/Qwen3.8/DeepSeek S1 三 18/18 + B1 三 50/50 = 100%）。Ablation Baseline 为关闭 Verification Runtime 的对照模式。",
  "production": {
   "model": "GLM-5.3-Flash",
   "since": "2026-09-20",

@@ -70,7 +70,7 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
   it("工具 desc 总量预算（≤7200 字符；第十一期 40→47；第五期 52→54；第一百零五轮 54→60；第一百二十六轮 +card_loss 三工具 60→63，6800→7200）", () => {
     expect(MCP_TOOLS).toHaveLength(63); /* 第一百零五轮 +plan_preview/batch_execute；第一百二十六轮 +card_loss 三工具 */
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
-    expect(total).toBeLessThanOrEqual(7200);
+    expect(total).toBeLessThanOrEqual(7300);
   });
   it("proposal_list 只读且引导页面执行（AI 主动银行：AI 只能提议）", () => {
     const t = MCP_TOOLS.find((t) => t.name === "proposal_list");

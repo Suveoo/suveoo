@@ -4643,11 +4643,11 @@ export const MCP_TOOLS = [
   { name: "transaction_history", desc: "查询交易流水（ts 为 UTC；向用户展示日期/时间须换算为北京时间 +8 小时）", args: { days: { type: "number" }, category: { type: "string" } } },
   { name: "bill_analysis", desc: "账单分类统计与异常识别；支出归因按流水的 card 字段区分付款卡（by_card，含信用卡消费）", args: { period: { type: "string" } } },
   { name: "wealth_product_query", desc: "查询理财产品目录（可传 risk_level/min_duration 过滤；返回含您的当前风险承受等级 user_pr_level）。适当性硬规则：推荐、对比与申购建议仅限风险等级不高于 user_pr_level 的产品；更高等级产品只能客观陈列并明确提示超出用户风险承受等级，不得推荐", args: { risk_level: { type: "number" }, min_duration: { type: "number" } } },
-  { name: "wealth_holdings_query", desc: "查询用户当前理财持仓（名称、风险等级、净值、成本、市值、redeem_value 预计赎回回款、unrealized_pnl 浮动盈亏）。赎回按市值结算。当日总收益以 account_query 返回的 today_pnl 为准直接引用，勿按日涨幅自行估算", args: {} },
+  { name: "wealth_holdings_query", desc: "查询用户当前理财持仓（名称、风险等级、净值、成本、市值、redeem_value 预计赎回回款、unrealized_pnl 浮动盈亏、total_principal/total_value/total_pnl 服务端预算合计）。赎回按市值结算。合计与当日收益直接引用 total_* 与 account_query.today_pnl，勿自行加总或估算", args: {} },
   { name: "card_status_query", desc: "查卡状态/限额/欠款。借记卡 balance=可用余额；信用卡 balance=欠款、available=总额度−欠款；recent_txs 为各卡最近消费（按流水 card 字段挂卡）。完整卡号不经 AI 通道返回——引用返回的 full_number_hint 设置页链接引导用户自查，不得编造卡号。", args: { card_id: { type: "string" } } },
   { name: "subscription_scan", desc: "扫描订阅扣费与使用评分", args: { lookback_days: { type: "number" } } },
   { name: "split_bill_calculate", desc: "AA 分账精确计算", args: { total: { type: "string" }, participants: { type: "array" }, adjustments: { type: "object" } } },
-  { name: "contacts_search", desc: "按姓名或手机号搜索常用收款人（仅返回已通过真实性校验的收款人，卡号均为真实 Suveoo 账户，可直接用于转账；手机号支持全号或尾号）。返回的完整卡号仅用于转账工具参数回传——回复正文中出现卡号一律只写尾号 4 位（如 ****3026）", args: { name: { type: "string" } } },
+  { name: "contacts_search", desc: "搜索常用收款人（不传 name 返回全部+total_payees 总数；按姓名/手机号可精确匹配，仅返回已通过真实性校验的，卡号均为真实 Suveoo 账户可直接转账；手机号支持全号或尾号）。回复正文中卡号只写尾号 4 位", args: { name: { type: "string" } } },
   { name: "fx_quote_query", desc: "查询外汇实时牌价（买/卖/中间价，数据源为真实市场汇率日更+15 分钟缓存）。currency 可选过滤币种", args: { currency: { type: "string" } } },
   { name: "fx_balance_query", desc: "查询用户各币种外币余额（含按实时买入价折算的人民币参考值 cny_estimate）。用户问“我有多少外币/美元余额/能换回多少人民币”时先查此工具", args: {} },
   { name: "deposit_product_query", desc: "查询六档存款方案（活期/通知/3月/6月/1年/3年）：利率、起存、计息方式、提前支取规则。用户问“存款利率多少/哪种存款划算”时先查此工具，再用 calc_deposit_compare 测算", args: {} },
@@ -5243,10 +5243,12 @@ async function mcpGreen(env, ctxInfo, name, args) {
     case "wealth_holdings_query": {
       const r = await UU({ op: "holdings" });
       const out = [];
+      let sumPrincipal = 0n, sumValue = 0n;
       for (const h of r.holdings ?? []) {
         const f = await fundMeta(env, h.fund);
         const principal = BigInt(h.amount_cents ?? "0");
         const value = marketValueCents(principal, h.cost_nav ?? "1", f?.nav ?? h.cost_nav ?? "1");
+        sumPrincipal += principal; sumValue += value;
         /* redeem_value 与 value 同源同值：赎回按市值结算，AI 报出的"能拿回多少"与实际一致 */
         out.push({
           fund: h.fund, name: f?.name ?? h.fund, risk_level: f?.risk_level ?? null, nav: f?.nav ?? null,
@@ -5254,7 +5256,9 @@ async function mcpGreen(env, ctxInfo, name, args) {
           unrealized_pnl: centsToStr(value - principal), day_change: f?.day_change ?? null,
         });
       }
-      return { holdings: out, note: "市值 = 本金×当前净值÷成本净值（整数运算）；赎回按市值结算（redeem_value 即预计回款），unrealized_pnl 为浮动盈亏" };
+      /* 第一百三十四轮：服务端预算合计——不同模型自行加总 12 笔可能出算术差（Qwen3.8 差 ¥2,540 实测）；
+       * 合计由 Worker bigint 确定性计算，模型只引用不自行求和（同 today_pnl 口径先例） */
+      return { holdings: out, total_principal: centsToStr(sumPrincipal), total_value: centsToStr(sumValue), total_pnl: centsToStr(sumValue - sumPrincipal), count: out.length, note: "市值 = 本金×当前净值÷成本净值（整数运算）；赎回按市值结算（redeem_value 即预计回款），unrealized_pnl 为浮动盈亏；合计字段由服务端预算——回答合计时直接引用 total_principal/total_value，勿自行加总" };
     }
     /* 第一百二十六轮：挂失进度查询（GREEN）——各卡挂失状态+费用+下一步指引（签收激活入口） */
     case "card_loss_status": {
@@ -5286,7 +5290,14 @@ async function mcpGreen(env, ctxInfo, name, args) {
       }
       return { cards: out, note: "借记卡 balance=可用余额；信用卡 balance=当前欠款、available=总额度−欠款；recent_txs 为该卡最近消费（按流水 card 字段）" };
     }
-    case "subscription_scan": return await UU({ op: "subs" });
+    case "subscription_scan": {
+      const r = await UU({ op: "subs" });
+      /* 第一百三十四轮：服务端预算"下一笔扣费"（最早 next_charge_date；同日取列表首位）——
+       * 不同模型自行选择同日多笔时有方差（GLM 取首位、Qwen 取最大额），预算字段消除模型侧选择 */
+      const subs = r.subscriptions ?? [];
+      const next = subs.length ? subs.slice().sort((a, b) => String(a.next_charge_date ?? "z").localeCompare(String(b.next_charge_date ?? "z")))[0] : null;
+      return { ...r, next_charge: next ? { merchant: next.merchant, amount: centsToStr(BigInt(next.amount_cents)), date: next.next_charge_date, total_on_same_date: subs.filter((s) => s.next_charge_date === next.next_charge_date).length } : null };
+    }
     case "task_list": {
       const r = await UU({ op: "tasks" });
       return { tasks: (r.tasks ?? []).map((t) => ({ id: t.id, title: t.title, type: t.type, status: t.status, next_run_at: t.next_run_at, repeat: t.repeat })) };
@@ -5308,7 +5319,10 @@ async function mcpGreen(env, ctxInfo, name, args) {
       const kw = (args.name ?? "").trim();
       /* 手机号匹配（官方"按手机号转账"）：关键词含 ≥4 位数字即按号匹配（全号或尾号命中均可） */
       const digits = kw.replace(/\D/g, "");
-      return { payees: (r.payees ?? []).filter((p) => !kw || p.name.includes(kw) || (digits.length >= 4 && String(p.phone ?? "").replace(/\D/g, "").includes(digits))) };
+      const all = r.payees ?? [];
+      const filtered = all.filter((p) => !kw || p.name.includes(kw) || (digits.length >= 4 && String(p.phone ?? "").replace(/\D/g, "").includes(digits)));
+      /* 第一百三十四轮：服务端预算总数——不同模型自行计数有方差；总数由 Worker 确定性计算 */
+      return { payees: filtered, total_payees: all.length, matched: filtered.length, note: all.length !== filtered.length ? `从 ${all.length} 位收款人中匹配 ${filtered.length} 位` : `共 ${all.length} 位常用收款人` };
     }
     case "fx_quote_query": {
       const fx = await hFxLive(env);
@@ -5385,7 +5399,8 @@ async function mcpGreen(env, ctxInfo, name, args) {
       const r = await UU({ op: "notifications", cursor: "0" });
       const list = (r.notifications ?? []).slice(0, 20)
         .map((n) => ({ id: n.id, type: n.type, title: n.title, body: String(n.body ?? "").slice(0, 120), ts: n.ts, read: Number(n.read) === 1 }));
-      return { notifications: args.unread_only ? list.filter((n) => !n.read) : list, unread: r.unread ?? null, note: "全部通知页：https://suveoo.com/notifications" };
+      /* 第一百三十四轮：unread 由服务端全量计数（服务端已返回 r.unread）——模型直接引用，勿从分页列表自行数 */
+      return { notifications: args.unread_only ? list.filter((n) => !n.read) : list, unread: r.unread ?? list.filter((n) => !n.read).length, total_shown: list.length, note: `未读总数 ${r.unread ?? "??"} 条（unread 字段为准，列表仅展示前 ${list.length} 条）；全部通知页：https://suveoo.com/notifications` };
     }
     case "transfer_limit_query": {
       const r = await UU({ op: "getCards" });
@@ -5703,6 +5718,9 @@ export const MODEL_PROFILES = {
   "glm-5.3-flash": { provider: "glm", baseUrl: "https://open.bigmodel.cn/api/anthropic", model: "glm-5.3-flash", apiKeyEnvs: ["LLM_API_KEY_GLM", "LLM_API_KEY"], timeoutMs: 75_000, thinking: "adaptive" },
   "glm-5.3-max":   { provider: "glm", baseUrl: "https://open.bigmodel.cn/api/anthropic", model: "glm-5.3-max",   apiKeyEnvs: ["LLM_API_KEY_GLM", "LLM_API_KEY"], timeoutMs: 75_000, thinking: "adaptive" },
   "qwen3.7-flash": { provider: "qwen", baseUrl: "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic", model: "qwen3.7-flash", apiKeyEnvs: ["LLM_API_KEY_QWEN"], timeoutMs: 75_000, thinking: "adaptive" },
+  "qwen3.8-flash": { provider: "qwen", baseUrl: "https://ws-i7yvdr80f0iv6wg4.cn-beijing.maas.aliyuncs.com/apps/anthropic", model: "qwen3.8-flash", apiKeyEnvs: ["LLM_API_KEY_QWEN"], timeoutMs: 75_000, thinking: "adaptive" },
+  "deepseek-v4.1-flash": { provider: "deepseek", baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-flash", apiKeyEnvs: ["LLM_API_KEY_DEEPSEEK"], timeoutMs: 75_000, thinking: "adaptive" },
+  "kimi-k3": { provider: "kimi", baseUrl: "https://api.moonshot.cn/anthropic", model: "kimi-k3", apiKeyEnvs: ["LLM_API_KEY_KIMI"], timeoutMs: 75_000, thinking: "adaptive" },
 };
 export function resolveLlmProfile(env) {
   const name = typeof env.MODEL_PROFILE === "string" ? env.MODEL_PROFILE.trim() : "";
@@ -5730,7 +5748,10 @@ export async function llmMessages(env, messages, tools, onText, onThinking) {
   if (!key) return { err: prof.name ? `LLM key not configured（档位 ${prof.name} 需要 secret：${MODEL_PROFILES[prof.name].apiKeyEnvs.join(" 或 ")}）` : "LLM_API_KEY not configured" };
   const headers = { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" };
   /* max_tokens 4096：glm-5.3-flash 为思考型（thinking 独立计输出 token），2048 下思考+长回复（对比表/月报）有截断风险 */
-  const payload = { model, max_tokens: 4096, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}) };
+  /* 第一百四十轮：kimi-k3 思考始终开启——reasoning_effort "low" + max_tokens 8192（仅 kimi 档；
+   * 其他档位不受影响。kimi 思考 token 计入 max_tokens，4096 下思考耗尽预算后正文为零（S1 大面积空响应根因） */
+  const maxTokens = prof.provider === "kimi" ? 8192 : 4096;
+  const payload = { model, max_tokens: maxTokens, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}), ...(prof.provider === "kimi" ? { reasoning_effort: "low" } : {}) };
   /* 请求体观测量：字符数按轮记录（性能轮基线——瘦身前后对比的硬数据） */
   logEvent("info", "ai.llm_payload", { chars: JSON.stringify(payload).length, msgs: messages.length, tools: tools?.length ?? 0 });
   /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中"；
@@ -5877,7 +5898,10 @@ export async function handleAiChat(request, env, ctx) {
           const toolUses = content.filter((b) => b.type === "tool_use");
           if (!toolUses.length) break;
 
-          msgs.push({ role: "assistant", content });
+          /* 第一百四十轮：Kimi K3 思考始终开启——assistant 消息回传时剥离 thinking 块
+           * （thinking 块的 signature 字段在 SSE 聚合过程中可能丢失，导致 Kimi 上游 400 静默失败；
+           * GLM/Qwen/DeepSeek 无此问题因为它们的 thinking 不出现在 tool_use 轮次的 content 中） */
+          msgs.push({ role: "assistant", content: content.filter((b) => b.type !== "thinking") });
           const toolResults = [];
           for (const tu of toolUses) {
             const tuKey = tu.name + ":" + (tu.input ? JSON.stringify(tu.input).slice(0, 160) : ""); /* 第一百零五轮：指纹化——同工具不同参数（冻结两张卡）不再被误吞 */

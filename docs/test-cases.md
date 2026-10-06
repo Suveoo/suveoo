@@ -4,7 +4,9 @@
 
 ## 目录与覆盖
 
-### unit/（纯函数，83 用例）
+当前规模：**63 文件 / 463 用例**（unit 24 / integration 33 / attack 6）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
+
+### unit/（纯函数，24 文件）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -20,7 +22,7 @@
 | calc-tools.test.js | 10 款 calc_* 纯函数（复利/贷款/目标/信用卡/退休/通胀/AA/存款对比/汇率/预算分配）：典型值、边界与非法参数 |
 | fund-data.test.js | 16 只基金 JSON 完整性：序列 ≥49 月且三线等长、returns 自洽（since≈期末涨幅）、stats 合理（R1 波动<2.5%、R5>15%）、蒙特卡洛 p10≤p25≤p50≤p75≤p90、披露要素齐全；fxQuotesFromRates 纯函数（JPY 100 口径、点差比例、spark 透传） |
 
-### integration/（SELF 全栈 + 真实绑定，25 用例）
+### integration/（SELF 全栈 + 真实绑定，33 文件）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -31,17 +33,45 @@
 | scheduled-tasks.test.js | 预约建立（两段式）→alarm 到点执行→DONE+扣款；到期前取消→CANCELLED 不执行 |
 | dimensional-seed.test.js | 维度化注入：覆盖落库=注入计数+卡片按档位+欠款=明细合计+集团签名在册；预检 dry-run=实跑同构；合并只增+payees 无重名+二次幂等；自定义只动勾选块；缺省旧行为回归；非法 preset 兜底 |
 
-### attack/（对抗用例，回归时与 unit 同跑）
+### attack/（对抗用例，6 文件，与 unit 同跑）
 
-prompt-injection / replay-attack / authorization-bypass / consent-mutation 四类样本场景（当前由上述 unit/integration 文件承载断言；独立攻击语料库扩展中）。
+| 文件 | 覆盖 |
+|------|------|
+| prompt-injection-v2.test.js | 七族注入变体（角色扮演/跨语言/Unicode 同形/长上下文稀释/指令覆盖/数据外泄/工具滥用），66 断言 |
+| grant-forgery.test.js | 伪造/篡改/过期 grant、凭空哈希、连续 4 次伪造触发熔断，14 断言 |
+| prompt-injection.test.js | 第一代基础注入族 |
+| replay-attack.test.js | 同 nonce 重放、五道阶段顺序 |
+| authorization-bypass.test.js | 越权访问、AI 硬上限、未知工具、红级无 OTP |
+| consent-mutation.test.js | 确认后参数突变（500→5000）即失效 |
 
 ## 运行结果
 
 ```
-Test Files  37 passed (37)
-     Tests  267 passed (267)
-  Duration   ~40s
+Test Files  63 passed (63)
+     Tests  463 passed (463)
+  Duration   ~52s
 ```
+
+## 2026-10-06（板块一多指标测试 + 四模型消融）
+
+新增 6 个测试文件（377→463 用例，四模型各跑一遍全绿）：
+
+- tests/attack/prompt-injection-v2.test.js（7 用例/66 断言）——七族注入变体经 AI 通道注入，断言 taint 标注与结构化拒绝
+- tests/attack/grant-forgery.test.js（6 用例/14 断言）——伪造授权全族 + 熔断行为验证
+- tests/integration/circuit-breaker-v2.test.js（6 用例）——熔断触发/读通道隔离/到期自愈/邮件解锁
+- tests/integration/audit-coverage.test.js（16 intent/14 断言）——AI 写操作审计五字段逐条对齐
+- tests/integration/data-isolation-ai.test.js（8 工具 × 4 标识）——跨用户标识零泄露
+- tests/unit/money-parse-cases.test.js（28 用例/30 断言）——中文金额表达到分单位解析
+
+生产黑盒评测脚本（直连生产 Worker，真实登录 + 2FA）：
+
+- scripts/ai-hallucination.mjs——S1 数值幻觉 24 用例（truthJs 求值器 8 比较器，SSE 全文判定）
+- scripts/b1-intent-matrix.mjs——B1 意图分级 50 变体（10 意图 × 5 表述，判定取最终确认卡）
+- scripts/ai-bench.mjs——P1/P2 TTFT 与完整响应（18 指令）
+- scripts/tool-latency.mjs——P3 工具调用延迟（3 轮 × 11 并发，P95=435ms）
+- scripts/s2b4p4-e2e.mjs——S2/B4/P4 执行一致与转账全链路（14 有效执行 + 2 篡改拒绝）
+
+四模型消融：MODEL_PROFILE 切换 GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3，同一套矩阵（vitest 463 + S1 24 + B1 50 + 注入 66）全部 100% 一致；消融中修复 5 处模型无关缺陷（4 项服务端预计算 + B1 最终卡判定）。证据：docs/benchmarks/（整理副本）与 for_developer/bench-results/20261006/（原始 53 份）。
 
 2026-09-30（第五期 idle，v3.77）新增测试（377→384，两遍全绿）：
 - tests/integration/solution-package.test.js（7）——①solution_preview 确定性/整数守恒/期限风险上限（6M≤R2、36M 允许 R4）/应急场景零风险资产；②黄级两段式一键购买：默认卡扣减=总额、逐笔持仓=分配额、通知+审计；③幻觉产品 INVALID_PRODUCT 出卡前拦；④分配合计≠总额 INVALID_AMOUNT（服务端复算值入拒绝信息）；⑤PR1 用户含 R2 基金确认段 INVARIANT_PR_MISMATCH；⑥>¥1000 升红（确认段缺 OTP → OTP_REQUIRED）；⑦部分失败：已成交笔按成本 wealthRedeem 精确回退、成败笔数明确、余额/持仓归位

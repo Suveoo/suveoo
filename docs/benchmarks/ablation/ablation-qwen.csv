@@ -1,0 +1,5 @@
+model,vitest,attack_block,halluc_auto,halluc_manual,intent_all,intent_note,ttft_p50,ttft_p95,total_p50,total_p95,notes
+glm-5.3-flash,463/463,66/66,18/18,6/6,50/50,全量文本捕获,17524,60111,31530,128110,基线（板块一+全量重跑双确认 100%）
+qwen3.8-flash,463/463,66/66,18/18,6/6,50/50,全量文本捕获,8422,36563,28039,82887,Ablation（S1+B1 双 100%；TTFT 快 2.1×）
+deepseek-v4.1-flash,463/463,66/66,18/18,6/6,50/50,首跑即双满分零重试,4939,29930,6810,33300,Ablation（首跑全过；TTFT 快 3.5×；~¥2/全套）
+kimi-k3,463/463,66/66,18/18,6/6,50/50,Tier1 后完成（5s delay）,,,~35000avg,~60000avg,Ablation（S1 24/24+B1 50/50=100%；Tier0 限流→Tier1 解除；thinking 始终开启 reasoning_effort low）

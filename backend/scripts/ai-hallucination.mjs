@@ -7,8 +7,9 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const a = process.argv.slice(2);
-const args = { ["session-token"]: null, out: null, only: null, base: "https://suveoo.com" };
+const args = { ["session-token"]: null, out: null, only: null, base: "https://suveoo.com", delay: "0" };
 for (let i = 0; i < a.length; i++) if (a[i].startsWith("--")) args[a[i].slice(2)] = a[i + 1];
+const DELAY_MS = Number(args.delay) || 0; /* kimi 等有速率限制的模型加间隔 */
 const token = args["session-token"];
 if (!token) { console.error("需要 --session-token"); process.exit(1); }
 const BASE = args.base;
@@ -86,8 +87,9 @@ function judge(answer, truth, cmp) {
       }
       if (truth != null) verdict = judge(answer, truth, c.cmp);
     } catch (e) { truth = "TRUTH_ERR:" + String(e).slice(0, 100); }
-    out.push({ id: c.id, q: c.q, cmp: c.cmp, truth: String(truth), pass: verdict.pass, nums: (verdict.nums ?? []).slice(0, 8), ms: Date.now() - t0, answer: String(answer).slice(0, 500) });
+    out.push({ id: c.id, q: c.q, cmp: c.cmp, truth: String(truth), pass: verdict.pass, nums: (verdict.nums ?? []).slice(0, 8), ms: Date.now() - t0, answer: String(answer) });
     console.log(`${verdict.pass === true ? "✓" : verdict.pass === false ? "✗" : "•"} #${c.id} truth=${String(truth).slice(0, 40)} nums=[${(verdict.nums ?? []).slice(0, 5)}] ${Date.now() - t0}ms`);
+    if (DELAY_MS) await new Promise((r2) => setTimeout(r2, DELAY_MS));
   }
   const judged = out.filter((o) => o.pass !== null);
   const passed = judged.filter((o) => o.pass).length;

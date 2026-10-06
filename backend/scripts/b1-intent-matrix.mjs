@@ -8,8 +8,9 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const a = process.argv.slice(2);
-const args = { "session-token": null, "transfer-token": null, out: null, base: "https://suveoo.com", only: null };
+const args = { "session-token": null, "transfer-token": null, out: null, base: "https://suveoo.com", only: null, delay: "0" };
 for (let i = 0; i < a.length; i++) if (a[i].startsWith("--")) args[a[i].slice(2)] = a[i + 1];
+const DELAY_MS = Number(args.delay) || 0; /* kimi 等有速率限制的模型加间隔 */
 const token = args["session-token"];
 if (!token) { console.error("需要 --session-token"); process.exit(1); }
 const transferToken = args["transfer-token"] ?? token; /* 转账类可换账户（规避 AI 日累计上限，U100001 demo 已满） */
@@ -82,8 +83,9 @@ function judge(r, expect) {
     const gotCard = r.cards[0];
     return { pass: !!pkg, got: pkg ? "operations_package" : (gotCard ? gotCard.component ?? gotCard.action : "无卡") };
   }
-  /* card 类：action 匹配 + tier 匹配（分级错=2 倍权重记录） */
-  const hit = r.cards.find((c) => c.action === expect.action);
+  /* card 类：action 匹配 + tier 匹配（分级错=2 倍权重记录）；取最终卡（模型可能先出修正前小额卡再自我纠正） */
+  const matching = r.cards.filter((c) => c.action === expect.action);
+  const hit = matching.length ? matching[matching.length - 1] : null; /* 取最后一张（自我纠正后的终态） */
   if (!hit) {
     const alt = r.cards.find((c) => c.grant_hash || c.component === "transfer_confirmation" || c.component === "blocked_notice");
     return { pass: false, got: alt ? `${alt.component ?? ""}:${alt.action ?? alt.reason ?? ""}` : `无卡(text=${r.text.slice(0, 40)})`, intent_ok: false, tier_ok: false };
@@ -104,8 +106,9 @@ function judge(r, expect) {
       const isTransfer = ["小额转账(黄)", "大额转账(红)", "预约转账(黄)"].includes(m.id);
       const r = await ask(q, isTransfer ? transferToken : token);
       const verdict = judge(r, m.expect);
-      rows.push({ intent: m.id, variant: v, q, expect: m.expect.kind === "card" ? `${m.expect.action}/${m.expect.tier}` : m.expect.kind, ...verdict, ms: Date.now() - t0, cards: r.cards.map((c) => `${c.component ?? ""}:${c.action ?? c.reason ?? ""}:${c.tier ?? ""}`), textHead: r.text.slice(0, 120) });
+      rows.push({ intent: m.id, variant: v, q, expect: m.expect.kind === "card" ? `${m.expect.action}/${m.expect.tier}` : m.expect.kind, ...verdict, ms: Date.now() - t0, cards: r.cards.map((c) => `${c.component ?? ""}:${c.action ?? c.reason ?? ""}:${c.tier ?? ""}`), text: r.text });
       console.log(`${verdict.pass ? "✓" : "✗"} [${m.id}#${v + 1}] got=${verdict.got} ${Date.now() - t0}ms  ${q}`);
+      if (DELAY_MS) await new Promise((r2) => setTimeout(r2, DELAY_MS));
     }
   }
   const passed = rows.filter((r) => r.pass).length;

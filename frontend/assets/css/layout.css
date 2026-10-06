@@ -53,7 +53,7 @@
 @media (min-width: 768px) {
   .app-footer .cols, .app-footer .foot-bottom { max-width: 1080px; padding-left: calc(248px + var(--sp-6)); }
 }
-@media (min-width: 768px) and (max-width: 1180px) { .app-footer .cols { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) and (max-width: 900px) { .app-footer .cols { grid-template-columns: repeat(3, 1fr); gap: var(--sp-4); } }
 .app-footer h4 { font-size: var(--fs-12); color: var(--color-ink-2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: var(--sp-2); }
 .app-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-14); }
 /* —— 移动端 footer 手风琴（队长定稿样式）：一级项全宽行 + 发丝分隔线 + 右侧人字箭头，展开时箭头向下旋转、

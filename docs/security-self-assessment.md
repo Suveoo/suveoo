@@ -39,7 +39,7 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 | # | 风险 | 现状 | 缓解 / 计划 |
 |---|------|------|------------|
 | R-01 | Consent Grant KV 消费非原子（并发双请求存在极短重复消费窗口） | 已知；KV 无 CAS | 加固计划：迁 LedgerDO 以 SQL 事务消费；Demo 阶段影响可控（窗口毫秒级且需同用户并发同 grant） |
-| R-02 | AI 通道依赖 Anthropic `mcp_servers` 连接器行为（非我们控制的外部面） | 正常路径已验证 | 兜底：REST 确认端点独立存在；Qwen/GPT Ablation 需实测（官方 SSE/Streamable 兼容性缝隙已列入验证计划） |
+| R-02 | AI 通道依赖 Anthropic `mcp_servers` 连接器行为（非我们控制的外部面） | **已实测四模型**：GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3 经 `MODEL_PROFILE` 切换全部跑通（2026-10-06，Kimi 需剥离 thinking 块 + `reasoning_effort:"low"`，已入代码） | 兜底不变：REST 确认端点独立存在；消融全部核心指标四模型 100% 一致（docs/benchmarks/ablation/） |
 | R-03 | JWT 无刷新令牌；1h 过期后需重新登录 | 设计取舍（演示系统） | 计划：滑动续期或 refresh token |
 | R-04 | 速率限制计数器非原子（KV incr） | 已知 | 影响限流精度 ±1；加固计划：DO 计数 |
 | R-05 | 红级强验证当前为邮箱 OTP；Passkey/WebAuthn 未实现 | 路线图（原规划仅一条 FIDO2 流程） | 下一迭代：WebAuthn passkey 作为红级第二因子 |
@@ -51,7 +51,9 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 
 ## 3. 测试证据
 
-- 186 个用例全绿（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离）
+- **463 个用例全绿**（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离；63 文件 = unit 24 / integration 33 / attack 6）
+- **生产黑盒实测（2026-10-06）**：拦截类 106 断言（注入七族 66 + 越权伪造 37 + 熔断行为）+ 准确率类 122 用例（数值幻觉 24 / 执行一致 14 / 意图分级 50 / 金额解析 30+），全部通过——证据库 `docs/benchmarks/`
+- **四模型消融**：GLM / Qwen3.8 / DeepSeek / Kimi K3 同套用例 vitest 463 + S1 24 + B1 50 + 注入 66 全部 100% 一致（`docs/benchmarks/ablation/`）
 - 对抗用例：注入样本拦截、重放拦截、授权绕过（AI 硬上限/未知工具/红级无 OTP）、同意突变失效——见 `backend/tests/{unit,attack,integration}`
 
 ## 4. 2026-09-17 新增安全机制（第十一轮）
@@ -84,3 +86,18 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 ### 已知风险清单（更新）
 - 熔断计数存 SESSION_KV（单 key），极端并发下读改写存在竞拍窗口——最坏影响为少计/多计一次，阈值触发语义不受影响（非资金安全边界，是限速保护层）。
 - 触发通知依赖 sendMail best-effort（失败静默，站内通知兜底）。
+
+## 7. 2026-10-06 多指标安全实测（板块一）
+
+新增 6 个测试文件并全部纳入 vitest 常备回归（合计 463 用例全绿）：
+
+| 指标 | 文件 | 规模 | 结果 |
+|---|---|---|---|
+| S3 注入防御 v2（七族变体） | tests/attack/prompt-injection-v2.test.js | 7 用例 / 66 断言 | 66/66 |
+| S4 授权伪造 | tests/attack/grant-forgery.test.js | 6 用例 / 14 断言 | 14/14（连续 4 次伪造触发熔断） |
+| S5 熔断 v2 | tests/integration/circuit-breaker-v2.test.js | 6 用例 | 6/6 |
+| S6 审计完整性 | tests/integration/audit-coverage.test.js | 16 intent / 14 断言 | 14/14 |
+| S7 数据隔离 | tests/integration/data-isolation-ai.test.js | 8 工具 × 4 标识 | 零泄露 |
+| B2 金额解析 | tests/unit/money-parse-cases.test.js | 28 用例 / 30 断言 | 30/30 |
+
+生产黑盒评测（Node 脚本直连生产 Worker）：S1 数值幻觉 24/24（含 1 次产品修复循环——`wealth_holdings_query` 强制引用系统真值）、S2/B4 执行一致 14/14、B1 意图分级 50/50（分级错 0）。原始产物 `for_developer/bench-results/20261006/`（53 份），整理副本 `docs/benchmarks/`。

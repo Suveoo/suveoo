@@ -67,7 +67,7 @@ VOICE_ASR_PROVIDER = "ali"
 # 缺省不设置 MODEL_PROFILE = 沿用下方 LLM_* 三变量（与历史行为逐字节一致）。
 # 完整教程（三步切换法/新增模型/回滚/常见坑）：for_developer/switch_models.md
 MODEL_PROFILE = "glm-5.3-flash"
-# 当前（第五期 idle 2026-09-30 收尾）：切回智谱 glm-5.3-flash（qwen 任务期测试完毕；第十三期红队先例同操作）
+# 当前（第一百四十轮 Kimi Ablation 完毕）：切回 glm-5.3-flash（四模型全部 100%）
 LLM_PROVIDER = "glm"
 LLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
 LLM_MODEL = "glm-5.3-flash"
