@@ -1,25 +1,23 @@
 # Suveoo — Agentic Banking Control Plane
 
-<!-- 插图 1：全设备 Hero Mockup（手机 + 平板 + 电脑同框） -->
+<!-- 图 1：全设备 Hero Mockup -->
 ![Suveoo across devices](docs/images/readme/hero-devices.png)
 
 <div align="center">
 
-![Tests](https://img.shields.io/badge/tests-463%20passing-brightgreen) ![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Risk Tiers](https://img.shields.io/badge/permission%20tiers-GREEN%2FYELLOW%2FRED-success) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%97%203%20langs-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
+![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%97%203%20langs-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
 
-[Suveoo AI 概览](#Suveoo AI 概览) · [安全内核](#安全内核bankaction-ir-与五道确定性验证) · [Suveoo AI](#suveoo-ai自然语言驱动全行业务) · [六大场景](#六大官方场景全覆盖) · [快速开始](#快速开始) · [测试与评测体系](#测试与评测体系) · [文档地图](#文档地图)
+[关于](#关于) · [Suveoo AI 概览](#suveoo-ai-概览) · [安全内核](#安全内核bankaction-ir-与五道确定性验证) · [Suveoo AI](#suveoo-ai自然语言驱动全行业务) · [六大场景](#六大官方场景全覆盖) · [快速开始](#快速开始) · [测试与评测体系](#测试与评测体系) · [文档地图](#文档地图)
 
 </div>
 
 ---
 
-**Suveoo** 是一个运行在全球边缘的完整模拟银行系统。1 个 Worker + 2 类 Durable Object（账本、长程任务）+ 2 KV + R2，前端零构建 MPA，Web 版（`suveoo.com`）全平台兼容，Android 端 Capacitor 壳原生集成。
+## 关于
 
-**Suveoo AI** 是 Suveoo 内嵌的 AI 智能体。Suveoo AI 允许用户用自然语言（文字或语音）办理转账、账单、理财、卡片、订阅与跨场景长程任务；AI 通道、REST 表单、MCP 三通道收敛到同一套验证管线。
+**Suveoo** 是一个运行在全球边缘的完整模拟银行系统。前端零构建 MPA，提供 76 页面、 62 页面控制器。Web 版（`suveoo.com`）全平台兼容，Android 端 Capacitor 壳原生集成。
 
-**Suveoo AI 核心命题**：说话就能办业务，但大模型只能"提议"。任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
-
-**核心证据**：确定性自动化测试 463 条全绿；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；四模型消融实验（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关。
+**Suveoo AI** 是 Suveoo 内嵌的 AI 智能体。Suveoo AI 集成 63 个 MCP 工具，不仅允许用户用自然语言（语音、文字）办理各项传统银行业务及跨场景与长程任务，而且支持 10 大内嵌金融计算工具的调用与答复内直接渲染，还能对复杂任务进行 DAG 拆解与统一授权，同时能针对客户的实际状况，进行动态产品组合拼装和主动提议。
 
 ### 技术栈
 
@@ -36,35 +34,28 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![Capacitor 8][Capacitor]][Capacitor-url]
 [![Android · Java][Android]][Android-url]
 
-<!-- 插图 2：架构总览图（Figma 绘制，含 LLM→IR→五道→DO 链路） -->
+<!-- 图 2：架构总览图 -->
 ![Architecture](docs/images/readme/architecture.png)
 
 ---
 
 ## Suveoo AI 概览
 
-**它解决什么**：AI Agent 从"回答问题"跨到"替我办业务"的最后一公里是信任问题——不是"能不能听懂用户"，而是**凭什么敢把转账权限交给一个概率系统**。
+**背景与难点**：AI Agent 从"回答问题"到"替客户办业务"的最后一公里是信任问题——不是"能不能听懂用户"，而是"**凭什么敢把转账权限交给一个概率系统**"。
 
-**怎么解决**：LLM 输出永远不直接碰钱。每次工具调用被编译成类型化的 BankAction IR（金融行动 IR，含来源追踪、DAG 步骤、风险分级、补偿声明），连过五道确定性验证：
+**Suveoo AI 的定位**：说话就能办业务，但大模型只能"提议"，永远不直接碰钱。
 
-| # | 验证器 | 职责 | 对应风险 |
-|---|---|---|---|
-| 1 | **Policy** | 三色分级：绿自动 / 黄确认卡 / 红 OTP 强验证；日累计 ¥1,000 动态升红；AI 通道硬上限单笔 ¥5,000 / 日 ¥10,000 | 越权操作 |
-| 2 | **Consent Binding** | 用户确认的是 SHA256 哈希绑定的**精确参数快照**——确认后改一个数字，grant 立即失效 | "确认后 AI 偷改参数" |
-| 3 | **Provenance / Taint** | 账单备注等外部文本标 `EXTERNAL_UNTRUSTED`，可影响认知、**永不能成为收款人/金额** | 间接提示词注入 |
-| 4 | **Invariants** | bigint 整数分单位的守恒 / 适当性 / 余额断言——纯函数，不是"AI 觉得没问题" | 金融数学错误 |
-| 5 | **Replay / Idempotency** | trace_id + nonce 查重，重放即拒 | 重复扣款 |
+**Suveoo AI 的解决方案及核心技术**：任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
 
-<!-- 插图 3：五道验证流程图（五道闸门 + VERIFIED/BLOCKED 分叉） -->
-![Five Gates](docs/images/readme/five-gates.png)
+**Suveoo AI 为什么可信**：确定性自动化测试 463 条全绿；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
 
-**为什么可信**：不宣称"我们更安全"，只提交实测记录——提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型消融证明同一套用例换任何模型结果不变（详见[测试与评测体系](#测试与评测体系)）。
+## 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
----
+### BankAction IR（金融行为中间表示）
 
-## 安全内核：BankAction IR 与五道确定性验证
+IR（Intermediate Representation，中间表示）源自编译器领域，编译器不会直接把高级语言编译成机器码，而是先转换为结构化的中间表示。
 
-**BankAction IR**（自研中间表示）——LLM 的"方言"与账本的"方言"之间的译码层：
+基于此思路，Suveoo 的 **BankAction IR** 把 LLM 的每一次工具调用提议在服务端编译成一个**类型化、可静态校验、可重放**的金融行动对象，充当"模型语言"与"账本行为"之间的译码层，含来源追踪、DAG 步骤、风险分级、补偿声明：
 
 ```json
 {
@@ -78,21 +69,30 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 }
 ```
 
-- **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
-- **Verified GenUI**：确认卡上渲染的金额/收款人/费用**只来自已验证的 IR 快照**（`issuer === "verified_ir"`），"界面显示 ¥500、后端转 ¥5000"从架构上被堵死。13 个验证组件覆盖全部写操作形态。
-- **红级强验证**：短信 + 邮箱双通道 OTP、生物识别（Android）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
-- **全程审计**：每笔写操作 `user_audit` 五字段落库 + Trust Console 实时五盏灯（评委可在演示里亲眼看 POLICY → CONSENT → PROVENANCE → INVARIANTS → REPLAY 逐门亮起）。
+### Suveoo Verification Runtime 五道确定性验证
+
+每一笔动钱、动状态的操作，在触达账本之前必须连过五道闸门；任何一道 FAIL 即 BLOCKED，且全部阶段化证据实时上墙：
+
+| # | 验证器 | 职责 | 对应风险 |
+|---|---|---|---|
+| 1 | **Policy** | 三色分级：绿自动 / 黄确认卡 / 红 OTP 强验证；日累计 ¥1,000 动态升红；AI 通道硬上限单笔 ¥5,000 / 日 ¥10,000 | 越权操作 |
+| 2 | **Consent Binding** | 用户确认的是 SHA256 哈希绑定的**精确参数快照**——确认后改一个数字，grant 立即失效 | "确认后 AI 偷改参数" |
+| 3 | **Provenance / Taint** | 账单备注等外部文本标 `EXTERNAL_UNTRUSTED`，可影响认知、**永不能成为收款人/金额** | 间接提示词注入 |
+| 4 | **Invariants** | bigint 整数分单位的守恒 / 适当性 / 余额断言——纯函数，不是"AI 觉得没问题" | 金融数学错误 |
+| 5 | **Replay / Idempotency** | trace_id + nonce 查重，重放即拒 | 重复扣款 |
+
+<!-- 插图 3：五道验证流程图（五道闸门 + VERIFIED/BLOCKED 分叉） -->
+![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
+
+### 其他安全保障
+
+1. **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
+2. **Verified GenUI**：确认卡上渲染的金额/收款人/费用**只来自已验证的 IR 快照**（`issuer === "verified_ir"`），"界面显示 ¥500、后端转 ¥5000"从架构上被堵死。13 个验证组件覆盖全部写操作形态。
+3. **红级强验证**：短信 + 邮箱双通道 OTP、生物识别（Android）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
+4. **全程审计**：每笔写操作 `user_audit` 五字段落库 + Trust Console 实时五盏灯（评委可在演示里亲眼看 POLICY → CONSENT → PROVENANCE → INVARIANTS → REPLAY 逐门亮起）。
 
 <!-- 插图 4：Consent Binding 现场演示截图（确认卡 + 改金额后 BLOCKED 提示，带高级边框） -->
 ![Consent Binding Demo](docs/images/readme/consent-binding.png)
-
-<b>验证器实现细节</b>：
-
-- `compileToIR()` / `verify()` / `runGuarded()` —— `backend/worker-main.js`
-- Grant：SHA256(intent + authFields + user_id + expires_at + nonce)，KV 存储 TTL 300s（生产 `CONSENT_GRANT_TTL_SECONDS`；代码默认 120s），服务端消费一次
-- Taint 检查先于 Consent；GREEN 工具轻量通道（仅 Provenance 标注）
-- 金额内核：十进制字符串 → bigint 分单位，全程无浮点（`toCents/centsToStr/marketValueCents/navScaled4`）
-- 单测锁定：`tests/unit/{ir-compiler,consent-binding,taint-check,invariants,idempotency,policy-engine,money-math}.test.js`
 
 ---
 
