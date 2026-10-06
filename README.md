@@ -34,7 +34,6 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![Capacitor 8][Capacitor]][Capacitor-url]
 [![Android · Java][Android]][Android-url]
 
-<!-- 图 2：架构总览图 -->
 ![Architecture](docs/images/readme/architecture.png)
 
 ---
@@ -81,9 +80,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 | 4 | **Invariants** | bigint 整数分单位的守恒 / 适当性 / 余额断言——纯函数，不是"AI 觉得没问题" | 金融数学错误 |
 | 5 | **Replay / Idempotency** | trace_id + nonce 查重，重放即拒 | 重复扣款 |
 
-<!-- 插图 3：五道验证流程图（五道闸门 + VERIFIED/BLOCKED 分叉） -->
-![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
-
 ### 其他安全保障
 
 1. **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
@@ -91,8 +87,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 3. **红级强验证**：短信 + 邮箱双通道 OTP、生物识别（Android）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
 4. **全程审计**：每笔写操作 `user_audit` 五字段落库 + Trust Console 实时五盏灯（评委可在演示里亲眼看 POLICY → CONSENT → PROVENANCE → INVARIANTS → REPLAY 逐门亮起）。
 
-<!-- 插图 4：Consent Binding 现场演示截图（确认卡 + 改金额后 BLOCKED 提示，带高级边框） -->
-![Consent Binding Demo](docs/images/readme/consent-binding.png)
+![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
 
 ---
 
