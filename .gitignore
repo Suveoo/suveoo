@@ -62,6 +62,13 @@ backend/android/app/src/main/assets/public/
 *.tmp
 .deploy-state.json
 
+/._DEPLOYMENT.md
+/._README.md
+/._from_README_5_to_end.md
+/._frontend
+/._macos_client_plan_20261007.md
+/macos_client_plan_20261007.md
+
 # ===== 第一百二十五轮：安全审计临时产物（含会话令牌/APK 大件，永不入库） =====
 .apkaudit/
 .audit9/
