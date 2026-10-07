@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Suveoo 浏览器</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 12px "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #F7F7F8;
+    border-bottom: 1px solid #E4E6EB; box-sizing: border-box; -webkit-app-region: no-drag; }
+  .u { flex: 1; min-width: 0; color: #55595F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+  .b { border: 0; border-radius: 6px; padding: 4px 12px; cursor: pointer; background: #EEF0F9; color: #1E2A78; font-weight: 600; }
+  .b:hover { background: #E2E6F5; }
+  .x { background: #FAECEA; color: #C0392B; }
+  .x:hover { background: #F5DEDA; }
+</style>
+</head>
+<body>
+  <div class="u" id="u"></div>
+  <button class="b" id="open">在系统浏览器打开</button>
+  <button class="b x" id="close">关闭</button>
+<script>
+  const el = document.getElementById("u");
+  const render = (u) => { el.textContent = u || ""; el.title = u || ""; };
+  render(new URLSearchParams(location.search).get("url"));
+  window.suveooExtUpdate = render; // 主进程导航时经 executeJavaScript 回调刷新
+  document.getElementById("open").onclick = () => { if (window.suveooExt) window.suveooExt.open(el.textContent); };
+  document.getElementById("close").onclick = () => { if (window.suveooExt) window.suveooExt.close(); };
+</script>
+</body>
+</html>
