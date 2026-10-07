@@ -166,7 +166,12 @@
             }
           } catch {}
         }
-        try { localStorage.removeItem("suveoo_token"); sessionStorage.clear(); } catch {} // 清残留会话（防止假阳性登录判定）
+        try {
+          const suiteBak = sessionStorage.getItem("e2eSuite"); // clear 会连带清掉套件名——先备份
+          localStorage.removeItem("suveoo_token");
+          sessionStorage.clear();
+          if (suiteBak) sessionStorage.setItem("e2eSuite", suiteBak);
+        } catch {} // 清残留会话（防止假阳性登录判定）
         await sleep(1000);
         val("l-id", creds.id); val("l-pw", creds.pw);
         await sleep(200);

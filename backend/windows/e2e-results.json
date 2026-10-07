@@ -298,5 +298,23 @@
     "pass": false,
     "detail": "超时未收到页面侧结论",
     "when": "2026-10-06T23:36:16.743Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "超时未收到页面侧结论",
+    "when": "2026-10-07T03:47:08.658Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "登录码 180s 未回填",
+    "when": "2026-10-07T03:54:13.217Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "红卡OTP→执行=true；流水 0→0；收款人=谢宇洲；卡=确认转账YELLOW需确认",
+    "when": "2026-10-07T03:57:13.161Z"
   }
 ]

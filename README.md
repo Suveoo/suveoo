@@ -342,7 +342,9 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 **演示账户**：`demo@suveoo.com` / `jinrongkeji2026`（模拟银行系统，不涉及真实资金；登录含邮箱验证码 2FA；可用 `/api/demo/seed` 重灌演示数据——DEMO_MODE 门控）。
 
-完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建）。
+**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK 与 **Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）。
+
+完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows 客户端构建与发布）。
 
 ---
 
@@ -353,6 +355,7 @@ suveoo/
 ├── backend/
 │   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9700 行）
 │   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
+│   ├── windows/                # Electron 壳（suveoo-app 协议/Capacitor 兼容 shim/三级更新/Hello/Toast/E2E 驱动器）
 │   ├── tests/                  # 463 用例（unit 24 / integration 33 / attack 6）
 │   └── scripts/                # 部署/APK 构建/评测脚本（ai-hallucination / b1-intent-matrix / ai-bench / tool-latency / s2b4p4-e2e）
 ├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA

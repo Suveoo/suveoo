@@ -7839,6 +7839,10 @@ function r2Response(obj, key, status = 200) {
 }
 export async function serveStatic(env, request, url) {
   if (request.method !== "GET" && request.method !== "HEAD") return apiError("METHOD_NOT_ALLOWED", "static assets are GET/HEAD only", 405);
+  /* 第一百五十轮：/downloads 与 /download 同页——规范名 /download，别名 301 永久重定向（SEO 归一） */
+  if (url.pathname === "/downloads" || url.pathname === "/downloads/") {
+    return withSecurityHeaders(new Response(null, { status: 301, headers: { location: "/download", "cache-control": "public, max-age=86400" } }));
+  }
   const pathname = rewriteDynamicRoutes(url.pathname);
   /* 点开头路径一律 404（第六十九轮教训纵深防御）：deploy 脚本曾把 .mimosa 工具缓存传进桶且公网可读；
    * 即使未来再有类似对象入桶，本守卫也确保其永不可被访问 */
@@ -7867,8 +7871,9 @@ export async function serveStatic(env, request, url) {
 /* ================================================================
  * Worker 入口
  * ================================================================ */
-/* 原生壳 WebView 源白名单（CORS 仅对它们生效；Capacitor 默认 androidScheme=https → https://localhost） */
-const SHELL_ORIGINS = new Set(["https://localhost", "http://localhost", "capacitor://localhost", "https://suveoo.local"]);
+/* 原生壳 WebView 源白名单（CORS 仅对它们生效；Capacitor 默认 androidScheme=https → https://localhost；
+ * 第一百五十轮：Windows Electron 壳自定义协议 origin suveoo-app://local 一并放行） */
+const SHELL_ORIGINS = new Set(["https://localhost", "http://localhost", "capacitor://localhost", "https://suveoo.local", "suveoo-app://local"]);
 export default {
   /* CORS 外壳（第四十五轮 Android 壳）：白名单源（Capacitor WebView）预检直答、响应注入跨源头；
      网页版同源请求不进此分支，行为零变化。真实路由全部在 handle()。 */

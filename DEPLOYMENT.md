@@ -223,10 +223,31 @@ npx wrangler tail suveoo-bank-main --format pretty                     # 实时�
 - [ ] `curl https://suveoo.com/api/health` → `{status:"ok"}`
 - [ ] `/home`、`/ai`、`/wealth/funds/global-mixed-1`、`/account/login`、`/transfer/intrabank/`（尾斜杠）均 200
 - [ ] 未知路径返回 404.html（HTTP 404）；`/` 跳转 `/home`
-- [ ] `www.suveoo.com` 301 → `suveoo.com`
+- [ ] `www.suveoo.com` 301 → `suveoo.com`；`/downloads` 301 → `/download`
 - [ ] MCP Inspector 连 `https://suveoo.com/mcp`：initialize + tools/list（22 个）成功
 - [ ] 注册开户：收到验证码邮件；开户后 4 借记 + 1 信用卡、总余额 ∈ [999,328.24, 1,124,549.38]
 - [ ] 黄级转账：确认卡倒计时 + grant_hash 显示；红级：OTP 邮件可达
+
+## 15. Windows 客户端（Suveoo for Windows，Electron 44）
+
+源码 `backend/windows/`；构建与发布一键化：`npm run release`（`--dry` 只构建不上传）。
+
+### 15.1 首次环境
+`npm install`（.npmrc 已配 npmmirror，electron 二进制走镜像）→ `npm install-scripts approve electron && npm rebuild electron`（npm 新版安全机制放行 postinstall）→ `python scripts/make-ico.py`（需 Pillow，生成 build/icon.ico）。
+
+### 15.2 构建（三段式，绕开 winCodeSign 符号链接坑）
+① `npx electron-builder --win dir` 解包 → ② 用 winCodeSign 缓存内的 rcedit-x64.exe 给 `dist/win-unpacked/Suveoo.exe` 打图标与版本元数据（ProductName=Suveoo、file/product-version）→ ③ `npx electron-builder --win nsis portable --prepackaged dist/win-unpacked` 出安装包+便携版（`release.mjs` 已封装全流程并自动定位 rcedit）。产物约 136 MB（extraResources 裁剪 cards-front 源图 + .mimosa）。
+
+坑位备忘：非管理员无符号链接特权致 winCodeSign 缓存解包必败——正解是构建配置关掉签改可执行文件 + 手动 rcedit（剥归档/Developer Mode 均偏方）；npx 在 Windows 须经 shell；asar 内不可写（运行时日志写 userData）；混合显卡本机默认禁 GPU（崩溃根治）。
+
+### 15.3 发布（R2 铁律 --remote）
+`node scripts/release.mjs`：三段构建 → sha256 → 上传 setup/portable → 更新 `/dl/windows-manifest.json`（字段 versionName/versionCode/minVersionCode/url/sha256/sizeBytes/portableUrl；versionCode=major×1e6+minor×1e3+patch）。**强制更新**＝把 minVersionCode 提到高于存量版本（客户端全屏阻断层）；回滚＝manifest 改回旧值。
+
+### 15.4 服务端配套（一次性）
+Worker 壳源白名单已含 Windows 壳 origin `suveoo-app://local`；`/download` 页读 windows-manifest 渲染 Windows 卡片。
+
+### 15.5 测试
+`npm test`（vitest 29+：更新决策/URL 白名单/导航分类/IPC schema）｜`npx electron . --smoke`（78 路由冒烟）｜`--shot=<url> --size=WxH --out` 排版截图｜`--e2e=<suite>` 实机 E2E（demo-login / transfer-yellow / transfer-red-xyz / i18n-switch / external-browser / offline-resilience / tray-persist / deeplink / update-ask / update-force）。OTP 套件取码：browser-use 驱动 IAB Gmail 读码写入 `e2e-otp.txt`；账户凭据经 `e2e-creds.json` 注入（gitignore）。
 - [ ] 商户备注注入样本 → Trust Console 显示 `TAINT BLOCKED`
 - [ ] 重复提交同一转账 → `REPLAY BLOCKED` 且返回原结果
 - [ ] GA4 实时收到 page_view（接受全部后）

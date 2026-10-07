@@ -25,7 +25,9 @@ S.api = {
     try {
       out = await attempt();
     } catch (e) {
-      if (e.name !== "AbortError") throw e;
+      /* 断网/连接被拒（TypeError: Failed to fetch）与超时同构处理：统一回落 TIMEOUT
+       * 错误对象——此前原生异常直接上抛，调用方多数未捕获（断网时登录按钮永久 spinner 的根因） */
+      if (e.name !== "AbortError" && !(e instanceof TypeError)) throw e;
       if (method === "GET") {
         try { out = await attempt(); } catch { out = null; }
       }
