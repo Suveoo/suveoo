@@ -1,0 +1,26 @@
+[
+  {
+    "suite": "tray-persist",
+    "pass": true,
+    "detail": "关窗后进程存活=true；窗口隐藏=true；唤起恢复=true",
+    "when": "2026-10-07T10:13:09.896Z"
+  },
+  {
+    "suite": "update-ask",
+    "pass": true,
+    "detail": "发现新版本询问弹窗出现（soft 级）",
+    "when": "2026-10-07T10:30:38.098Z"
+  },
+  {
+    "suite": "update-force",
+    "pass": true,
+    "detail": "强制更新阻断层出现（force 级）",
+    "when": "2026-10-07T10:33:15.817Z"
+  },
+  {
+    "suite": "deeplink",
+    "pass": true,
+    "detail": "suveoo://account/cards → 主窗直达卡片页",
+    "when": "2026-10-07T10:38:58.227Z"
+  }
+]

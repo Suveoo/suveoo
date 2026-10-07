@@ -1331,7 +1331,7 @@
   "bio.enabled": "Fingerprint quick sign-in enabled",
   "bio.enrollFail": "Setup incomplete. You can try again after next sign-in",
   "apk.title": "Download Suveoo",
-  "apk.subtitle": "One account, two native apps. The Android and Windows clients mirror the full web experience — natural-language banking guarded by tiered authorization and 2FA.",
+  "apk.subtitle": "One account, three native apps. The Android, Windows and macOS clients mirror the full web experience — natural-language banking guarded by tiered authorization and 2FA.",
   "apk.btn": "Download for Android",
   "apk.version": "Version",
   "apk.size": "Size",
@@ -1540,5 +1540,14 @@
   "dl.winStepsTitle": "Windows installation",
   "dl.wstep1": "Tap \"Download for Windows\" to save the installer",
   "dl.wstep2": "Run it; if SmartScreen appears on first run, choose \"More info → Run anyway\"",
-  "dl.wstep3": "Follow the wizard, then open Suveoo and sign in"
+  "dl.wstep3": "Follow the wizard, then open Suveoo and sign in",
+  "dl.macTitle": "Suveoo for macOS",
+  "dl.macBtn": "Download for macOS",
+  "dl.macZip": "Zip archive",
+  "dl.macRequireVal": "macOS 11 or later (Intel x64)",
+  "dl.macNote": "The package is not notarized: on first launch, if macOS says it cannot verify the developer, right-click Suveoo and choose Open, or allow it in System Settings → Privacy & Security.",
+  "dl.macStepsTitle": "macOS installation",
+  "dl.mstep1": "Tap \"Download for macOS\" to save the DMG",
+  "dl.mstep2": "Open the DMG and drag Suveoo into Applications (overwrite to upgrade)",
+  "dl.mstep3": "On the first-launch security prompt, right-click Suveoo → Open (once only)"
 }

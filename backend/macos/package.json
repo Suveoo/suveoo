@@ -1,0 +1,82 @@
+{
+  "name": "suveoo-macos",
+  "productName": "Suveoo",
+  "private": true,
+  "version": "3.183.0",
+  "description": "Suveoo for macOS — Agentic Banking Control Plane desktop shell",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "test": "vitest run",
+    "icon": "bash scripts/make-icns.sh",
+    "dist": "electron-builder --mac dmg zip",
+    "release": "node scripts/release.mjs",
+    "release:dry": "node scripts/release.mjs --dry"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^25.1.8",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "electron@44.5.1": true
+  },
+  "build": {
+    "appId": "com.suveoo.app",
+    "productName": "Suveoo",
+    "copyright": "© 2026 Suveoo",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**/*",
+      "bridge/**/*",
+      "preload.js",
+      "!smoke-report.json",
+      "!smoke-progress.log"
+    ],
+    "extraResources": [
+      {
+        "from": "../../frontend",
+        "to": "frontend",
+        "filter": [
+          "**/*",
+          "!**/*.md",
+          "!.mimosa/**",
+          "!assets/images/cards-front/**/*.jpg",
+          "!assets/images/cards-front/**/*.svg"
+        ]
+      }
+    ],
+    "protocols": [
+      {
+        "name": "Suveoo Deep Link",
+        "schemes": ["suveoo"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "build/icon.icns",
+      "extendInfo": {
+        "LSMinimumSystemVersion": "11.0"
+      },
+      "artifactName": "suveoo-macos-${version}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Suveoo ${version}",
+      "artifactName": "suveoo-setup-${version}.${ext}"
+    }
+  }
+}

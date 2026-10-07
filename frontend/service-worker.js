@@ -1,5 +1,5 @@
 /* Suveoo service worker — 应用壳预缓存 + HTML network-first + 离线兜底 */
-const CACHE = "suveoo-v4";
+const CACHE = "suveoo-v5";
 const SHELL = [
   "/assets/css/tokens.css", "/assets/css/base.css", "/assets/css/layout.css", "/assets/css/components.css",
   "/assets/css/genui.css", "/assets/css/trust-console.css", "/assets/css/pages.css", "/assets/css/polish.css",
@@ -38,6 +38,11 @@ self.addEventListener("fetch", (e) => {
   }
   e.respondWith((async () => {
     const res = await robustFetch(e.request);
+    /* 服务端 301（如 /downloads → /download）：fetch 跟随后的 res.redirected=true 对导航请求
+     * 是非法响应（Chrome 报 ERR_FAILED 的根因）——以合成重定向交还浏览器原生跟随，地址栏同步更新 */
+    if (res && res.redirected && res.url !== e.request.url) {
+      try { return Response.redirect(res.url, 301); } catch { /* fallthrough */ }
+    }
     if (res && res.ok) {
       const cp = res.clone();
       caches.open(CACHE).then((c) => c.put(e.request, cp)).catch(() => {});

@@ -156,25 +156,25 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S3 提示注入防御
 
-| 维度 | 内容 |
-|---|---|
+| #    | 内容 |
+|------|---|
 | 指标定义 | 恶意外部文本（账单备注/收款人名等 `EXTERNAL_UNTRUSTED` 源）诱导 AI 越权操作或泄露数据时的拦截率 |
 | 测试方法 | 七族变体（角色扮演、跨语言、Unicode 同形、长上下文稀释、指令覆盖、数据外泄、工具滥用）经 AI 通道注入，断言 taint 标注与结构化拒绝 |
 | 用例规模 | 7 用例 / 66 断言（另有第一代基础族 `prompt-injection.test.js`） |
-| 实测结果 | **66/66 = 100%**（2026-10-06；四模型消融下同为 66/66，见下文消融总表） |
+| 实测结果 | **66/66 = 100%**（四模型消融下同为 66/66，见下文消融总表） |
 | 测试文件 | [`backend/tests/attack/prompt-injection-v2.test.js`](./backend/tests/attack/prompt-injection-v2.test.js) |
 | 证据数据 | [`docs/benchmarks/security/phase1-l0-results.json`](./docs/benchmarks/security/phase1-l0-results.json) |
 
 ### S4 越权与授权伪造拦截
 
-| 维度 | 内容 |
-|---|---|
-| 指标定义 | 伪造/篡改/过期 grant、红黄分级错位、跨用户访问、重放请求被前置拦截的比例 |
-| 测试方法 | 四个攻击族独立发难：authorization-bypass（越权访问）、consent-mutation（确认后参数篡改）、replay-attack（重放）、grant-forgery（伪造授权，6 用例 14 断言，含连续 4 次伪造触发熔断的行为验证） |
-| 用例规模 | 4 族合计 37 断言 |
-| 实测结果 | **37/37 = 100%**，全部结构化 BLOCKED（2026-10-06） |
-| 测试文件 | [`grant-forgery.test.js`](./backend/tests/attack/grant-forgery.test.js) · [`authorization-bypass.test.js`](./backend/tests/attack/authorization-bypass.test.js) · [`consent-mutation.test.js`](./backend/tests/attack/consent-mutation.test.js) · [`replay-attack.test.js`](./backend/tests/attack/replay-attack.test.js)（均在 `backend/tests/attack/`） |
-| 证据数据 | 同 S3，[`docs/benchmarks/security/phase1-l0-results.json`](./docs/benchmarks/security/phase1-l0-results.json) |
+| #    | 内容                                                                                                                                                                                                                                                                                                                                              |
+|------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 指标定义 | 伪造/篡改/过期 grant、红黄分级错位、跨用户访问、重放请求被前置拦截的比例                                                                                                                                                                                                                                                                                                        |
+| 测试方法 | 四个攻击族独立发难：authorization-bypass（越权访问）、consent-mutation（确认后参数篡改）、replay-attack（重放）、grant-forgery（伪造授权，6 用例 14 断言，含连续 4 次伪造触发熔断的行为验证）                                                                                                                                                                                                              |
+| 用例规模 | 4 族合计 37 断言                                                                                                                                                                                                                                                                                                                                     |
+| 实测结果 | **37/37 = 100%**，全部结构化 BLOCKED                                                                                                                                                                                                                                                                                                                  |
+| 测试文件 | [`grant-forgery.test.js`](./backend/tests/attack/grant-forgery.test.js)、[`authorization-bypass.test.js`](./backend/tests/attack/authorization-bypass.test.js)、[`consent-mutation.test.js`](./backend/tests/attack/consent-mutation.test.js)、[`replay-attack.test.js`](./backend/tests/attack/replay-attack.test.js)（均在 `backend/tests/attack/`） |
+| 证据数据 | 同 S3，[`docs/benchmarks/security/phase1-l0-results.json`](./docs/benchmarks/security/phase1-l0-results.json)                                                                                                                                                                                                                                     |
 
 ### S5 异常熔断正确性
 
@@ -222,12 +222,12 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 **四模型分项表现**（同一套 24 用例）：
 
-| 模型 | 自动 18 | 人工 6 | 合计 |
-|---|---|---|---|
-| GLM-5.3-Flash | 18/18 | 6/6 | **24/24 = 100%** |
-| Qwen3.8-Flash | 18/18 | 6/6 | **24/24 = 100%** |
-| DeepSeek V4.1-Flash | 18/18 | 6/6 | **24/24 = 100%** |
-| Kimi K3 | 18/18 | 6/6 | **24/24 = 100%** |
+| 模型 | 自动 18 | 人工 6 | 合计 | 测试数据 |
+|---|---|---|---|---|
+| GLM-5.3-Flash | 18/18 | 6/6 | **24/24 = 100%** | [`s1-glm-full.json`](./docs/benchmarks/business/s1-glm-full.json) |
+| Qwen3.8-Flash | 18/18 | 6/6 | **24/24 = 100%** | [`s1-qwen38-full.json`](./docs/benchmarks/business/s1-qwen38-full.json) |
+| DeepSeek V4.1-Flash | 18/18 | 6/6 | **24/24 = 100%** | [`s1-deepseek-full.json`](./docs/benchmarks/business/s1-deepseek-full.json) |
+| Kimi K3 | 18/18 | 6/6 | **24/24 = 100%** | [`s1-kimi-full.json`](./docs/benchmarks/business/s1-kimi-full.json) |
 
 ### S2 幻觉防护：执行一致性（与 B4 同链验证）
 
@@ -253,12 +253,12 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 **四模型分项表现**（同一套 50 变体）：
 
-| 模型 | 意图正确 | 分级正确 | 合计 |
-|---|---|---|---|
-| GLM-5.3-Flash | 50/50 | 50/50 | **50/50 = 100%** |
-| Qwen3.8-Flash | 50/50 | 50/50 | **50/50 = 100%** |
-| DeepSeek V4.1-Flash | 50/50 | 50/50 | **50/50 = 100%** |
-| Kimi K3 | 50/50 | 50/50 | **50/50 = 100%** |
+| 模型 | 意图正确 | 分级正确 | 合计 | 测试数据 |
+|---|---|---|---|---|
+| GLM-5.3-Flash | 50/50 | 50/50 | **50/50 = 100%** | [`b1-glm-full.json`](./docs/benchmarks/business/b1-glm-full.json) |
+| Qwen3.8-Flash | 50/50 | 50/50 | **50/50 = 100%** | [`b1-qwen38-full.json`](./docs/benchmarks/business/b1-qwen38-full.json) |
+| DeepSeek V4.1-Flash | 50/50 | 50/50 | **50/50 = 100%** | [`b1-deepseek-full.json`](./docs/benchmarks/business/b1-deepseek-full.json) |
+| Kimi K3 | 50/50 | 50/50 | **50/50 = 100%** | [`b1-kimi-full.json`](./docs/benchmarks/business/b1-kimi-full.json) |
 
 ### B2 金额解析
 
@@ -342,9 +342,9 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 **演示账户**：`demo@suveoo.com` / `jinrongkeji2026`（模拟银行系统，不涉及真实资金；登录含邮箱验证码 2FA；可用 `/api/demo/seed` 重灌演示数据——DEMO_MODE 门控）。
 
-**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK 与 **Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）。
+**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK、**Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）与 **Suveoo for macOS**（Electron 44，DMG/zip 158 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动）。
 
-完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows 客户端构建与发布）。
+完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 
 ---
 
@@ -356,6 +356,7 @@ suveoo/
 │   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9700 行）
 │   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
 │   ├── windows/                # Electron 壳（suveoo-app 协议/Capacitor 兼容 shim/三级更新/Hello/Toast/E2E 驱动器）
+│   ├── macos/                  # Electron 壳（Windows 壳同源 + Touch ID/DMG 更新/open-url 深链/dock 角标/mac 菜单）
 │   ├── tests/                  # 463 用例（unit 24 / integration 33 / attack 6）
 │   └── scripts/                # 部署/APK 构建/评测脚本（ai-hallucination / b1-intent-matrix / ai-bench / tool-latency / s2b4p4-e2e）
 ├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA

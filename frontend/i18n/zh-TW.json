@@ -1331,7 +1331,7 @@
   "bio.enabled": "已啟用指紋快捷登入",
   "bio.enrollFail": "啟用未完成，可下次登入後再試",
   "apk.title": "下載 Suveoo 用戶端",
-  "apk.subtitle": "一套帳戶，雙端體驗。Android 與 Windows 用戶端與網頁版功能完全一致——自然語言辦理業務，分級授權與兩步驗證守護每一筆操作。",
+  "apk.subtitle": "一套帳戶，三端體驗。Android、Windows 與 macOS 用戶端與網頁版功能完全一致——自然語言辦理業務，分級授權與兩步驗證守護每一筆操作。",
   "apk.btn": "下載 Android 版",
   "apk.version": "版本",
   "apk.size": "大小",
@@ -1540,5 +1540,14 @@
   "dl.winStepsTitle": "Windows 安裝步驟",
   "dl.wstep1": "點擊「下載 Windows 安裝版」儲存安裝包",
   "dl.wstep2": "雙擊執行；首次遇到 SmartScreen 提示時選擇「更多資訊 → 仍要執行」",
-  "dl.wstep3": "按精靈完成安裝，開啟 Suveoo 登入即可"
+  "dl.wstep3": "按精靈完成安裝，開啟 Suveoo 登入即可",
+  "dl.macTitle": "Suveoo for macOS",
+  "dl.macBtn": "下載 macOS 安裝版",
+  "dl.macZip": "壓縮版（zip）",
+  "dl.macRequireVal": "macOS 11 及以上（Intel x64）",
+  "dl.macNote": "安裝包未經公證：首次開啟若提示「無法驗證開發者」，右鍵點按 Suveoo 選「開啟」，或前往「系統設定 → 隱私權與安全性」點「仍要開啟」。",
+  "dl.macStepsTitle": "macOS 安裝步驟",
+  "dl.mstep1": "點按「下載 macOS 安裝版」儲存 DMG 安裝包",
+  "dl.mstep2": "雙擊開啟 DMG，將 Suveoo 拖入 Applications 資料夾（覆蓋舊版即完成升級）",
+  "dl.mstep3": "首次開啟若遇安全提示，右鍵 Suveoo →「開啟」（僅需一次）"
 }

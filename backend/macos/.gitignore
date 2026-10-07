@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out.txt
+main-log.txt
+smoke-report.json
+smoke-progress.log
+gui-check*.png
+e2e-otp.txt
+e2e-creds.json
+e2e-artifacts/

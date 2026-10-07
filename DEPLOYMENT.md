@@ -252,3 +252,25 @@ Worker 壳源白名单已含 Windows 壳 origin `suveoo-app://local`；`/downloa
 - [ ] 重复提交同一转账 → `REPLAY BLOCKED` 且返回原结果
 - [ ] GA4 实时收到 page_view（接受全部后）
 - [ ] `npx wrangler tail` 无未捕获异常
+
+## 16. macOS 客户端（Suveoo for macOS，Electron 44）
+
+源码 `backend/macos/`（整目录复制自 `backend/windows/` + 8 处平台适配：Touch ID/DMG 安装语义/open-url 深链/mac 最小菜单/dock 角标/Cmd+← 返回/tray 单击/`macos` 平台串）；构建与发布一键化：`npm run release`（`--dry` 只构建不上传）。构建环境：macOS 11+ x64 + Node 22 LTS（**wrangler 4 要求 ≥22**）+ Xcode（codesign/hdiutil/iconutil/sips）。**构建盘必须是本地 APFS**（vmhgfs 共享目录上签名/DMG 不可靠）。
+
+### 16.1 首次环境
+`npm install`（.npmrc 已配 npmmirror，electron 二进制走镜像）→ `bash scripts/make-icns.sh`（favicon-1024 → iconset → `iconutil -c icns`，纯系统工具）。Electron postinstall 若被 npm 安全机制拦截：`npm install-scripts approve electron && npm rebuild electron`。
+
+### 16.2 构建（三段式，mac 版）
+① `npx electron-builder --mac dir` 解包 → ② `codesign --force --deep -s - dist/mac/Suveoo.app` **ad-hoc 签名** + `codesign --verify` 自验（electron-builder 25 对 `mac.identity:"-"` 会误查证书名而跳过签名——ad-hoc 必须手动做，发布脚本已封装且签名失败即中止）→ ③ `npx electron-builder --mac dmg zip --prepackaged dist/mac` 出 DMG（拖装）+ zip（脚本党）。产物约 158 MB（extraResources 裁剪同 Windows：cards-front 源图 + .mimosa）。
+
+### 16.3 发布（R2 铁律 --remote）
+`node scripts/release.mjs`：三段构建 → sha256 → 上传 DMG/zip → 更新 `/dl/macos-manifest.json`（字段 versionName/versionCode/minVersionCode/url(DMG)/sha256/sizeBytes/zipUrl/zipSha256；versionCode=major×1e6+minor×1e3+patch，3.183.0=3183000）。**强制更新**＝minVersionCode 抬线；回滚＝manifest 改回旧值。客户端「安装」＝`shell.openPath(DMG)` 挂载后拖入 Applications（与 Android 唤起系统安装器同语义）。
+
+### 16.4 服务端配套（一次性）
+Worker 壳源白名单 `SHELL_ORIGINS` 已含 `suveoo-app://local`（与 Windows 壳同 origin，零服务端改动）；`/download` 页读 macos-manifest 渲染 macOS 卡片（前端 mac 卡要求 manifest 含非空 sha256 才显示）。
+
+### 16.5 Gatekeeper（未公证分发指引）
+无 Apple 开发者账号 → ad-hoc 签名 + 不公证：用户首次打开若提示「无法验证开发者/已损坏」，右键 Suveoo →「打开」（Sonoma 有效），或 `xattr -d com.apple.quarantine /Applications/Suveoo.app`。/download 页与 i18n `dl.macNote` 已写明。VM 内自测：`xattr -cr dist/mac/Suveoo.app` 清理后启动。
+
+### 16.6 测试
+`npm test`（vitest 42：29 继承 + mac 平台 13——返回键映射/DMG 候选/深链归一）｜`npx electron . --smoke`（78 路由冒烟，打包态自动写 userData）｜`--shot=<url> --size=WxH --out` 排版截图（打包态自动改落 userData——Windows 轮遗留项的 mac 正解）｜`--e2e=<suite>` 实机 E2E（同 Windows 十套件）｜`scripts/probe-m2.js --stage=bio|notify|ext|upd` 功能探针（不进打包产物）。深链：开发态用 argv（冷启）/二实例 argv（热启）；`open "suveoo://…"`（LaunchServices/open-url 事件）仅打包态可用。

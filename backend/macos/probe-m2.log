@@ -1,0 +1,25 @@
+[probe 09:41:02] stage=bio electron=44.6.0
+[probe 09:41:02] isAvailable = {"strong":false,"hasStored":false}（VM 无 Touch ID 传感器 → 预期 strong=false → 前端回落密码/OTP）
+[probe 09:41:02] verify() 无旁路抛出 = TOUCHID_NOT_AVAILABLE（预期 TOUCHID_NOT_AVAILABLE）
+[probe 09:41:02] verify() BIO_OK 旁路 = {"ok":true}（预期 {"ok":true}）
+[probe 09:41:04] stage=upd electron=44.6.0
+[probe 09:41:04] 白名单拒连 = URL_NOT_ALLOWED（预期 URL_NOT_ALLOWED）
+[probe 09:41:05] sha256 拒交付 = SHA256_MISMATCH（预期 SHA256_MISMATCH，且 updates 目录无残留）
+[probe 09:41:05] updates 目录残留 = []（预期 [] 或目录为空）
+[probe 09:42:32] stage=notify electron=44.6.0
+[probe 09:42:32] Notification.isSupported = true
+[probe 09:42:32] schedule = {"notifications":[{"id":424242}]}
+[probe 09:42:32] getSyncState = {"seenId":424242}（预期 seenId=424242）
+[probe 09:42:32] badge 管道已挂（正式计数由登录后 token 轮询驱动）
+[probe 09:42:44] notify stage done
+[probe 09:45:33] stage=notify electron=44.6.0
+[probe 09:45:33] Notification.isSupported = true
+[probe 09:45:33] schedule = {"notifications":[{"id":424242}]}
+[probe 09:45:33] getSyncState = {"seenId":424242}（预期 seenId=424242）
+[probe 09:45:33] dock badge 直驱置 3（视觉证据）
+[probe 09:45:33] badge 管道已挂（正式计数由登录后 token 轮询驱动）
+[probe 09:45:45] notify stage done
+[probe 09:45:47] stage=ext electron=44.6.0
+[probe 09:45:48] openExternalInApp(example.com) = true（预期 true：单例子窗+工具条+BrowserView）
+[probe 09:45:48] openExternalInApp(127.0.0.1) = false（预期 false：环回拒绝）
+[probe 09:45:57] ext stage done

@@ -66,7 +66,12 @@
       const p = of_.apply(this, a);
       const u = String(a[0]);
       if (u.indexOf("/api/") >= 0) {
-        p.then((r) => dbg("fetch " + u.slice(-34) + " → " + r.status), () => dbg("fetch失败 " + u.slice(-34)));
+        p.then(async (r) => {
+          dbg("fetch " + u.slice(-34) + " → " + r.status);
+          if (r.status >= 400 && u.indexOf("/api/transfers") >= 0) {
+            try { const c = r.clone(); const t = (await c.text()).slice(0, 260); dbg("resp[" + r.status + "] " + t); } catch {}
+          }
+        }, () => dbg("fetch失败 " + u.slice(-34)));
       }
       return p;
     };
@@ -105,7 +110,10 @@
         if (!await wait(() => document.getElementById("t-go"), 10000)) return done(false, "转账表单未出现");
         stubBiometricVerifyForAutomation();
         const pr = await api("/api/payees", null, token());
-        const payee = pr.body && (pr.body.payees || [])[0];
+        const ses = await api("/api/session", null, token()).catch(() => null);
+        const myName = (ses && ses.body && (ses.body.name || (ses.body.user && ses.body.user.name))) || "";
+        const list = (pr.body && pr.body.payees) || [];
+        const payee = list.find((p) => p.name && p.name !== myName) || list[0]; // 跳过本人（SAME_CARD）
         if (!payee || !payee.name) return done(false, "demo 无种子收款人");
         val("t-name", String(payee.name));
         val("t-acct", String(payee.account || payee.card || payee.card_no || ""));
@@ -133,13 +141,15 @@
         await sleep(800);
         const headTxt = (document.querySelector(".gc-head") || {}).textContent || "";
         dbg("点击后 mask=" + !!document.querySelector(".modal-mask") + " 卡头=" + headTxt.replace(/\s+/g, " ").slice(0, 60));
-        const finished = await wait(() => !document.querySelector(".modal-mask"), 30000);
+        const okModal = await wait(() => { const m = document.querySelector(".modal"); return !!(m && /成功|Done|receipt/i.test(m.textContent)); }, 30000);
+        const finished = okModal || await wait(() => !document.querySelector(".modal-mask"), 3000);
         await sleep(1500);
         shot("executed");
         const after = await api("/api/transfers?scope=all", null, token());
-        const cnt = (x) => ((x.body && (x.body.tx || x.body.transfers)) || []).length;
-        const grew = cnt(after) > cnt(before);
-        done(finished && grew, "确认卡→执行=" + finished + "；流水 " + cnt(before) + "→" + cnt(after) + "；收款人=" + payee.name);
+        const cnt = (x) => ((x.body && (x.body.txs || x.body.tx || x.body.transfers)) || []);
+        const firstId = (x) => { const a = cnt(x); return a.length ? String(a[0].id ?? a[0].tx_id ?? a[0].created_at) : ""; };
+        const grew = cnt(after).length !== cnt(before).length || firstId(after) !== firstId(before);
+        done(finished && grew, "确认卡→执行=" + finished + "（成功模态=" + okModal + "）；流水首条 " + firstId(before).slice(0, 10) + "→" + firstId(after).slice(0, 10) + "；收款人=" + payee.name);
       },
     },
 
@@ -205,8 +215,11 @@
         if (!await wait(() => document.getElementById("t-go"), 10000)) return done(false, "转账表单未出现");
         stubBiometricVerifyForAutomation();
         const pr = await api("/api/payees", null, token());
-        const payee = pr.body && (pr.body.payees || [])[0];
-        if (!payee || !payee.name) return done(false, "XYZ 无收款人");
+        const ses = await api("/api/session", null, token()).catch(() => null);
+        const myName = (ses && ses.body && (ses.body.name || (ses.body.user && ses.body.user.name))) || "";
+        const list = (pr.body && pr.body.payees) || [];
+        const payee = list.find((p) => p.name && p.name !== myName) || list[0]; // 跳过本人（SAME_CARD）
+        if (!payee || !payee.name) return done(false, "无可用收款人");
         val("t-name", String(payee.name));
         val("t-acct", String(payee.account || payee.card || ""));
         val("t-amt", "10");
@@ -242,13 +255,16 @@
           document.getElementById("ck-otp").value = code;
         }
         click("ck-ok");
-        const finished = await wait(() => !document.querySelector(".modal-mask"), 40000);
+        /* 成功路径出「转账成功」模态（mask 保留）；失败路径 mask 消失或错误横幅 */
+        const okModal = await wait(() => { const m = document.querySelector(".modal"); return !!(m && /成功|Done|receipt/i.test(m.textContent)); }, 40000);
+        const finished = okModal || await wait(() => !document.querySelector(".modal-mask"), 3000);
         await sleep(1800);
         shot("executed");
         const after = await api("/api/transfers?scope=all", null, token());
-        const cnt = (x) => ((x.body && (x.body.tx || x.body.transfers)) || []).length;
-        const grew = cnt(after) > cnt(before);
-        done(finished && grew, "红卡OTP→执行=" + finished + "；流水 " + cnt(before) + "→" + cnt(after) + "；收款人=" + payee.name + "；卡=" + headTxt.replace(/\s+/g, "").slice(0, 20));
+        const cnt = (x) => ((x.body && (x.body.txs || x.body.tx || x.body.transfers)) || []);
+        const firstId = (x) => { const a = cnt(x); return a.length ? String(a[0].id ?? a[0].tx_id ?? a[0].created_at) : ""; };
+        const grew = cnt(after).length !== cnt(before).length || firstId(after) !== firstId(before);
+        done(finished && grew, "执行=" + finished + "（成功模态=" + okModal + "）；流水首条 " + firstId(before).slice(0, 10) + "→" + firstId(after).slice(0, 10) + "（" + cnt(before).length + "→" + cnt(after).length + "条）；收款人=" + payee.name + "；卡=" + headTxt.replace(/\s+/g, "").slice(0, 20));
       },
     },
 

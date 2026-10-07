@@ -864,9 +864,12 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 }
 
 /* §41.1 第一百五十轮：/download 双平台改版（dl-*）。hero 沿用 apk-hero（去按钮版），
- * 平台卡/步骤卡共用 .dl-grid；桌面/平板双列、手机（≤640px）单列。 */
+ * 平台卡/步骤卡共用 .dl-grid；第一百五十六轮三平台：宽屏三列（≥1081px）、中屏双列、手机（≤640px）单列。 */
 .dl-hero .apk-hero-txt p { margin-bottom: 0; }
 .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: stretch; }
+@media (min-width: 1081px) {
+  .dl-grid { grid-template-columns: repeat(3, 1fr); }
+}
 .dl-card { margin: 0; padding: 20px 22px; display: flex; flex-direction: column; }
 .dl-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .dl-pf-ico { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--color-primary-tint); color: var(--color-navy); }

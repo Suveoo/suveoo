@@ -316,5 +316,41 @@
     "pass": false,
     "detail": "红卡OTP→执行=true；流水 0→0；收款人=谢宇洲；卡=确认转账YELLOW需确认",
     "when": "2026-10-07T03:57:13.161Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "红卡OTP→执行=true；流水 0→0；收款人=谢宇洲；卡=确认转账YELLOW需确认",
+    "when": "2026-10-07T04:11:06.619Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "确认卡未出现",
+    "when": "2026-10-07T04:22:48.023Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "红卡OTP→执行=false；流水 0→0；收款人=黄嗣仁；卡=确认转账YELLOW需确认",
+    "when": "2026-10-07T04:34:38.347Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "红卡OTP→执行=false；流水 20→20；收款人=黄嗣仁；卡=确认转账YELLOW需确认",
+    "when": "2026-10-07T04:46:38.102Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": true,
+    "detail": "执行=true（成功模态=true）；流水首条 TXMUXMK6XA→TXMUXN0NC2（20→20条）；收款人=黄嗣仁；卡=确认转账YELLOW需确认",
+    "when": "2026-10-07T04:58:52.350Z"
+  },
+  {
+    "suite": "transfer-yellow",
+    "pass": true,
+    "detail": "确认卡→执行=true（成功模态=true）；流水首条 TXMUXN0NC2→TXMUXNDUHI；收款人=黄嗣仁",
+    "when": "2026-10-07T05:09:07.088Z"
   }
 ]
