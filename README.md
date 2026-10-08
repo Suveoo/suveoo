@@ -353,39 +353,42 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 ```
 suveoo/
+├── .github/
+│   └── workflows/
 ├── backend/
-│   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9700 行）
+│   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9740 行）
 │   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
 │   ├── windows/                # Electron 壳（suveoo-app 协议/Capacitor 兼容 shim/三级更新/Hello/Toast/E2E 驱动器）
-│   ├── macos/                  # Electron 壳（与 windows 七文件逐行同源；Touch ID/通知中心/dock 角标/DMG 分发）
-│   ├── macos/                  # Electron 壳（Windows 壳同源 + Touch ID/DMG 更新/open-url 深链/dock 角标/mac 菜单）
+│   ├── macos/                  # Electron 壳（Windows 壳同源 + Touch ID/DMG 更新/open-url 深链/通知中心/dock 角标/mac 菜单）
 │   ├── tests/                  # 463 用例（unit 24 / integration 33 / attack 6）
 │   └── scripts/                # 部署/APK 构建/评测脚本（ai-hallucination / b1-intent-matrix / ai-bench / tool-latency / s2b4p4-e2e）
 ├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA
 ├── docs/
 │   ├── benchmarks/             # 评测证据库（security / business / performance / ablation，可直接核查）
 │   ├── architecture.md, core-algorithms.md, security-self-assessment.md, design-language.md, test-cases.md
-├── for_developer/              # 内部文档（测试方案 / 特性全景 / 评测原始产物 bench-results/）
 ├── DEPLOYMENT.md               # 部署手册
-└── README.md
+├── README.md
+├── SECURITY.md
+├── LICENSE
+├── .gitattributes
+├── .editorconfig
+├── .gitignore
+└── .nvmrc
 ```
 
 ## 文档地图
 
-| 文档 | 内容 |
-|---|---|
-| [from_README_start_to_4.md](./from_README_start_to_4.md) + [from_README_5_to_end.md](./from_README_5_to_end.md) | 全量开发实录（180+ 版 changelog，每一版含根因分析） |
-| [docs/benchmarks/](./docs/benchmarks/) | 评测证据库：S1/B1 四模型全量文本、性能原始数据、消融总表与报告 |
-| [docs/architecture.md](./docs/architecture.md) · [docs/core-algorithms.md](./docs/core-algorithms.md) | 系统架构 / 核心算法 |
-| [docs/security-self-assessment.md](./docs/security-self-assessment.md) · [docs/test-cases.md](./docs/test-cases.md) | 安全自评 / 测试用例说明 |
-| [for_developer/suveoo_ai_features.md](./for_developer/suveoo_ai_features.md) | 特性全景母本（20 章，技术+叙事双文体） |
-| [for_developer/testing_20261002.md](./for_developer/testing_20261002.md) | 多指标测试体系 + Ablation 实验方案 v1.1 |
+| 文档                                                                                                                  | 内容 |
+|---------------------------------------------------------------------------------------------------------------------|---|
+| [docs/benchmarks/](./docs/benchmarks/)                                                                              | 评测证据库：S1/B1 四模型全量文本、性能原始数据、消融总表与报告 |
+| [docs/architecture.md](./docs/architecture.md) , [docs/core-algorithms.md](./docs/core-algorithms.md)               | 系统架构 / 核心算法 |
+| [docs/security-self-assessment.md](./docs/security-self-assessment.md) , [docs/test-cases.md](./docs/test-cases.md) | 安全自评 / 测试用例说明 |
 
 ## 诚实披露
 
-- 模拟银行系统，全部数据虚构，不涉及真实资金。
-- 我们不使用没有跑通的技术名词（规则引擎为内联类型化规则表；未实现的能力不写入特性清单）。
-- P1/P2/P4 延迟受思考型模型固有开销影响，标注为记录型指标而非承诺；唯一设阈值的性能指标是 P3 工具调用（P95 ≤ 800ms，实测 435ms）。
+1. 模拟银行系统，全部数据虚构，不涉及真实资金。
+2. 我们不使用没有跑通的技术名词（规则引擎为内联类型化规则表；未实现的能力不写入特性清单）。
+3. P1/P2/P4 延迟受思考型模型固有开销影响，标注为记录型指标而非承诺；唯一设阈值的性能指标是 P3 工具调用（P95 ≤ 800ms，实测 435ms）。
 
 ## 许可（License）
 
