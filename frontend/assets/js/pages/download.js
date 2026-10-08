@@ -89,7 +89,7 @@ S.router.register("download", async () => {
       <div class="dl-card-head">
         <span class="dl-pf-ico">${ICO_MAC}</span>
         <div class="dl-card-t"><b>${esc(t("dl.macTitle", "Suveoo for macOS"))}</b>
-          <span class="dl-pf-sub">${esc(t("dl.macRequireVal", "macOS 11 及以上（Intel x64）"))}</span></div>
+          <span class="dl-pf-sub">${esc(t("dl.macRequireVal", "macOS 11 及以上（Intel 与 Apple Silicon 通用）"))}</span></div>
         <span class="dl-ver-chip">v${esc(mc.versionName)}<i> (${esc(mc.versionCode ?? "")})</i></span>
       </div>
       <div class="apk-kv"><span class="muted">${esc(t("apk.size", "大小"))}</span><b>${mb(mc.sizeBytes)}</b></div>

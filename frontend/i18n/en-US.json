@@ -1544,7 +1544,7 @@
   "dl.macTitle": "Suveoo for macOS",
   "dl.macBtn": "Download for macOS",
   "dl.macZip": "Zip archive",
-  "dl.macRequireVal": "macOS 11 or later (Intel x64)",
+  "dl.macRequireVal": "macOS 11 or later (Intel & Apple Silicon, universal)",
   "dl.macNote": "The package is not notarized: on first launch, if macOS says it cannot verify the developer, right-click Suveoo and choose Open, or allow it in System Settings → Privacy & Security.",
   "dl.macStepsTitle": "macOS installation",
   "dl.mstep1": "Tap \"Download for macOS\" to save the DMG",

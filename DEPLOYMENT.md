@@ -261,11 +261,11 @@ Worker 壳源白名单已含 Windows 壳 origin `suveoo-app://local`；`/downloa
 ### 16.1 首次环境
 `npm install`（.npmrc 已配 npmmirror，electron 二进制走镜像）→ `bash scripts/make-icns.sh`（favicon-1024 → iconset → `iconutil -c icns`，纯系统工具）。Electron postinstall 若被 npm 安全机制拦截：`npm install-scripts approve electron && npm rebuild electron`。
 
-### 16.2 构建（三段式，mac 版）
-① `npx electron-builder --mac dir` 解包 → ② `codesign --force --deep -s - dist/mac/Suveoo.app` **ad-hoc 签名** + `codesign --verify` 自验（electron-builder 25 对 `mac.identity:"-"` 会误查证书名而跳过签名——ad-hoc 必须手动做，发布脚本已封装且签名失败即中止）→ ③ `npx electron-builder --mac dmg zip --prepackaged dist/mac` 出 DMG（拖装）+ zip（脚本党）。产物约 158 MB（extraResources 裁剪同 Windows：cards-front 源图 + .mimosa）。
+### 16.2 构建（三段式，mac 版；**3.183.2 起为 Universal 双架构**）
+① `npx electron-builder --mac dir --universal` 解包（**输出目录 `dist/mac-universal/`**，非旧 x64 流程的 `dist/mac/`——release.mjs 已内置两目录的构建前清理，防旧残留骗过检查）→ ② `codesign --force --deep -s - dist/mac-universal/Suveoo.app` **ad-hoc 签名** + `codesign --verify` 自验 + **`lipo -archs` 双片断言**（必须同时含 x86_64 与 arm64，缺片即中止——3.183.2 首构建曾拦截旧 x64 残留冒充事件）（electron-builder 25 对 `mac.identity:"-"` 会误查证书名而跳过签名——ad-hoc 必须手动做，发布脚本已封装且签名失败即中止）→ ③ `npx electron-builder --mac dmg zip --prepackaged dist/mac-universal --universal` 出 DMG（拖装）+ zip（脚本党）。产物约 250 MB（extraResources 裁剪同 Windows：cards-front 源图 + .mimosa）。**arm64 切片在 Intel 构建机上无法运行实测**（壳为纯 Electron+JS 零原生模块 + Electron 官方双架构预编译产物，风险低；x64 切片 VM 全量可测，待 Apple Silicon 真机补章）。
 
 ### 16.3 发布（R2 铁律 --remote）
-`node scripts/release.mjs`：三段构建 → sha256 → 上传 DMG/zip → 更新 `/dl/macos-manifest.json`（字段 versionName/versionCode/minVersionCode/url(DMG)/sha256/sizeBytes/zipUrl/zipSha256；versionCode=major×1e6+minor×1e3+patch，3.183.0=3183000）。**强制更新**＝minVersionCode 抬线；回滚＝manifest 改回旧值。客户端「安装」＝`shell.openPath(DMG)` 挂载后拖入 Applications（与 Android 唤起系统安装器同语义）。
+`node scripts/release.mjs`：三段构建 → sha256 → 上传 DMG/zip → 更新 `/dl/macos-manifest.json`（字段 versionName/version/versionCode/minVersionCode/url(DMG)/sha256/sizeBytes/zipUrl/zipSha256；`--no-upload`＝协作模式：VM 构建后工件经共享目录由宿主机上传（VM 直传大文件不稳的既定对策）；versionCode=major×1e6+minor×1e3+patch，3.183.0=3183000）。**强制更新**＝minVersionCode 抬线；回滚＝manifest 改回旧值。客户端「安装」＝`shell.openPath(DMG)` 挂载后拖入 Applications（与 Android 唤起系统安装器同语义）。
 
 ### 16.4 服务端配套（一次性）
 Worker 壳源白名单 `SHELL_ORIGINS` 已含 `suveoo-app://local`（与 Windows 壳同 origin，零服务端改动）；`/download` 页读 macos-manifest 渲染 macOS 卡片（前端 mac 卡要求 manifest 含非空 sha256 才显示）。

@@ -2,7 +2,7 @@
   "name": "suveoo-macos",
   "productName": "Suveoo",
   "private": true,
-  "version": "3.183.1",
+  "version": "3.183.2",
   "description": "Suveoo for macOS — Agentic Banking Control Plane desktop shell",
   "main": "main/main.js",
   "scripts": {
@@ -69,13 +69,13 @@
         {
           "target": "dmg",
           "arch": [
-            "x64"
+            "universal"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "x64"
+            "universal"
           ]
         }
       ]

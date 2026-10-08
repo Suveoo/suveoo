@@ -353,7 +353,7 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 **演示账户**：`demo@suveoo.com` / `jinrongkeji2026`（模拟银行系统，不涉及真实资金；登录含邮箱验证码 2FA；可用 `/api/demo/seed` 重灌演示数据——DEMO_MODE 门控）。
 
-**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK、**Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）与 **Suveoo for macOS**（Electron 44，DMG/zip 158 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动）。
+**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK、**Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）与 **Suveoo for macOS**（Electron 44 **Universal 双架构包**——Intel 与 Apple Silicon 通用，DMG/zip 250 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动）。
 
 完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 

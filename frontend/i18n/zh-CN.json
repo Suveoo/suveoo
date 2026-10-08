@@ -1544,7 +1544,7 @@
   "dl.macTitle": "Suveoo for macOS",
   "dl.macBtn": "下载 macOS 安装版",
   "dl.macZip": "压缩版（zip）",
-  "dl.macRequireVal": "macOS 11 及以上（Intel x64）",
+  "dl.macRequireVal": "macOS 11 及以上（Intel 与 Apple Silicon 通用）",
   "dl.macNote": "安装包未做公证：首次打开若提示「无法验证开发者」，右键点击 Suveoo 选「打开」，或在「系统设置 → 隐私与安全性」点「仍要打开」。",
   "dl.macStepsTitle": "macOS 安装步骤",
   "dl.mstep1": "点击「下载 macOS 安装版」保存 DMG 安装包",
