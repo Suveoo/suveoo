@@ -15,7 +15,7 @@
 
 ## 关于
 
-**Suveoo** 是一个运行在全球边缘的完整模拟银行系统。前端零构建 MPA，提供 76 页面、 62 页面控制器。Web 版（`suveoo.com`）全平台兼容，Android 端 Capacitor 壳原生集成。
+**Suveoo** 是一个运行在全球边缘的完整模拟银行系统。前端零构建 MPA，提供 76 页面、 62 页面控制器。Web 版（`suveoo.com`）全平台兼容；原生客户端三端齐备——Android（Capacitor 8）、Windows 与 macOS（Electron 44 双壳同源，`/download` 一站分发）。
 
 **Suveoo AI** 是 Suveoo 内嵌的 AI 智能体。Suveoo AI 集成 63 个 MCP 工具，不仅允许用户用自然语言（语音、文字）办理各项传统银行业务及跨场景与长程任务，而且支持 10 大内嵌金融计算工具的调用与答复内直接渲染，还能对复杂任务进行 DAG 拆解与统一授权，同时能针对客户的实际状况，进行动态产品组合拼装和主动提议。
 
@@ -23,8 +23,7 @@
 
 Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计算、持久化存储、渐进式 Web 应用、AI API 及开放协议，为应用提供高性能、可扩展且跨平台的运行环境。
 
-[![Cloudflare Workers][CloudflareWorkers]][CloudflareWorkers-url]
-[![Durable Objects · SQLite][DurableObjects]][DurableObjects-url]
+[![Cloudflare Workers · Durable Objects][CloudflareEdge]][CloudflareEdge-url]
 [![Cloudflare R2][CloudflareR2]][CloudflareR2-url]
 [![JavaScript ES2022][JavaScript]][JavaScript-url]
 [![PWA][PWA]][PWA-url]
@@ -33,6 +32,10 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![Vitest][Vitest]][Vitest-url]
 [![Capacitor 8][Capacitor]][Capacitor-url]
 [![Android · Java][Android]][Android-url]
+[![Electron 44][Electron]][Electron-url]
+[![electron-builder 25][ElectronBuilder]][ElectronBuilder-url]
+[![NSIS · Windows Installer][NSIS]][NSIS-url]
+[![Windows Hello · Touch ID][HelloTouchID]][HelloTouchID-url]
 
 ![Architecture](docs/images/readme/suveoo_system_architecture.svg)
 
@@ -46,7 +49,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **Suveoo AI 的解决方案及核心技术**：任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
 
-**Suveoo AI 为什么可信**：确定性自动化测试 463 条全绿；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
+**Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
 
 ## 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
@@ -106,6 +109,9 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 2. **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
 3. **对话即方案的动态产品拼装**："5 万闲钱半年后买车" → 分析顾客资金状况与目标，加权拼装存款阶梯 + 期限封顶基金层 + 货币基金流动性层等理财产品 → 一键打包组合购买（两段式 grant + PR 适当性 + 若部分失败则按成本回退）。
+
+![Dynamic Solution Packaging](docs/images/readme/dynamic-solution-packaging.png)
+
 4. **组合操作 DAG**：说"默认卡给张三转账 120，再冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 输出组合方案卡（整卡=最高颜色级别、金额合计判红、**红级一次性 OTP**）→ `batch_execute` 逐项执行，一次性完成用户多项需求（期间失败即停）。
 5. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页**现场故障注入按钮**用于模拟商户履约失败）。
 6. **AI 主动银行**：规则引擎扫描沉睡订阅/周期转账/自动扣款/还款/闲钱理财/产品推荐 → 提议清单 + **站内/客户端推送/Email 三路提醒**；Suveoo AI 页顾客提问前先主动依据实情推荐产品；特制"AI 提议"页面，汇总各项 AI 建议、当月省下金额、当月办妥事项、自动打理惯例；多页面内嵌"AI 洞察"板块，点击对应提议直发 AI，一条龙办完。
@@ -139,8 +145,9 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ## 一套代码，全平台交付
 
-- **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1531 键恒等**、SEO 三方友善。
+- **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
 - **Android**（Capacitor 8）：本地资产秒载、生物识别四场景、**后台原生通知服务**、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；**站内链接 100% App 内原生打开 + 站外链接内嵌浏览器**（无 GMS 设备可用——荣耀 V10 真机长期在测试矩阵）。
+- **Windows / macOS**（Electron 44 双壳同源，`backend/windows/` + `backend/macos/` 七文件逐行同源纪律）：同一 `suveoo-app://local` 安全协议承载前端快照（origin 已入 Worker CORS 白名单，零服务端改动）；三级自动更新（R2 manifest + sha256 校验）、系统通知与未读角标（Toast / 通知中心 + dock）、生物识别（Windows Hello / Touch ID，无传感器自动回落）、外链内嵌浏览器、`suveoo://` 深链与托盘驻留五能力对齐 Android；Windows 安装版/便携版 + macOS DMG/zip 均经 `/download` 分发。
 
 <!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
 ![Multi Platform](docs/images/readme/multi-platform.png)
@@ -152,8 +159,9 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 测试分三层，全部可复现、证据落盘：
 
 1. **确定性自动化**：vitest + @cloudflare/vitest-pool-workers，**63 文件 463 用例全绿**（unit 24 / integration 33 / attack 6）。攻击套件覆盖注入（两代）、越权、确认后篡改、重放、授权伪造五类。
-2. **生产黑盒评测**：Node 脚本直连生产 Worker（真实登录 + 2FA），准确率类 **122 用例**、拦截类 **106 断言**，2026-10-06 全部通过。
-3. **四模型消融（Ablation）**：同一套用例在 4 个 LLM 上完整重跑，证明结果与模型无关。
+2. **客户端壳套件**：Windows 34 用例 + macOS 47 用例（各自独立 vitest 配置；含 IPC schema / 导航守卫 / 更新决策 / 动态路由重写），打包态全路由冒烟 78/78 × 双壳，实机 E2E（Windows 10 套件全绿；macOS 9/10 + 队长实机手动全链验证）。
+3. **生产黑盒评测**：Node 脚本直连生产 Worker（真实登录 + 2FA），准确率类 **122 用例**、拦截类 **106 断言**，2026-10-06 全部通过。
+4. **四模型消融（Ablation）**：同一套用例在 4 个 LLM 上完整重跑，证明结果与模型无关。
 
 以下每个指标独立成表，给出定义、方法、规模、结果，以及**测试文件 / 驱动脚本 / 证据数据**三类可核查路径。证据数据另整理于 [`docs/benchmarks/`](./docs/benchmarks/)（原始全量产物在 `for_developer/bench-results/20261006/`，共 53 份文件）。
 
@@ -359,6 +367,7 @@ suveoo/
 │   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9700 行）
 │   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
 │   ├── windows/                # Electron 壳（suveoo-app 协议/Capacitor 兼容 shim/三级更新/Hello/Toast/E2E 驱动器）
+│   ├── macos/                  # Electron 壳（与 windows 七文件逐行同源；Touch ID/通知中心/dock 角标/DMG 分发）
 │   ├── macos/                  # Electron 壳（Windows 壳同源 + Touch ID/DMG 更新/open-url 深链/dock 角标/mac 菜单）
 │   ├── tests/                  # 463 用例（unit 24 / integration 33 / attack 6）
 │   └── scripts/                # 部署/APK 构建/评测脚本（ai-hallucination / b1-intent-matrix / ai-bench / tool-latency / s2b4p4-e2e）
@@ -404,11 +413,8 @@ suveoo/
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[CloudflareWorkers]: https://img.shields.io/badge/Cloudflare%20Workers-F6821F?style=for-the-badge&logo=cloudflareworkers&logoColor=white
-[CloudflareWorkers-url]: https://developers.cloudflare.com/workers/
-
-[DurableObjects]: https://img.shields.io/badge/Durable%20Objects%20%C2%B7%20SQLite-F6821F?style=for-the-badge&logo=cloudflare&logoColor=white
-[DurableObjects-url]: https://developers.cloudflare.com/durable-objects/
+[CloudflareEdge]: https://img.shields.io/badge/Cloudflare%20Workers%20%C2%B7%20Durable%20Objects-F6821F?style=for-the-badge&logo=cloudflareworkers&logoColor=white
+[CloudflareEdge-url]: https://developers.cloudflare.com/workers/
 
 [CloudflareR2]: https://img.shields.io/badge/Cloudflare%20R2-F6821F?style=for-the-badge&logo=cloudflare&logoColor=white
 [CloudflareR2-url]: https://developers.cloudflare.com/r2/
@@ -433,3 +439,15 @@ suveoo/
 
 [Android]: https://img.shields.io/badge/Android%20%C2%B7%20Java-3DDC84?style=for-the-badge&logo=android&logoColor=black
 [Android-url]: https://developer.android.com/
+
+[Electron]: https://img.shields.io/badge/Electron%2044-9FEAF9?style=for-the-badge&logo=electron&logoColor=black
+[Electron-url]: https://www.electronjs.org/
+
+[ElectronBuilder]: https://img.shields.io/badge/electron-builder%2025-2B3160?style=for-the-badge&logo=electronbuilder&logoColor=white
+[ElectronBuilder-url]: https://www.electron.build/
+
+[NSIS]: https://img.shields.io/badge/NSIS%20%C2%B7%20Windows%20Installer-0F4C81?style=for-the-badge&logo=nsis&logoColor=white
+[NSIS-url]: https://nsis.sourceforge.io/
+
+[HelloTouchID]: https://img.shields.io/badge/Windows%20Hello%20%C2%B7%20Touch%20ID-0078D7?style=for-the-badge&logoColor=white
+[HelloTouchID-url]: https://learn.microsoft.com/windows/security/identity-protection/hello-for-business/
