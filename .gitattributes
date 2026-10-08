@@ -1,0 +1,60 @@
+# Suveoo — 跨平台换行与二进制治理（Windows 宿主 / macOS VM / Linux CI 三方协作）
+# 与 .editorconfig（end_of_line = lf）同源：仓库内一律 LF，Windows 专属脚本除外。
+# 现状核对（2026-10-08）：git index 已全 LF（i/lf ×761 / 二进制 ×168 / i/crlf ×0），
+# 本文件为防护性规则，不产生重整提交。
+
+* text=auto eol=lf
+
+# —— 明确文本类型（防 auto 误判；统一 LF 检出）——
+*.js         text
+*.mjs        text
+*.cjs        text
+*.json       text
+*.md         text
+*.html       text
+*.css        text
+*.svg        text
+*.yml        text
+*.yaml       text
+*.toml       text
+*.nsh        text
+*.py         text
+*.java       text
+*.kt         text
+*.xml        text
+*.gradle     text
+*.properties text
+*.sh         text eol=lf
+gradlew      text eol=lf
+
+# —— Windows 平台脚本保持 CRLF（bat/cmd 解析依赖；PowerShell 惯例）——
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# —— 二进制资产：永不换行转换、不参与文本 diff ——
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.ico      binary
+*.icns     binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.otf      binary
+*.pdf      binary
+*.mp3      binary
+*.wav      binary
+*.apk      binary
+*.exe      binary
+*.dmg      binary
+*.zip      binary
+*.keystore binary
+*.jks      binary
+
+# —— GitHub 语言统计：机器生成物不计入手写代码占比 ——
+package-lock.json                linguist-generated=true
+docs/benchmarks/**               linguist-generated=true
+for_developer/bench-results/**   linguist-generated=true
