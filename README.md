@@ -104,6 +104,9 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 ![Clarification Questioning](docs/images/readme/clarification-questioning.png)
 
 2. **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
+
+![Tool Call Calculation and Rendering](docs/images/readme/tool-call-calculation-and-rendering.png)
+
 3. **对话即方案的动态产品拼装**："5 万闲钱半年后买车" → 分析顾客资金状况与目标，加权拼装存款阶梯 + 期限封顶基金层 + 货币基金流动性层等理财产品 → 一键打包组合购买（两段式 grant + PR 适当性 + 若部分失败则按成本回退）。
 
 ![Dynamic Solution Packaging](docs/images/readme/dynamic-solution-packaging.png)
