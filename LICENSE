@@ -1,0 +1,136 @@
+Suveoo Proprietary License
+Version 1.0 — 2026-10-08
+
+Copyright (c) 2026 Suveoo Team. All rights reserved.
+
+1. Definitions
+
+   "Software" means the contents of this repository, including source code,
+   documentation, configuration, assets, and any copies or derivatives thereof.
+
+   "Licensor" means the Suveoo Team, the copyright holders of the Software.
+
+   "You" and "Your" mean the individual or entity that obtains, views, or uses
+   the Software in any form.
+
+   "Permitted Purpose" means any of the following, and only the following:
+   (a)  evaluation of the Software for academic review, competition judging,
+        coursework, or research;
+   (b)  personal, noncommercial study and experimentation;
+   (c)  security research conducted in accordance with the repository's
+        SECURITY.md policy;
+   (d)  preparing a contribution of code or documentation back to this
+        repository.
+
+   "Commercial Purpose" means any use of the Software intended for or directed
+   toward commercial advantage or monetary compensation, including without
+   limitation: operating a product or service (including SaaS) based on or
+   derived from the Software; selling, leasing, or licensing the Software or
+   derivatives; internal business operations; and paid training or consulting
+   built on the Software.
+
+2. Grant of Limited Copyright Rights
+
+   Subject to Your compliance with this License, the Licensor grants You a
+   worldwide, non-exclusive, non-transferable, non-sublicensable, revocable
+   license to:
+
+   (a)  view, download, and run the Software solely for a Permitted Purpose;
+   (b)  prepare modifications of the Software solely for a Permitted Purpose,
+        provided that modified versions are not published or distributed
+        outside Your own internal use and are contributed back to this
+        repository if You wish to share them.
+
+   All rights not expressly granted to You are reserved by the Licensor.
+   Without separate written permission from the Licensor, You may not:
+
+   (a)  use the Software for any Commercial Purpose;
+   (b)  redistribute, publish, or make available the Software or any
+        derivative work, in source or binary form, to any third party;
+   (c)  remove, obscure, or alter any copyright notice, license notice, or
+        attribution contained in the Software.
+
+3. Patent License
+
+   Subject to Your compliance with this License, the Licensor hereby grants
+   You a limited, non-exclusive, non-transferable, non-sublicensable,
+   royalty-free patent license to make, use, and run the Software, but only
+   for Permitted Purposes and only to the extent that the Licensor can grant
+   such a license. This patent license does not cover uses of the Software
+   that are not permitted by Section 2.
+
+   Defensive termination. If You or any entity You control or are controlled
+   by initiates (or becomes a party to, or actively assists) any patent
+   litigation or other patent assertion against the Licensor, any contributor,
+   or any user of the Software, alleging that the Software or a necessary
+   portion of it infringes a patent, then:
+
+   (a)  all patent licenses granted to You under this Section 3 terminate
+        automatically and immediately; and
+   (b)  all copyright licenses granted under Section 2 terminate automatically
+        and immediately.
+
+3.1 No further patent rights. Nothing in this License shall be construed as
+   granting You, by implication, estoppel, or otherwise, any rights under any
+   patent other than those expressly stated in Section 3.
+
+4. Trademarks
+
+   This License does not grant any right to use the trade names, trademarks,
+   service marks, logos, or product names of the Licensor, including "Suveoo",
+   except as required for reasonable and customary use in describing the
+   origin of the Software and reproducing the notices required by Section 2(c).
+
+5. Notices and Attribution
+
+   You must retain, in all copies or substantial portions of the Software that
+   You are permitted to make, the copyright notice above, this License text,
+   and the disclaimer below.
+
+6. Contributions
+
+   Unless You explicitly state otherwise, any contribution intentionally
+   submitted for inclusion in the Software by You to the Licensor shall be
+   licensed under this License, without additional terms or conditions. The
+   Licensor remains free to relicense its codebase, including contributions,
+   at its sole discretion.
+
+7. No Warranty; Nature of the Software
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. THE SOFTWARE IS A
+   SIMULATED BANKING SYSTEM FOR EDUCATIONAL AND COMPETITION PURPOSES. IT DOES
+   NOT HOLD, MOVE, OR PROMISE ANY REAL FUNDS, AND IT IS NOT A REAL FINANCIAL
+   INSTITUTION OR FINANCIAL ADVICE.
+
+   IN NO EVENT SHALL THE LICENSORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE. THE LICENSOR'S TOTAL LIABILITY SHALL NOT EXCEED
+   THE AMOUNT, IF ANY, PAID BY YOU TO THE LICENSOR FOR THE SOFTWARE.
+
+8. Term and Termination
+
+   This License takes effect when You obtain the Software and continues until
+   terminated. It terminates automatically and immediately if You fail to
+   comply with any of its conditions, including the defensive termination in
+   Section 3. Upon termination, You must cease all use of the Software and
+   delete or destroy all copies in Your possession or control. Sections 3.1,
+   4, 5, 7, 8, 9, and 10 survive termination.
+
+9. Requests for Additional Rights
+
+   Licenses for Commercial Purposes, redistribution, or other uses beyond the
+   Permitted Purposes are available from the Licensor upon written request
+   (see SECURITY.md or the repository's contact channels).
+
+10. General
+
+   This License is the entire agreement between You and the Licensor regarding
+   the Software and supersedes any prior agreements. If any provision is held
+   unenforceable, it will be modified to the minimum extent necessary, and the
+   remaining provisions will remain in full force. No waiver of any term is
+   effective unless in writing and signed by the Licensor. This License is
+   governed by the laws of the People's Republic of China, without regard to
+   its conflict-of-laws rules.

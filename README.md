@@ -410,6 +410,12 @@ suveoo/
 
 </div>
 
+---
+
+## 许可（License）
+
+本仓库采用 **Suveoo Proprietary License v1.0**（见 [LICENSE](./LICENSE)）：专有许可基线——源码公开供学术与竞赛评审、个人非商业学习实验，以及按 [SECURITY.md](./SECURITY.md) 开展的安全研究；**未经书面授权，禁止任何商业使用与再分发**。专利条款采用许可用途内有限授予 + 防御性终止设计。商用授权事宜请联系 support@suveoo.com。
+
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
