@@ -202,6 +202,15 @@ a.list-row:hover, .list-row[style*="cursor"]:hover { background: #FAFBFC; }
     padding-bottom: 0;
   }
   .trust-console.open { display: flex; animation: fade-in .18s ease-out both; }
+  /* 第一百六十轮：768-1023（窄窗电脑/平板竖屏）控制台全屏层让位 Side Drawer。
+     ① 必须置于上方 .trust-console 全屏层定义之后（同特异性后定义者胜——原 min-768 块里的 top:64px
+       写在前面是死规则，实际被 49px 移动头高覆盖，控制台一直压着 64px 桌面 header 底缘 15px）；
+     ② 层叠根因：#content 的 fade-in 动画（fill both 持续生效）创建层叠上下文，控制台 z-250 只在
+       该上下文内有效，压不过 body 层抽屉 z-90（elementFromPoint 实证重叠区赢家=抽屉）——层级无解
+       就几何让位：左缘 248px 与抽屉并立零遮挡，导航保持可用；top 64px 让位桌面 header。 */
+  @media (min-width: 768px) {
+    .trust-console { top: 64px; left: 248px; }
+  }
   .tc-head { position: sticky; top: 0; background: #fff; z-index: 2; }
   .tc-events { flex: 1 1 0; min-height: 0; -webkit-overflow-scrolling: touch; }
   .tc-verifiers, .tc-demo, .tc-ir { flex: none; }
@@ -844,7 +853,7 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .apk-kv { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: 14px; }
 .apk-kv:last-of-type { border-bottom: none; }
 .apk-vc { color: var(--color-ink-2); font-weight: 400; font-size: 12.5px; }
-.apk-sha { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
+.apk-sha { margin-top: 4px; } /* 第一百六十轮续：SHA 区上方实线移除后再收紧（原 8px） */
 .apk-sha .lb { display: block; color: var(--color-ink-2); font-size: 12.5px; margin-bottom: 6px; }
 .apk-sha-row { display: flex; align-items: center; gap: 10px; }
 .apk-sha-row code { flex: 1; min-width: 0; font-size: 11.5px; word-break: break-all; background: var(--color-surface); border-radius: 8px; padding: 8px 10px; color: var(--color-ink-2); }
@@ -864,32 +873,54 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 }
 
 /* §41.1 第一百五十轮：/download 双平台改版（dl-*）。hero 沿用 apk-hero（去按钮版），
- * 平台卡/步骤卡共用 .dl-grid；第一百五十六轮三平台：宽屏三列（≥1081px）、中屏双列、手机（≤640px）单列。 */
+ * 平台卡/步骤卡共用 .dl-grid；第一百五十六轮三平台：宽屏三列（≥1081px）、中屏双列、手机（≤640px）单列。
+ * 第一百六十轮大改版：① 三张下载卡恒单列（.dl-grid-cards，双类选择器压过宽度断点）；
+ * ② 版本号从卡头 chip 移入信息区（apk.version），三项（版本/大小/日期）流式排列自适应换行；
+ * ③ 次按钮（便携版/zip）与主按钮同行（不强行拉满）；④ apk-sha 虚线去除（见 §41）。 */
 .dl-hero .apk-hero-txt p { margin-bottom: 0; }
 .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: stretch; }
 @media (min-width: 1081px) {
   .dl-grid { grid-template-columns: repeat(3, 1fr); }
 }
-.dl-card { margin: 0; padding: 20px 22px; display: flex; flex-direction: column; }
-.dl-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.dl-grid.dl-grid-cards { grid-template-columns: 1fr; } /* 下载卡恒单列（步骤卡沿用上方网格律） */
+.dl-card { margin: 0; padding: 18px 22px 16px; display: flex; flex-direction: column; }
+.dl-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .dl-pf-ico { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--color-primary-tint); color: var(--color-navy); }
 .dl-pf-ico svg { width: 26px; height: 26px; }
 .dl-card-t { flex: 1; min-width: 0; }
 .dl-card-t b { font-size: 16px; line-height: 1.3; }
 .dl-pf-sub { display: block; color: var(--color-ink-2); font-size: 12.5px; margin-top: 3px; }
-.dl-ver-chip { flex: none; font-size: 12px; font-weight: 650; color: var(--color-navy); background: var(--color-primary-tint); padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
-.dl-ver-chip i { font-style: normal; font-weight: 400; font-size: 11px; color: var(--color-ink-2); }
+/* 信息区：版本/大小/发布日期 三项流式（宽屏同行、窄屏自动换行）。第一百六十轮续：去底部分隔线（SHA 区上方唯一实线按队长要求移除） */
+.dl-kv-flow { display: flex; flex-wrap: wrap; column-gap: 28px; padding: 2px 0 2px; }
+.dl-kv-flow .apk-kv { display: inline-flex; align-items: baseline; gap: 8px; border-bottom: none; padding: 5px 0; font-size: 13.5px; }
 .dl-card .apk-kv { font-size: 13.5px; padding: 8px 0; }
-.dl-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-.dl-actions .btn { flex: 1 1 180px; justify-content: center; min-height: 44px; }
-.dl-actions .btn:last-child:nth-child(2) { flex: 0 1 auto; } /* 双按钮时次按钮不强行拉满 */
+/* 按钮在卡头内：宽屏（≥821px，电脑/宽平板）推到标题右侧靠右对齐；窄屏整行换行退到标题下方 */
+.dl-card-head .dl-actions { display: flex; gap: 10px; flex-wrap: wrap; flex-basis: 100%; margin: 8px 0 0; }
+@media (min-width: 821px) {
+  .dl-card-head .dl-actions { flex-basis: auto; margin: 0 0 0 auto; align-self: center; justify-content: flex-end; }
+}
+.dl-card-head .dl-actions .btn { flex: 0 1 auto; justify-content: center; min-height: 44px; }
 .dl-note { margin: 10px 0 0; font-size: 12px; color: var(--color-ink-2); line-height: 1.65; }
 @media (max-width: 640px) {
   .dl-grid { grid-template-columns: 1fr; }
-  .dl-actions { flex-direction: column; }
-  .dl-actions .btn, .dl-actions .btn:last-child:nth-child(2) { flex: 1 1 auto; width: 100%; }
-  .dl-card-head { flex-wrap: wrap; }
-  .dl-ver-chip { order: 3; margin-left: 58px; } /* 手机端 chip 换行对齐标题（避开 46px 图标 + 12px 间距） */
+  .dl-kv-flow { column-gap: 18px; }
+  .dl-card-head .dl-actions { flex-direction: column; }
+  .dl-card-head .dl-actions .btn { flex: 1 1 auto; width: 100%; }
+}
+
+/* §41.2 第一百六十轮：hero 紧凑化——logo 左、文字右（logo 右侧靠左对齐，三端一致不再居中）；
+ * 图标与白边缩小、字号行距收紧、砍容器留蓝（纵向高度约为原 1/3）。.dl-hero 双类选择器
+ * 压过 §41 的 .apk-hero-* 基础规则与 ≤820px 纵向堆叠断点（该页为 apk-hero 唯一使用方）。 */
+.dl-hero { margin: 8px 0 14px; border-radius: 16px; padding: 0; } /* padding:0 归零 §39 旧 dl-hero 规则（504 行）的 28px 24px——内距由 .apk-hero-in 承担 */
+.dl-hero .apk-hero-in { flex-direction: row; text-align: left; padding: 14px 20px; gap: 16px; }
+.dl-hero .apk-icon { width: 54px; height: 54px; border-radius: 14px; padding: 5px; box-shadow: 0 6px 16px rgba(0, 0, 0, .22); }
+.dl-hero .apk-hero-txt h1 { font-size: 19px; margin: 0 0 2px; line-height: 1.35; }
+.dl-hero .apk-hero-txt p { font-size: 13px; line-height: 1.5; margin: 0; max-width: 640px; }
+@media (max-width: 820px) {
+  .dl-hero .apk-hero-in { padding: 12px 14px; gap: 13px; }
+  .dl-hero .apk-icon { width: 46px; height: 46px; border-radius: 12px; padding: 4px; }
+  .dl-hero .apk-hero-txt h1 { font-size: 17px; }
+  .dl-hero .apk-hero-txt p { font-size: 12.5px; }
 }
 
 /* ===== §42 登录过期提示 + 账户记忆（第六十九轮） ===== */

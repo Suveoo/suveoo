@@ -127,10 +127,12 @@ S.chrome = {
         <div class="cols">
           <div class="fcol"><h4 class="fcol-head"><button type="button" aria-expanded="false"><span>${S.fmt.escape(S.t("footer.product"))}</span>${S.ui.icon("chevron", 14)}</button></h4>
             <div class="fcol-body"><ul>
-            <li><a href="/home">${S.fmt.escape(S.t("nav.home"))}</a></li><li><a href="/pay">${S.fmt.escape(S.t("nav.pay"))}</a></li>
-            <li><a href="/wealth">${S.fmt.escape(S.t("nav.wealth"))}</a></li><li><a href="/ai">Suveoo AI</a></li></ul></div></div>
+            <li><a href="/ai">Suveoo AI</a></li><li><a href="/home">${S.fmt.escape(S.t("nav.home"))}</a></li>
+            <li><a href="/pay">${S.fmt.escape(S.t("nav.pay"))}</a></li><li><a href="/wealth">${S.fmt.escape(S.t("nav.wealth"))}</a></li>
+            <li><a href="${user ? "/account" : "/account/login"}">${S.fmt.escape(S.t("nav.account"))}</a></li></ul></div></div>
           <div class="fcol"><h4 class="fcol-head"><button type="button" aria-expanded="false"><span>${S.fmt.escape(S.t("footer.support"))}</span>${S.ui.icon("chevron", 14)}</button></h4>
             <div class="fcol-body"><ul>
+            ${window.Capacitor?.isNativePlatform?.() ? "" : `<li><a href="/download">${S.fmt.escape(S.t("footer.download"))}</a></li>`}
             <li><a href="/help">${S.fmt.escape(S.t("footer.help"))}</a></li><li><a href="/contact">${S.fmt.escape(S.t("footer.contact"))}</a></li>
             <li><a href="/notifications">${S.fmt.escape(S.t("footer.notifications"))}</a></li>
             <li><a href="/about">${S.fmt.escape(S.t("footer.about"))}</a></li></ul></div></div>

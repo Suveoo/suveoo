@@ -39,8 +39,6 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 ![Architecture](docs/images/readme/suveoo_system_architecture.svg)
 
----
-
 ## Suveoo AI 概览
 
 **背景与难点**：AI Agent 从"回答问题"到"替客户办业务"的最后一公里是信任问题——不是"能不能听懂用户"，而是"**凭什么敢把转账权限交给一个概率系统**"。
@@ -92,8 +90,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
 
----
-
 ## Suveoo AI：自然语言驱动全行业务
 
 **63 个 MCP 工具**（GREEN 26 / YELLOW 24 / RED 13）覆盖查询、转账、账单、理财、卡片、订阅、缴费、任务、计算器、账户管理、产品动态组合拼装、主动提议、站点指南——全部走同一 IR → 五道管线。
@@ -128,8 +124,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 <!-- 插图 9：生日订花 Saga + Trust Console 五盏灯截图 -->
 ![Saga Trust Console](docs/images/readme/saga-trust-console.png)
 
----
-
 ## 六大官方场景全覆盖
 
 | 场景 | Suveoo 实现 | 证据 |
@@ -141,8 +135,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 | 5 订阅代扣 | 订阅扫描/退订/提醒、**真自动缴费引擎** | bills-autopay 3 用例 + 生产 cron 实扣 |
 | 6 跨场景联动 | 生日锁定+订花 Saga、月度自动攒、组合 DAG | birthday-chain / saga-compensation + 故障注入 |
 
----
-
 ## 一套代码，全平台交付
 
 - **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
@@ -151,8 +143,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 <!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
 ![Multi Platform](docs/images/readme/multi-platform.png)
-
----
 
 ## 测试与评测体系
 
@@ -339,8 +329,6 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 > 看板呈现：`/ai/benchmark`（SuveooBench，12 指标 + 四模型消融对比，数据源 `frontend/assets/data/benchmark.json`）。完整测试方案：[`for_developer/testing_20261002.md`](./for_developer/testing_20261002.md)（v1.1）。
 
----
-
 ## 快速开始
 
 ```bash
@@ -357,8 +345,6 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 
----
-
 ## 仓库结构
 
 ```
@@ -374,13 +360,11 @@ suveoo/
 ├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA
 ├── docs/
 │   ├── benchmarks/             # 评测证据库（security / business / performance / ablation，可直接核查）
-│   ├── architecture.md · core-algorithms.md · security-self-assessment.md · design-language.md · test-cases.md
+│   ├── architecture.md, core-algorithms.md, security-self-assessment.md, design-language.md, test-cases.md
 ├── for_developer/              # 内部文档（测试方案 / 特性全景 / 评测原始产物 bench-results/）
 ├── DEPLOYMENT.md               # 部署手册
 └── README.md
 ```
-
----
 
 ## 文档地图
 
@@ -393,13 +377,15 @@ suveoo/
 | [for_developer/suveoo_ai_features.md](./for_developer/suveoo_ai_features.md) | 特性全景母本（20 章，技术+叙事双文体） |
 | [for_developer/testing_20261002.md](./for_developer/testing_20261002.md) | 多指标测试体系 + Ablation 实验方案 v1.1 |
 
----
-
 ## 诚实披露
 
 - 模拟银行系统，全部数据虚构，不涉及真实资金。
 - 我们不使用没有跑通的技术名词（规则引擎为内联类型化规则表；未实现的能力不写入特性清单）。
 - P1/P2/P4 延迟受思考型模型固有开销影响，标注为记录型指标而非承诺；唯一设阈值的性能指标是 P3 工具调用（P95 ≤ 800ms，实测 435ms）。
+
+## 许可（License）
+
+本仓库采用 **Suveoo Proprietary License v1.0**（见 [LICENSE](./LICENSE)）：专有许可基线——源码公开供学术与竞赛评审、个人非商业学习实验，以及按 [SECURITY.md](./SECURITY.md) 开展的安全研究；**未经书面授权，禁止任何商业使用与再分发**。专利条款采用许可用途内有限授予 + 防御性终止设计。商用授权事宜请联系 support@suveoo.com。
 
 <div align="center">
 
@@ -409,12 +395,6 @@ suveoo/
 ![Demo Story](docs/images/readme/demo-story.png)
 
 </div>
-
----
-
-## 许可（License）
-
-本仓库采用 **Suveoo Proprietary License v1.0**（见 [LICENSE](./LICENSE)）：专有许可基线——源码公开供学术与竞赛评审、个人非商业学习实验，以及按 [SECURITY.md](./SECURITY.md) 开展的安全研究；**未经书面授权，禁止任何商业使用与再分发**。专利条款采用许可用途内有限授予 + 防御性终止设计。商用授权事宜请联系 support@suveoo.com。
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->

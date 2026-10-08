@@ -1,0 +1,94 @@
+{
+  "name": "suveoo-windows",
+  "productName": "Suveoo",
+  "private": true,
+  "version": "3.184.0",
+  "description": "Suveoo for Windows — Agentic Banking Control Plane desktop shell",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "test": "vitest run",
+    "icon": "python scripts/make-ico.py",
+    "dist": "electron-builder --win nsis portable",
+    "release": "node scripts/release.mjs",
+    "release:dry": "node scripts/release.mjs --dry"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^25.1.8",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "electron@44.5.1": true
+  },
+  "build": {
+    "appId": "com.suveoo.app",
+    "productName": "Suveoo",
+    "copyright": "© 2026 Suveoo",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**/*",
+      "bridge/**/*",
+      "preload.js",
+      "!smoke-report.json",
+      "!smoke-progress.log"
+    ],
+    "extraResources": [
+      {
+        "from": "../../frontend",
+        "to": "frontend",
+        "filter": [
+          "**/*",
+          "!**/*.md",
+          "!.mimosa/**",
+          "!assets/images/cards-front/**/*.jpg",
+          "!assets/images/cards-front/**/*.svg"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "suveoo-${name}-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "shortcutName": "Suveoo",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "include": "build/installer.nsh",
+      "artifactName": "suveoo-setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "suveoo-portable-${version}.${ext}"
+    }
+  }
+}
