@@ -323,9 +323,13 @@ npx wrangler dev        # 本地起 Worker + DO + KV + R2 模拟
 npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 ```
 
-**演示账户**：`demo@suveoo.com` / `jinrongkeji2026`（模拟银行系统，不涉及真实资金；登录含邮箱验证码 2FA；可用 `/api/demo/seed` 重灌演示数据——DEMO_MODE 门控）。
+**Web**：[suveoo.com](https://suveoo.com)，全平台兼容。零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
 
-**桌面/移动客户端**：[suveoo.com/download](https://suveoo.com/download)（`/downloads` 同页 301）提供 Android APK、**Suveoo for Windows**（Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`）与 **Suveoo for macOS**（Electron 44 **Universal 双架构包**——Intel 与 Apple Silicon 通用，DMG/zip 250 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动）。
+**Suveoo for Android**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。本地资产秒载、生物识别四场景、后台原生通知服务、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；站内链接 100% App 内原生打开 + 站外链接内嵌浏览器；无 GMS 设备可用。
+
+**Suveoo for Windows**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`。
+
+**Suveoo for macOS**：[suveoo.com/download](https://suveoo.com/download) Electron 44 双壳同源；**Universal 双架构包**——Intel 与 Apple Silicon 通用，DMG/zip 250 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动。
 
 完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 
@@ -378,15 +382,6 @@ suveoo/
 
 ### Suveoo 技术与架构图像
 ![Architecture](docs/images/readme/suveoo_system_architecture.svg)
-
-### 一套代码，全平台交付
-
-1. **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
-2. **Android**（Capacitor 8）：本地资产秒载、生物识别四场景、**后台原生通知服务**、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；**站内链接 100% App 内原生打开 + 站外链接内嵌浏览器**（无 GMS 设备可用——荣耀 V10 真机长期在测试矩阵）。
-3. **Windows / macOS**（Electron 44 双壳同源，`backend/windows/` + `backend/macos/` 七文件逐行同源纪律）：同一 `suveoo-app://local` 安全协议承载前端快照（origin 已入 Worker CORS 白名单，零服务端改动）；三级自动更新（R2 manifest + sha256 校验）、系统通知与未读角标（Toast / 通知中心 + dock）、生物识别（Windows Hello / Touch ID，无传感器自动回落）、外链内嵌浏览器、`suveoo://` 深链与托盘驻留五能力对齐 Android；Windows 安装版/便携版 + macOS DMG/zip 均经 `/download` 分发。
-
-<!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
-![Multi Platform](docs/images/readme/multi-platform.png)
 
 <div align="center">
 
