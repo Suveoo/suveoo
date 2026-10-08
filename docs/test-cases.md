@@ -4,7 +4,7 @@
 
 ## 目录与覆盖
 
-当前规模：**63 文件 / 463 用例**（unit 24 / integration 33 / attack 6）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
+当前规模：**Worker 域 63 文件 / 463 用例**（unit 24 / integration 33 / attack 6），另有**桌面壳独立套件**：`backend/windows/tests/` 4 文件 34 用例、`backend/macos/tests/` 4 文件 47 用例（各自 vitest 配置 node 池——依赖 electron，与根 Workers 池互斥；根配置 `include` 已限定 `tests/**`）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
 
 ### unit/（纯函数，24 文件）
 
@@ -47,10 +47,21 @@
 ## 运行结果
 
 ```
-Test Files  63 passed (63)
+Test Files  63 passed (63)          # cd backend && npx vitest run（Workers 池，backend/tests 域）
      Tests  463 passed (463)
   Duration   ~52s
+
+# 桌面壳（各自目录独立跑，node 池）：
+cd backend/windows && npx vitest run   # 4 files / 34 tests passed（ipc-schema / navigation-guard / update-decision / protocol-routes）
+cd backend/macos   && npx vitest run   # 4 files / 47 tests passed（同前三 + mac-platform：navKeyAction / installerCandidate / 动态路由）
 ```
+
+## 2026-10-08（三端客户端测试体系收口）
+
+- **windows/tests/protocol-routes.test.js 新增 5 用例**：`rewriteDynamicRoutes` 动态路由重写（卡片页 slug 剥离 / `/ai/s/{sid}` 复用 / 卡面图旧路径→mastercard/ / 不重写路径 / resolveAsset 落地三页可解析）——Bug4（队长实测卡片页三按钮壳内 404，根因=Worker 动态路由在 Electron 壳缺失）的回归防线；与 macos 侧 mac-platform.test.js 同款（Windows 版对路径分隔符做归一断言）。windows 套件 29→34。
+- **根 vitest include 边界修复**：backend/vitest.config.js 此前未限定 include，默认全仓扫描会把 windows/macos 壳测试卷进 Cloudflare Workers 池（无法 require electron）——现限定 `tests/**/*.test.js`，三套件分列（463 + 34 + 47 = 544）。
+- **桌面壳 E2E 现状**：Windows 10 套件全绿（`backend/windows/e2e-results.json`）；macOS 9/10（transfer-red-xyz 因 VM 性能差 3 秒未赶上取码窗口，队长实机手动全链验证覆盖；`backend/macos/e2e-results.json`）。
+- **AppleDouble 清理**：mac 写 vmhgfs 共享产生的 84 个 `._*` 元数据文件曾混入 macos/tests 致根套件误加载——已删（.gitignore 已含 `._*` 规则）。
 
 ## 2026-10-06（板块一多指标测试 + 四模型消融）
 

@@ -232,7 +232,17 @@ if (!gotLock) {
     if (coldDeep) routeDeepLink(coldDeep);
     trayRef = createTray(win);
     require("./credential").isAvailable().catch(() => {}); // Touch ID 可用性预热
-    app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); }); // dock 图标点击
+    // dock 图标点击（activate）：红钮 close→hide 后窗口仍在但隐藏——必须显式 show
+    // （队长实测第一百五十七轮 Bug2：仅判 getAllWindows().length===0 会漏掉隐藏窗口）
+    app.on("activate", () => {
+      if (mainWin && !mainWin.isDestroyed()) {
+        if (mainWin.isMinimized()) mainWin.restore();
+        mainWin.show();
+        mainWin.focus();
+      } else {
+        createWindow();
+      }
+    });
   });
 
   app.on("before-quit", () => { app.isQuitting = true; });

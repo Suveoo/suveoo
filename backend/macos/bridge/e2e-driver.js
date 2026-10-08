@@ -141,7 +141,9 @@
         await sleep(800);
         const headTxt = (document.querySelector(".gc-head") || {}).textContent || "";
         dbg("点击后 mask=" + !!document.querySelector(".modal-mask") + " 卡头=" + headTxt.replace(/\s+/g, " ").slice(0, 60));
-        const okModal = await wait(() => { const m = document.querySelector(".modal"); return !!(m && /成功|Done|receipt/i.test(m.textContent)); }, 30000);
+        /* 多重模态兼容（mac 实测）：确认卡模态在成功回执出现后仍留在 DOM 且排在前——
+         * 单查第一个 .modal 会永远命中确认卡；扫全部 .modal/.modal-mask 任一层含成功语即算 */
+        const okModal = await wait(() => [...document.querySelectorAll(".modal, .modal-mask")].some((el) => /成功|Done|receipt/i.test(el.textContent || "")), 30000);
         const finished = okModal || await wait(() => !document.querySelector(".modal-mask"), 3000);
         await sleep(1500);
         shot("executed");
@@ -255,8 +257,8 @@
           document.getElementById("ck-otp").value = code;
         }
         click("ck-ok");
-        /* 成功路径出「转账成功」模态（mask 保留）；失败路径 mask 消失或错误横幅 */
-        const okModal = await wait(() => { const m = document.querySelector(".modal"); return !!(m && /成功|Done|receipt/i.test(m.textContent)); }, 40000);
+        /* 成功路径出「转账成功」模态（mask 保留）；失败路径 mask 消失或错误横幅——同上扫全部模态层 */
+        const okModal = await wait(() => [...document.querySelectorAll(".modal, .modal-mask")].some((el) => /成功|Done|receipt/i.test(el.textContent || "")), 40000);
         const finished = okModal || await wait(() => !document.querySelector(".modal-mask"), 3000);
         await sleep(1800);
         shot("executed");
@@ -326,8 +328,12 @@
     "update-ask": {
       "/home": async () => {
         const ok = await wait(() => document.querySelector(".upd-mask"), 85000, 800);
+        /* 第一百五十九轮：版本文案断言——manifest 缺 version 字段时弹窗/下载条显示 "vundefined"
+         * （Android apk-manifest 用 version、双 Electron 壳用 versionName，前端已归一兜底） */
+        const ver = ok ? String((document.querySelector(".upd-mask .upd-ver") || {}).textContent || "").trim() : "";
+        const verOk = /^v\d+\.\d+/.test(ver);
         shot("ask");
-        done(ok, ok ? "发现新版本询问弹窗出现（soft 级）" : "85s 内未出现询问弹窗");
+        done(ok && verOk, !ok ? "85s 内未出现询问弹窗" : verOk ? `发现新版本询问弹窗出现（soft 级，${ver.split("·")[0].trim()}）` : `弹窗出现但版本文案异常: "${ver}"`);
       },
     },
 

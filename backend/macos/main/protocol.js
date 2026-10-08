@@ -57,10 +57,25 @@ function candidateKeys(pathname) {
   return [p, `${p}/index.html`, `${p}.html`];
 }
 
+/** 动态路由重写（镜像 worker-main.js rewriteDynamicRoutes——第一百五十七轮队长实测：
+ *  卡片页三按钮（交易明细/挂失/更多）与 /ai/s/{sid} 在壳内 404 的根因即壳缺此层。
+ *  仅重写文件查找路径，地址栏 URL 不变——页面 JS 从 location.pathname 取 slug 不受影响。） */
+function rewriteDynamicRoutes(pathname) {
+  const m = /^\/account\/card\/[^/]+\/(history|settings|report-loss)\/?$/.exec(pathname);
+  if (m) return `/account/card/${m[1]}`;
+  if (/^\/ai\/s\/[a-zA-Z0-9_-]+\/?$/.test(pathname)) return "/ai";
+  const am = /^\/assets\/images\/cards-front\/credit-cards\/(?!mastercard\/|visa\/|american-express\/|unionpay\/)([^/]+\.webp)$/.exec(pathname);
+  if (am) return `/assets/images/cards-front/credit-cards/mastercard/${am[1]}`;
+  const dm = /^\/assets\/images\/cards-front\/debit-cards\/(?!mastercard\/|visa\/|american-express\/|unionpay\/)([^/]+\.webp)$/.exec(pathname);
+  if (dm) return `/assets/images/cards-front/debit-cards/mastercard/${dm[1]}`;
+  return pathname;
+}
+
 /** 把候选键解析为 frontend 快照内的真实文件；防目录穿越，未命中返回 null */
 function resolveAsset(pathname) {
   const FRONTEND_DIR = frontendDir();
-  for (const key of candidateKeys(pathname)) {
+  const route = rewriteDynamicRoutes(pathname);
+  for (const key of candidateKeys(route)) {
     const abs = path.normalize(path.join(FRONTEND_DIR, key));
     if (abs !== FRONTEND_DIR && !abs.startsWith(FRONTEND_DIR + path.sep)) continue; // 防穿越
     try {
@@ -160,4 +175,4 @@ function registerProtocolHandler() {
   });
 }
 
-module.exports = { SCHEME, HOST, frontendDir, BRIDGE_DIR, resolveAsset, toLocalUrl, fromLocalUrl, registerSchemesAsPrivileged, registerProtocolHandler, candidateKeys };
+module.exports = { SCHEME, HOST, frontendDir, BRIDGE_DIR, resolveAsset, toLocalUrl, fromLocalUrl, registerSchemesAsPrivileged, registerProtocolHandler, candidateKeys, rewriteDynamicRoutes };

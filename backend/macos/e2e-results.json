@@ -22,5 +22,47 @@
     "pass": true,
     "detail": "suveoo://account/cards → 主窗直达卡片页",
     "when": "2026-10-07T10:38:58.227Z"
+  },
+  {
+    "suite": "i18n-switch",
+    "pass": true,
+    "detail": "zh-CN:missing=0,title=Suveoo · 主页 | zh-TW:missing=0,title=Suveoo · 主页 | en-US:missing=0,title=Suveoo · 主页",
+    "when": "2026-10-07T14:43:59.607Z"
+  },
+  {
+    "suite": "external-browser",
+    "pass": true,
+    "detail": "子窗=true 工具条=true 视图=https://example.com/",
+    "when": "2026-10-07T14:44:12.872Z"
+  },
+  {
+    "suite": "offline-resilience",
+    "pass": true,
+    "detail": "断网本地渲染=true；错误提示=true；恢复登录=true",
+    "when": "2026-10-07T14:44:58.486Z"
+  },
+  {
+    "suite": "demo-login",
+    "pass": true,
+    "detail": "登录成功落地 /home，token=true",
+    "when": "2026-10-07T14:45:07.303Z"
+  },
+  {
+    "suite": "transfer-yellow",
+    "pass": false,
+    "detail": "确认卡→执行=false（成功模态=false）；流水首条 TXMUWSLRY4→TXMUY7Z2DK；收款人=谢宇洲",
+    "when": "2026-10-07T14:45:55.988Z"
+  },
+  {
+    "suite": "transfer-yellow",
+    "pass": true,
+    "detail": "确认卡→执行=true（成功模态=true）；流水首条 TXMUY7Z2DK→TXMUYA9D8P；收款人=谢宇洲",
+    "when": "2026-10-07T15:49:26.967Z"
+  },
+  {
+    "suite": "transfer-red-xyz",
+    "pass": false,
+    "detail": "登录码 180s 未回填",
+    "when": "2026-10-07T16:14:43.470Z"
   }
 ]

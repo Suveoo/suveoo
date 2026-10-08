@@ -49,7 +49,7 @@ JWT HS256（1h，jti 黑名单登出）；PBKDF2-SHA256 100,000 轮 + 16B 盐 + 
 
 - 单 Worker 冷启动 <50ms（无重依赖；pdf-lib 与 fontkit 动态 import）
 - 每用户一个 LedgerDO（SQLite）：转账路径 O(1) 索引查询 + 两条 SQL
-- 测试：全量 63 文件 463 用例全绿（含四模型消融各跑一遍；本算法域早期规模 99 用例）
+- 测试：全量 63 文件 463 用例全绿（含四模型消融各跑一遍；本算法域早期规模 99 用例。另有 Windows/macOS 桌面壳单测 81 例独立套件，不属本算法域）
 
 
 ## 7. 基金数据生成模型（backend/scripts/gen-fund-data.mjs，确定性）

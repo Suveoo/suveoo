@@ -37,6 +37,7 @@ if (!gotLock) {
   }
 
   app.on("second-instance", (_e, argv) => {
+    deeplinkLog(`second-instance argv=${JSON.stringify(argv)}`);
     const deep = argv.find((a) => a.startsWith("suveoo://"));
     const target = mainWin || globalThis.__e2eWin; // E2E 模式路由到协调器窗口
     if (target && !target.isDestroyed()) {
@@ -49,6 +50,22 @@ if (!gotLock) {
       }
     }
   });
+
+  // —— 深链诊断日志（GUI 子系统无 stdout，一律文件日志；镜像 mac 壳同名机制）——
+  const deeplinkLog = (s) => {
+    try {
+      const fs = require("fs");
+      const { app: a } = require("electron");
+      fs.appendFileSync(require("path").join(a.getPath("userData"), "deeplink.log"), `[${new Date().toISOString()}] ${s}\n`);
+    } catch { /* 日志失败不影响主流程 */ }
+  };
+
+  function routeDeepLink(deep) {
+    if (typeof deep !== "string" || !deep.startsWith("suveoo://")) return;
+    deeplinkLog(`route ${deep} win=${!!(mainWin && !mainWin.isDestroyed())}`);
+    const t = nav.classifyTarget(deep);
+    if (t.kind === "internal" && mainWin && !mainWin.isDestroyed()) mainWin.webContents.loadURL(t.url);
+  }
 
   let mainWin = null;
   let trayRef = null;
@@ -159,6 +176,10 @@ if (!gotLock) {
     const win = createWindow();
     trayRef = createTray(win);
     require("./credential").isAvailable().catch(() => {}); // Hello 可用性预热（首次 PS 探测数秒，提前到启动期）
+    // 冷启动深链：注册表协议唤起本应用为第一实例时（suveoo:// 落在启动 argv）——
+    // second-instance 只覆盖"已运行再唤起"，第一实例 argv 由此处兜底路由（mac 壳同款）
+    const coldDeep = process.argv.find((a) => a.startsWith("suveoo://"));
+    if (coldDeep) routeDeepLink(coldDeep);
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
 

@@ -246,7 +246,10 @@
     if (!isAbs && !isRel) throw new Error("url bad form");
     const abs = isAbs ? raw.url : ((S.api && S.api.base) || "https://suveoo.com") + raw.url;
     if (!/^https:\/\/([\w-]+\.)?suveoo\.com\//.test(abs)) throw new Error("url not allowed");
-    return { info: { ...raw, url: abs }, cur };
+    /* 第一百五十九轮：manifest 版本字段归一——Android apk-manifest 用 version，双 Electron 壳
+     * manifest 用 versionName；统一回落防 "vundefined"（历史 manifest 缺字段时旧壳也能正确显示） */
+    const info = { ...raw, version: raw.version || raw.versionName || "", url: abs };
+    return { info, cur };
   };
 
   /* ===== 第七十五轮：自动检查 + 强制更新 ===== */

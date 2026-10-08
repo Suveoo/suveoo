@@ -105,4 +105,4 @@
 
 ---
 
-*本策略参考社区最佳实践：[GitHub 协调披露指南](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/about-repository-security-advisories) · [CISA 漏洞披露政策模板](https://www.cisa.gov/resources-tools/resources/vulnerability-disclosure-policy-template) · [RFC 9116（security.txt）](https://www.rfc-editor.org/rfc/rfc9116)。站点级 `/.well-known/security.txt` 已在规划中。*
+*本策略参考社区最佳实践：[GitHub 协调披露指南](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/about-repository-security-advisories) · [CISA 漏洞披露政策模板](https://www.cisa.gov/resources-tools/resources/vulnerability-disclosure-policy-template) · [RFC 9116（security.txt）](https://www.rfc-editor.org/rfc/rfc9116)。站点级指路标已上线：[`https://suveoo.com/.well-known/security.txt`](https://suveoo.com/.well-known/security.txt)（Expires 动态自续期）。*

@@ -76,4 +76,14 @@
 
 ## 6. 前端（无构建 MPA + PWA）
 
-原生 ES2022 + Web Components 风格命名空间（`S.*`），76 个页面壳 + 62 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback，1531 键恒等）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。
+原生 ES2022 + Web Components 风格命名空间（`S.*`），76 个页面壳 + 62 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback，1551 键恒等）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。
+
+## 7. 原生客户端壳（Android + Windows + macOS，一套前端四端交付）
+
+**同构三件套**（全线上线）：壳内本地加载 frontend 静态快照（资源秒开、断网可渲染），业务 API 经前端双层 base 直发 `https://suveoo.com` 生产域，SW 壳内免注册——frontend/ 对所有壳零改动。
+
+- **Android**（`backend/android/`，Capacitor 8，v2.66）：原生 BiometricPrompt/通知服务/目录路由（含动态路由重写）。
+- **Windows + macOS**（`backend/windows/` + `backend/macos/`，Electron 44 双壳）：自定义特权协议 `suveoo-app://local` 承载前端快照（origin 已入 Worker `SHELL_ORIGINS` CORS 白名单，零服务端改动）；preload 显式方法对象模拟 Capacitor 插件面（NativeBridge/LocalNotifications/Biometric/Update → IPC 白名单 16 方法）；协议层服务时注入 shell-update/biometric-shell（等价 Android 构建期注入）；**七文件逐行同源纪律**（protocol/preload/ipc/navigation/smoke/qa-shot/e2e-driver——跨壳修 bug 双写并各自重发布）。
+- **五能力对齐**：三级自动更新（R2 manifest + sha256，强制阻断层）、系统通知 + 未读角标、生物识别（Hello/Touch ID，无传感器回落）、外链内嵌浏览器、`suveoo://` 深链 + 托盘驻留。
+- **动态路由镜像**：Worker `rewriteDynamicRoutes`（卡片页 slug 剥离、`/ai/s/{sid}` 复用、卡面图旧路径）在三壳各有镜像实现（Android 第五十二轮、双 Electron 壳第一百五十七轮）——服务端与壳的路由语义保持逐条一致。
+

@@ -7806,6 +7806,27 @@ async function handleVoiceStream(request, env, ctx) {
   server.addEventListener("close", shutdown);
   return new Response(null, { status: 101, webSocket: client });
 }
+/** RFC 9116 security.txt（第一百六十轮）：站点级漏洞披露指路标。
+ *  Contact 与 Expires 为规范必填——Expires 动态生成（当前时刻 +180 天）保证永不过期失信、
+ *  自续期免人工维护；Contact/Policy 与仓库根 SECURITY.md 同源一致。缓存 1 天：校验器友好 + 变更次日生效。 */
+export function securityTxtResponse() {
+  const expires = new Date(Date.now() + 180 * 86400000).toISOString();
+  const lines = [
+    "# Suveoo security policy: https://github.com/Suveoo/suveoo/blob/main/SECURITY.md",
+    "Contact: mailto:security@suveoo.com",
+    "Contact: https://github.com/Suveoo/suveoo/security/advisories/new",
+    "Expires: " + expires,
+    "Preferred-Languages: zh, en",
+    "Canonical: https://suveoo.com/.well-known/security.txt",
+    "Policy: https://github.com/Suveoo/suveoo/blob/main/SECURITY.md",
+    "",
+  ];
+  const headers = new Headers();
+  headers.set("content-type", "text/plain; charset=utf-8");
+  headers.set("cache-control", "public, max-age=86400");
+  return new Response(lines.join("\n"), { headers });
+}
+
 export function rewriteDynamicRoutes(pathname) {
   const m = /^\/account\/card\/[^/]+\/(history|settings|report-loss)\/?$/.exec(pathname);
   if (m) return `/account/card/${m[1]}`;
@@ -7904,6 +7925,7 @@ export default {
       return new Response(null, { status, headers: { location } });
     }
     if (url.pathname === "/api/health") return json({ status: "ok", version: VERSION });
+    if (url.pathname === "/.well-known/security.txt") return securityTxtResponse(); /* RFC 9116（第一百六十轮） */
     if (url.pathname === "/api/version") {
       const lp = resolveLlmProfile(env);
       return json({ version: VERSION, provider: lp.provider ?? null, model: lp.model ?? null, profile: lp.name ?? null, ...(lp.err ? { profile_error: lp.err } : {}), demo_mode: env.DEMO_MODE ?? null });

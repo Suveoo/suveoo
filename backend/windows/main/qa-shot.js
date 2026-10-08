@@ -27,10 +27,22 @@ async function runShot(argv) {
   const win = new BrowserWindow({ show: false, width: w || 1280, height: h || 1400, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
   await win.webContents.loadURL(url);
   await new Promise((r) => setTimeout(r, 1500)); // 等 manifest 拉取与渲染
-  const img = await win.webContents.capturePage();
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, img.toPNG());
-  process.stdout.write(`[shot] ${out} (${w}x${h}, ${(img.toPNG().length / 1024).toFixed(0)} KB)\n`);
+  let img;
+  try {
+    img = await win.webContents.capturePage();
+  } catch (e) {
+    process.stdout.write(`[shot] capturePage 失败：${e && e.message}\n`);
+    app.exit(1);
+    return;
+  }
+  // 打包态 asar 只读——若 out 落在应用目录内则改落 userData（Windows 轮遗留项，mac 轮正解回同步）
+  let outFinal = out;
+  try {
+    if (app.isPackaged && !outFinal.startsWith(userData + path.sep)) outFinal = path.join(userData, path.basename(rawOut));
+  } catch { /* 保持原路径 */ }
+  fs.mkdirSync(path.dirname(outFinal), { recursive: true });
+  fs.writeFileSync(outFinal, img.toPNG());
+  process.stdout.write(`[shot] ${outFinal} (${w}x${h}, ${(img.toPNG().length / 1024).toFixed(0)} KB)\n`);
   app.exit(0);
 }
 

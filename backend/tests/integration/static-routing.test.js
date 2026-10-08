@@ -46,6 +46,20 @@ describe("① 静态查找顺序（pages.md §2.6）", () => {
     expect(robots.headers.get("content-type")).toContain("text/plain");
   });
 
+  it("/.well-known/security.txt：RFC 9116 必填字段 + 动态 Expires 恒为未来", async () => {
+    const r = await get("/.well-known/security.txt");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/plain");
+    expect(r.headers.get("cache-control")).toContain("max-age=86400");
+    const body = await r.text();
+    expect(body).toContain("Contact: mailto:security@suveoo.com");
+    expect(body).toContain("Canonical: https://suveoo.com/.well-known/security.txt");
+    expect(body).toContain("Policy: https://github.com/Suveoo/suveoo/blob/main/SECURITY.md");
+    const m = body.match(/^Expires: (.+)$/m);
+    expect(m).toBeTruthy();
+    expect(new Date(m[1]).getTime()).toBeGreaterThan(Date.now()); /* 过期时间恒在未来（动态 +180 天自续期） */
+  });
+
   it("未知路径 → 404.html + HTTP 404", async () => {
     const r = await get("/definitely/not/here");
     expect(r.status).toBe(404);

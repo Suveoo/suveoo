@@ -224,6 +224,7 @@ npx wrangler tail suveoo-bank-main --format pretty                     # 实时�
 - [ ] `/home`、`/ai`、`/wealth/funds/global-mixed-1`、`/account/login`、`/transfer/intrabank/`（尾斜杠）均 200
 - [ ] 未知路径返回 404.html（HTTP 404）；`/` 跳转 `/home`
 - [ ] `www.suveoo.com` 301 → `suveoo.com`；`/downloads` 301 → `/download`
+- [ ] `/download` 200 且三平台卡（Android/Windows/macOS）渲染；`/dl/apk-manifest.json`、`/dl/windows-manifest.json`、`/dl/macos-manifest.json` 三件均 200（客户端验收细则见 §15/§16）
 - [ ] MCP Inspector 连 `https://suveoo.com/mcp`：initialize + tools/list（22 个）成功
 - [ ] 注册开户：收到验证码邮件；开户后 4 借记 + 1 信用卡、总余额 ∈ [999,328.24, 1,124,549.38]
 - [ ] 黄级转账：确认卡倒计时 + grant_hash 显示；红级：OTP 邮件可达

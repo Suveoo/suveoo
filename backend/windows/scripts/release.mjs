@@ -92,6 +92,7 @@ try {
 } catch { /* 线上无 manifest（首次） */ }
 const manifest = {
   versionName: V,
+  version: V, /* 第一百五十九轮：前端 shell-update.js 读 info.version（Android apk-manifest 字段名）——缺此字段显示 vundefined */
   versionCode: semverToCode(V),
   minVersionCode,
   url: `/dl/suveoo-setup-${V}.exe`,
