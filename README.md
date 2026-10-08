@@ -401,7 +401,7 @@ suveoo/
 **Suveoo（源自爱沙尼亚语 suveöö，夏夜）**
 
 <!-- 插图 11：四幕演示叙事拼图（AA 分账 / Consent Binding 失效 / Saga 故障注入 / 攻防看板，四格拼图） -->
-![Demo Story](docs/images/readme/demo-story.png)
+![Demo Story](docs/images/readme/demo-story.webp)
 
 </div>
 
