@@ -21,7 +21,7 @@
 
 ### 技术栈
 
-Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计算、持久化存储、渐进式 Web 应用、AI API 及开放协议，为应用提供高性能、可扩展且跨平台的运行环境。
+Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计算、持久化存储、渐进式 Web 应用、AI API 及开放协议，为应用提供高性能、可扩展且跨平台的运行环境。详见附录 [Suveoo 技术与架构图像](#suveoo-技术与架构图像)。
 
 [![Cloudflare Workers · Durable Objects][CloudflareEdge]][CloudflareEdge-url]
 [![Cloudflare R2][CloudflareR2]][CloudflareR2-url]
@@ -36,8 +36,6 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![electron-builder 25][ElectronBuilder]][ElectronBuilder-url]
 [![NSIS · Windows Installer][NSIS]][NSIS-url]
 [![Windows Hello · Touch ID][HelloTouchID]][HelloTouchID-url]
-
-![Architecture](docs/images/readme/suveoo_system_architecture.svg)
 
 ## Suveoo AI 概览
 
@@ -99,31 +97,34 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### Suveoo AI 代表性能力
 
-1. **模糊表达与反问澄清**：说"挂失尾号 6792 的卡，帮我补办" → AI 核对卡片、查状态 → **反问邮寄地址并明言"我不能代填"** → 手续、工本、邮寄费用三项合计 ¥53 → OTP 验证码与挂失后流程告知。
-
-![Clarification Questioning](docs/images/readme/clarification-questioning.png)
-
-2. **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
-
-![Tool Call Calculation and Rendering](docs/images/readme/tool-call-calculation-and-rendering.png)
-
-3. **对话即方案的动态产品拼装**："5 万闲钱半年后买车" → 分析顾客资金状况与目标，加权拼装存款阶梯 + 期限封顶基金层 + 货币基金流动性层等理财产品 → 一键打包组合购买（两段式 grant + PR 适当性 + 若部分失败则按成本回退）。
+1. **对话即方案的动态产品拼装**："5 万闲钱半年后买车" → 分析顾客资金状况与目标，加权拼装存款阶梯 + 期限封顶基金层 + 货币基金流动性层等理财产品 → 一键打包组合购买（两段式 grant + PR 适当性 + 若部分失败则按成本回退）。
 
 ![Dynamic Solution Packaging](docs/images/readme/dynamic-solution-packaging.png)
 
-4. **组合操作 DAG**：说"默认卡给张三转账 120，再冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 输出组合方案卡（整卡=最高颜色级别、金额合计判红、**红级一次性 OTP**）→ `batch_execute` 逐项执行，一次性完成用户多项需求（期间失败即停）。
-5. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页**现场故障注入按钮**用于模拟商户履约失败）。
-6. **AI 主动银行**：规则引擎扫描沉睡订阅/周期转账/自动扣款/还款/闲钱理财/产品推荐 → 提议清单 + **站内/客户端推送/Email 三路提醒**；Suveoo AI 页顾客提问前先主动依据实情推荐产品；特制"AI 提议"页面，汇总各项 AI 建议、当月省下金额、当月办妥事项、自动打理惯例；多页面内嵌"AI 洞察"板块，点击对应提议直发 AI，一条龙办完。
-7. **自动缴费**：cron 引擎（每 5 分钟扫描、北京时区、月末并档、防重键）——生产部署后首个 cron 真实自动扣款两笔（¥286.40 / ¥28,453.27），流水 `channel=auto` 可查。
-8. **语音输入**：阿里云实时 ASR + Web Speech 双通道。
+2. **组合操作 DAG**：说"默认卡给张三转账 120，再冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 输出组合方案卡（整卡=最高颜色级别、金额合计判红、**红级一次性 OTP**）→ `batch_execute` 逐项执行，一次性完成用户多项需求（期间失败即停）。
+
+![Complex Requirements DAG](docs/images/readme/complex-requirements-dag.svg)
+
+3. **模糊表达与反问澄清**：说"挂失尾号 6792 的卡，帮我补办" → AI 核对卡片、查状态 → **反问邮寄地址并明言"我不能代填"** → 手续、工本、邮寄费用三项合计 ¥53 → OTP 验证码与挂失后流程告知。
+
+![Clarification Questioning](docs/images/readme/clarification-questioning.png)
+
+4. **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
+
+![Tool Call Calculation and Rendering](docs/images/readme/tool-call-calculation-and-rendering.png)
+
+5. **AI 主动银行**：规则引擎扫描沉睡订阅/周期转账/自动扣款/还款/闲钱理财/产品推荐 → 提议清单 + **站内/客户端推送/Email 三路提醒**；Suveoo AI 页顾客提问前先主动依据实情推荐产品；特制"AI 提议"页面，汇总各项 AI 建议、当月省下金额、当月办妥事项、自动打理惯例；多页面内嵌"AI 洞察"板块，点击对应提议直发 AI，一条龙办完。
+
+![Proactive AI Banking](docs/images/readme/proactive-ai-banking.png)
+
+6. **语音输入**：阿里云实时 ASR + Web Speech 双通道，已注入 1,200 常用词汇与专业表述。
+
+![AI Voice to Text](docs/images/readme/ai-voice-to-text.png)
+
+7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页**现场故障注入按钮**用于模拟商户履约失败）。
+8. **自动缴费**：cron 引擎（每 5 分钟扫描、北京时区、月末并档、防重键）——生产部署后首个 cron 真实自动扣款两笔（¥286.40 / ¥28,453.27），流水 `channel=auto` 可查。
 9. **全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
 
-<!-- 插图 6：对话内嵌计算器（tool-embed）特写截图 -->
-![Tool Embed](docs/images/readme/tool-embed.png)
-<!-- 插图 7：对话即方案（solution_preview 组合方案卡）截图 -->
-![Solution Preview](docs/images/readme/solution-preview.png)
-<!-- 插图 8：组合操作卡（冻结+挂失两项、风险圆点、一次 OTP）截图 -->
-![Operations Package](docs/images/readme/operations-package.png)
 <!-- 插图 9：生日订花 Saga + Trust Console 五盏灯截图 -->
 ![Saga Trust Console](docs/images/readme/saga-trust-console.png)
 
@@ -389,6 +390,11 @@ suveoo/
 ## 许可（License）
 
 本仓库采用 **Suveoo Proprietary License v1.0**（见 [LICENSE](./LICENSE)）：专有许可基线——源码公开供学术与竞赛评审、个人非商业学习实验，以及按 [SECURITY.md](./SECURITY.md) 开展的安全研究；**未经书面授权，禁止任何商业使用与再分发**。专利条款采用许可用途内有限授予 + 防御性终止设计。商用授权事宜请联系 support@suveoo.com。
+
+## 附录
+
+### Suveoo 技术与架构图像
+![Architecture](docs/images/readme/suveoo_system_architecture.svg)
 
 <div align="center">
 

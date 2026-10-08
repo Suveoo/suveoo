@@ -2,7 +2,7 @@
   "name": "suveoo-macos",
   "productName": "Suveoo",
   "private": true,
-  "version": "3.184.0",
+  "version": "3.185.0",
   "description": "Suveoo for macOS — Agentic Banking Control Plane desktop shell",
   "main": "main/main.js",
   "scripts": {

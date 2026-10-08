@@ -8,6 +8,21 @@
 
 !macro customUnInstall
   DeleteRegKey HKCU "Software\Classes\suveoo"
+  ; 卸载全程留痕（%TEMP%\suveoo-uninstall-trace.txt）——升级链排障用（队长实测弹窗根因排查期加入）
+  nsExec::Exec `"$SYSDIR\cmd.exe" /c echo [%DATE% %TIME%] un.install end reached>>"%TEMP%\suveoo-uninstall-trace.txt"`
+!macroend
+
+; 第一百六十轮终二：整体替换模板的文件移除块（!ifmacrodef customRemoveFiles 钩子）。
+; 原块的 atomicRMDir（把旧文件 rename 进 $PLUGINSDIR\old-install）失败即 Abort → 卸载器退出码 2
+; → 新安装器 installUtil 重试 5 次全败 → 弹 "Suveoo cannot be closed"（队长实测升级卡点根因）。
+; 替换为直删（RMDir /r ×2）：被锁文件只会残留、不会 Abort；配合 customCheckAppRunning 的
+; 双杀 + 1.2s 句柄释放窗，正常路径零残留零弹窗。
+!macro customRemoveFiles
+  nsExec::Exec `"$SYSDIR\cmd.exe" /c echo [%DATE% %TIME%] customRemoveFiles begin>>"%TEMP%\suveoo-uninstall-trace.txt"`
+  RMDir /r "$INSTDIR"
+  Sleep 400
+  RMDir /r "$INSTDIR"
+  nsExec::Exec `"$SYSDIR\cmd.exe" /c echo [%DATE% %TIME%] customRemoveFiles end>>"%TEMP%\suveoo-uninstall-trace.txt"`
 !macroend
 
 ; 第一百五十九轮：整体替换 electron-builder 的 CHECK_APP_RUNNING（安装/卸载段都会插入）。
@@ -17,6 +32,12 @@
 ; 同名子进程与前次会话僵尸实例），无任何用户交互——更新安装与手动安装统一此语义。
 !macro customCheckAppRunning
   DetailPrint `Closing running "${PRODUCT_NAME}"...`
+  ; 第一百六十轮终二：确定性双杀 + 句柄释放窗（无循环无栈操作——曾试 tasklist 验证循环，
+  ; ExecToStack 栈错位可致 $R1 被吃、计数永不到位而无限循环（/S 安装卡死实测））。
+  ; 杀两次覆盖子进程级联与 AV 延迟退出；再静置 1.2s 等文件句柄释放——本宏位于
+  ; uninstallOldVersion 之前（installSection.nsh 顺序），确保旧卸载器 rename 不遇锁。
   nsExec::Exec `"$SYSDIR\cmd.exe" /c taskkill /f /im "${APP_EXECUTABLE_FILENAME}" /fi "USERNAME eq %USERNAME%"`
-  Sleep 400
+  Sleep 600
+  nsExec::Exec `"$SYSDIR\cmd.exe" /c taskkill /f /im "${APP_EXECUTABLE_FILENAME}" /fi "USERNAME eq %USERNAME%"`
+  Sleep 1200
 !macroend
