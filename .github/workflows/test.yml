@@ -1,0 +1,25 @@
+name: Test
+
+# 后端确定性测试矩阵（63 文件 / 463 用例，vitest + vitest-pool-workers 本地 miniflare 绑定，
+# 无需任何线上密钥）。Windows/macOS 壳单测与打包冒烟在各自开发机本地跑（见 DEPLOYMENT §15/§16）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests (vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # wrangler 4 要求 Node >= 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test

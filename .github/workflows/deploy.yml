@@ -1,0 +1,63 @@
+name: Deploy
+
+# 对齐 DEPLOYMENT.md §10 的 CI/CD 设计：main 分支 push（或手动 dispatch）→ 测试 → 部署。
+# 需要 Repository Secrets（Settings → Secrets and variables → Actions）：
+#   CLOUDFLARE_API_TOKEN（Workers Scripts:Edit / KV Storage:Edit / R2:Edit / Account:Read / Zone:Edit）
+#   CLOUDFLARE_ACCOUNT_ID
+# Secrets 未配置时部署步骤自动跳过（测试照常执行），不会误部署。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Backend tests (vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    name: Deploy Worker + frontend
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Secrets 就绪检查
+        id: secs
+        run: echo "ready=${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}" >> "$GITHUB_OUTPUT"
+      - name: Deploy Worker（wrangler deploy）
+        if: steps.secs.outputs.ready == 'true'
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy frontend（deploy-frontend.mjs）
+        if: steps.secs.outputs.ready == 'true'
+        run: node scripts/deploy-frontend.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Secrets 未配置提示
+        if: steps.secs.outputs.ready != 'true'
+        run: echo '::warning::未配置 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID，已跳过部署（仅测试）。配置后下次 push 生效；注意 CI 首次部署为全量上传（本地无增量 state）。'
