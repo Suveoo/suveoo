@@ -103,7 +103,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 2. **组合操作 DAG**：说"默认卡给张三转账 120，再冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 输出组合方案卡（整卡=最高颜色级别、金额合计判红、**红级一次性 OTP**）→ `batch_execute` 逐项执行，一次性完成用户多项需求（期间失败即停）。
 
-![Complex Requirements DAG](docs/images/readme/complex-requirements-dag.svg)
+![Complex Requirements DAG](docs/images/readme/complex-requirements-dag.png)
 
 3. **模糊表达与反问澄清**：说"挂失尾号 6792 的卡，帮我补办" → AI 核对卡片、查状态 → **反问邮寄地址并明言"我不能代填"** → 手续、工本、邮寄费用三项合计 ¥53 → OTP 验证码与挂失后流程告知。
 
