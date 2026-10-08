@@ -1,19 +1,22 @@
 # Suveoo — Agentic Banking Control Plane
 
 <!-- 图 1：全设备 Hero Mockup -->
-![Suveoo across devices](docs/images/readme/hero-devices.png)
+![Suveoo across devices](docs/images/readme/hero-devices.webp)
 
 <div align="center">
 
 ![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%97%203%20langs-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
 
-[关于](#关于) · [Suveoo AI 概览](#suveoo-ai-概览) · [安全内核](#安全内核bankaction-ir-与五道确定性验证) · [Suveoo AI](#suveoo-ai自然语言驱动全行业务) · [六大场景](#六大官方场景全覆盖) · [快速开始](#快速开始) · [测试与评测体系](#测试与评测体系) · [文档地图](#文档地图)
-
 </div>
+
+**目录**：[1 关于](#1-关于) · [2 Suveoo AI 概览](#2-suveoo-ai-概览) · [3 安全内核](#3-安全内核bankAction-ir-与-suveoo-verification-runtime) · [4 Suveoo AI 自然语言驱动全行业务](#4-suveoo-ai自然语言驱动全行业务) · [5 测试与评测体系](#5-测试与评测体系) · [6 快速开始](#6-快速开始) · [7 仓库结构](#7-仓库结构) · [8 文档地图](#8-文档地图) · [9 诚实披露](#9-诚实披露) · [10 许可（License）](#10-许可license) · [11 附录](#11-附录)
+
+
+
 
 ---
 
-## 关于
+## 1. 关于
 
 **Suveoo** 是一个运行在全球边缘的完整模拟银行系统。前端零构建 MPA，提供 76 页面、 62 页面控制器。Web 版（`suveoo.com`）全平台兼容；原生客户端三端齐备——Android（Capacitor 8）、Windows 与 macOS（Electron 44 双壳同源，`/download` 一站分发）。
 
@@ -37,7 +40,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 [![NSIS · Windows Installer][NSIS]][NSIS-url]
 [![Windows Hello · Touch ID][HelloTouchID]][HelloTouchID-url]
 
-## Suveoo AI 概览
+## 2. Suveoo AI 概览
 
 **背景与难点**：AI Agent 从"回答问题"到"替客户办业务"的最后一公里是信任问题——不是"能不能听懂用户"，而是"**凭什么敢把转账权限交给一个概率系统**"。
 
@@ -47,7 +50,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
 
-## 安全内核：BankAction IR 与 Suveoo Verification Runtime
+## 3. 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
 ### BankAction IR（金融行为中间表示）
 
@@ -88,7 +91,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
 
-## Suveoo AI：自然语言驱动全行业务
+## 4. Suveoo AI：自然语言驱动全行业务
 
 **63 个 MCP 工具**（GREEN 26 / YELLOW 24 / RED 13）覆盖查询、转账、账单、理财、卡片、订阅、缴费、任务、计算器、账户管理、产品动态组合拼装、主动提议、站点指南——全部走同一 IR → 五道管线。
 
@@ -128,27 +131,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 <!-- 插图 9：生日订花 Saga + Trust Console 五盏灯截图 -->
 ![Saga Trust Console](docs/images/readme/saga-trust-console.png)
 
-## 六大官方场景全覆盖
-
-| 场景 | Suveoo 实现 | 证据 |
-|---|---|---|
-| 1 智能转账 | 按人名/手机号/邮箱/卡号收款、AA 分账（¥860/3 → 286.67/286.67/286.66）、预约转账、跨用户双记 | transfer-flow 10 用例 |
-| 2 账单分析 | 分类统计、异常归因、月度 PDF 报告（pdf-lib 矢量品牌） | 对账三 bug 根治记录 |
-| 3 理财操作 | 16 基金 + 5 存款档、PR 分级适当性、一键申赎、**对话即方案**、攒钱目标五件套 | solution-package 集成测试 + 生产 ¥10 真实执行 |
-| 4 卡片管理 | 状态/限额/冻结解冻、**卡片挂失全链**（三态页/红级打包费用/签收激活/LOSS_ACTIVE 防绕过） | card-loss 4 用例 + 生产双通道闭环 |
-| 5 订阅代扣 | 订阅扫描/退订/提醒、**真自动缴费引擎** | bills-autopay 3 用例 + 生产 cron 实扣 |
-| 6 跨场景联动 | 生日锁定+订花 Saga、月度自动攒、组合 DAG | birthday-chain / saga-compensation + 故障注入 |
-
-## 一套代码，全平台交付
-
-- **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
-- **Android**（Capacitor 8）：本地资产秒载、生物识别四场景、**后台原生通知服务**、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；**站内链接 100% App 内原生打开 + 站外链接内嵌浏览器**（无 GMS 设备可用——荣耀 V10 真机长期在测试矩阵）。
-- **Windows / macOS**（Electron 44 双壳同源，`backend/windows/` + `backend/macos/` 七文件逐行同源纪律）：同一 `suveoo-app://local` 安全协议承载前端快照（origin 已入 Worker CORS 白名单，零服务端改动）；三级自动更新（R2 manifest + sha256 校验）、系统通知与未读角标（Toast / 通知中心 + dock）、生物识别（Windows Hello / Touch ID，无传感器自动回落）、外链内嵌浏览器、`suveoo://` 深链与托盘驻留五能力对齐 Android；Windows 安装版/便携版 + macOS DMG/zip 均经 `/download` 分发。
-
-<!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
-![Multi Platform](docs/images/readme/multi-platform.png)
-
-## 测试与评测体系
+## 5. 测试与评测体系
 
 测试分三层，全部可复现、证据落盘：
 
@@ -183,7 +166,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S5 异常熔断正确性
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | 连续验证失败后锁定账户高危操作、且查询类不受影响的隔离正确性 |
 | 测试方法 | 伪造 OTP/grant 连错触发熔断，断言写通道锁定、读通道可用、锁定时长与恢复 |
@@ -194,7 +177,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S6 审计完整性
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | 每笔 AI 写操作在 `user_audit` 五字段（who/what/when/tier/trace）的可回溯覆盖率 |
 | 测试方法 | 16 个 intent 全量执行后拉取审计流，断言逐条对齐（市场行情类 4 项留 L1 覆盖） |
@@ -205,7 +188,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S7 数据隔离
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | AI 工具在跨用户标识（他人手机号/邮箱/卡号/凭证）诱导下的数据泄露率 |
 | 测试方法 | 8 个工具 × 4 类跨用户标识发起查询，断言返回内容不含任何他人数据 |
@@ -216,7 +199,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S1 幻觉防护：数值一致性
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | AI 口头报告的数值与系统真值（余额/持仓/订阅/收款人计数等）的精确一致率 |
 | 测试方法 | 18 个自动判定用例（truthJs 求值器，8 种比较器：exact/pm1/pm1-yuan/dual-pm1/sub-next/count/text-in/manual）+ 6 个人工复核用例，对生产 SSE 全文判定 |
@@ -236,7 +219,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### S2 幻觉防护：执行一致性（与 B4 同链验证）
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | AI 执行类回答中声称的动作、金额、对象与账本实际落库的执行记录一致率 |
 | 测试方法 | 生产 E2E：AI 发起操作 → 确认卡 → 执行 → 拉取流水/状态比对执行声明；另设 2 条"确认后篡改"用例断言 CONSENT_INVALIDATED 零假声明 |
@@ -247,7 +230,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### B1 意图识别与风险分级
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | 自然语言变体被映射到正确 intent、并授予正确风险分级（GREEN/YELLOW/RED）的比例 |
 | 测试方法 | 10 类意图 × 5 种表述变体（口语化/省略/敬语/数字变体/复合指令）经生产 AI 通道发起；判定取最终确认卡（模型自我纠正语义） |
@@ -267,7 +250,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### B2 金额解析
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | 中文金额表达（大写、口语、区间、万/亿单位、分隔符）到分单位整数的解析正确率 |
 | 测试方法 | 28 用例 / 30 断言覆盖典型与边界输入 |
@@ -276,7 +259,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### P1 / P2 AI 对话延迟（TTFT 与完整响应）
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | AI 通道首字延迟（TTFT）与完整响应时长分布 |
 | 测试方法 | 18 条指令对生产 SSE 计时（记录型指标，无硬阈值；作为四模型消融的延迟基线） |
@@ -286,7 +269,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### P3 工具调用延迟
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | REST API 绿色查询工具的服务端处理延迟 |
 | 测试方法 | 3 轮 × 11 并发共 33 样本 |
@@ -296,7 +279,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ### P4 转账全链路延迟
 
-| 维度 | 内容 |
+| # | 内容 |
 |---|---|
 | 指标定义 | AI 对话发起转账到账本落库的端到端时长（含出确认卡 + 用户确认 + 执行） |
 | 测试方法 | 14 次有效执行计时（chat 段约 20s + exec 段约 6s） |
@@ -308,7 +291,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 **论点**：Suveoo 的安全与业务正确性由 Runtime 架构保证，与底层 LLM 无关。**验证方式**：通过 `MODEL_PROFILE` 配置切换（不改一行代码），让 4 个 LLM 跑同一套完整测试矩阵——vitest 全量 463 用例 + S1 幻觉 24 用例 + B1 意图分级 50 变体 + 注入攻击 66 断言。
 
-| 维度 | GLM-5.3-Flash | Qwen3.8-Flash | DeepSeek V4.1-Flash | Kimi K3 | 一致性 |
+| # | GLM-5.3-Flash | Qwen3.8-Flash | DeepSeek V4.1-Flash | Kimi K3 | 一致性 |
 |---|---|---|---|---|---|
 | vitest 全量 | 463/463 | 463/463 | 463/463 | 463/463 | 四模型一致 |
 | S3 注入拦截 | 66/66 | 66/66 | 66/66 | 66/66 | 四模型一致 |
@@ -333,7 +316,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 > 看板呈现：`/ai/benchmark`（SuveooBench，12 指标 + 四模型消融对比，数据源 `frontend/assets/data/benchmark.json`）。完整测试方案：[`for_developer/testing_20261002.md`](./for_developer/testing_20261002.md)（v1.1）。
 
-## 快速开始
+## 6. 快速开始
 
 ```bash
 git clone https://github.com/Suveoo/suveoo.git && cd suveoo/backend
@@ -349,7 +332,7 @@ npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 
 完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 
-## 仓库结构
+## 7. 仓库结构
 
 ```
 suveoo/
@@ -376,7 +359,7 @@ suveoo/
 └── .nvmrc
 ```
 
-## 文档地图
+## 8. 文档地图
 
 | 文档                                                                                                                  | 内容 |
 |---------------------------------------------------------------------------------------------------------------------|---|
@@ -384,20 +367,29 @@ suveoo/
 | [docs/architecture.md](./docs/architecture.md) , [docs/core-algorithms.md](./docs/core-algorithms.md)               | 系统架构 / 核心算法 |
 | [docs/security-self-assessment.md](./docs/security-self-assessment.md) , [docs/test-cases.md](./docs/test-cases.md) | 安全自评 / 测试用例说明 |
 
-## 诚实披露
+## 9. 诚实披露
 
 1. 模拟银行系统，全部数据虚构，不涉及真实资金。
 2. 我们不使用没有跑通的技术名词（规则引擎为内联类型化规则表；未实现的能力不写入特性清单）。
 3. P1/P2/P4 延迟受思考型模型固有开销影响，标注为记录型指标而非承诺；唯一设阈值的性能指标是 P3 工具调用（P95 ≤ 800ms，实测 435ms）。
 
-## 许可（License）
+## 10. 许可（License）
 
 本仓库采用 **Suveoo Proprietary License v1.0**（见 [LICENSE](./LICENSE)）：专有许可基线——源码公开供学术与竞赛评审、个人非商业学习实验，以及按 [SECURITY.md](./SECURITY.md) 开展的安全研究；**未经书面授权，禁止任何商业使用与再分发**。专利条款采用许可用途内有限授予 + 防御性终止设计。商用授权事宜请联系 support@suveoo.com。
 
-## 附录
+## 11. 附录
 
 ### Suveoo 技术与架构图像
 ![Architecture](docs/images/readme/suveoo_system_architecture.svg)
+
+### 一套代码，全平台交付
+
+1. **Web**：零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
+2. **Android**（Capacitor 8）：本地资产秒载、生物识别四场景、**后台原生通知服务**、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；**站内链接 100% App 内原生打开 + 站外链接内嵌浏览器**（无 GMS 设备可用——荣耀 V10 真机长期在测试矩阵）。
+3. **Windows / macOS**（Electron 44 双壳同源，`backend/windows/` + `backend/macos/` 七文件逐行同源纪律）：同一 `suveoo-app://local` 安全协议承载前端快照（origin 已入 Worker CORS 白名单，零服务端改动）；三级自动更新（R2 manifest + sha256 校验）、系统通知与未读角标（Toast / 通知中心 + dock）、生物识别（Windows Hello / Touch ID，无传感器自动回落）、外链内嵌浏览器、`suveoo://` 深链与托盘驻留五能力对齐 Android；Windows 安装版/便携版 + macOS DMG/zip 均经 `/download` 分发。
+
+<!-- 插图 10：三端同框 mockup（Web 桌面 + Android 手机 + 平板） -->
+![Multi Platform](docs/images/readme/multi-platform.png)
 
 <div align="center">
 
