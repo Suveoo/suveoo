@@ -1,4 +1,4 @@
-# Suveoo — 跨平台换行与二进制治理（Windows 宿主 / macOS VM / Linux CI 三方协作）
+# Suveoo — 跨平台换行与二进制治理（Windows / macOS  / Linux CI 三方协作）
 # 与 .editorconfig（end_of_line = lf）同源：仓库内一律 LF，Windows 专属脚本除外。
 # 现状核对（2026-10-08）：git index 已全 LF（i/lf ×761 / 二进制 ×168 / i/crlf ×0），
 # 本文件为防护性规则，不产生重整提交。
