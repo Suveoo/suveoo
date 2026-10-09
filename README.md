@@ -121,12 +121,13 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ![AI Voice to Text](docs/images/readme/ai-voice-to-text.png)
 
-7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页**现场故障注入按钮**用于模拟商户履约失败）。
-8. **自动缴费**：cron 引擎（每 5 分钟扫描、北京时区、月末并档、防重键）——生产部署后首个 cron 真实自动扣款两笔（¥286.40 / ¥28,453.27），流水 `channel=auto` 可查。
-9. **全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
+7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页 / 长程任务中心页（[/ai/tasks](https://suveoo.com/ai/tasks)）**现场故障注入按钮**用于模拟商户履约失败）。
 
-<!-- 插图 9：生日订花 Saga + Trust Console 五盏灯截图 -->
 ![Saga Trust Console](docs/images/readme/saga-trust-console.png)
+
+8**全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
+
+[Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.png)
 
 ## 5. 测试与评测体系
 
@@ -354,6 +355,9 @@ suveoo/
 ├── README.md
 ├── SECURITY.md
 ├── LICENSE
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+├── CODEOWNERS
 ├── .gitattributes
 ├── .editorconfig
 ├── .gitignore
