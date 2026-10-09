@@ -47,6 +47,8 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
 
+**三色分级、官方场景全覆盖**：自然语言编译为 BankAction IR，规则引擎确定性三色分级：绿自动执行、黄确认卡（grant 哈希绑定参数）、红邮箱 OTP；63 个工具同走五道验证，六大场景全覆盖，四模型 100% 一致。
+
 ## 3. 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
 ### BankAction IR（金融行为中间表示）
@@ -93,41 +95,41 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 **63 个 MCP 工具**（GREEN 26 / YELLOW 24 / RED 13）覆盖查询、转账、账单、理财、卡片、订阅、缴费、任务、计算器、账户管理、产品动态组合拼装、主动提议、站点指南——全部走同一 IR → 五道管线。
 
 <!-- 插图 5：AI 对话界面截图（深色/浅色对话 + 内嵌计算器 + 确认卡同框） -->
-![Suveoo AI logo](docs/images/readme/suveoo-ai-logo.png)
+![Suveoo AI logo](docs/images/readme/suveoo-ai-logo.webp)
 
 ### Suveoo AI 代表性能力
 
 1. **对话即方案的动态产品拼装**："5 万闲钱半年后买车" → 分析顾客资金状况与目标，加权拼装存款阶梯 + 期限封顶基金层 + 货币基金流动性层等理财产品 → 一键打包组合购买（两段式 grant + PR 适当性 + 若部分失败则按成本回退）。
 
-![Dynamic Solution Packaging](docs/images/readme/dynamic-solution-packaging.png)
+![Dynamic Solution Packaging](docs/images/readme/dynamic-solution-packaging.webp)
 
 2. **组合操作 DAG**：说"默认卡给张三转账 120，再冻结尾号 8317，同时挂失尾号 2323 补办"→ `plan_preview` 输出组合方案卡（整卡=最高颜色级别、金额合计判红、**红级一次性 OTP**）→ `batch_execute` 逐项执行，一次性完成用户多项需求（期间失败即停）。
 
-![Complex Requirements DAG](docs/images/readme/complex-requirements-dag.png)
+![Complex Requirements DAG](docs/images/readme/complex-requirements-dag.webp)
 
 3. **模糊表达与反问澄清**：说"挂失尾号 6792 的卡，帮我补办" → AI 核对卡片、查状态 → **反问邮寄地址并明言"我不能代填"** → 手续、工本、邮寄费用三项合计 ¥53 → OTP 验证码与挂失后流程告知。
 
-![Clarification Questioning](docs/images/readme/clarification-questioning.png)
+![Clarification Questioning](docs/images/readme/clarification-questioning.webp)
 
 4. **站内计算工具调用与直接渲染**：10 个金融计算器（复利/贷款/攒目标/还款/退休/通胀/分账/存款/汇率/预算）。回答内嵌"图形化计算器"按钮卡，且**对话气泡内直接注水渲染完整可交互计算器**（深链参数回填、改输入即时重算）；三方一致性体检（AI 回答 = /mcp 返回 = 页面 DOM）**10/10 一致**。
 
-![Tool Call Calculation and Rendering](docs/images/readme/tool-call-calculation-and-rendering.png)
+![Tool Call Calculation and Rendering](docs/images/readme/tool-call-calculation-and-rendering.webp)
 
 5. **AI 主动银行**：规则引擎扫描沉睡订阅/周期转账/自动扣款/还款/闲钱理财/产品推荐 → 提议清单 + **站内/客户端推送/Email 三路提醒**；Suveoo AI 页顾客提问前先主动依据实情推荐产品；特制"AI 提议"页面，汇总各项 AI 建议、当月省下金额、当月办妥事项、自动打理惯例；多页面内嵌"AI 洞察"板块，点击对应提议直发 AI，一条龙办完。
 
-![Proactive AI Banking](docs/images/readme/proactive-ai-banking.png)
+![Proactive AI Banking](docs/images/readme/proactive-ai-banking.webp)
 
 6. **语音输入**：阿里云实时 ASR + Web Speech 双通道，已注入 1,200 常用词汇与专业表述。
 
-![AI Voice to Text](docs/images/readme/ai-voice-to-text.png)
+![AI Voice to Text](docs/images/readme/ai-voice-to-text.webp)
 
 7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页 / 长程任务中心页（[/ai/tasks](https://suveoo.com/ai/tasks)）**现场故障注入按钮**用于模拟商户履约失败）。
 
-![Saga Trust Console](docs/images/readme/saga-trust-console.png)
+![Saga Trust Console](docs/images/readme/saga-trust-console.webp)
 
 8**全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
 
-[Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.png)
+[Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.webp)
 
 ## 5. 测试与评测体系
 
