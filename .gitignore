@@ -69,3 +69,5 @@ backend/android/app/src/main/assets/public/
 # ===== 第一百二十五轮：安全审计临时产物（含会话令牌/APK 大件，永不入库） =====
 .apkaudit/
 .audit9/
+# NSIS 安装包解包临时目录（发布会垃圾，勿入库）
+backend/windows/nsis-decomp/
