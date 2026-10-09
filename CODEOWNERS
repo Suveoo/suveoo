@@ -1,0 +1,39 @@
+# Suveoo — CODEOWNERS（代码所有者）
+# ============================================================
+# 语法：每行 = 文件模式 + 一个或多个所有者（@用户名 或 @组织/团队）；
+#       模式遵循 .gitignore 规则；**后行规则优先于先行**（宽规则在上、覆盖规则在下）；
+#       本文件须位于默认分支（main）方可生效。
+# 参考：https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# 当前为单一维护者；协作者加入后按区域在对应条目追加 @username，
+# 并可在 Settings → Branches → main 保护规则中启用
+# "Require review from Code Owners" 使评审强制生效。
+
+# —— 默认：全部路径 ——
+*                               @perishability
+
+# —— 核心后端（BankAction IR + 五道确定性验证 + DO 账本 + MCP）——
+/backend/worker-main.js         @perishability
+/backend/wrangler.toml          @perishability
+/backend/tests/                 @perishability
+
+# —— 前端（零构建 MPA，Web/Android/Windows/macOS 四端共用）——
+/frontend/                      @perishability
+
+# —— 三端客户端壳（Windows/macOS 双壳七文件同源纪律：
+#     protocol / preload / ipc / navigation / smoke / qa-shot / e2e-driver）——
+/backend/android/               @perishability
+/backend/windows/               @perishability
+/backend/macos/                 @perishability
+
+# —— 安全与仓库工程（许可/披露策略/CI 与模板的变更需维护者本人评审）——
+/LICENSE                        @perishability
+/SECURITY.md                    @perishability
+/CONTRIBUTING.md                @perishability
+/CODE_OF_CONDUCT.md             @perishability
+/CODEOWNERS                     @perishability
+/.github/                       @perishability
+
+# —— 基础设施与部署 ——
+/DEPLOYMENT.md                  @perishability
+/backend/scripts/               @perishability
