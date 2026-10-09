@@ -59,15 +59,31 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ```json
 {
-  "trace_id": "bai_8f7a29e1",
-  "intent": "transfer_execute",
-  "facts": [{ "value": "张三", "provenance": "user_input", "trust": "TRUSTED" }],
-  "steps": [{ "op": "transfer_execute", "params": { "recipient": "payee:42", "amount": "500.00" }, "dep": ["contacts_search"] }],
-  "risk": { "tier": "YELLOW", "reasons": [] },
-  "preconditions": ["balance >= amount", "recipient.status == ACTIVE"],
-  "compensation": ["unlock_funds"]
+  "ir_version": 1,
+  "trace_id": "bai_7be15f6631",
+  "nonce": "db2b86ba9fa9d432599a9b1fc3636146",
+  "intent": "scheduled_task_create",
+  "user_id": "U100004",
+  "channel": "ai",
+  "model": "glm",
+  "risk": {"tier": "YELLOW", "reasons": []},
+  "facts": [
+    {"field": "execute_at",  "value": "2026-10-09T16:30:00+08:00", "provenance": "user_input", "trust": "TRUSTED"},
+    {"field": "repeat", "value": "once", "provenance": "user_input", "trust": "TRUSTED"},
+    {"field": "task_type", "value": "scheduled_transfer", "provenance": "user_input", "trust": "TRUSTED"},
+    {"field": "title", "value": "给林芷晴转账35.88（周末饭钱AA）", "provenance": "user_input", "trust": "TRUSTED"},
+    {"field": "transfer", "value": "{\"amount\":\"35.88\",\"memo\":\"周末饭钱AA\",\"recipient_account\":\"6222880177757477\",\"recipient_name\":\"林芷晴\"}", "provenance": "user_input", "trust": "TRUSTED"},
+    {"field": "amount", "value": "35.88", "provenance": "user_input", "trust": "TRUSTED"}
+  ],
+  "steps": [{ "op": "scheduled_task_create" }],
+  "preconditions": [],
+  "compensation": ["scheduled_task_cancel"],
+  "created_at": "2026-10-09T04:46:13.641Z",
+  "expires_at": "2026-10-09T04:56:13.641Z"
 }
 ```
+
+> 案例中人物与场景均经虚构处理，未涉及任何团队及他人的隐私
 
 ### Suveoo Verification Runtime 五道确定性验证
 
@@ -122,6 +138,8 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 6. **语音输入**：阿里云实时 ASR + Web Speech 双通道，已注入 1,200 常用词汇与专业表述。
 
 ![AI Voice to Text](docs/images/readme/ai-voice-to-text.webp)
+
+> 案例中人物与场景均经虚构处理，未涉及任何团队及他人的隐私
 
 7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页 / 长程任务中心页（[/ai/tasks](https://suveoo.com/ai/tasks)）**现场故障注入按钮**用于模拟商户履约失败）。
 
