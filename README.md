@@ -9,7 +9,7 @@
 
 </div>
 
-**目录**：[1 关于](#1-关于) · [2 Suveoo AI 概览](#2-suveoo-ai-概览) · [3 Suveoo AI 安全内核](#3-安全内核bankAction-ir-与-suveoo-verification-runtime) · [4 Suveoo AI 自然语言驱动全行业务](#4-suveoo-ai自然语言驱动全行业务) · [5 Suveoo AI 测试与评测体系](#5-测试与评测体系) · [6 快速开始](#6-快速开始) · [7 仓库结构](#7-仓库结构) · [8 文档地图](#8-文档地图) · [9 诚实披露](#9-诚实披露) · [10 许可（License）](#10-许可license) · [11 附录](#11-附录)
+**目录**：[1 关于](#1-关于) · [2 Suveoo AI 概览](#2-suveoo-ai-概览) · [3 Suveoo AI 安全内核](#3-suveoo-ai-安全内核bankaction-ir-与-suveoo-verification-runtime) · [4 Suveoo AI 自然语言驱动全行业务](#4-suveoo-ai自然语言驱动全行业务) · [5 Suveoo AI 测试与评测体系](#5-suveoo-ai-测试与评测体系) · [6 快速开始](#6-快速开始) · [7 仓库结构](#7-仓库结构) · [8 文档地图](#8-文档地图) · [9 诚实披露](#9-诚实披露) · [10 许可（License）](#10-许可license) · [11 附录](#11-附录)
 
 ---
 
@@ -49,7 +49,7 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **三色分级、官方场景全覆盖**：自然语言编译为 BankAction IR，规则引擎确定性三色分级：绿自动执行、黄确认卡（grant 哈希绑定参数）、红邮箱 OTP；63 个工具同走五道验证，六大场景全覆盖，四模型 100% 一致。
 
-## 3. 安全内核：BankAction IR 与 Suveoo Verification Runtime
+## 3. Suveoo AI 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
 ### BankAction IR（金融行为中间表示）
 
@@ -131,7 +131,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 [Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.webp)
 
-## 5. 测试与评测体系
+## 5. Suveoo AI 测试与评测体系
 
 测试分三层，全部可复现、证据落盘：
 
