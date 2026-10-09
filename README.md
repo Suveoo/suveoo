@@ -145,9 +145,9 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ![Saga Trust Console](docs/images/readme/saga-trust-console.webp)
 
-8**全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
+8. **全站知识注入**：76 页站点指南作为 GREEN 工具（site_guide），AI 回答"某功能在哪"只引用真实路由——提示词铁律"绝不自造任何 URL"被单测锁定。
 
-[Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.webp)
+![Data Scraping and Cleaning](docs/images/readme/data-scraping-and-cleaning.webp)
 
 ## 5. Suveoo AI 测试与评测体系
 
