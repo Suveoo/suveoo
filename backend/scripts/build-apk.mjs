@@ -78,6 +78,6 @@ execFileSync("cmd.exe", ["/c", path.join(ANDROID, "gradlew.bat"), "assembleRelea
 const apk = path.join(ANDROID, "app/build/outputs/apk/release/app-release.apk");
 if (!existsSync(apk)) throw new Error("APK not found");
 mkdirSync(OUT, { recursive: true });
-const dest = path.join(OUT, "Suveoo-v3.185.0.apk");
+const dest = path.join(OUT, "Suveoo-v3.186.0.apk");
 cpSync(apk, dest);
 console.log(`✓ APK ${(statSync(dest).size / 1024 / 1024).toFixed(1)} MB → ${dest}`);

@@ -58,6 +58,8 @@ run(RCEDIT, [
   "--set-icon", path.join(ROOT, "build", "icon.ico"),
   "--set-version-string", "ProductName", "Suveoo",
   "--set-version-string", "FileDescription", "Suveoo — Agentic Banking Control Plane",
+  "--set-version-string", "CompanyName", "Suveoo Team",
+  "--set-version-string", "OriginalFilename", "Suveoo.exe",
   "--set-file-version", `${V}.0`,
   "--set-product-version", `${V}.0`,
 ]);

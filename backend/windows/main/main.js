@@ -19,8 +19,14 @@ const { registerCapacitorIpc } = require("./ipc");
 const APP_START = "/home/index.html"; // 与 Android capacitor.config.json appStartPath 一致
 const APP_VERSION = app.getVersion ? app.getVersion() : require("../package.json").version;
 const faviconDir = () => path.join(protocol.frontendDir(), "favicon");
+/* 应用图标（ico 多尺寸）：打包态=resources/icon.ico（extraResources），开发态=build/icon.ico */
+const APP_ICON = path.join(process.resourcesPath || path.join(__dirname, ".."), "icon.ico");
 
 if (process.argv.includes("--smoke")) process.env.SVEOO_SMOKE = "1"; // 冒烟跳过壳注入口（解耦线上 manifest）
+
+/* 第一百六十轮终六：AUMID 必须尽早设置（模块顶层、ready 前）——Windows 用它归属 Toast/任务栏；
+ * 配合安装器写入的 AppUserModelId 注册表项（DisplayName/IconUri）通知中心才能显示 Suveoo 而非 Electron */
+if (process.platform === "win32") app.setAppUserModelId("com.suveoo.app");
 
 // 安全协议注册（必须在 app ready 之前）
 protocol.registerSchemesAsPrivileged();
@@ -84,7 +90,7 @@ if (!gotLock) {
       minHeight: 680,
       show: false,
       autoHideMenuBar: true,
-      icon: nativeImage.createFromPath(path.join(faviconDir(), "favicon-128x128.png")),
+      icon: nativeImage.createFromPath(require("fs").existsSync(APP_ICON) ? APP_ICON : path.join(faviconDir(), "favicon-128x128.png")), /* ico 优先（多尺寸，任务栏/通知更清晰）；打包态 resources/icon.ico */
       backgroundColor: "#FFFFFF",
       title: "Suveoo",
       webPreferences: {
@@ -115,7 +121,6 @@ if (!gotLock) {
   app.whenReady().then(() => {
     protocol.registerProtocolHandler();
     Menu.setApplicationMenu(null); // 无原生菜单栏（autoHideMenuBar + 空 Menu，Alt 不弹）
-    app.setAppUserModelId("com.suveoo.app"); // Windows Toast 归属（通知中心按应用聚合）
 
     ipcMain.handle("app:version", () => APP_VERSION);
     ipcMain.handle("app:platform", () => "windows");

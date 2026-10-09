@@ -1,13 +1,22 @@
 ; Suveoo for Windows — NSIS 定制：suveoo:// 深链协议注册（HKCU 用户级，免管理员）
 !macro customInstall
+  ; 第一百六十轮终六：AUMID 注册表项——Windows 解析 Toast/任务栏归属时读
+  ; HKCU\Classes\AppUserModelId\{AUMID} 的 DisplayName/IconUri；
+  ; 仅有 setAppUserModelId 而无此键时，通知中心图标与应用名兜底显示 Electron（队长 3.185.0 实测）。
+  WriteRegExpandStr HKCU "Software\Classes\AppUserModelId\com.suveoo.app" "DisplayName" "Suveoo"
+  WriteRegExpandStr HKCU "Software\Classes\AppUserModelId\com.suveoo.app" "IconUri" "$INSTDIR\resources\icon.ico"
   WriteRegStr HKCU "Software\Classes\suveoo" "" "URL:Suveoo Protocol"
   WriteRegStr HKCU "Software\Classes\suveoo" "URL Protocol" ""
   WriteRegStr HKCU "Software\Classes\suveoo\DefaultIcon" "" "$INSTDIR\Suveoo.exe,0"
   WriteRegStr HKCU "Software\Classes\suveoo\shell\open\command" "" '"$INSTDIR\Suveoo.exe" "%1"'
+  ; 第一百六十轮终八（P0 回撤）：曾在此处 taskkill explorer + 重启以刷新品牌缓存——队长实测
+  ; 在其机器上重启失败致桌面全黑/Explorer 消失（本机通过纯属侥幸）。已彻底移除：
+  ; 品牌缓存改为"自然自愈"——注册表已为 REG_EXPAND_SZ，注销/重启/Explorer 重启后即显示 Suveoo。
 !macroend
 
 !macro customUnInstall
   DeleteRegKey HKCU "Software\Classes\suveoo"
+  DeleteRegKey HKCU "Software\Classes\AppUserModelId\com.suveoo.app"
   ; 卸载全程留痕（%TEMP%\suveoo-uninstall-trace.txt）——升级链排障用（队长实测弹窗根因排查期加入）
   nsExec::Exec `"$SYSDIR\cmd.exe" /c echo [%DATE% %TIME%] un.install end reached>>"%TEMP%\suveoo-uninstall-trace.txt"`
 !macroend

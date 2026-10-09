@@ -6,7 +6,7 @@
  * origin）相对 /dl/ 会落到本地资产 404；Windows/macOS 壳内点按钮由主进程 /dl/ 拦截转下载流。 */
 S.router.register("download", async () => {
   const c = document.getElementById("content");
-  const FALLBACK = {"file":"Suveoo-v3.185.0.apk","url":"/dl/Suveoo-v3.185.0.apk","version":"3.185.0","versionCode":80,"minVersionCode":0,"sizeBytes":36951509,"sha256":"b22a2e7a861817dbcc382567e38b79941a3ae554c216994e20b0be7b3ea1a9bc","releasedAt":"2026-10-08","minAndroid":"7.0"};
+  const FALLBACK = {"file":"Suveoo-v3.186.0.apk","url":"/dl/Suveoo-v3.186.0.apk","version":"3.186.0","versionCode":81,"minVersionCode":0,"sizeBytes":36951513,"sha256":"8e94d19831ed6ba132154fba655f6b461cd7cbb5485af55744243feb11ede499","releasedAt":"2026-10-09","minAndroid":"7.0"};
   const base = (S.api && S.api.base) || "";
   const mb = (n) => (n ? (n / 1024 / 1024).toFixed(1) + " MB" : "—");
   let m = FALLBACK;
