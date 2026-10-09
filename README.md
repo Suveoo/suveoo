@@ -45,11 +45,13 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **Suveoo AI 的解决方案及核心技术**：任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
 
-**Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#测试与评测体系)）。
+**Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#5-suveoo-ai-测试与评测体系)）。
 
 **三色分级、官方场景全覆盖**：自然语言编译为 BankAction IR，规则引擎确定性三色分级：绿自动执行、黄确认卡（grant 哈希绑定参数）、红邮箱 OTP；63 个工具同走五道验证，六大场景全覆盖，四模型 100% 一致。
 
 ## 3. Suveoo AI 安全内核：BankAction IR 与 Suveoo Verification Runtime
+
+用户 REST 表单、AI 对话、MCP 请求 —— 这些异构的原始意图都被统一编译为一份结构化中间表示 —— BankAction IR。IR 随即进入 Suveoo Verification Runtime，依序接受五道确定性检验；任何一道不过，请求即被结构化拒绝，连请求授权的资格都没有。黄/红级操作触发 Verified GenUI 确认卡，卡上数据只来自服务端签发的授权快照，用户确认的正是这份快照而非一句“确认”；红级再叠加手机号/邮箱验证码强验证。通过全部检验的 IR 才交由账本执行层原子执行，结果由系统回填，模型无法自造交易结果；全程审计逐笔留痕，用户可在安全中心自查每一笔操作的前因后果。
 
 ### BankAction IR（金融行为中间表示）
 
@@ -97,7 +99,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 | 4 | **Invariants** | bigint 整数分单位的守恒 / 适当性 / 余额断言——纯函数，不是"AI 觉得没问题" | 金融数学错误 |
 | 5 | **Replay / Idempotency** | trace_id + nonce 查重，重放即拒 | 重复扣款 |
 
-### 其他安全保障
+### 其他安全保障机制
 
 1. **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
 2. **Verified GenUI**：确认卡上渲染的金额/收款人/费用**只来自已验证的 IR 快照**（`issuer === "verified_ir"`），"界面显示 ¥500、后端转 ¥5000"从架构上被堵死。13 个验证组件覆盖全部写操作形态。
