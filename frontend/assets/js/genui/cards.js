@@ -118,14 +118,26 @@ S.genuiCards = {
     /* "ALL" 全额赎回占位按文案显示；既无金额也无 ALL（退订/开关类操作）不渲染金额行——
        此前误落 genui.redeemAll 把退订确认卡显示成"全部持仓"（第六期 idle 生产实测抓出，存量 bug） */
     const amtText = rawAmt != null && /^\d+(\.\d{1,2})?$/.test(String(rawAmt)) ? `¥ ${S.fmt.moneyPlain(rawAmt)}` : (String(rawAmt) === "ALL" ? S.t("genui.redeemAll") : null);
+    /* 换汇卡主数值按方向：购汇=人民币支出 / 结汇=卖出外币（修复前 sell 侧只显折合 ¥、方向与对侧金额全缺） */
+    const fxAmtText = c.action === "fx_exchange"
+      ? (p.direction === "sell" ? `${p.amount_foreign ?? "?"} ${p.currency ?? ""}` : `¥ ${S.fmt.moneyPlain(p.amount_cny)}`)
+      : null;
     /* 转账确认卡：收款方已通过真实性校验（服务端 genuiCardFor 附带 verified） */
     const verifiedBadge = c.action == null || c.action === "transfer_execute" ? (c.params?.verified ? ` ${S.ui.badge(S.t("genui.verified"), "badge-green")}` : "") : "";
     return `<div class="genui-card">
       <div class="gc-head">${S.ui.icon(meta.icon, 16)} <span class="gc-title">${S.t(titleKey)}</span> ${S.ui.tierBadge(c.tier)}${verifiedBadge}</div>
-      ${amtText ? `<div class="gc-amount">${amtText}</div>` : ""}
+      ${(fxAmtText ?? amtText) ? `<div class="gc-amount">${fxAmtText ?? amtText}</div>` : ""}
       ${S.genuiCards.kv([
         ...(fieldKey && subject != null ? [[S.t(fieldKey), subject]] : []),
         ...(p.from_card_display != null ? [[S.t("genui.fromCard"), p.from_card_display]] : []),
+        /* 第一百六十三轮：换汇卡字段化——方向（购汇/结汇）、币种、对侧折合金额、成交牌价。
+           此前方向整行缺失、币种行是硬编码英文 "Currency"，sell 侧所卖外币数量无处可见。 */
+        ...(c.action === "fx_exchange" ? [
+          [S.t("genui.fxDirection"), p.direction === "sell" ? S.t("genui.fxSell") : S.t("genui.fxBuy")],
+          [S.t("genui.fxCurrency"), p.currency ?? "—"],
+          [S.t("genui.fxConverted"), p.direction === "sell" ? `¥ ${S.fmt.moneyPlain(p.amount_cny)}` : `${p.amount_foreign ?? "?"} ${p.currency ?? ""}`],
+          ...(p.rate_used != null ? [[S.t("genui.fxRate"), `${p.rate_used}${p.currency === "JPY" ? S.t("genui.fxPer100") : ""}`]] : []),
+        ] : []),
         ...(c.action === "card_loss_report" ? [
           [S.t("genui.lossReplace"), p.replace_new ? S.t("genui.lossRepYes") : S.t("genui.lossRepNo")],
           ...(p.mail_to != null ? [[S.t("genui.lossMailTo"), p.mail_to]] : []),
@@ -156,7 +168,6 @@ S.genuiCards = {
           [S.t("genui.goalMonthlyNew"), "¥" + S.fmt.moneyPlain(p.monthly_plan)],
         ] : []),
         ...(meta.fee ? [[S.t("genui.fee"), "¥0.00"]] : []),
-        ...(p.currency != null ? [["Currency", p.currency]] : []),
         [S.t("genui.trace"), c.trace_id ?? "—"],
       ])}
       ${c.action === "solution_package_purchase" && Array.isArray(p.items) ? `<div class="sol-lines">

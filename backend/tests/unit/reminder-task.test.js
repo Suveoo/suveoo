@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hardPolicyDenials, checkInvariants, compileToIR, AI_SYSTEM_PROMPT, MCP_TOOLS } from "../../worker-main.js";
+import { hardPolicyDenials, checkInvariants, compileToIR, AI_SYSTEM_PROMPT, systemPromptWithDate, MCP_TOOLS } from "../../worker-main.js";
 
 /* 第二十轮：提醒类长程任务（task_type=reminder，无资金语义）豁免金额硬校验；
    预约转账等既有 amountArg 语义不变。 */
@@ -58,14 +58,26 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
     ["专业语气称您", "专业克制、称"],
     ["危机不机械拒答", "不机械拒答、暂停办理"],
     ["危机转人工", "转人工客服"],
+    /* 第一百六十二轮：光杆人名提问（"顾清羽的账户里有多少钱"）曾被当作问本人——
+       模型需要当前客户实名作比对基准，规则 13 查询主语核验 */
+    ["查询主语核验", "查询主语核验"],
+    ["查询只作用本人", "只作用于当前登录客户本人"],
+    ["他人账户拒绝话术", "我无法查询他人账户"],
+    ["本人数据不作他人答复", "绝不把本人数据当作该人数据答复"],
   ];
   it("包含全部安全语义关键句", () => {
     for (const [name, phrase] of MUST_CONTAIN) {
       expect(AI_SYSTEM_PROMPT, `缺失语义：${name}`).toContain(phrase);
     }
   });
-  it("提示词瘦身达标（≤2050 字符；第二十七轮 1500→1600；第五期 idle 1600→2050：规则 11 对话即方案为赛题创新必需项）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2050);
+  it("提示词瘦身达标（≤2200 字符；第二十七轮 1500→1600；第五期 idle 1600→2050；第一百六十二轮 2050→2198：规则 13 查询主语核验（148 字）为数据隔离语义层必需项）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2200);
+  });
+  it("systemPromptWithDate 注入当前客户实名（规则 13 的比对基准）", () => {
+    expect(systemPromptWithDate("顾清羽")).toContain("当前登录客户实名：顾清羽");
+    expect(systemPromptWithDate("顾清羽")).toContain("查询主语核验");
+    expect(systemPromptWithDate()).not.toContain("当前登录客户实名：");
+    expect(systemPromptWithDate("  ")).not.toContain("当前登录客户实名：");
   });
   it("工具 desc 总量预算（≤7200 字符；第十一期 40→47；第五期 52→54；第一百零五轮 54→60；第一百二十六轮 +card_loss 三工具 60→63，6800→7200）", () => {
     expect(MCP_TOOLS).toHaveLength(63); /* 第一百零五轮 +plan_preview/batch_execute；第一百二十六轮 +card_loss 三工具 */

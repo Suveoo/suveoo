@@ -106,11 +106,11 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 
 三端壳（Android Capacitor / Windows / macOS Electron）不引入新的信任面，边界如下（均有单测或实机 E2E 佐证）：
 
-| 面 | 机制 | 佐证 |
-|---|---|---|
-| 壳 origin CORS | Worker `SHELL_ORIGINS` 白名单仅五源（localhost ×2 / capacitor://localhost / suveoo.local / suveoo-app://local），双 Electron 壳共用同 origin，零新增服务端改动 | E2E 实测壳内 API 全通；Web 同源零影响 |
-| 本地资产协议 | 自定义特权协议防路径穿越（解析序 `[p, p/index.html, p.html]` 复刻 Worker）；**动态路由重写镜像**（卡片 slug / `/ai/s/{sid}` / 卡面图旧路径）三壳与 Worker 逐条一致——防"壳内 404 被当缺陷"与"壳路由偏离服务端语义" | windows/macos 各 5 例 resolveAsset 级单测 |
+| 面 | 机制 | 佐证                                     |
+|---|---|----------------------------------------|
+| 壳 origin CORS | Worker `SHELL_ORIGINS` 白名单仅五源（localhost ×2 / capacitor://localhost / suveoo.local / suveoo-app://local），双 Electron 壳共用同 origin，零新增服务端改动 | E2E 实测壳内 API 全通；Web 同源零影响              |
+| 本地资产协议 | 自定义特权协议防路径穿越（解析序 `[p, p/index.html, p.html]` 复刻 Worker）；**动态路由重写镜像**（卡片 slug / `/ai/s/{sid}` / 卡面图旧路径）三壳与 Worker 逐条一致——防"壳内 404 被当缺陷"与"壳路由偏离服务端语义" | windows/macos 各 5 例 resolveAsset 级单测   |
 | 更新链 | 下载仅 https + suveoo.com 域白名单（拒环回/私网）→ sha256 必校验 → 仅执行自家 updates 目录内的安装器（`shell.openPath` 唤起系统安装器，无子进程执行）→ manifest 强制线 minVersionCode 可远程抬升 | S5 探针实测（evil.com 拒绝 / 错 sha256 拒绝且零残留） |
-| 渲染层输入 | IPC 路由白名单 16 方法 + 入参形状校验（渲染进程输入不可信）；preload 显式方法对象（contextBridge 不能传 Proxy——结构化克隆摊平） | windows/macos ipc-schema 单测 |
-| 凭据存储 | 生物识别走系统级（Android BiometricPrompt / Windows Hello UserConsentVerifier / Touch ID），凭据 safeStorage 加密落盘（DPAPI / Keychain）；无传感器自动回落密码/OTP，不降级安全语义 | 四场景语义对齐实测；VM 无 Touch ID 回落路径实测 |
-| 测试凭据 | E2E 账户凭据走 gitignored `e2e-creds.json`（不入源码不入 Git）；OTP 走本地文件通道 | .gitignore 三壳规则 |
+| 渲染层输入 | IPC 路由白名单 16 方法 + 入参形状校验（渲染进程输入不可信）；preload 显式方法对象（contextBridge 不能传 Proxy——结构化克隆摊平） | windows/macos ipc-schema 单测            |
+| 凭据存储 | 生物识别走系统级（Android BiometricPrompt / Windows Hello UserConsentVerifier / Touch ID），凭据 safeStorage 加密落盘（DPAPI / Keychain）；无传感器自动回落密码/OTP，不降级安全语义 | 四场景语义对齐实测；无 Touch ID 主机回落路径实测          |
+| 测试凭据 | E2E 账户凭据走 gitignored `e2e-creds.json`（不入源码不入 Git）；OTP 走本地文件通道 | .gitignore 三壳规则                        |

@@ -135,3 +135,53 @@ describe("① 缓存头、内容类型与条件请求", () => {
     expect(post.status).toBe(405);
   });
 });
+
+describe("① PDF 交付物直链（frontend/docs/ 技术文档 · 安全自评）", () => {
+  beforeAll(async () => {
+    /* 21MB 级真实文件用头部字节做 fixture 即可——测的是路由/头语义，不是内容 */
+    await put("docs/suveoo-technical-documentation.pdf", "%PDF-1.4 tech-doc-fixture", "application/pdf");
+    await put("docs/suveoo-security-self-assessment.pdf", "%PDF-1.4 sec-report-fixture", "application/pdf");
+    /* 模拟历史脏元数据：customMetadata 写 octet-stream，仍必须被 pdf 规则强制为 application/pdf */
+    await env.ASSETS.put("docs/stale-meta.pdf", "%PDF-1.4 stale", { customMetadata: { contentType: "application/octet-stream" } });
+  });
+
+  it("200 + application/pdf + inline 展示 + accept-ranges（无需下载）", async () => {
+    const r = await get("/docs/suveoo-technical-documentation.pdf");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("application/pdf");
+    expect(r.headers.get("content-disposition")).toBe('inline; filename="suveoo-technical-documentation.pdf"');
+    expect(r.headers.get("accept-ranges")).toBe("bytes");
+    expect(await r.text()).toContain("%PDF-1.4");
+    const s = await get("/docs/suveoo-security-self-assessment.pdf");
+    expect(s.status).toBe(200);
+    expect(s.headers.get("content-type")).toBe("application/pdf");
+  });
+
+  it("脏元数据（octet-stream）也被强制为 application/pdf", async () => {
+    const r = await get("/docs/stale-meta.pdf");
+    expect(r.headers.get("content-type")).toBe("application/pdf");
+  });
+
+  it("单段 Range → 206 + content-range（PDF 查看器渐进加载）", async () => {
+    const r = await get("/docs/suveoo-technical-documentation.pdf", { range: "bytes=0-4" });
+    expect(r.status).toBe(206);
+    expect(r.headers.get("content-range")).toMatch(/^bytes 0-4\/\d+$/);
+    expect(await r.text()).toBe("%PDF-");
+  });
+
+  it("短链别名 301 → 规范 .pdf（去扩展名 / 短名 / 尾斜杠 / 大小写）", async () => {
+    const cases = [
+      ["/docs/technical", "/docs/suveoo-technical-documentation.pdf"],
+      ["/docs/suveoo-technical-documentation", "/docs/suveoo-technical-documentation.pdf"],
+      ["/docs/security", "/docs/suveoo-security-self-assessment.pdf"],
+      ["/docs/suveoo-security-self-assessment", "/docs/suveoo-security-self-assessment.pdf"],
+      ["/docs/Technical/", "/docs/suveoo-technical-documentation.pdf"],
+    ];
+    for (const [from, to] of cases) {
+      const r = await SELF.fetch(BASE + from, { redirect: "manual" });
+      expect(r.status, `${from} 应 301`).toBe(301);
+      expect(r.headers.get("location"), `${from} → ${to}`).toBe(to);
+    }
+  });
+});
+

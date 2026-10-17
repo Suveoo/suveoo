@@ -66,6 +66,7 @@ const CONTENT_TYPES = {
   ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon",
   ".ttf": "font/ttf", ".woff": "font/woff", ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8", ".xml": "application/xml; charset=utf-8",
+  ".pdf": "application/pdf",
 };
 
 /* 2026-10-02 第六十九轮教训：walk 必须跳过点开头目录——.mimosa 工具缓存曾被当资产上传

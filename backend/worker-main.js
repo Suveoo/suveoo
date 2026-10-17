@@ -2190,6 +2190,19 @@ async function preValidateIntent(env, ctxInfo, intent, args) {
     args.pay_card_display = `${pay.kind === "credit" ? "信用卡" : "借记卡"}${pay.alias ? `「${pay.alias}」` : ""}（尾号 ${String(pay.number).slice(-4)}）`;
     return null;
   }
+  /* 换汇参数归一进预检（第一百六十三轮）：组合项与单工具同规——plan_preview 阶段即钉死
+     direction/currency/amount_cny/amount_foreign/rate_used。此前组合链路缺归一：确认卡金额恒"?"、
+     方向字段反写，batch 执行端 toCents(undefined) 亦必败。REST/单工具入口已各自归一，此处幂等
+     （sell 双轮归一同式：amount_foreign 优先，重算结果一致）。 */
+  if (intent === "fx_exchange") {
+    const n = await fxNormalizeArgs(env, args);
+    if (n.err) {
+      const body = await n.err.json();
+      return { code: body.error?.code ?? "FX_INVALID", status: n.err.status ?? 400, message: body.error?.message ?? "换汇参数无效" };
+    }
+    Object.assign(args, n.args);
+    return null;
+  }
   if (intent === "transfer_execute") {
     if (args.recipient != null && typeof args.recipient === "object") return reject("INVALID_CARD_FORMAT"); // 对象形收款人（模型偶发）：显式拒绝，不留畸形参数通道
     const rec0 = String(args.recipient ?? "");
@@ -5041,7 +5054,11 @@ async function genuiCardFor(env, ctxInfo, g) {
       if (intent === "card_loss_report") disp.pay_card_display = cardDisp(args.pay_card);
       const amtArg = TOOL_REGISTRY[intent]?.amountArg;
       const amt = amtArg && args[amtArg] ? (String(args[amtArg]).toUpperCase() === "ALL" ? "全部持仓" : "¥ " + args[amtArg]) : null;
-      return { idx: i, intent, tier: t, summary: batchItemSummary(env, intent, args), amount_text: amt, fields: batchItemFields(intent, disp, { cardName: disp.card_display ?? null }), args };
+      /* 换汇主数值按方向：buy=人民币支出 / sell=卖出外币（amountArg 的 ¥ 前缀口径不适用于 sell 侧） */
+      const amtFx = intent === "fx_exchange"
+        ? (args.direction === "sell" ? `${args.amount_foreign ?? "?"} ${args.currency ?? ""}` : "¥ " + (args.amount_cny ?? "?"))
+        : null;
+      return { idx: i, intent, tier: t, summary: batchItemSummary(env, intent, args), amount_text: amtFx ?? amt, fields: batchItemFields(intent, disp, { cardName: disp.card_display ?? null }), args };
     });
     return { component: "operations_package", issuer: "verified_ir", tier: g.tier, action: "batch_execute", snapshot: snap, grant_hash: g.grant.grant_hash, expires_at: g.grant.expires_at, params: { items }, trace_id: g.ir.trace_id };
   }
@@ -5053,7 +5070,7 @@ async function genuiCardFor(env, ctxInfo, g) {
 
 /* 第一百零零六轮：组合项结构化表单字段（key 由前端 i18n 映射标签；value 为可直接展示的串）。
  * 卡片从文本摘要改为精致表单——每项 = 头部（意图+徽章+主数值）+ label/value 行（.gc-kv 同款）。 */
-function batchItemFields(intent, a, { cardName = null } = {}) {
+export function batchItemFields(intent, a, { cardName = null } = {}) {
   const A = a ?? {};
   const f = [];
   const push = (k, v) => { if (v != null && String(v) !== "") f.push([k, String(v)]); };
@@ -5146,9 +5163,19 @@ function batchItemFields(intent, a, { cardName = null } = {}) {
         push("id", "#" + (A.goal_id ?? "?"));
         break;
       case "fx_exchange":
-        push("direction", A.direction === "sell" ? "购汇" : "结汇");
-        push("amount", "¥ " + (A.amount ?? "?"));
-        push("product", A.currency ?? "");
+        /* 第一百六十三轮修复：方向映射此前反写（sell→购汇）；金额取 A.amount 恒空（fx 无该字段）。
+           归一化后 amount_cny/amount_foreign 双侧齐备——按方向取主金额（buy=人民币/sell=外币），
+           对侧入 converted，成交牌价 rate（JPY 每 100 日元口径标注）。 */
+        push("direction", A.direction === "sell" ? "结汇" : "购汇");
+        push("currency", A.currency ?? "?");
+        if (A.direction === "sell") {
+          push("amount", `${A.amount_foreign ?? "?"} ${A.currency ?? ""}`);
+          push("converted", "¥ " + (A.amount_cny ?? "?"));
+        } else {
+          push("amount", "¥ " + (A.amount_cny ?? "?"));
+          push("converted", `${A.amount_foreign ?? "?"} ${A.currency ?? ""}`);
+        }
+        if (A.rate_used != null) push("rate", `${A.rate_used}${A.currency === "JPY" ? "（每 100 日元）" : ""}`);
         break;
       default: {
         /* 通用兜底：取至多 4 个标量参数 */
@@ -5165,7 +5192,7 @@ function batchItemFields(intent, a, { cardName = null } = {}) {
 
 /* 第一百零五轮：组合项人类摘要（plan_preview 回告模型 + operations_package 卡共用）。
  * 纯函数（无 DO 往返）——卡侧的户名/卡别名已在预检钉死进 args（acct: 尾号/display 字段）。 */
-function batchItemSummary(env, intent, a) {
+export function batchItemSummary(env, intent, a) {
   const A = a ?? {};
   const last4 = (v) => String(v ?? "").replace(/\D/g, "").slice(-4);
   try {
@@ -5198,7 +5225,12 @@ function batchItemSummary(env, intent, a) {
       case "goal_create": return `创建攒钱目标「${A.name ?? "?"}」¥${A.target_amount ?? "?"}`;
       case "goal_contribute": return `目标存入 ¥${A.amount ?? "?"}`;
       case "goal_abandon": return `放弃目标 #${A.goal_id ?? "?"}`;
-      case "fx_exchange": return `换汇 ${A.direction ?? ""} ¥${A.amount ?? "?"} → ${A.currency ?? "?"}`;
+      case "fx_exchange": {
+        const dirZh = A.direction === "sell" ? "结汇" : "购汇";
+        const main = A.direction === "sell" ? `${A.amount_foreign ?? "?"} ${A.currency ?? ""}` : `¥${A.amount_cny ?? "?"}`;
+        const other = A.direction === "sell" ? `¥${A.amount_cny ?? "?"}` : `${A.amount_foreign ?? "?"} ${A.currency ?? ""}`;
+        return `${dirZh} ${A.currency ?? "?"} ${main}（折合 ${other}）`;
+      }
       case "phone_manage": return `手机号管理 ${A.action ?? ""}`;
       case "notify_prefs": return `通知偏好 ${A.action ?? ""}`;
       case "autopay_manage": return `自动缴费 ${A.enabled ? "开启" : "关闭"} #${A.bill_id ?? ""}`;
@@ -5622,15 +5654,19 @@ export const AI_SYSTEM_PROMPT = `你是 Suveoo 银行的智能助理（模拟银
 12) 多项写操作（2-8 项）先 plan_preview 再 batch_execute 合一组合卡，不拆单卡；单项直接调。
 11.5) 手机号：绑定入口=我的账户/安全中心/开户第一步；仅 +86 一号一户（解绑释放）；好处=短信接码（红级/两步/找回）与手机号登录转账；换绑解绑走安全中心或 phone_manage。收款可传 phone:/email:（须已绑定）；验证码须用户本人提供，绝不编造。
 11.6) 挂失：入口=卡片页或设置页「挂失」按钮。费用：挂失 ¥20，补办+¥15+¥18（合计 ¥53），从非挂失卡扣。补办必须先问邮寄地址（缺会被拒，绝不代编）；执行 card_loss_report（红级卡打包挂失+费用，OTP 用户完成）；进度 card_loss_status；收到新卡或找回原卡用 card_loss_activate 恢复；挂失中不可直接解冻。
-12) 用户表达"金额+期限+风险偏好"类诉求（如 10 万闲钱半年后用、教育金）先调 solution_preview，按返回 items 原样展示（产品/占比/金额/理由）与合计；用户同意才把 items 与 total_amount 原样传给 solution_package_purchase——绝不自行换产品、改金额或编收益率。`;
+12) 用户表达"金额+期限+风险偏好"类诉求（如 10 万闲钱半年后用、教育金）先调 solution_preview，按返回 items 原样展示（产品/占比/金额/理由）与合计；用户同意才把 items 与 total_amount 原样传给 solution_package_purchase——绝不自行换产品、改金额或编收益率。
+13) 查询主语核验：查询类工具永远只作用于当前登录客户本人（实名见提示词开头）。提问以具体人名/第三人称为主语（"XX 的账户/卡/余额/持仓"等）时，先与当前客户实名比对：是本人则按本人查询；不是或无法确认→如实回答"我无法查询他人账户"，绝不把本人数据当作该人数据答复，也不暗示两人是同一个人。`;
 
-/** 系统提示词前缀注入当前日期（北京时间）：模型不知道"今天"就无法换算"下周三/后天"，
- *  实测预约类指令因此退化为向用户反问具体日期（模型不会主动查系统时钟）。 */
-function systemPromptWithDate() {
+/** 系统提示词前缀注入当前日期（北京时间）与当前登录客户实名：
+ *  日期——模型不知道"今天"就无法换算"下周三/后天"（实测预约类指令因此退化为向用户反问具体日期）；
+ *  实名——规则 13 查询主语核验的比对基准：光杆人名提问（"顾清羽的账户有多少钱"）曾把本人数据
+ *  当作他人数据答复，模型必须先知道"当前客户是谁"才能正确拒绝（第一百六十二轮修复）。 */
+export function systemPromptWithDate(userName) {
   const now = new Date(Date.now() + 8 * 3600_000);
   const week = ["日", "一", "二", "三", "四", "五", "六"][now.getUTCDay()];
   const hh = String(now.getUTCHours()).padStart(2, "0"), mm = String(now.getUTCMinutes()).padStart(2, "0");
-  return `今天是 ${now.getUTCFullYear()} 年 ${now.getUTCMonth() + 1} 月 ${now.getUTCDate()} 日（星期${week}），北京时间 ${hh}:${mm}（UTC+8）。涉及"下周三/后天/月底"等相对日期与"25分钟后/两小时后"等相对时刻时，先换算成具体日期时间（ISO 8601 带 +08:00 偏移）再调用工具。\n${AI_SYSTEM_PROMPT}`;
+  const who = typeof userName === "string" && userName.trim() ? `当前登录客户实名：${userName.trim()}——您只服务这位客户本人的数据。` : "";
+  return `今天是 ${now.getUTCFullYear()} 年 ${now.getUTCMonth() + 1} 月 ${now.getUTCDate()} 日（星期${week}），北京时间 ${hh}:${mm}（UTC+8）。涉及"下周三/后天/月底"等相对日期与"25分钟后/两小时后"等相对时刻时，先换算成具体日期时间（ISO 8601 带 +08:00 偏移）再调用工具。\n${who}${AI_SYSTEM_PROMPT}`;
 }
 
 /** Messages API 工具定义（由 MCP_TOOLS 注册表生成；模型名手动配置，不走 /v1/models）。 */
@@ -5739,7 +5775,7 @@ export function resolveLlmProfile(env) {
 /** 调用 Messages API（Anthropic 兼容）。流式优先：提供 onText 时加 stream:true，边收 content_block_delta
  *  边回调下发（worker 转发、浏览器打字机平滑只是观感层）；工具轮次由 consumeLlmSse 聚合完整 JSON 后才执行。
  *  上游不支持流式（非 SSE 响应/请求被拒）自动回退非流式；流中途 error 且已有部分文本时返回部分结果不重放。 */
-export async function llmMessages(env, messages, tools, onText, onThinking) {
+export async function llmMessages(env, messages, tools, onText, onThinking, userName) {
   const prof = resolveLlmProfile(env);
   if (prof.err) return { err: prof.err };
   const base = prof.baseUrl;
@@ -5751,7 +5787,7 @@ export async function llmMessages(env, messages, tools, onText, onThinking) {
   /* 第一百四十轮：kimi-k3 思考始终开启——reasoning_effort "low" + max_tokens 8192（仅 kimi 档；
    * 其他档位不受影响。kimi 思考 token 计入 max_tokens，4096 下思考耗尽预算后正文为零（S1 大面积空响应根因） */
   const maxTokens = prof.provider === "kimi" ? 8192 : 4096;
-  const payload = { model, max_tokens: maxTokens, system: systemPromptWithDate(), messages, ...(tools?.length ? { tools } : {}), ...(prof.provider === "kimi" ? { reasoning_effort: "low" } : {}) };
+  const payload = { model, max_tokens: maxTokens, system: systemPromptWithDate(userName), messages, ...(tools?.length ? { tools } : {}), ...(prof.provider === "kimi" ? { reasoning_effort: "low" } : {}) };
   /* 请求体观测量：字符数按轮记录（性能轮基线——瘦身前后对比的硬数据） */
   logEvent("info", "ai.llm_payload", { chars: JSON.stringify(payload).length, msgs: messages.length, tools: tools?.length ?? 0 });
   /* 上游超时兜底：网关偶发整轮挂起（连接建立但 0 字节），无超时会让 SSE 永挂在"思考中"；
@@ -5878,7 +5914,8 @@ export async function handleAiChat(request, env, ctx) {
           const r = await U(env, claims.sub)({ op: "chatWindow", sid, turns: TURNS });
           hist = { f: r.first ?? null, w: Array.isArray(r.window) ? r.window : [] };
         }
-        await U(env, claims.sub)({ op: "chatUpsert", id: sid, title: text.slice(0, 30) });
+        const upsert = await U(env, claims.sub)({ op: "chatUpsert", id: sid, title: text.slice(0, 30) });
+        const customerName = typeof upsert?.name === "string" ? upsert.name : null;
         await airingDrain(env, sid);
 
         /* —— 手动工具循环（与厂商无关）—— */
@@ -5889,7 +5926,7 @@ export async function handleAiChat(request, env, ctx) {
         let hadError = false;
         let pendingGrantTools = new Set(); /* 已产出确认卡/OTP 门工具：防模型无视规则 4 重复发起同一笔 */
         for (let round = 0; round < 8; round++) {
-          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }), llmProf.thinking === "off" ? null : () => send({ type: "thinking" }));
+          const { out, err, streamed } = await llmMessages(env, msgs, tools, (t) => send({ type: "token", text: t }), llmProf.thinking === "off" ? null : () => send({ type: "thinking" }), customerName);
           if (err) { hadError = true; await flushAiring(); send({ type: "error", code: "LLM_UPSTREAM", message: err }); break; }
           const content = out.content ?? [];
           const textPart = content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
@@ -7662,6 +7699,7 @@ const STATIC_MIME = {
   js: "text/javascript", mjs: "text/javascript", json: "application/json", webmanifest: "application/manifest+json",
   svg: "image/svg+xml", png: "image/png", webp: "image/webp", ico: "image/x-icon",
   ttf: "font/ttf", woff: "font/woff", woff2: "font/woff2", txt: "text/plain; charset=utf-8", xml: "application/xml; charset=utf-8",
+  pdf: "application/pdf",
 };
 const contentTypeFor = (key) => STATIC_MIME[key.slice(key.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";
 const cacheControlFor = (key) => {
@@ -7852,6 +7890,13 @@ function r2Headers(obj, key) {
     headers["content-type"] = "application/vnd.android.package-archive";
     headers["content-disposition"] = `attachment; filename="${key.slice(key.lastIndexOf("/") + 1)}"`;
   }
+  /* PDF 交付物直链（技术文档/安全自评，frontend/docs/）：强制 application/pdf 内联展示——
+     不让旧上传元数据（octet-stream）把它变成"下载"；并声明 accept-ranges 供查看器按页取段 */
+  if (key.endsWith(".pdf")) {
+    headers["content-type"] = "application/pdf";
+    headers["content-disposition"] = `inline; filename="${key.slice(key.lastIndexOf("/") + 1)}"`;
+    headers["accept-ranges"] = "bytes";
+  }
   if (key === "service-worker.js") headers["service-worker-allowed"] = "/";
   return headers;
 }
@@ -7864,10 +7909,39 @@ export async function serveStatic(env, request, url) {
   if (url.pathname === "/downloads" || url.pathname === "/downloads/") {
     return withSecurityHeaders(new Response(null, { status: 301, headers: { location: "/download", "cache-control": "public, max-age=86400" } }));
   }
+  /* 文档别名（2026-10-17）：短链 /docs/technical、/docs/security 与去扩展名形式
+     → 301 到规范 .pdf URL（与 /downloads→/download 同款：永久重定向、地址栏收敛到唯一规范 URL） */
+  const DOC_ALIAS = {
+    "/docs/technical": "/docs/suveoo-technical-documentation.pdf",
+    "/docs/suveoo-technical-documentation": "/docs/suveoo-technical-documentation.pdf",
+    "/docs/security": "/docs/suveoo-security-self-assessment.pdf",
+    "/docs/suveoo-security-self-assessment": "/docs/suveoo-security-self-assessment.pdf",
+  };
+  const docTarget = DOC_ALIAS[url.pathname.replace(/\/+$/, "").toLowerCase()];
+  if (docTarget) {
+    return withSecurityHeaders(new Response(null, { status: 301, headers: { location: docTarget, "cache-control": "public, max-age=86400" } }));
+  }
   const pathname = rewriteDynamicRoutes(url.pathname);
   /* 点开头路径一律 404（第六十九轮教训纵深防御）：deploy 脚本曾把 .mimosa 工具缓存传进桶且公网可读；
    * 即使未来再有类似对象入桶，本守卫也确保其永不可被访问 */
   if (/^\/\./.test(url.pathname)) return withSecurityHeaders(new Response("404 Not Found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } }));
+  /* PDF 大文件（frontend/docs/ 技术文档 21MB · 安全自评 15MB）Range 支持：
+     浏览器 PDF 查看器按页取段渐进渲染，不必等整份下载完；单段 Range 走 206，
+     多段/越界等异常一律退化为 200 全量（交给查看器自行处理） */
+  if (request.method === "GET" && /\.pdf$/i.test(pathname) && request.headers.get("range")) {
+    for (const key of staticKeyCandidates(pathname)) {
+      const ranged = await env.ASSETS.get(key, { range: request.headers }).catch(() => null);
+      if (!ranged) continue;
+      if (!ranged.range) return r2Response(ranged, key);
+      const rg = ranged.range;
+      const total = ranged.size;
+      const offset = rg.offset ?? Math.max(0, total - (rg.suffix ?? total));
+      const length = rg.length ?? (total - offset);
+      const headers = r2Headers(ranged, key);
+      headers["content-range"] = `bytes ${offset}-${offset + length - 1}/${total}`;
+      return withSecurityHeaders(new Response(ranged.body, { status: 206, headers }));
+    }
+  }
   /* /ai/s/{sid} 会话页与 /ai 同一 HTML：头部声明 noindex 防搜索引擎按会话 ID 抓出无限变体 URL */
   const extraHeaders = /^\/ai\/s\//.test(url.pathname) ? { "x-robots-tag": "noindex, nofollow" } : null;
   const inm = request.headers.get("if-none-match");
@@ -9161,10 +9235,13 @@ export class LedgerDO {
           return json({ month: input.month, total_out: sum("OUT"), total_in: sum("IN"), txs: txs.slice(0, 120) });
         }
         case "chatUpsert": {
-          /* 会话注册：首条消息落标题（INSERT OR IGNORE 保住首轮语义），后续轮只刷新活跃时间 */
+          /* 会话注册：首条消息落标题（INSERT OR IGNORE 保住首轮语义），后续轮只刷新活跃时间。
+             顺路带回客户实名（profile 单行表）——AI 系统提示词注入用（规则 13 查询主语核验），
+             免去每条消息一次额外 DO 读 */
           sql.exec("INSERT OR IGNORE INTO chats(id, title, ts, created_at, updated_at) VALUES(?,?,?,?,?)", input.id, input.title ?? "", NOW, NOW, NOW);
           sql.exec("UPDATE chats SET ts = ?, updated_at = ? WHERE id = ?", NOW, NOW, input.id);
-          return json({ ok: true });
+          const nm = (this.#rows(sql.exec("SELECT name FROM profile LIMIT 1"))[0] ?? {}).name ?? null;
+          return json({ ok: true, name: typeof nm === "string" ? nm : null });
         }
         case "chatLog": {
           /* 消息落库（事实源）：turn 结束时整批写入；失败轮只落 user 侧由调用方决定 */

@@ -110,7 +110,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 ## 4. Suveoo AI：自然语言驱动全行业务
 
-**63 个 MCP 工具**（GREEN 26 / YELLOW 24 / RED 13）覆盖查询、转账、账单、理财、卡片、订阅、缴费、任务、计算器、账户管理、产品动态组合拼装、主动提议、站点指南——全部走同一 IR → 五道管线。
+**63 个 MCP 工具**（GREEN 36 / YELLOW 19 / RED 8）覆盖查询、转账、账单、理财、卡片、订阅、缴费、任务、计算器、账户管理、产品动态组合拼装、主动提议、站点指南——全部走同一 IR → 五道管线。
 
 <!-- 插图 5：AI 对话界面截图（深色/浅色对话 + 内嵌计算器 + 确认卡同框） -->
 ![Suveoo AI logo](docs/images/readme/suveoo-ai-logo.webp)
