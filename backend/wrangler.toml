@@ -66,7 +66,7 @@ VOICE_ASR_PROVIDER = "ali"
 #   qwen 档：secret LLM_API_KEY_QWEN
 # 缺省不设置 MODEL_PROFILE = 沿用下方 LLM_* 三变量（与历史行为逐字节一致）。
 # 完整教程（三步切换法/新增模型/回滚/常见坑）：for_developer/switch_models.md
-MODEL_PROFILE = "glm-5.3-flash"
+MODEL_PROFILE = "deepseek-v4.1-flash"
 # 当前（第一百四十轮 Kimi Ablation 完毕）：切回 glm-5.3-flash（四模型全部 100%）
 LLM_PROVIDER = "glm"
 LLM_BASE_URL = "https://open.bigmodel.cn/api/anthropic"
