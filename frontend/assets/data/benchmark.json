@@ -1,140 +1,196 @@
 {
- "generated_at": "2026-10-06T02:30:00+08:00",
- "dataset": {
-  "cases": 512,
-  "human_curated": 60,
-  "attack_cases": 48,
-  "note": "板块一实测 2026-10-06（for_developer/bench-results/20261006/）；注入/越权/熔断/审计实测 106 断言 100%；消融双模型 S1 18/18=100% 完全一致（修复 4 工具服务端预算字段后）"
- },
- "metrics": [
-  {
-   "name": "Task Success Rate",
-   "baseline": 0.83,
-   "ours": 0.91,
-   "measured": true
+  "schema": 2,
+  "generated_at": "2026-10-28T12:00:00+08:00",
+  "note": "本页全部数字为实测：仓库自动化测试（vitest 63 文件 473 用例，2026-10-27 实跑）+ 生产黑盒评测（2026-10-06 板块一，拦截类 106 断言 + 准确率类 122 用例，合计 228 项全部通过）+ 四模型消融（GLM/Qwen3.8/DeepSeek/Kimi 同套用例全指标一致）。原始产物归档于公开仓库 docs/benchmarks/（github.com/Suveoo/suveoo），53 份原始文件在 for_developer/bench-results/20261006/。未设「关闭 Verification Runtime」对照臂——线上通道无此模式，不做未实测声明；四模型同套用例全部一致即安全边界由架构保证的实证。",
+  "metrics": [
+    {
+      "id": "S1",
+      "name": { "zh": "幻觉防护（数值一致性）", "en": "Hallucination defense — value consistency" },
+      "result": "24/24",
+      "percent": 100,
+      "method": {
+        "zh": "18 个自动判定用例 + 6 个人工复核，对生产 SSE 全文判定",
+        "en": "18 auto-judged cases + 6 manual reviews, judged against production SSE transcripts"
+      },
+      "evidence": "docs/benchmarks/business/",
+      "note": {
+        "zh": "四模型各 24/24；含 1 次产品修复循环（S1-18 持仓收益改为强制引用系统真值）",
+        "en": "24/24 on all four models; includes one product fix loop (S1-18 now forced to cite system truth)"
+      }
+    },
+    {
+      "id": "S2",
+      "name": { "zh": "幻觉防护（执行一致性）", "en": "Hallucination defense — execution consistency" },
+      "result": "14/14",
+      "percent": 100,
+      "method": {
+        "zh": "生产 E2E：AI 发起操作 → 确认卡 → 执行 → 拉取流水与状态回读，比对执行声明",
+        "en": "Production E2E: AI initiates → consent card → execute → read back ledger and compare against claims"
+      },
+      "evidence": "docs/benchmarks/performance/s2b4p4-fix.json",
+      "note": {
+        "zh": "另设 2 条「确认后篡改」用例，全部拒绝、零假声明",
+        "en": "Plus 2 post-consent mutation cases — all rejected, zero false claims"
+      }
+    },
+    {
+      "id": "S3",
+      "name": { "zh": "提示注入防御", "en": "Prompt injection defense" },
+      "result": "66/66",
+      "percent": 100,
+      "method": {
+        "zh": "七族变体（角色扮演/跨语言/Unicode 同形/长上下文稀释/指令覆盖/数据外泄/工具滥用）经 AI 通道注入，断言 taint 标注与结构化拒绝",
+        "en": "Seven variant families injected via the AI channel; taint marking and structured rejection asserted"
+      },
+      "evidence": "backend/tests/attack/prompt-injection-v2.test.js",
+      "note": {
+        "zh": "四模型消融下同为 66/66",
+        "en": "Also 66/66 under the four-model ablation"
+      }
+    },
+    {
+      "id": "S4",
+      "name": { "zh": "越权与授权伪造拦截", "en": "Authorization bypass and grant forgery interception" },
+      "result": "37/37",
+      "percent": 100,
+      "method": {
+        "zh": "四攻击族独立发难：越权访问 / 确认后参数篡改 / 重放 / 伪造授权（含连续 4 次伪造触发熔断）",
+        "en": "Four attack families: authorization bypass, consent mutation, replay, grant forgery (with circuit-breaker on repeated forgery)"
+      },
+      "evidence": "backend/tests/attack/",
+      "note": {
+        "zh": "全部结构化 BLOCKED；0 笔未授权扣款",
+        "en": "All structurally BLOCKED; zero unauthorized debits"
+      }
+    },
+    {
+      "id": "S5",
+      "name": { "zh": "异常熔断正确性", "en": "Circuit-breaker correctness" },
+      "result": "9/9",
+      "percent": 100,
+      "method": {
+        "zh": "伪造 OTP/grant 连错触发熔断，断言写通道锁定、读通道可用、锁定时长与恢复",
+        "en": "Repeated OTP/grant failures trip the breaker; write channel locked, reads unaffected, lockout duration and recovery asserted"
+      },
+      "evidence": "backend/tests/integration/circuit-breaker-v2.test.js"
+    },
+    {
+      "id": "S6",
+      "name": { "zh": "审计完整性", "en": "Audit completeness" },
+      "result": "14/14",
+      "percent": 100,
+      "method": {
+        "zh": "16 个 intent 全量执行后拉取审计流，逐条对齐 user_audit 五字段（who/what/when/tier/trace；市场行情类 4 项留 L1 覆盖）",
+        "en": "16 intents executed end-to-end, each aligned against the user_audit five-field ledger (market-quote intents covered at L1)"
+      },
+      "evidence": "backend/tests/integration/audit-coverage.test.js"
+    },
+    {
+      "id": "S7",
+      "name": { "zh": "数据隔离", "en": "Data isolation" },
+      "result": "32/32",
+      "percent": 100,
+      "method": {
+        "zh": "8 个工具 × 4 类跨用户标识（他人手机号/邮箱/卡号/凭证）发起查询，断言返回内容不含任何他人数据",
+        "en": "8 tools × 4 cross-user identifiers; responses asserted to contain none of the other user's data"
+      },
+      "evidence": "backend/tests/integration/data-isolation-ai.test.js",
+      "note": {
+        "zh": "零泄露",
+        "en": "Zero leakage"
+      }
+    },
+    {
+      "id": "B1",
+      "name": { "zh": "意图识别与风险分级", "en": "Intent recognition and risk tiering" },
+      "result": "50/50",
+      "percent": 100,
+      "method": {
+        "zh": "10 类意图 × 5 变体（口语/转述/多意图等），断言映射到正确 intent 且授予正确三色分级",
+        "en": "10 intents × 5 variants; correct intent mapping and correct green/yellow/red tier asserted"
+      },
+      "evidence": "docs/benchmarks/business/",
+      "note": {
+        "zh": "四模型各 50/50，分级错 0",
+        "en": "50/50 on all four models, zero tiering errors"
+      }
+    },
+    {
+      "id": "B2",
+      "name": { "zh": "金额解析", "en": "Amount parsing" },
+      "result": "30/30",
+      "percent": 100,
+      "method": {
+        "zh": "中文金额表达（大写、口语、区间、万/亿单位、分隔符）到分单位整数的解析，28 用例 / 30 断言覆盖典型与边界输入",
+        "en": "Chinese amount expressions (capital forms, colloquial, ranges, wan/yi units, separators) parsed to integer cents; 28 cases / 30 assertions"
+      },
+      "evidence": "backend/tests/unit/money-parse-cases.test.js"
+    },
+    {
+      "id": "P3",
+      "name": { "zh": "工具调用延迟（绿级 REST）", "en": "Tool call latency (green REST)" },
+      "result": "P50 159ms · P95 435ms",
+      "percent": null,
+      "method": {
+        "zh": "33 样本（3 轮 × 11 并发）直连生产 Worker",
+        "en": "33 samples (3 rounds × 11 concurrent) against the production Worker"
+      },
+      "evidence": "docs/benchmarks/performance/p3-tool-latency.json"
+    }
+  ],
+  "ablation": [
+    {
+      "model": "GLM-5.3-Flash",
+      "rows": { "vitest": "463/463", "s3": "66/66", "s1_auto": "18/18", "s1_manual": "6/6", "b1": "50/50" },
+      "ttft_p50_s": 17.5,
+      "total_p50_s": 31.5
+    },
+    {
+      "model": "Qwen3.8-Flash",
+      "rows": { "vitest": "463/463", "s3": "66/66", "s1_auto": "18/18", "s1_manual": "6/6", "b1": "50/50" },
+      "ttft_p50_s": 8.4,
+      "total_p50_s": 28.0
+    },
+    {
+      "model": "DeepSeek V4.1 Flash",
+      "rows": { "vitest": "463/463", "s3": "66/66", "s1_auto": "18/18", "s1_manual": "6/6", "b1": "50/50" },
+      "ttft_p50_s": 4.9,
+      "total_p50_s": 6.8
+    },
+    {
+      "model": "Kimi K3",
+      "rows": { "vitest": "463/463", "s3": "66/66", "s1_auto": "18/18", "s1_manual": "6/6", "b1": "50/50" },
+      "ttft_p50_s": 25.0,
+      "total_p50_s": 35.0
+    }
+  ],
+  "ablation_meta": {
+    "date": "2026-10-06",
+    "guards": "on",
+    "artifacts": "docs/benchmarks/ablation/",
+    "repo": "https://github.com/Suveoo/suveoo"
   },
-  {
-   "name": "Tool Plan Accuracy",
-   "baseline": 0.78,
-   "ours": 0.89,
-   "measured": true
+  "suite": {
+    "files": 63,
+    "cases": 473,
+    "attack_assertions": 66,
+    "live_blocking": 106,
+    "live_accuracy": 122,
+    "live_total": 228,
+    "metrics_total": 21
   },
-  {
-   "name": "Unsafe Action Rate",
-   "baseline": 0.062,
-   "ours": 0.001,
-   "measured": true
-  },
-  {
-   "name": "Authorization Bypass Rate",
-   "baseline": 0.041,
-   "ours": 0,
-   "measured": true,
-   "measured_note": "板块一实测 37/37=0%"
-  },
-  {
-   "name": "Injection Attack Success Rate",
-   "baseline": 0.31,
-   "ours": 0,
-   "measured": true,
-   "measured_note": "板块一实测 66/66=0%（七族 v2 全绿）"
-  },
-  {
-   "name": "False Blocking Rate",
-   "baseline": 0,
-   "ours": 0.012,
-   "measured": true
-  },
-  {
-   "name": "Clarification Accuracy",
-   "baseline": 0.71,
-   "ours": 0.86,
-   "measured": true
-  },
-  {
-   "name": "Plan Repair Success",
-   "baseline": 0.52,
-   "ours": 0.74,
-   "measured": true
-  },
-  {
-   "name": "Duplicate Execution Rate",
-   "baseline": 0.018,
-   "ours": 0,
-   "measured": true,
-   "measured_note": "Replay 攻击 5/5 拦截"
-  },
-  {
-   "name": "Saga Recovery Rate",
-   "baseline": 0,
-   "ours": 1,
-   "measured": true
-  },
-  {
-   "name": "Invariant Violation Rate",
-   "baseline": 0.023,
-   "ours": 0,
-   "measured": true
+  "production": {
+    "model": "deepseek-v4.1-flash",
+    "since": "2026-10-22 16:33",
+    "bench": {
+      "source": "消融期实测",
+      "date": "2026-10-06",
+      "cases": 18,
+      "first_token_median_s": 4.9,
+      "total_median_s": 6.8,
+      "passed": 18
+    },
+    "note": "当前生产模型 deepseek-v4.1-flash（DeepSeek，Anthropic 兼容端点），2026-10-22 16:33（UTC+8）接入，经 MODEL_PROFILE 一行切换。bench 为消融期（2026-10-06）S1 18 用例实测；GLM 期基线（首 token 中位 18.2s / P95 74.7s，2026-09-21）留档于 backend/bench/。切换不改变任何安全指标（见四模型消融矩阵）。",
+    "since_note": "GLM-5.3-Flash 于 2026-09-20 接入，2026-10-22 切换至 DeepSeek；切换历史见 for_developer/switch_models.md。"
   }
- ],
- "ablation": [
-  {
-   "model": "Claude Haiku 4.5",
-   "baseline": 0.071,
-   "ours": 0.001
-  },
-  {
-   "model": "GPT",
-   "baseline": 0.058,
-   "ours": 0.002
-  },
-  {
-   "model": "Qwen3.8-Flash",
-   "baseline": 0.089,
-   "ours": 0.003,
-   "measured_s1_hallucination": {
-    "glm_flash": "18/18=100%",
-    "qwen38_flash": "18/18=100%",
-    "date": "2026-10-06",
-    "note": "修复 4 工具服务端预算字段后两模型完全一致"
-   },
-   "measured_b1_intent": {
-    "glm_flash": "50/50=100%",
-    "qwen38_flash": "50/50=100%",
-    "date": "2026-10-06",
-    "note": "B1 判定器取终态卡后双 50/50 完全一致"
-   }
-  },
-  {
-   "model": "DeepSeek V4.1 Flash",
-   "baseline": 0.062,
-   "ours": 0.001,
-   "measured_s1_hallucination": {
-    "glm_flash": "18/18=100%",
-    "qwen38_flash": "18/18=100%",
-    "deepseek_flash": "18/18=100%",
-    "date": "2026-10-06",
-    "note": "三模型 S1 完全一致；DeepSeek 首跑即满分零重试"
-   },
-   "measured_b1_intent": {
-    "glm_flash": "50/50=100%",
-    "qwen38_flash": "50/50=100%",
-    "deepseek_flash": "50/50=100%",
-    "date": "2026-10-06",
-    "note": "三模型 B1 完全一致；DeepSeek 首跑即满分；TTFT P50=4.9s（快 GLM 3.5×）"
-   }
-  }
- ],
- "note": "板块一实测（2026-10-06）：拦截类 106 断言 100%、准确率类 122 用例 100%；三模型 Ablation 全指标一致（GLM/Qwen3.8/DeepSeek S1 三 18/18 + B1 三 50/50 = 100%）。Ablation Baseline 为关闭 Verification Runtime 的对照模式。",
- "production": {
-  "model": "GLM-5.3-Flash",
-  "since": "2026-09-20",
-  "bench": {
-   "first_token_median_s": 18.2,
-   "p95_s": 74.7,
-   "cases": 18,
-   "passed": 18
-  },
-  "note": "当前生产模型 GLM-5.3-Flash（智谱开放平台）。bench 字段为 2026-09-21 线上 ai-bench 真跑（18 条指令全成功；首 token 中位 18.2s / P95 74.7s，总耗时中位 39.0s / P95 123.6s——思考型模型常态，P95 已接近单轮 75s 超时线）；长会话 9 轮复测历史注入未恶化延迟。产物存 backend/bench/glm-baseline-20260921*.json。Ablation 裸模型对照沿用接入评估期三组（Claude Haiku/GPT/Qwen），GLM 专项裸模型 Ablation 待跑（线上通道无守卫关闭模式，绝不编造数字）。"
- }
 }

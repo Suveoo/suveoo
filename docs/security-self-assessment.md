@@ -42,7 +42,7 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 | R-02 | AI 通道依赖 Anthropic `mcp_servers` 连接器行为（非我们控制的外部面） | **已实测四模型**：GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3 经 `MODEL_PROFILE` 切换全部跑通（2026-10-06，Kimi 需剥离 thinking 块 + `reasoning_effort:"low"`，已入代码） | 兜底不变：REST 确认端点独立存在；消融全部核心指标四模型 100% 一致（docs/benchmarks/ablation/） |
 | R-03 | JWT 无刷新令牌；1h 过期后需重新登录 | 设计取舍（演示系统） | 计划：滑动续期或 refresh token |
 | R-04 | 速率限制计数器非原子（KV incr） | 已知 | 影响限流精度 ±1；加固计划：DO 计数 |
-| R-05 | 红级强验证当前为邮箱 OTP；Passkey/WebAuthn 未实现 | 路线图（原规划仅一条 FIDO2 流程） | 下一迭代：WebAuthn passkey 作为红级第二因子 |
+| R-05 | 红级强验证当前为短信/邮箱双通道 OTP + 本机生物识别前置（客户端壳 / Web）；服务端可验证的 FIDO2 / Passkey 因子未实现（Web 端黄级确认已于 2026-10-28 启用 WebAuthn 本机在场门） | 路线图（原规划仅一条 FIDO2 流程） | 下一迭代：FIDO2 passkey 作为红级第二因子；Web 黄级本机门为可选增强，不改变红级语义 |
 | R-06 | 越狱/注入检测为启发式（金丝雀 + provenance 规则），非学习型分类器 | 按框架纪律未过度宣称 | Taint 能力模型从架构上阻断授权面（攻击成功率测试为 0） |
 | R-07 | `cardTx` 明细为模拟聚合（未按卡过滤） | Demo 简化 | 下一迭代：tx 表加 card 列 |
 | R-08 | ~~演示种子接口 `/api/demo/seed` 在 DEMO_MODE=true 时无鉴权~~ **已修复（2026-09-17）**：现需请求头 `x-admin-token` 与 secret ADMIN_TOKEN 匹配（常数时间比较，**fail-closed**——未配置 secret 一律 403），DEMO_MODE 门保留为双重门；成功调用写 AUDIT_KV 审计；支持 `{"inspect":true}` 只读巡检 | 已缓解 | 轮换：`printf '%s' '<新值>' \| npx wrangler secret put ADMIN_TOKEN` |
@@ -114,3 +114,14 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 | 渲染层输入 | IPC 路由白名单 16 方法 + 入参形状校验（渲染进程输入不可信）；preload 显式方法对象（contextBridge 不能传 Proxy——结构化克隆摊平） | windows/macos ipc-schema 单测            |
 | 凭据存储 | 生物识别走系统级（Android BiometricPrompt / Windows Hello UserConsentVerifier / Touch ID），凭据 safeStorage 加密落盘（DPAPI / Keychain）；无传感器自动回落密码/OTP，不降级安全语义 | 四场景语义对齐实测；无 Touch ID 主机回落路径实测          |
 | 测试凭据 | E2E 账户凭据走 gitignored `e2e-creds.json`（不入源码不入 Git）；OTP 走本地文件通道 | .gitignore 三壳规则                        |
+
+### 8.1 Web 端黄级确认的本机在场门（2026-10-28 增补）
+
+三端原生客户端之外，Web 端黄级确认也接入同一语义的本机在场校验；这是确认动线层的本地增强，不改变服务端五道验证、grant 与审计：
+
+- **范围**：表单/REST 两段式确认（客户端壳走各自原生框架：AndroidX BiometricPrompt / Windows Hello / Touch ID；Web 走 WebAuthn 平台通行密钥，触发的仍是设备同一套 OS 生物识别）与 AI 对话确认卡（Web 端同样接入，`ai.js` 的「确认执行」）。
+- **机制**：`frontend/assets/js/core/biometric-web.js`（`S.bioWeb`）按需懒加载，不进入任何 HTML；首次黄级确认弹窗征得同意后 `credentials.create()` 本地登记（`authenticatorAttachment: platform`、`userVerification: required`），此后每次确认 `credentials.get()` 由 OS 生物识别把关。凭据 id 仅存本浏览器 localStorage，不含生物特征、不能用于登录、他站不可用；`user.id` 随机生成，与账户无关。
+- **失败语义**：用户取消/超时 → 中止本次确认（对齐客户端 `verify()` 的 `{ok:false}`）；未启用、无平台认证器、加载或校验异常 → 一律放行。**增强不是门槛**，绝不因缺失或故障阻断业务。
+- **边界**：该门为纯本地因子，服务端零感知、零改动；红级仍以 OTP 为准，红级服务端可验证的 FIDO2/Passkey 因子仍属路线图（R-05）。它与「通行密钥登录」是两件事，不构成认证因子。
+- **隐私**：生物特征由设备 OS 持有，平台不收集、不上传；仅保存 WebAuthn 凭据标识于本浏览器，清除浏览器数据即删除。条款见隐私政策第十一条之五（Web 端，2026-10 增补）。
+- **佐证**：2026-10-28 demo 账户黄级限额调整实测——首次确认弹出启用询问，「暂不」后放行并落库，二次确认不再询问；回滚后额度恢复。真实登记后的 `create/get` 仪式需本机 Hello/Touch ID 交互，属代码级审查、待真机首用验证。

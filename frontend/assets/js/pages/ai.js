@@ -611,6 +611,18 @@ S.router.register("ai", async ({ user }) => {
         return;
       }
       bar.querySelector("#gc-ok").disabled = true;
+      /* 黄级本地在场校验（web 专属）：客户端壳走原生分支（AI 确认卡四端本无门——web 先补上，
+       * 客户端行为零改动；将来放开 Capacitor 前置即可让壳内同享此门）。取消=中止，异常放行。 */
+      if (card.tier !== "RED" && !window.Capacitor?.Plugins?.Biometric) {
+        try {
+          const g = await S.bioWebLoad().then(() => S.bioWeb.gate());
+          if (g === "cancel") {
+            S.ui.toast(S.t("bio.verifyCancel"), true);
+            const okB = bar.querySelector("#gc-ok"); if (okB && !expired) okB.disabled = false;
+            return;
+          }
+        } catch { /* 加载/校验异常放行 */ }
+      }
       /* AI 通道确认必须原样回传工具参数（grant 快照绑定的是工具参数，不是表单字段），直连 /mcp 不再经过模型 */
       const args = { ...(card.params ?? {}), grant_hash: card.grant_hash };
       if (card.tier === "RED") {

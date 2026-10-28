@@ -4,7 +4,7 @@
 
 ## 目录与覆盖
 
-当前规模：**Worker 域 63 文件 / 463 用例**（unit 24 / integration 33 / attack 6），另有**桌面壳独立套件**：`backend/windows/tests/` 4 文件 34 用例、`backend/macos/tests/` 4 文件 47 用例（各自 vitest 配置 node 池——依赖 electron，与根 Workers 池互斥；根配置 `include` 已限定 `tests/**`）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
+当前规模：**Worker 域 63 文件 / 473 用例**（unit 24 / integration 33 / attack 6；2026-10-27 实跑全绿，四模型消融时点为 463），另有**桌面壳独立套件**：`backend/windows/tests/` 4 文件 34 用例、`backend/macos/tests/` 4 文件 47 用例（各自 vitest 配置 node 池——依赖 electron，与根 Workers 池互斥；根配置 `include` 已限定 `tests/**`）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
 
 ### unit/（纯函数，24 文件）
 

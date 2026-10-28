@@ -3,6 +3,7 @@
 > Agentic Banking Control Plane（银行智能体可信执行中间层）
 > 这是模拟银行系统，不涉及真实资金行为。
 >
+> 2026-10-28 更新：Web 端黄级确认接入 WebAuthn 平台通行密钥本地在场门（§4.1）；客户端壳沿用各自原生生物识别；红级仍以 OTP 为准。
 > 2026-10-06 更新：多指标测试体系与四模型消融落地——63 个 MCP 工具、vitest 63 文件 463 用例全绿；生产黑盒评测（拦截类 106 断言 + 准确率类 122 用例）全部通过；MODEL_PROFILES 多模型注册表（glm-5.3-flash / glm-5.3-max / qwen3.8-flash / deepseek-v4.1-flash / kimi-k3）支持零代码换模，四模型消融全部核心指标 100% 一致（证据库 docs/benchmarks/）。测试 463 项全绿。
 > 2026-09-17 更新：转账与收款人真实化（Luhn+registry+户名三重校验，REST 与 AI 同规）与跨用户双记（对方 DO credit 先行，资金守恒）；13 个演示人物落户为真实账户；演示种子端点加管理员令牌双门（fail-closed + 审计）；卡片完整卡号 reveal（属主隔离）；理财赎回按市值结算（整数运算，显示值=回款额）；换汇按服务端实时牌价结算（JPY 每 100 口径、可选结算卡、外币余额可见）。测试 186 项全绿。
 > 2026-09-16 更新：财富产品 v2（16 只基金，数据由锚定真实市场史的多因子模型生成）；外汇实时牌价（er-api + KV 缓存 + 静态回退）；Telegram 运维通知（注册/登录/全部 EXECUTED 写操作，waitUntil 生命周期保障）；种子端点支持任意已注册账户（DEMO_MODE 守卫不变）；测试 159 项全绿。
@@ -67,7 +68,15 @@
 2. `runGuarded`：编译 IR（facts 全带 provenance/trust；金额一律字符串，内核 bigint 分）
 3. 五道验证：Policy（三色 + AI 通道硬上限）→ Taint（授权字段必须 TRUSTED）→ Consent（无 grant 则签发并返回 `INPUT_REQUIRED`；有则**服务端查 KV 消费**，参数突变即 `CONSENT_INVALIDATED`）→ Invariants（余额守恒/PR 适当性）→ Replay（nonce 去重）；红级另需 redstep 邮箱 OTP
 4. `executeIntent`：LedgerDO 原子记账（卡可用余额、日累计）、邮件回执、审计、通知
-5. 前端 Verified GenUI：确认卡数据只来自 `grant.snapshot`（`issuer==="verified_ir"` 才渲染）
+5. 前端 Verified GenUI：确认卡数据只来自 `grant.snapshot`（`issuer==="verified_ir"` 才渲染）；黄级另有本机在场门（§4.1）
+
+### 4.1 确认动线的本机在场校验（2026-10-28 增补）
+
+黄级确认在服务端同意绑定之上，另有一道可选的本地在场门；它只影响确认动线，不改变 `runGuarded` 的五道验证、grant 校验与审计：
+
+- **客户端壳**：AndroidX BiometricPrompt / Windows Hello / Touch ID；Windows/macOS 经 preload 的 Capacitor 兼容 shim 与 IPC 白名单调用，无传感器自动回落。
+- **Web**：WebAuthn 平台通行密钥（`core/biometric-web.js` 按需懒加载，不入任何 HTML）。首用弹窗征得同意后本地登记，确认时 `credentials.get()` 由 OS 生物识别把关；表单/REST 与 AI 确认卡两条链路均接入。取消即中止本次确认，无平台认证器、未启用或任何异常一律放行（增强不是门槛）；凭据 id 仅存本浏览器，不能用于登录、不上传服务器。
+- **边界**：纯本地因子，服务端零感知、零改动；红级仍以 OTP 为准，服务端可验证的 FIDO2/Passkey 因子仍属路线图（安全自评 R-05）。
 
 ## 5. Saga 长程任务（生日订花演示）
 

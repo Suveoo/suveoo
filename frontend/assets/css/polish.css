@@ -985,3 +985,20 @@ body[data-page="demo-lab"] #content > .card:last-child { margin-bottom: 0; }
 .ph-banner svg { flex: none; color: #C2410C; }
 .ph-switch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 8px; padding: 8px 10px; border-radius: 10px; background: rgba(30, 42, 120, .05); } /* 第九十四轮补：margin 上移收紧与标题间距 */
 .ph-switch-btn { border: none; background: none; color: var(--color-navy, #1E2A78); font-weight: 600; cursor: pointer; font-size: 12.5px; text-decoration: underline; padding: 0; }
+
+/* ===== §46 评测看板 v2（2026-10-28）：九项指标表 + 四模型消融矩阵 ===== */
+.bench-table td { vertical-align: top; }
+.bench-abl th, .bench-abl td { text-align: center; white-space: nowrap; }
+.bench-abl th:first-child, .bench-abl td:first-child { text-align: left; }
+.bench-evi { display: block; margin-top: 3px; font-size: 11px; color: var(--color-ink-2); word-break: break-all; }
+
+/* 指标表四列版（2026-10-28 二次调整，队长令「拆分成更多列」）：
+   方法与证据拆成两列，各列文本量下降；列宽按内容配比，方法与证据之间加 1px 竖线分隔 */
+.bench-metrics th:nth-child(1) { width: 24%; }
+.bench-metrics th:nth-child(2) { width: 10%; }
+.bench-metrics th:nth-child(3) { width: 40%; }
+.bench-metrics th:nth-child(4) { width: 26%; }
+.bench-metrics td { padding-top: 13px; padding-bottom: 13px; }
+.bench-metrics td .muted.small { line-height: 1.55; }
+.bench-metrics th:nth-child(4), .bench-metrics td:nth-child(4) { border-left: 1px solid var(--color-line); padding-left: 16px; }
+.bench-metrics td:nth-child(4) { vertical-align: middle; }

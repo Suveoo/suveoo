@@ -1,4 +1,15 @@
 /* genui/consent.js — 两段式确认弹窗（黄/红；红级内嵌 OTP；标题/图标按 IR intent 定制） */
+/* Web 版本地门懒加载器：biometric-web.js 不入任何 HTML（客户端壳零加载零影响），
+ * 黄级确认首次触发时按需注入；URL 跟随全站资产版本号（i18n.js 同款提取）防缓存错配 */
+S.bioWebLoad = () => new Promise((resolve, reject) => {
+  if (window.S.bioWeb) return resolve();
+  const av = (document.querySelector('script[src*="?v="]')?.src.match(/[?&]v=([a-z0-9]+)/) ?? [])[1] ?? "";
+  const s = document.createElement("script");
+  s.src = `/assets/js/core/biometric-web.js${av ? `?v=${av}` : ""}`;
+  s.onload = () => resolve();
+  s.onerror = () => reject(new Error("biometric-web load failed"));
+  document.head.appendChild(s);
+});
 S.consent = {
   /** data = 202 INPUT_REQUIRED 响应体。resolve(null)=取消，resolve({otp})=确认。
    *  opts.action 覆盖 IR intent（目前仅存款页传 "deposit"——与申购共用 wealth_product_purchase intent）；
@@ -38,14 +49,23 @@ S.consent = {
       box.querySelector("#ck-ok").onclick = async () => {
         const otp = box.querySelector("#ck-otp")?.value.trim();
         if (red && !/^\d{6}$/.test(otp ?? "")) { S.ui.toast(S.t("consent.otpNeeded"), true); return; }
-        /* 第六十六轮：黄级确认执行前本地生物识别在场校验（仅 Android 壳；红级照旧邮件 OTP，
-         * 叠加不替换；Web 无 Capacitor 分支零影响；插件异常/设备无生物识别一律放行——
-         * 生物识别是增强不是门槛，绝不因其缺失或故障阻断业务） */
-        if (!red && window.Capacitor?.Plugins?.Biometric) {
-          try {
-            const v = await window.Capacitor.Plugins.Biometric.verify();
-            if (v && v.ok === false) { S.ui.toast(S.t("bio.verifyCancel"), true); return; }
-          } catch { /* 插件异常放行 */ }
+        /* 黄级确认执行前本地生物识别在场校验（第六十六轮起；web 分支本轮新增）：
+         * 客户端壳经 Capacitor（Android 原生 / Win·mac 兼容 shim）→ AndroidX BiometricPrompt /
+         * Windows Hello / Touch ID；web → WebAuthn 平台通行密钥（S.bioWeb，同款 OS 生物识别、
+         * 纯本地、懒加载）。红级照旧 OTP，叠加不替换。「增强不是门槛」：取消各自语义处理，
+         * 插件/加载/校验异常一律放行，绝不因缺失或故障阻断业务。 */
+        if (!red) {
+          if (window.Capacitor?.Plugins?.Biometric) {
+            try {
+              const v = await window.Capacitor.Plugins.Biometric.verify();
+              if (v && v.ok === false) { S.ui.toast(S.t("bio.verifyCancel"), true); return; }
+            } catch { /* 插件异常放行 */ }
+          } else {
+            try {
+              const g = await S.bioWebLoad().then(() => S.bioWeb.gate());
+              if (g === "cancel") { S.ui.toast(S.t("bio.verifyCancel"), true); return; }
+            } catch { /* 加载/校验异常放行 */ }
+          }
         }
         onEvent?.("consent_granted");
         S.ga4.event("consent_grant", { tier });
