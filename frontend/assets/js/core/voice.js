@@ -154,7 +154,17 @@ S.voice = (() => {
       /* Android WebView 自动播放策略：getUserMedia 的 await 已消耗手势上下文，ctx 可能 suspended */
       if (ctx.state === "suspended") ctx.resume().catch(() => { /* resume 失败不阻断——ScriptProcessor 可能仍回调 */ });
       const wsUrl = (S.api.base || location.origin).replace(/^http/, "ws");
-      const ws = new WebSocket(`${wsUrl}/api/voice/stream?t=${encodeURIComponent(S.api.token ?? "")}`);
+      /* P2-10：不再把长期 JWT 拼进 URL——先用会话换 90 秒一次性票据（单次消费），
+         令牌只出现在请求头里，不会落进访问日志。 */
+      let vt = "";
+      try { const tr = await S.api.post("/api/voice/ticket", {}); vt = tr?.data?.ticket ?? ""; } catch { vt = ""; }
+      if (!vt) {
+        S.ui.toast(S.t("voice.err"), true);
+        try { stream?.getTracks().forEach((t) => t.stop()); } catch { /* ignore */ }
+        try { await ctx.close(); } catch { /* ignore */ }
+        return;
+      }
+      const ws = new WebSocket(`${wsUrl}/api/voice/stream?ticket=${encodeURIComponent(vt)}`);
       ws.binaryType = "arraybuffer";
       const st = { ws, ctx, stream, btn, input, committed: "", partial: "", onFinal: opts.onFinal ?? null, timer: null, hsTimer: null, done: false, discard: false, pending: [], live: false, srcRate: ctx.sampleRate || 16000 };
       s2 = st;

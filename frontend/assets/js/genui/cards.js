@@ -84,10 +84,12 @@ S.genuiCards = {
     /* 修复 5：长程任务确认卡按 task_type 分型——birthday/reminder/goal_contribution 不再套"预约转账确认"（前缀兼容口径同后端） */
     const tt = c.action === "scheduled_task_create" ? String(p.task_type ?? "") : "";
     const isBd = tt.startsWith("birthday_flower");
+    /* 2026-10-30 跨场景第二轮：定时代付/订购与生日别名同一执行分支，卡片文案分型 */
+    const isPurchase = tt === "scheduled_purchase";
     const isRem = tt === "reminder";
     const isGoalTask = tt === "goal_contribution";
-    const titleKey = isBd ? "genui.confirmBirthday" : isRem ? "genui.confirmReminder" : isGoalTask ? "genui.confirmGoalTask" : meta.title;
-    const fieldKey = isBd ? "genui.taskItem" : isRem ? "genui.remindItem" : isGoalTask ? "genui.goalName" : meta.field;
+    const titleKey = isBd ? "genui.confirmBirthday" : isPurchase ? "genui.confirmOrder" : isRem ? "genui.confirmReminder" : isGoalTask ? "genui.confirmGoalTask" : meta.title;
+    const fieldKey = isBd ? "genui.taskItem" : isPurchase ? "genui.purchaseItem" : isRem ? "genui.remindItem" : isGoalTask ? "genui.goalName" : meta.field;
     /* 主字段取值：转账收收款人、理财/存款收产品名（subject 由调用方传入）、缴费收账单号；
        birthday 收预订内容（缺 item 回落任务标题）、reminder 收任务标题 */
     let subject = c.subject ?? null;
@@ -99,7 +101,7 @@ S.genuiCards = {
       else if (c.action === "deposit_open") subject = p.product_display ?? p.product_id ?? null;
       else if (c.action === "task_cancel") subject = p.task_title ?? ("#" + (p.task_id ?? "—"));
       else if (c.action === "fx_exchange") subject = null;
-      else if (isBd) subject = p.item ?? p.title ?? null;
+      else if (isBd || isPurchase) subject = p.item ?? p.title ?? null;
       else if (isRem) subject = p.title ?? null;
       else if (isGoalTask) subject = p.goal_name ?? ("#" + (p.goal_id ?? "—"));
       else if (c.action === "goal_create") subject = p.name ?? null;
@@ -152,8 +154,16 @@ S.genuiCards = {
         ] : []),
         ...(c.action === "task_cancel" && p.task_next != null ? [[S.t("genui.executeAt"), S.fmt.datetimeSec(p.task_next)]] : []),
         ...(c.action === "scheduled_task_create" && p.execute_at != null ? [[S.t("genui.executeAt"), S.fmt.datetimeSec(p.execute_at)]] : []),
+        /* 定时代付：场景/送给谁/模拟商户/备注——空值不显示（资金来源与去向都不在这里，收款仍是模拟商户） */
+        ...(isPurchase && p.occasion != null && String(p.occasion) !== "" ? [[S.t("genui.occasion"), S.fmt.escape(String(p.occasion))]] : []),
+        ...(isPurchase && p.recipient_name != null && String(p.recipient_name) !== "" ? [[S.t("genui.recipient"), S.fmt.escape(String(p.recipient_name))]] : []),
+        ...(isPurchase && p.merchant != null && String(p.merchant) !== "" ? [[S.t("genui.merchant"), S.fmt.escape(String(p.merchant))]] : []),
+        ...(isPurchase && p.note != null && String(p.note) !== "" ? [[S.t("genui.memo"), S.fmt.escape(String(p.note))]] : []),
         ...(c.action === "scheduled_task_create" && p.repeat != null ? [[S.t("genui.repeatRule"), p.repeat === "monthly" ? S.t("sch.monthly") : p.repeat === "yearly" ? S.t("sch.yearly") : S.t("sch.once")]] : []),
         ...(c.action === "card_limit_adjust" && p.new_limit != null ? [[S.t("genui.newLimit"), "¥" + S.fmt.moneyPlain(p.new_limit)]] : []),
+        ...(c.action === "card_limit_adjust" && p.new_daily_limit != null ? [[S.t("genui.limitDaily"), "¥" + S.fmt.moneyPlain(p.new_daily_limit)]] : []),
+        ...(c.action === "card_limit_adjust" && p.alias != null && String(p.alias) !== "" ? [[S.t("genui.alias"), S.fmt.escape(String(p.alias))]] : []),
+        ...(c.action === "card_limit_adjust" && p.set_default != null ? [[S.t("genui.defaultCard"), p.set_default ? S.t("genui.stateOn") : S.t("genui.stateOff")]] : []),
         ...(c.action === "subscription_reminder_toggle" ? [
           [S.t("genui.reminderState"), p.enabled ? S.t("genui.stateOn") : S.t("genui.stateOff")],
         ] : []),
@@ -179,7 +189,8 @@ S.genuiCards = {
         <div class="sol-line sol-total"><span class="grow muted">${S.fmt.escape(S.t("genui.solutionTotal"))}</span><span class="mono">¥${S.fmt.moneyPlain(p.total_amount)}</span></div>
       </div>` : ""}
       ${c.action === "solution_package_purchase" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.solutionNote"))}</p>` : ""}
-      ${isBd && amtText ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.lockNote", S.fmt.moneyPlain(rawAmt)))}</p>` : ""}
+      ${(isBd || isPurchase) && amtText ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.lockNote", S.fmt.moneyPlain(rawAmt)))}</p>` : ""}
+      ${isPurchase ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.purchaseMockNote"))}</p>` : ""}
       ${c.action === "subscription_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.subCancelNote"))}</p>` : ""}
       ${c.action === "task_cancel" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.taskCancelNote"))}</p>` : ""}
       ${c.action === "goal_contribute" ? `<p class="small muted" style="margin-top:8px">${S.fmt.escape(S.t("genui.goalNote"))}</p>` : ""}
@@ -213,8 +224,16 @@ S.genuiCards = {
       ${S.genuiCards.kv([[S.t("genui.budget"), c.snapshot?.params?.amount ? "¥" + c.snapshot.params.amount : null]])}</div>`;
   },
   card_setting_confirm(c) {
+    /* 卡片设置卡（限额/别名/默认卡）：展示与 grant 快照的授权字段一一对应——看得见的就是锁得住的 */
+    const p = c.snapshot?.params ?? {};
     return `<div class="genui-card"><div class="gc-head">${S.ui.icon("gear", 16)} ${S.t("genui.cardSetting")} ${S.ui.tierBadge(c.tier)}</div>
-      ${S.genuiCards.kv([[S.t("genui.card"), c.snapshot?.params?.card_id], [S.t("genui.newLimit"), c.snapshot?.params?.new_limit ? "¥" + c.snapshot.params.new_limit : null]])}</div>`;
+      ${S.genuiCards.kv([
+        [S.t("genui.card"), p.card_id],
+        [S.t("genui.newLimit"), p.new_limit ? "¥" + S.fmt.moneyPlain(p.new_limit) : null],
+        [S.t("genui.limitDaily"), p.new_daily_limit ? "¥" + S.fmt.moneyPlain(p.new_daily_limit) : null],
+        [S.t("genui.alias"), p.alias != null && String(p.alias) !== "" ? S.fmt.escape(String(p.alias)) : null],
+        [S.t("genui.defaultCard"), p.set_default ? S.t("genui.stateOn") : null],
+      ])}</div>`;
   },
   fx_quote(c) {
     return `<div class="genui-card"><div class="gc-head">${S.ui.icon("exchange", 16)} ${S.t("genui.fxTitle")}</div>

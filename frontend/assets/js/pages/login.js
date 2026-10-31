@@ -4,7 +4,8 @@
  * ③会话过期提示（api.js 401 跳转时置位 sessionStorage，本页一次性消费后显示 amber 提示行）。 */
 S.router.register("login", async () => {
   const c = document.getElementById("content");
-  const next = new URLSearchParams(location.search).get("next") || "/home";
+  /* P3-15：next 只接受站内路径（//evil.com、绝对 URL、javascript: 一律回落 /home） */
+  const next = S.fmt.safeNext(new URLSearchParams(location.search).get("next"), "/home");
   const HINT_KEY = "suveoo_login_hint";
   const expired = sessionStorage.getItem("suveoo_session_expired");
   if (expired) sessionStorage.removeItem("suveoo_session_expired");

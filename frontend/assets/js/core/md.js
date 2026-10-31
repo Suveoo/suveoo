@@ -1,10 +1,23 @@
 /* md.js — 极简安全 Markdown 渲染器（AI 对话气泡用）
-   安全模型：先整体 HTML 转义，再仅生成白名单标签（strong/em/code/pre/a[http(s)]/ul/ol/table/blockquote/hr/h3-h5）；
-   链接仅接受 http(s) 并强制 target/rel；不引入任何外部依赖。 */
+   安全模型：先整体 HTML 转义（含引号，P0-2 2026-10-30），再仅生成白名单标签
+   （strong/em/code/pre/a[http(s)]/ul/ol/table/blockquote/hr/h3-h5）；
+   链接只接受 http(s)（safeUrl 二次校验协议）并强制 target/rel；不引入任何外部依赖。 */
 S.md = {
+  /** 链接出口：只放行 http/https；解析失败或其它协议一律回空串（href="" 不执行脚本）。
+   *  P0-2：仅靠"转义引号"还不够——这里再做一层协议白名单，防 javascript:/data: 变体。 */
+  safeUrl(url) {
+    try {
+      const base = typeof location !== "undefined" && location.origin ? location.origin : "https://suveoo.com";
+      const u = new URL(String(url ?? ""), base);
+      return u.protocol === "https:" || u.protocol === "http:" ? u.href : "";
+    } catch { return ""; }
+  },
   render(src) {
     if (!src) return "";
-    let text = String(src).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    /* P0-2：补转 " 与 ' ——之前只转 &<>，模型输出里的引号可以闭合 href 属性并注入事件处理器
+       （实测 https://suveoo.com/x"onmouseover="... 可执行）。 */
+    let text = String(src).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     /* 1. 围栏代码块先摘出（占位符保护） */
     const fences = [];
     text = text.replace(/```([a-zA-Z0-9+#-]*)\r?\n?([\s\S]*?)(```|$)/g, (m, lang, code) => {
@@ -91,7 +104,7 @@ S.md = {
     const embed = m && S.toolPages ? `<div class="tool-embed" data-tool="${m[1]}" data-query="${m[2] ?? ""}" hidden></div>` : "";
     /* 壳内去 target=_blank：无多窗口支持本就同窗导航，剥 origin 后相对直达，返回手势可回聊天 */
     const tgt = !S.api || !S.api.base ? ' target="_blank" rel="noopener noreferrer"' : "";
-    return `<a class="tool-open" href="${this.siteHref(url)}"${tgt}>${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>${embed}`;
+    return `<a class="tool-open" href="${this.safeUrl(this.siteHref(url))}"${tgt}>${S.ui.icon("calc", 18)}<span>${S.fmt.escape(S.t("ai.toolOpen"))}</span>${S.ui.icon("arrow-right", 16)}</a>${embed}`;
   },
   /* 行内：代码 span → 工具深链按钮（先于普通链接；输出经 \u0000T 占位符保护，防后续裸 URL 正则嵌套命中已生成的 href）→
      站内裸 URL（仅 suveoo.com 域；工具深链转按钮卡，其余渲染为同窗可点链接，外链裸形式不放行）→
@@ -108,14 +121,14 @@ S.md = {
     /* 裸 URL：前缀不得是 URL 字符或 '('（避免截断 markdown 链接括号内的地址）；句读全角标点不入链；结尾实体剥除 */
     s = s.replace(/(?<![\w\/.=&,(])(https:\/\/suveoo\.com\/[^\s<)）」』】。，；、！？：]+)/g, (m) => {
       const url = m.replace(/(?:&gt;|&amp;)+$/, "");
-      return this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : `<a href="${this.siteHref(url)}">${url}</a>`;
+      return this.toolLinkRe.test(url) ? keep(this.toolCard(url)) : `<a href="${this.safeUrl(this.siteHref(url))}">${url}</a>`;
     });
     s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, t, url) => {
-      if (/^https:\/\/(www\.)?suveoo\.com\//i.test(url)) return `<a href="${this.siteHref(url)}">${t}</a>`;
+      if (/^https:\/\/(www\.)?suveoo\.com\//i.test(url)) return `<a href="${this.safeUrl(this.siteHref(url))}">${t}</a>`;
       /* 外链：Web 新标签；壳内同窗（Java 路由进 App 内嵌浏览器，_blank 无多窗口支持本就同窗） */
       return !S.api || !S.api.base
-        ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${t}</a>`
-        : `<a href="${url}">${t}</a>`;
+        ? `<a href="${this.safeUrl(url)}" target="_blank" rel="noopener noreferrer">${t}</a>`
+        : `<a href="${this.safeUrl(url)}">${t}</a>`;
     });
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");

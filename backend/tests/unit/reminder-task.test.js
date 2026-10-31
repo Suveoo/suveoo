@@ -70,8 +70,8 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
       expect(AI_SYSTEM_PROMPT, `缺失语义：${name}`).toContain(phrase);
     }
   });
-  it("提示词瘦身达标（≤2200 字符；第二十七轮 1500→1600；第五期 idle 1600→2050；第一百六十二轮 2050→2198：规则 13 查询主语核验（148 字）为数据隔离语义层必需项）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2200);
+  it("提示词瘦身达标（≤2600 字符；第二十七轮 1500→1600；第五期 idle 1600→2050；第一百六十二轮 2050→2198；第二百零七轮 2200→2600：规则 10.1 模拟商户代付/订购）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2600);
   });
   it("systemPromptWithDate 注入当前客户实名（规则 13 的比对基准）", () => {
     expect(systemPromptWithDate("顾清羽")).toContain("当前登录客户实名：顾清羽");
@@ -79,10 +79,10 @@ describe("AI_SYSTEM_PROMPT 安全语义锁定", () => {
     expect(systemPromptWithDate()).not.toContain("当前登录客户实名：");
     expect(systemPromptWithDate("  ")).not.toContain("当前登录客户实名：");
   });
-  it("工具 desc 总量预算（≤7200 字符；第十一期 40→47；第五期 52→54；第一百零五轮 54→60；第一百二十六轮 +card_loss 三工具 60→63，6800→7200）", () => {
+  it("工具 desc 总量预算（≤8100 字符；第十一期 40→47；第五期 52→54；第一百零五轮 54→60；第一百二十六轮 +card_loss 三工具 60→63，6800→7200；第二百零七轮 7300→7700，7700→7900，7900→8100：scheduled_purchase/funds_lock/砍价与频率口径）", () => {
     expect(MCP_TOOLS).toHaveLength(63); /* 第一百零五轮 +plan_preview/batch_execute；第一百二十六轮 +card_loss 三工具 */
     const total = MCP_TOOLS.reduce((a, t) => a + t.desc.length, 0);
-    expect(total).toBeLessThanOrEqual(7300);
+    expect(total).toBeLessThanOrEqual(8100);
   });
   it("proposal_list 只读且引导页面执行（AI 主动银行：AI 只能提议）", () => {
     const t = MCP_TOOLS.find((t) => t.name === "proposal_list");

@@ -2,7 +2,7 @@
   "name": "suveoo-windows",
   "productName": "Suveoo",
   "private": true,
-  "version": "3.186.0",
+  "version": "3.188.0",
   "description": "Suveoo for Windows — Agentic Banking Control Plane desktop shell",
   "main": "main/main.js",
   "scripts": {
@@ -47,7 +47,8 @@
           "!**/*.md",
           "!.mimosa/**",
           "!assets/images/cards-front/**/*.jpg",
-          "!assets/images/cards-front/**/*.svg"
+          "!assets/images/cards-front/**/*.svg",
+          "!docs/**/*.pdf"
         ]
       },
       {

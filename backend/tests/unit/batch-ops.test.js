@@ -72,8 +72,8 @@ describe("操作组合硬校验（hardPolicyDenials batch_execute）", () => {
 });
 
 describe("提示词预算（规则 12 并入后）", () => {
-  it("AI_SYSTEM_PROMPT ≤ 2200 字符（第一百六十二轮 2050→2198：规则 13 查询主语核验为数据隔离语义层必需项）", () => {
-    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2200);
+  it("AI_SYSTEM_PROMPT ≤ 2600 字符（第一百六十二轮 2050→2198；第二百零七轮 2200→2600：规则 10.1 模拟商户代付/订购与路由判据）", () => {
+    expect(AI_SYSTEM_PROMPT.length).toBeLessThanOrEqual(2600);
   });
 });
 

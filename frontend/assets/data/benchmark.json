@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "generated_at": "2026-10-28T12:00:00+08:00",
-  "note": "本页全部数字为实测：仓库自动化测试（vitest 63 文件 473 用例，2026-10-27 实跑）+ 生产黑盒评测（2026-10-06 板块一，拦截类 106 断言 + 准确率类 122 用例，合计 228 项全部通过）+ 四模型消融（GLM/Qwen3.8/DeepSeek/Kimi 同套用例全指标一致）。原始产物归档于公开仓库 docs/benchmarks/（github.com/Suveoo/suveoo），53 份原始文件在 for_developer/bench-results/20261006/。未设「关闭 Verification Runtime」对照臂——线上通道无此模式，不做未实测声明；四模型同套用例全部一致即安全边界由架构保证的实证。",
+  "note": "本页全部数字为实测：仓库自动化测试（vitest 77 文件 537 用例，2026-10-30 实跑）+ 生产黑盒评测（2026-10-06 板块一，拦截类 106 断言 + 准确率类 122 用例，合计 228 项全部通过）+ 四模型消融（GLM/Qwen3.8/DeepSeek/Kimi 同套用例全指标一致）。原始产物归档于公开仓库 docs/benchmarks/（github.com/Suveoo/suveoo），53 份原始文件在 for_developer/bench-results/20261006/。未设「关闭 Verification Runtime」对照臂——线上通道无此模式，不做未实测声明；四模型同套用例全部一致即安全边界由架构保证的实证。",
   "metrics": [
     {
       "id": "S1",
@@ -171,8 +171,8 @@
     "repo": "https://github.com/Suveoo/suveoo"
   },
   "suite": {
-    "files": 63,
-    "cases": 473,
+    "files": 77,
+    "cases": 537,
     "attack_assertions": 66,
     "live_blocking": 106,
     "live_accuracy": 122,

@@ -98,9 +98,10 @@ S.router.register("intrabank-scheduled", async ({ user } = {}) => {
     if (seq !== lookupSeq) return;
     if (r.ok && r.data?.found) {
       contactAcct = isPhone ? S.phone.normCN(rawV) : rawV;
+      /* P2-12：服务端只回 found（不再回姓名/掩码），姓名由用户自行填写——
+         避免"输入手机号即查实名"的免费查询接口 */
       acctSt.className = "tf-st ok";
-      acctSt.innerHTML = `${S.ui.icon("check", 13)} ${S.fmt.escape(S.t("transfer.contactFound", "已找到 Suveoo 用户"))} <b>${S.fmt.escape(r.data.name)}</b> · ${S.fmt.escape(r.data.masked)}`;
-      document.getElementById("s-name").value = r.data.name;
+      acctSt.innerHTML = `${S.ui.icon("check", 13)} ${S.fmt.escape(S.t("transfer.contactFound", "已找到 Suveoo 用户"))} · ${S.fmt.escape(S.t("transfer.nameManual", "请填写收款人姓名以便核对"))}`;
       setSameWarn(false);
     } else {
       contactAcct = null;

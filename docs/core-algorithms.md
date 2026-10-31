@@ -1,6 +1,6 @@
 # Suveoo — 核心算法说明
 
-> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 463 个 vitest 用例，跑在真实 workerd 运行时）
+> 配套代码：`backend/worker-main.js`（全部算法为确定性纯函数，随附 545 个 vitest 用例，跑在真实 workerd 运行时）
 
 ## 1. 十进制金额运算（防浮点幻觉）
 
@@ -22,12 +22,12 @@ centsToStr(50055n) = "500.55"
 | 验证器 | 算法要点 |
 |--------|----------|
 | ① Policy | 注册表三色规则 + 动态升级（日累计 >¥1,000 → 红）+ 硬拒绝（非法金额；AI 通道转账单笔 ¥5,000 / 日 ¥10,000 上限） |
-| ② Consent | `grant_hash = SHA256(action ‖ 授权字段(按 Schema 顺序) ‖ user_id ‖ expires_at ‖ nonce)`；确认时**服务端凭哈希查 KV**：条目存在 ∧ 绑定当前用户 ∧ 未过期 ∧ 未消费 ∧ 快照与当前 IR 逐字段相等，才消费放行。绝不"重算比对"。 |
+| ② Consent | `grant_hash = SHA256(action ‖ 授权字段(按 Schema 顺序) ‖ user_id ‖ expires_at ‖ nonce)`；确认时**服务端凭哈希查 KV**：条目存在 ∧ 绑定当前用户 ∧ 未过期 ∧ 未消费 ∧ 快照与当前 IR 逐字段相等，才消费放行。授权字段由 `TOOL_SCHEMA.authFields` 按工具声明（含批量 items 与定时代付 item）；标量保型、对象按排序键规范化；grant 绑定签发 tier，执行时不得跨级复用。绝不"重算比对"。 |
 | ③ Provenance/Taint | 授权字段（recipient/amount/currency 等）的 trust 必须 TRUSTED；商户备注/OCR 等外部来源只能影响认知（可传入分析），不能获得行动授权——先于 Consent 执行，被污染参数连请求授权的资格都没有 |
 | ④ Invariants | 余额守恒（amount ≤ 可用余额）、理财适当性（product.R ≤ user.PR）、长程任务必须声明补偿；strict 模式下数据缺失即拒绝 |
 | ⑤ Replay | IR.nonce 在 LedgerDO 幂等集查重，命中拒绝；执行成功后登记 |
 
-绿色工具走轻量通道（仅 Provenance 标注）；黄/红走全五道；红级另需邮箱 OTP（redstep 场景，验证码哈希存储、错 5 次作废）。
+绿色工具走轻量通道（仅 Provenance 标注）；黄/红走全五道；红级另需短信/邮箱双通道 OTP（redstep 场景，验证码哈希存储、一次性消费、错 5 次作废）。
 
 ## 4. Verified GenUI（A2UI 的安全化）
 
@@ -35,7 +35,7 @@ LLM 只输出组件意图；卡片上的收款人/金额/费率**只来自已验
 
 ## 5. Saga 补偿与调度
 
-长程任务（生日订花/预约转账）三段式：`T1 LockFunds → T2 履约 → (失败) C1 UnlockFunds`。故障注入开关（DEMO_MODE）将 T2 标记失败，`taskDue` 返回 `["T1 ✓","T2 ✗","C1 ✓"]` 并解锁资金——余额守恒由测试断言。调度：SagaDO `alarm()` 精确唤醒 + 读路径 `sweepDue` 补偿扫描（alarm 丢失兜底）；monthly 任务执行后自动重排。
+长程任务（定时代付/订购 scheduled_purchase、生日别名 birthday_flowers、预约转账）三段式：`T1 LockFunds → T2 履约 → (失败) C1 UnlockFunds`。故障注入开关（DEMO_MODE）将 T2 标记失败，`taskDue` 返回 `["T1 ✓","T2 ✗","C1 ✓"]` 并解锁资金——余额守恒由测试断言。调度：SagaDO `alarm()` 精确唤醒 + 读路径 `sweepDue` 补偿扫描（alarm 丢失兜底）；monthly 任务执行后自动重排。
 
 ## 6. 卡号生成与开户分配
 
@@ -43,13 +43,13 @@ LLM 只输出组件意图；卡片上的收款人/金额/费率**只来自已验
 
 ## 7. 认证与口令
 
-JWT HS256（1h，jti 黑名单登出）；PBKDF2-SHA256 100,000 轮 + 16B 盐 + 常数时间比较；登录 15 分钟内错 5 次锁定；邮箱验证码 60s 冷却 / 每小时 5 次 / 10 分钟有效 / 哈希存储。
+JWT HS256（1h，jti 黑名单登出）；PBKDF2-SHA256 100,000 轮 + 16B 盐 + 常数时间比较；登录 15 分钟内错 5 次锁定；短信/邮箱验证码 60s 冷却 / 每小时 5 次 / 10 分钟有效 / 哈希存储 / 一次性消费。
 
 ## 8. 复杂度与规模
 
 - 单 Worker 冷启动 <50ms（无重依赖；pdf-lib 与 fontkit 动态 import）
 - 每用户一个 LedgerDO（SQLite）：转账路径 O(1) 索引查询 + 两条 SQL
-- 测试：全量 63 文件 463 用例全绿（含四模型消融各跑一遍；本算法域早期规模 99 用例。另有 Windows/macOS 桌面壳单测 81 例独立套件，不属本算法域）
+- 测试：全量 78 文件 545 用例全绿（unit 26 / integration 45 / attack 7；四模型消融基线为 463。另有 Windows/macOS 桌面壳单测 34 + 47 例独立套件，不属本算法域）
 
 
 ## 7. 基金数据生成模型（backend/scripts/gen-fund-data.mjs，确定性）

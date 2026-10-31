@@ -14,6 +14,8 @@
 | Android 客户端 | 仅最新 versionCode；更新清单远程强制线 `minVersionCode` 可阻断旧版 |
 | Windows / macOS 客户端 | 仅 `/download` 与 R2 manifest 提供的最新发布版 |
 
+当前客户端发布线：**v3.188.0**（Android vc82 / Windows·macOS vc3188000）。
+
 历史版本不提供安全回溯修补；客户端旧版本会被更新链的强制线主动阻断。
 
 ## 2. 如何报告漏洞
@@ -74,7 +76,7 @@
 
 1. **IR 编译**：自然语言与表单统一编译为结构化操作；LLM 无自造交易结果的能力——所有结果 JSON 来自账本执行层（幻觉防护），金额边界为字符串、内核 BigInt；
 2. **Provenance / Taint Check**：每个 IR 事实携带来源与可信等级，被污染参数（商户备注/用户输入等）在请求授权**之前**即被拦截；
-3. **Policy 三色分级**：GREEN 自动执行 / YELLOW 确认（服务端签发 grant，生产 TTL 300s）/ RED 强验证（邮箱 OTP：哈希存储、60s 冷却、错 5 次作废、10 分钟有效）；
+3. **Policy 三色分级**：GREEN 自动执行 / YELLOW 确认（服务端签发 grant，生产 TTL 300s）/ RED 强验证（短信/邮箱双通道 OTP：哈希存储、60s 冷却、一次性消费、错 5 次作废、10 分钟有效）；借记卡单笔/日累计限额在执行层独立强制；
 4. **Consent Binding**：`grant_hash` 绑定参数级快照——确认前改任何授权字段即失效；nonce 幂等集防重放；
 5. **Financial Invariants**：余额守恒（含锁定金额）、PR 适当性匹配、跨用户转账双记（收款方 credit 成功才扣款）。
 
@@ -86,11 +88,11 @@
 
 **三端客户端壳**：CORS 仅五源白名单（`SHELL_ORIGINS`）；本地资产协议防路径穿越；更新链强制 https + suveoo.com 域白名单、sha256 逐包校验、仅执行自家 updates 目录内工件、远程强制线；IPC 白名单 16 方法 + 入参形状校验；生物识别走系统级（Android BiometricPrompt / Windows Hello / Touch ID），凭据 safeStorage 加密落盘（DPAPI / Keychain），无传感器自动回落密码/OTP、不降级安全语义。
 
-**测试面**：vitest 463（后端）+ 34（Windows 壳）+ 47（macOS 壳）；attack 六文件（注入两代 / 越权 / 重放 / 同意突变 / 授权伪造）；生产黑盒 228 断言；四模型消融（GLM / Qwen3.8 / DeepSeek / Kimi K3）全部核心指标一致。证据见 `docs/security-self-assessment.md` 与 `docs/benchmarks/`。
+**测试面**：vitest 545（后端）+ 34（Windows 壳）+ 47（macOS 壳）；attack 七文件（注入两代 / 越权 / 重放 / 同意突变含 v2 / 授权伪造）；生产黑盒 228 断言；四模型消融（GLM / Qwen3.8 / DeepSeek / Kimi K3）全部核心指标一致。证据见 `docs/security-self-assessment.md` 与 `docs/benchmarks/`。
 
 ## 6. 已知风险与已披露项
 
-我们以**诚实披露**方式维护已知风险清单——如 KV 消费非原子的极短并发窗口、JWT 无刷新令牌、WebAuthn 未实现、注入检测为启发式规则等——完整清单见 `docs/security-self-assessment.md` §2（R-01～R-10）。这些属于已知取舍或已排期加固项，**重复报告不计入致谢**；但**绕过既有缓解措施的新利用链**仍在报告范围内。
+我们以**诚实披露**方式维护已知风险清单——如 KV 消费非原子的极短并发窗口、JWT 无刷新令牌、**红级服务端可验证 Passkey 仍在路线图（Web 黄级本机 WebAuthn 门已启用）**、注入检测为启发式规则等——完整清单见 `docs/security-self-assessment.md` §2（R-01～R-10）。这些属于已知取舍或已排期加固项，**重复报告不计入致谢**；但**绕过既有缓解措施的新利用链**仍在报告范围内。
 
 ## 7. 秘密与凭据政策
 

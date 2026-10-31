@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TEST_PASSWORD } from "../helpers/test-creds.js";
-import { SELF } from "cloudflare:test";
+import { SELF, env } from "cloudflare:test";
 
 /** 队员自助灌入（/demo-lab）：登录态门、动态收款人数据源、真实性核对、幂等、自查。 */
 const BASE = "https://suveoo.com";
@@ -9,7 +9,7 @@ const PASSWORD = TEST_PASSWORD;
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {
     method: "POST",
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(env.ADMIN_TOKEN ? { "x-admin-token": env.ADMIN_TOKEN } : {}) },
     body: JSON.stringify(body ?? {}),
   }, 20000);
 }
@@ -31,9 +31,9 @@ describe("self-seed（/demo-lab 隐藏入口）", () => {
     const src2 = await registerUser(env, "labsrc2@demo.suveoo.com", "张三"); // 低拟真名 → 尾部
     const src3 = await registerUser(env, "labsrc3@gmail.com", "路人乙"); // 非 suveoo 域名 → 不入数据源
 
-    const anon = await SELF.fetch(BASE + "/api/demo/self-seed"); expect(anon.status).toBe(401);
+    const anon = await SELF.fetch(BASE + "/api/demo/self-seed"); expect(anon.status).toBe(403); /* 令牌门先于登录门 */
 
-    const prev = await j(await SELF.fetch(BASE + "/api/demo/self-seed", { headers: { authorization: `Bearer ${member.token}` } }));
+    const prev = await j(await SELF.fetch(BASE + "/api/demo/self-seed", { headers: { authorization: `Bearer ${member.token}`, "x-admin-token": env.ADMIN_TOKEN } }));
 
     expect(prev.seed_version).toBeTruthy();
     const names = prev.payee_source.map((p) => p.name);
@@ -62,7 +62,7 @@ describe("self-seed（/demo-lab 隐藏入口）", () => {
     expect(r1.verification.payees_actual).toBeGreaterThanOrEqual(2);
 
     /* 回读：每位收款人卡号都能在 registry 命中（真实账户） */
-    const H = { authorization: `Bearer ${member.token}` };
+    const H = { authorization: `Bearer ${member.token}`, "x-admin-token": env.ADMIN_TOKEN };
     const payees = (await j(await SELF.fetch(BASE + "/api/payees", { headers: H }))).payees ?? [];
     expect(payees.length).toBe(r1.verification.payees_actual);
     const nums = payees.map((p) => p.account).filter((a) => /^\d{16}$/.test(String(a ?? "")));

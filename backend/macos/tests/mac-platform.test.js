@@ -1,8 +1,12 @@
 /** macOS 平台差异纯函数：返回键映射 / DMG 安装器候选 / 深链归一 / 动态路由重写（mac 补充面） */
 import { describe, it, expect } from "vitest";
+import os from "node:os";
+import path from "node:path";
 import { navKeyAction, classifyTarget } from "../main/navigation.js";
 import { installerCandidate } from "../main/update.js";
 import { rewriteDynamicRoutes, resolveAsset } from "../main/protocol.js";
+/* 测试跨平台可跑：断言一律先归一到 POSIX 分隔符（Windows 宿主/ mac VM 结果一致） */
+const slash = (s) => (s == null ? s : String(s).replace(/\\/g, "/"));
 
 describe("navKeyAction 返回/前进键映射", () => {
   const key = (o) => ({ type: "keyDown", key: "a", ...o });
@@ -31,18 +35,18 @@ describe("navKeyAction 返回/前进键映射", () => {
 });
 
 describe("installerCandidate DMG/zip 安装器候选（mac 安装语义）", () => {
-  const DIR = "/Users/u/Library/Application Support/Suveoo/updates";
+  const DIR = path.join(os.tmpdir(), "suveoo-updates-test");
   it("updates 目录内的 .dmg / .zip 入选", () => {
-    expect(installerCandidate(`${DIR}/suveoo-setup-3.183.0.dmg`, DIR)).toBe(`${DIR}/suveoo-setup-3.183.0.dmg`);
-    expect(installerCandidate(`${DIR}/suveoo-macos-3.183.0.zip`, DIR)).toBe(`${DIR}/suveoo-macos-3.183.0.zip`);
+    expect(slash(installerCandidate(path.join(DIR, "suveoo-setup-3.183.0.dmg"), DIR))).toBe(slash(path.join(DIR, "suveoo-setup-3.183.0.dmg")));
+    expect(slash(installerCandidate(path.join(DIR, "suveoo-macos-3.183.0.zip"), DIR))).toBe(slash(path.join(DIR, "suveoo-macos-3.183.0.zip")));
   });
   it(".exe 一律拒绝（Windows 残留语义不适用 mac）", () => {
-    expect(installerCandidate(`${DIR}/suveoo-setup-3.183.0.exe`, DIR)).toBeNull();
+    expect(installerCandidate(path.join(DIR, "suveoo-setup-3.183.0.exe"), DIR)).toBeNull();
   });
   it("目录外/穿越/其他后缀拒绝", () => {
-    expect(installerCandidate("/tmp/evil.dmg", DIR)).toBeNull();
-    expect(installerCandidate(`${DIR}/../evil.dmg`, DIR)).toBeNull(); // resolve 后落在目录外
-    expect(installerCandidate(`${DIR}/notes.txt`, DIR)).toBeNull();
+    expect(installerCandidate(path.join(os.tmpdir(), "evil.dmg"), DIR)).toBeNull();
+    expect(installerCandidate(path.join(DIR, "..", "evil.dmg"), DIR)).toBeNull(); // resolve 后落在目录外
+    expect(installerCandidate(path.join(DIR, "notes.txt"), DIR)).toBeNull();
     expect(installerCandidate(DIR, DIR)).toBeNull(); // 目录本身且无后缀
   });
   it("非字符串/空串拒绝", () => {
@@ -92,9 +96,9 @@ describe("rewriteDynamicRoutes 动态路由重写（镜像 worker-main.js；队�
     expect(rewriteDynamicRoutes("/")).toBe("/");
   });
   it("resolveAsset 落地：卡片三页与 /ai/s/{id} 在壳内可解析到真实文件（修复前 404）", () => {
-    expect(String(resolveAsset("/account/card/debit-card-4/history"))).toContain("account/card/history/index.html");
-    expect(String(resolveAsset("/account/card/credit-card-1/report-loss"))).toContain("account/card/report-loss/index.html");
-    expect(String(resolveAsset("/account/card/debit-card-2/settings"))).toContain("account/card/settings/index.html");
-    expect(String(resolveAsset("/ai/s/abc123"))).toContain("ai/index.html");
+    expect(slash(resolveAsset("/account/card/debit-card-4/history"))).toContain("account/card/history/index.html");
+    expect(slash(resolveAsset("/account/card/credit-card-1/report-loss"))).toContain("account/card/report-loss/index.html");
+    expect(slash(resolveAsset("/account/card/debit-card-2/settings"))).toContain("account/card/settings/index.html");
+    expect(slash(resolveAsset("/ai/s/abc123"))).toContain("ai/index.html");
   });
 });

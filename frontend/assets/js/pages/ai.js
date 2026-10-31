@@ -660,7 +660,7 @@ S.router.register("ai", async ({ user }) => {
       bar.replaceWith(done);
       S.trust.onEvent({ kind: okExec ? "RESULT" : "BLOCKED", ok: okExec, reason: out?.reason });
       /* 修复 4：birthday 建单确认执行成功 → Trust Console 演示注入按钮接通（此前 showDemo 全站零调用） */
-      if (okExec && out?.task_id && String(card.params?.task_type ?? "").startsWith("birthday_flower")) {
+      if (okExec && out?.task_id && (String(card.params?.task_type ?? "").startsWith("birthday_flower") || card.params?.task_type === "scheduled_purchase")) {
         S.trust.showDemo(async () => {
           const r2 = await S.api.post("/api/demo/inject-failure", { task_id: Number(out.task_id) });
           const btn = document.getElementById("tc-inject");

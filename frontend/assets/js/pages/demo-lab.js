@@ -1,12 +1,16 @@
 /* demo-lab.js — 队员隐藏数据入口（密码门 + 维度化拟真注入 + 数据源自查 + 预检/运行/核对）
-   服务端真门：DEMO_MODE + 登录态（只能灌自己账户）；前端密码仅是入口遮罩，非安全边界。
-   第三十五轮：四个正交维度（财富×薪资×职业×企业）+ 三种覆盖模式（覆盖/合并/自定义块勾选）。 */
+   服务端真门：DEMO_MODE + 管理员令牌 + 登录态（2026-10-30 复审 P1-6 后三条件齐备；前端密码仅是入口遮罩）。 */
 S.router.register("demo-lab", async ({ user }) => {
   if (!user) { location.replace("/account/login?next=/demo-lab"); return; }
   const c = document.getElementById("content");
   const UNLOCK_KEY = "suveoo.demoLabUnlocked";
+  /* 管理员令牌只存 sessionStorage（关标签即失效），随每个 self-seed 请求以 x-admin-token 下发 */
+  const ADMIN_KEY = "suveoo.demoAdminToken";
+  const adminTok = () => sessionStorage.getItem(ADMIN_KEY) || "";
+  const adminOpts = (rest = {}) => ({ ...rest, headers: { "x-admin-token": adminTok() } });
+  const adminRejected = (r) => !!r && r.status === 403 && (r.data?.reason === "ADMIN_FORBIDDEN" || r.data?.error?.code === "ADMIN_FORBIDDEN");
 
-  const renderLock = () => {
+  const renderLock = (msg) => {
     c.innerHTML = `
       <div class="dl-hero">
         <div class="dl-badge">${S.ui.icon("shield", 14)} Suveoo Data Lab</div>
@@ -17,19 +21,29 @@ S.router.register("demo-lab", async ({ user }) => {
         <label class="field"><span class="lb">${S.fmt.escape(S.t("demoLab.passLabel"))}</span>
           <div class="pw-wrap"><input class="input mono" id="dl-pass" type="password" autocomplete="off">
           <button class="pw-eye" id="dl-eye">${S.ui.icon("eye", 18)}</button></div></label>
+        <label class="field"><span class="lb">管理员令牌（ADMIN_TOKEN）</span>
+          <div class="pw-wrap"><input class="input mono" id="dl-admin" type="password" autocomplete="off" value="${S.fmt.escape(adminTok())}">
+          <button class="pw-eye" id="dl-eye2">${S.ui.icon("eye", 18)}</button></div></label>
+        ${msg ? `<div class="banner" style="background:var(--color-red-bg);color:var(--color-red)">${S.ui.icon("x", 14)} ${S.fmt.escape(msg)}</div>` : ""}
         <button class="btn btn-primary btn-block" id="dl-go">${S.ui.icon("lock", 14)} ${S.fmt.escape(S.t("demoLab.unlock"))}</button>
         <p class="muted small" style="margin-top:10px">${S.fmt.escape(S.t("demoLab.passHint"))}</p>
       </div>`;
     const pass = document.getElementById("dl-pass");
+    const admin = document.getElementById("dl-admin");
     const eye = document.getElementById("dl-eye");
+    const eye2 = document.getElementById("dl-eye2");
     eye.onclick = () => { const show = pass.type === "password"; pass.type = show ? "text" : "password"; eye.innerHTML = S.ui.icon(show ? "eye-off" : "eye", 18); };
+    eye2.onclick = () => { const show = admin.type === "password"; admin.type = show ? "text" : "password"; eye2.innerHTML = S.ui.icon(show ? "eye-off" : "eye", 18); };
     const tryUnlock = () => {
-      if (pass.value.trim() === "suveoo_data_injection") { sessionStorage.setItem(UNLOCK_KEY, "1"); renderMain(); }
-      else { S.ui.toast(S.t("demoLab.wrongPass"), true); pass.value = ""; pass.focus(); }
+      if (pass.value.trim() !== "suveoo_data_injection") { S.ui.toast(S.t("demoLab.wrongPass"), true); pass.value = ""; pass.focus(); return; }
+      if (!admin.value.trim()) { S.ui.toast("请填写管理员令牌", true); admin.focus(); return; }
+      sessionStorage.setItem(ADMIN_KEY, admin.value.trim());
+      sessionStorage.setItem(UNLOCK_KEY, "1");
+      renderMain();
     };
     document.getElementById("dl-go").onclick = tryUnlock;
-    pass.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
-    pass.focus();
+    for (const el of [pass, admin]) el.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
+    (adminTok() ? pass : admin).focus();
   };
 
   const renderMain = () => {
@@ -47,8 +61,9 @@ S.router.register("demo-lab", async ({ user }) => {
       /* 数据源预检：每次打开页面实时拉取——数据源更新后版本号与清单随之变化（自查机制）；
          catalog 携带维度目录（90 职业按类目）。
          带时间戳参数绕开 SW/HTTP 缓存（旧形状响应无 catalog 会让渲染中断——部署陈旧坑实测复现） */
-      let r = await S.api.get(`/api/demo/self-seed?_=${Date.now()}`);
-      if (r.ok && !r.data?.catalog) r = await S.api.get(`/api/demo/self-seed?_=${Date.now()}&r=2`);
+      let r = await S.api.req("GET", `/api/demo/self-seed?_=${Date.now()}`, undefined, adminOpts());
+      if (r.ok && !r.data?.catalog) r = await S.api.req("GET", `/api/demo/self-seed?_=${Date.now()}&r=2`, undefined, adminOpts());
+      if (adminRejected(r)) { sessionStorage.removeItem(ADMIN_KEY); renderLock("管理员令牌无效或服务端未配置，请重新输入"); return; }
       const dimBox = document.getElementById("dl-dim");
       const srcBox = document.getElementById("dl-src");
       if (!r.ok || !r.data?.catalog) {
@@ -180,7 +195,8 @@ S.router.register("demo-lab", async ({ user }) => {
       const doPreview = async () => {
         const out = document.getElementById("dl-prevout");
         out.innerHTML = `<p class="small muted">${S.fmt.escape(S.t("demoLab.previewing"))}</p>`;
-        const q = await S.api.get(`/api/demo/self-seed?${previewQ()}&_=${Date.now()}`);
+        const q = await S.api.req("GET", `/api/demo/self-seed?${previewQ()}&_=${Date.now()}`, undefined, adminOpts());
+        if (adminRejected(q)) { sessionStorage.removeItem(ADMIN_KEY); renderLock("管理员令牌已失效，请重新输入"); return; }
         if (!q.ok) { out.innerHTML = `<div class="banner" style="background:var(--color-red-bg);color:var(--color-red)">${S.ui.icon("x", 14)} ${S.fmt.escape(q.data?.error?.message ?? "failed")}</div>`; return; }
         const p = q.data.preview;
         before = q.data.current;
@@ -204,7 +220,8 @@ S.router.register("demo-lab", async ({ user }) => {
         btn.innerHTML = `<span class="dots"><i></i><i></i><i></i></span> ${S.fmt.escape(S.t("demoLab.running"))}`;
         const t0 = Date.now();
         /* 维度化合并写量大：长超时 180s（AbortSignal 在 api.req 内部控制） */
-        const res = await S.api.req("POST", "/api/demo/self-seed", preset === null ? {} : { preset }, { timeoutMs: 180000 });
+        const res = await S.api.req("POST", "/api/demo/self-seed", preset === null ? {} : { preset }, adminOpts({ timeoutMs: 180000 }));
+        if (adminRejected(res)) { sessionStorage.removeItem(ADMIN_KEY); renderLock("管理员令牌已失效，请重新输入"); return; }
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         btn.disabled = false;
         btn.innerHTML = `${S.ui.icon("send", 14)} ${S.fmt.escape(S.t("demoLab.execAgain"))}`;
@@ -262,5 +279,5 @@ S.router.register("demo-lab", async ({ user }) => {
     })();
   };
 
-  sessionStorage.getItem(UNLOCK_KEY) === "1" ? renderMain() : renderLock();
+  (sessionStorage.getItem(UNLOCK_KEY) === "1" && adminTok() ? renderMain() : renderLock());
 });

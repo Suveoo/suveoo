@@ -6,8 +6,8 @@ S.api = {
   tokenKey: "suveoo_token",
   get token() { return localStorage.getItem(this.tokenKey); },
   set token(v) { v ? localStorage.setItem(this.tokenKey, v) : localStorage.removeItem(this.tokenKey); },
-  async req(method, path, body, { timeoutMs = 15000 } = {}) {
-    const headers = { ...(body != null ? { "content-type": "application/json" } : {}) };
+  async req(method, path, body, { timeoutMs = 15000, headers: extraHeaders = null } = {}) {
+    const headers = { ...(body != null ? { "content-type": "application/json" } : {}), ...(extraHeaders ?? {}) };
     if (this.token) headers.authorization = `Bearer ${this.token}`;
     // 超时必须覆盖到 body 读完（连接停滞时 header 可达而 body 永挂）；
     // 幂等 GET 超时后换新连接自动重试一次（等价于用户手点刷新，实测可恢复）
@@ -45,6 +45,8 @@ S.api = {
       if (!onPublicPage && !path.startsWith("/api/auth/") && !location.pathname.startsWith("/account/login") && !sessionStorage.getItem("suveoo_redirecting")) {
         sessionStorage.setItem("suveoo_redirecting", "1");
         sessionStorage.setItem("suveoo_session_expired", "1"); /* 登录页一次性显示"已过期"提示（第六十九轮） */
+        /* P3-16：会话失效同样清 SW 缓存（避免离线回退泄露上一会话的页面快照） */
+        try { navigator.serviceWorker?.controller?.postMessage({ type: "suveoo:clear-cache" }); } catch { /* ignore */ }
         const next = encodeURIComponent(location.pathname + location.search);
         location.replace((S.router?.navPath?.("/account/login") ?? "/account/login") + `?next=${next}`);
         setTimeout(() => sessionStorage.removeItem("suveoo_redirecting"), 4000);

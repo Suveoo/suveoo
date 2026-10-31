@@ -3,8 +3,9 @@
 > Agentic Banking Control Plane（银行智能体可信执行中间层）
 > 这是模拟银行系统，不涉及真实资金行为。
 >
-> 2026-10-28 更新：Web 端黄级确认接入 WebAuthn 平台通行密钥本地在场门（§4.1）；客户端壳沿用各自原生生物识别；红级仍以 OTP 为准。
-> 2026-10-06 更新：多指标测试体系与四模型消融落地——63 个 MCP 工具、vitest 63 文件 463 用例全绿；生产黑盒评测（拦截类 106 断言 + 准确率类 122 用例）全部通过；MODEL_PROFILES 多模型注册表（glm-5.3-flash / glm-5.3-max / qwen3.8-flash / deepseek-v4.1-flash / kimi-k3）支持零代码换模，四模型消融全部核心指标 100% 一致（证据库 docs/benchmarks/）。测试 463 项全绿。
+> 2026-10-31 更新：当前基线为客户端 v3.188.0、backend 78 文件 545 用例（unit 26 / integration 45 / attack 7）、双壳 34 + 47、i18n 1,606 键 ×4；新增定时代付/订购（scheduled_purchase，生日别名 birthday_flowers）、卡限额/OTP 单次/语音票据等现行控制。
+> 2026-10-28 更新：Web 端黄级确认接入 WebAuthn 平台通行密钥本地在场门（§4.1）；客户端壳沿用各自原生生物识别；红级仍以短信/邮箱 OTP 为准。
+> 2026-10-06 更新：多指标测试体系与四模型消融落地——63 个 MCP 工具、vitest 63 文件 463 用例全绿（历史时点）；生产黑盒评测（拦截类 106 断言 + 准确率类 122 用例）全部通过；MODEL_PROFILES 多模型注册表（glm-5.3-flash / glm-5.3-max / qwen3.8-flash / deepseek-v4.1-flash / kimi-k3）支持零代码换模，四模型消融全部核心指标 100% 一致（证据库 docs/benchmarks/）。
 > 2026-09-17 更新：转账与收款人真实化（Luhn+registry+户名三重校验，REST 与 AI 同规）与跨用户双记（对方 DO credit 先行，资金守恒）；13 个演示人物落户为真实账户；演示种子端点加管理员令牌双门（fail-closed + 审计）；卡片完整卡号 reveal（属主隔离）；理财赎回按市值结算（整数运算，显示值=回款额）；换汇按服务端实时牌价结算（JPY 每 100 口径、可选结算卡、外币余额可见）。测试 186 项全绿。
 > 2026-09-16 更新：财富产品 v2（16 只基金，数据由锚定真实市场史的多因子模型生成）；外汇实时牌价（er-api + KV 缓存 + 静态回退）；Telegram 运维通知（注册/登录/全部 EXECUTED 写操作，waitUntil 生命周期保障）；种子端点支持任意已注册账户（DEMO_MODE 守卫不变）；测试 159 项全绿。
 
@@ -46,7 +47,7 @@
 |------|------|------|
 | Worker | `suveoo-bank-main` | 唯一入口：静态资源（R2 回源）/ REST `/api/*` / MCP `/mcp` / AI SSE 代理 / IR 编译 + 五道验证 / Email / pdf-lib 报告 |
 | R2 | `suveoo-bank-r2` | 前端静态资源（无构建 MPA，URL 即对象键）+ 公共数据 `assets/data/*` + 月度报告 PDF |
-| KV | `suveoo-session-kv` | JWT 黑名单、邮箱验证码（哈希）、登录锁定计数、Consent Grant（`grant:{uid}:{hash}`，TTL 300s 生产/120s 默认）、AI 会话历史 |
+| KV | `suveoo-session-kv` | JWT 黑名单、短信/邮箱验证码（哈希）、OTP 失败累计 `nf:`、语音一次性票据 `vt:`、登录锁定计数、Consent Grant（`grant:{uid}:{hash}`，TTL 300s 生产/120s 默认）、AI 会话历史 |
 | KV | `suveoo-audit-index-kv` | 审计索引（`audit:{date}:{trace_id}`） |
 | DO | `LedgerDO` | registry 单例（邮箱/卡号全局唯一索引）+ 每用户账本（profile/cards/tx/payees/bills/subs/holdings/tasks/nonces/audit，SQLite） |
 | DO | `SagaDO` | 长程任务闹钟（alarm）+ 取消/补偿触发；读路径 `sweepDue` 兜底扫描 |
@@ -60,13 +61,14 @@
 | `/api/auth/*` | 注册发卡 / 登录 2FA / 找回（公开） |
 | `/api/**` | 数据 API：全部写操作经 `runGuarded()` → IR → 五道验证 → `executeIntent()` |
 | `/api/ai/chat` | SSE 流式 LLM 代理（服务端持 Key；mcp_servers 自指 /mcp；trust_event/genui_event 事件流） |
+| `POST /api/voice/ticket` | 语音 WS 一次性票据（90s，KV `vt:`，单次消费） |
 | `/mcp` | MCP Tool Gateway（JSON-RPC 2.0，63 工具，JWT Bearer） |
 
 ## 4. 关键数据流：转账（表单与 AI 同规）
 
 1. 用户提交（表单 `/api/transfers/intrabank` 或 AI `tools/call transfer_execute`）
 2. `runGuarded`：编译 IR（facts 全带 provenance/trust；金额一律字符串，内核 bigint 分）
-3. 五道验证：Policy（三色 + AI 通道硬上限）→ Taint（授权字段必须 TRUSTED）→ Consent（无 grant 则签发并返回 `INPUT_REQUIRED`；有则**服务端查 KV 消费**，参数突变即 `CONSENT_INVALIDATED`）→ Invariants（余额守恒/PR 适当性）→ Replay（nonce 去重）；红级另需 redstep 邮箱 OTP
+3. 五道验证：Policy（三色 + AI 通道硬上限）→ Taint（授权字段必须 TRUSTED）→ Consent（无 grant 则签发并返回 `INPUT_REQUIRED`；有则**服务端查 KV 消费**，参数突变即 `CONSENT_INVALIDATED`）→ Invariants（余额守恒/PR 适当性）→ Replay（nonce 去重）；红级另需 redstep 短信/邮箱 OTP（一次性消费）
 4. `executeIntent`：LedgerDO 原子记账（卡可用余额、日累计）、邮件回执、审计、通知
 5. 前端 Verified GenUI：确认卡数据只来自 `grant.snapshot`（`issuer==="verified_ir"` 才渲染）；黄级另有本机在场门（§4.1）
 
@@ -76,23 +78,23 @@
 
 - **客户端壳**：AndroidX BiometricPrompt / Windows Hello / Touch ID；Windows/macOS 经 preload 的 Capacitor 兼容 shim 与 IPC 白名单调用，无传感器自动回落。
 - **Web**：WebAuthn 平台通行密钥（`core/biometric-web.js` 按需懒加载，不入任何 HTML）。首用弹窗征得同意后本地登记，确认时 `credentials.get()` 由 OS 生物识别把关；表单/REST 与 AI 确认卡两条链路均接入。取消即中止本次确认，无平台认证器、未启用或任何异常一律放行（增强不是门槛）；凭据 id 仅存本浏览器，不能用于登录、不上传服务器。
-- **边界**：纯本地因子，服务端零感知、零改动；红级仍以 OTP 为准，服务端可验证的 FIDO2/Passkey 因子仍属路线图（安全自评 R-05）。
+- **边界**：纯本地因子，服务端零感知、零改动；红级仍以短信/邮箱 OTP 为准，服务端可验证的 FIDO2/Passkey 因子仍属路线图（安全自评 R-05）。
 
-## 5. Saga 长程任务（生日订花演示）
+## 5. Saga 长程任务（定时代付/订购与生日别名）
 
-`T1 LockFunds（锁 ¥600）→ T2 商户下单（可注入故障）→ 失败则 C1 UnlockFunds 补偿`。
+`T1 LockFunds（锁额）→ T2 商户履约（可注入故障）→ 失败则 C1 UnlockFunds 补偿`。`scheduled_task_create` 的 `scheduled_purchase` 与生日别名 `birthday_flowers` 共用该分支；预约转账、提醒、目标月存同骨架。
 检查点存 LedgerDO SQL；SagaDO alarm 到点触发 `taskDue`；任务中心可见时间线与故障注入开关（DEMO_MODE）。
 
 ## 6. 前端（无构建 MPA + PWA）
 
-原生 ES2022 + Web Components 风格命名空间（`S.*`），76 个页面壳 + 62 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback，1551 键恒等）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。
+原生 ES2022 + Web Components 风格命名空间（`S.*`），76 个页面壳 + 62 个控制器；自研 SVG 图表（line/bar/donut/sankey/sparkline）；三语 i18n（zh-CN/zh-TW/en-US + fallback，1,606 键恒等）；GA4 Consent Mode v2 默认 denied；Service Worker 应用壳预缓存 + 离线兜底。
 
 ## 7. 原生客户端壳（Android + Windows + macOS，一套前端四端交付）
 
 **同构三件套**（全线上线）：壳内本地加载 frontend 静态快照（资源秒开、断网可渲染），业务 API 经前端双层 base 直发 `https://suveoo.com` 生产域，SW 壳内免注册——frontend/ 对所有壳零改动。
 
-- **Android**（`backend/android/`，Capacitor 8，v2.66）：原生 BiometricPrompt/通知服务/目录路由（含动态路由重写）。
-- **Windows + macOS**（`backend/windows/` + `backend/macos/`，Electron 44 双壳）：自定义特权协议 `suveoo-app://local` 承载前端快照（origin 已入 Worker `SHELL_ORIGINS` CORS 白名单，零服务端改动）；preload 显式方法对象模拟 Capacitor 插件面（NativeBridge/LocalNotifications/Biometric/Update → IPC 白名单 16 方法）；协议层服务时注入 shell-update/biometric-shell（等价 Android 构建期注入）；**七文件逐行同源纪律**（protocol/preload/ipc/navigation/smoke/qa-shot/e2e-driver——跨壳修 bug 双写并各自重发布）。
+- **Android**（`backend/android/`，Capacitor 8，3.188.0 / versionCode 82）：原生 BiometricPrompt/通知服务/目录路由（含动态路由重写）。
+- **Windows + macOS**（`backend/windows/` + `backend/macos/`，Electron 44 双壳，均 3.188.0 / vc3188000）：自定义特权协议 `suveoo-app://local` 承载前端快照（origin 已入 Worker `SHELL_ORIGINS` CORS 白名单，零服务端改动）；preload 显式方法对象模拟 Capacitor 插件面（NativeBridge/LocalNotifications/Biometric/Update → IPC 白名单 16 方法）；协议层服务时注入 shell-update/biometric-shell（等价 Android 构建期注入）；**七文件逐行同源纪律**（protocol/preload/ipc/navigation/smoke/qa-shot/e2e-driver——跨壳变更双写并各自重发布）。
 - **五能力对齐**：三级自动更新（R2 manifest + sha256，强制阻断层）、系统通知 + 未读角标、生物识别（Hello/Touch ID，无传感器回落）、外链内嵌浏览器、`suveoo://` 深链 + 托盘驻留。
 - **动态路由镜像**：Worker `rewriteDynamicRoutes`（卡片页 slug 剥离、`/ai/s/{sid}` 复用、卡面图旧路径）在三壳各有镜像实现（Android 第五十二轮、双 Electron 壳第一百五十七轮）——服务端与壳的路由语义保持逐条一致。
 

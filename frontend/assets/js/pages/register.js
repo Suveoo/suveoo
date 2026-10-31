@@ -181,8 +181,14 @@ S.router.register("register", async () => {
       risk_answers: state.answers, aml_consented: true,
     });
     if (!r.ok) {
-      /* 失败不整页刷新（会丢失已填的身份/验证码/8 题测评/合规勾选）：回到密码步原样重试 */
-      pane.innerHTML = `<h2>${S.fmt.escape(S.t("common.loadFailed"))}</h2><p class="muted small">${S.fmt.escape(r.data?.error?.message ?? r.data?.error?.code ?? "")}</p>
+      /* 失败不整页刷新（会丢失已填的身份/验证码/8 题测评/合规勾选）：回到密码步原样重试。
+         P2-11 后：已注册邮箱不在发码阶段暴露（同形 200），而是在这里以 CODE_NOT_FOUND 呈现——
+         只有邮箱主人能走到这一步，给出"去登录/找回"的明确出口。 */
+      const errCode = r.data?.error?.code ?? "";
+      const isDup = errCode === "CODE_NOT_FOUND";
+      pane.innerHTML = `<h2>${S.fmt.escape(isDup ? "该邮箱可能已注册" : S.t("common.loadFailed"))}</h2>
+        <p class="muted small">${S.fmt.escape(isDup ? "若该邮箱此前已注册，请直接登录或使用「忘记密码」重置；否则请重新获取验证码。" : (r.data?.error?.message ?? errCode))}</p>
+        ${isDup ? `<a class="btn btn-ghost btn-block" href="/account/login" style="margin-bottom:8px">去登录</a><a class="btn btn-ghost btn-block" href="/account/recovery" style="margin-bottom:8px">忘记密码</a>` : ""}
         <button class="btn btn-primary btn-block" id="r-back">${S.fmt.escape(S.t("common.retry"))}</button>`;
       document.getElementById("r-back").onclick = () => step3();
       return;

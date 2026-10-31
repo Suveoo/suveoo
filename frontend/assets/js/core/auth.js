@@ -25,6 +25,8 @@ S.auth = {
     await S.api.post("/api/auth/logout", {}).catch(() => {});
     S.api.token = null;
     this._session = null;
+    /* P3-16：通知 Service Worker 清空 HTML/接口缓存，避免登出后仍能回退到旧页面快照 */
+    try { navigator.serviceWorker?.controller?.postMessage({ type: "suveoo:clear-cache" }); } catch { /* ignore */ }
     location.replace("/home");
   },
 };

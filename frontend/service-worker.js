@@ -1,5 +1,5 @@
 /* Suveoo service worker — 应用壳预缓存 + HTML network-first + 离线兜底 */
-const CACHE = "suveoo-v5";
+const CACHE = "suveoo-v8"; /* P3-16：缓存策略变更随版本号换代（activate 时清旧缓存） */
 const SHELL = [
   "/assets/css/tokens.css", "/assets/css/base.css", "/assets/css/layout.css", "/assets/css/components.css",
   "/assets/css/genui.css", "/assets/css/trust-console.css", "/assets/css/pages.css", "/assets/css/polish.css",
@@ -68,10 +68,18 @@ self.addEventListener("push", (e) => {
 });
 /* 通知点击 → 按通知携带的目标页打开/聚焦（第五十六轮：按类别精确跳转，无 data.url 回落通知中心） */
 self.addEventListener("notificationclick", (e) => {
-  const url = e.notification.data?.url || "/notifications";
+  /* 通知 URL 只允许站内路径（P3-16 附带：通知数据来自服务端，仍按不可信处理） */
+  const raw = e.notification.data?.url || "/notifications";
+  const url = typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/notifications";
   e.notification.close();
   e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
     for (const c of list) { if ("focus" in c) { c.navigate(url); return c.focus(); } }
     return clients.openWindow(url);
   }));
+});
+
+/* P3-16：登出/会话失效时清空全部缓存（页面 HTML 也能被缓存，避免旧会话快照被离线回退出来） */
+self.addEventListener("message", (e) => {
+  if (e.data?.type !== "suveoo:clear-cache") return;
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))).catch(() => {}));
 });

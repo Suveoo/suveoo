@@ -9,7 +9,7 @@ const PASSWORD = TEST_PASSWORD;
 async function post(path, body, token) {
   return SELF.fetch(BASE + path, {
     method: "POST",
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(env.ADMIN_TOKEN ? { "x-admin-token": env.ADMIN_TOKEN } : {}) },
     body: JSON.stringify(body ?? {}),
   }, 60000);
 }
@@ -93,7 +93,7 @@ describe("维度化注入（覆盖模式）", () => {
   it("GET 预检 dry-run 与 POST 实跑同构（确定性）；catalog 含 90 职业/11 类目", async () => {
     await ensureSource();
     const u = await registerUser("dim2@test.dev", "预检测试");
-    const H = { authorization: `Bearer ${u.token}` };
+    const H = { authorization: `Bearer ${u.token}`, "x-admin-token": env.ADMIN_TOKEN };
     const q = "tier=mass&income=salaried&profession=high-school-teacher";
     const prev = await j(await SELF.fetch(`${BASE}/api/demo/self-seed?${q}`, { headers: H }));
     expect(prev.catalog.professions).toHaveLength(90);

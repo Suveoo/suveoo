@@ -10,13 +10,13 @@
 |------|-----------------------------------|----------|------|
 | GREEN（自动执行） | 只读/纯计算/impact=0 | 余额/流水/账单分析/订阅扫描/AA 计算/汇率/联系人检索 | 即时结果；仅 Provenance 标注 |
 | YELLOW（用户确认） | 状态变更且日累计 ≤ ¥1,000 | 转账（≤¥1,000）、限额调整、订阅解约、收款人增删、自动扣款、缴费、资金锁定、预约任务建立 | 两段式：服务端签发 grant（300s TTL 生产值）→ 前端确认卡（Verified GenUI，数据来自 grant.snapshot）→ 凭 grant_hash 消费执行 |
-| RED（强验证） | 日累计 > ¥1,000、密码修改、冻结/解冻、理财申购/赎回、商户履约扣款 | 大额转账、改密、冻结卡、申购理财 | YELLOW 全流程 + 邮箱验证码（redstep：哈希存储、60s 冷却、错 5 次作废、10 分钟有效） |
+| RED（强验证） | 日累计 > ¥1,000、密码修改、冻结/解冻、理财申购/赎回、商户履约扣款 | 大额转账、改密、冻结卡、申购理财 | YELLOW 全流程 + 短信/邮箱双通道 OTP（redstep：哈希存储、60s 冷却、一次性消费、错 5 次作废、10 分钟有效） |
 
 阈值常量与代码同源（`POLICY_LIMITS`），测试断言边界（¥1,000 含本笔日累计）。
 
 ### 1.2 Consent Binding（参数级同意绑定）
 
-用户确认的不是一句"确认"，而是 `grant_hash = SHA256(action ‖ 授权字段 ‖ user_id ‖ expires_at ‖ nonce)` 绑定的精确快照。校验**只能凭哈希到 KV 查表**：条目存在 ∧ 绑定当前会话用户 ∧ 未过期 ∧ 未消费 ∧ 快照与当前 IR 逐字段相等。确认前改参数（500→5000）→ `CONSENT_INVALIDATED`（集成测试覆盖）。
+用户确认的不是一句"确认"，而是 `grant_hash = SHA256(action ‖ 授权字段 ‖ user_id ‖ expires_at ‖ nonce)` 绑定的精确快照。校验**只能凭哈希到 KV 查表**：条目存在 ∧ 绑定当前会话用户 ∧ 未过期 ∧ 未消费 ∧ 快照与当前 IR 逐字段相等。授权字段由 `TOOL_SCHEMA.authFields` 按工具声明，覆盖批量 items 与定时代付 item；标量保型、对象按排序键规范化；grant 绑定签发 tier。确认前改参数（500→5000）→ `CONSENT_INVALIDATED`（集成测试覆盖）。
 
 ### 1.3 Provenance / Taint Check（防间接提示词注入）
 
@@ -24,7 +24,7 @@
 
 ### 1.4 Financial Invariants + Replay 防护
 
-余额守恒（含锁定金额 held）、PR 适当性匹配、任务补偿配对声明，全部为确定性断言；nonce 幂等集防网络重试重复扣款（集成测试：重试同一 IR → REPLAY_DETECTED）。
+余额守恒（含锁定金额 held）、PR 适当性匹配、任务补偿配对声明，全部为确定性断言；借记卡单笔/日累计限额在转账、预约建单、到期执行三侧强制，信用卡走信用额度；预约失败/异步扣款另有余额与负余额守卫；nonce 幂等集防网络重试重复扣款（集成测试：重试同一 IR → REPLAY_DETECTED）。
 
 ### 1.5 幻觉防护
 
@@ -44,14 +44,14 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 | R-04 | 速率限制计数器非原子（KV incr） | 已知 | 影响限流精度 ±1；加固计划：DO 计数 |
 | R-05 | 红级强验证当前为短信/邮箱双通道 OTP + 本机生物识别前置（客户端壳 / Web）；服务端可验证的 FIDO2 / Passkey 因子未实现（Web 端黄级确认已于 2026-10-28 启用 WebAuthn 本机在场门） | 路线图（原规划仅一条 FIDO2 流程） | 下一迭代：FIDO2 passkey 作为红级第二因子；Web 黄级本机门为可选增强，不改变红级语义 |
 | R-06 | 越狱/注入检测为启发式（金丝雀 + provenance 规则），非学习型分类器 | 按框架纪律未过度宣称 | Taint 能力模型从架构上阻断授权面（攻击成功率测试为 0） |
-| R-07 | `cardTx` 明细为模拟聚合（未按卡过滤） | Demo 简化 | 下一迭代：tx 表加 card 列 |
-| R-08 | ~~演示种子接口 `/api/demo/seed` 在 DEMO_MODE=true 时无鉴权~~ **已修复（2026-09-17）**：现需请求头 `x-admin-token` 与 secret ADMIN_TOKEN 匹配（常数时间比较，**fail-closed**——未配置 secret 一律 403），DEMO_MODE 门保留为双重门；成功调用写 AUDIT_KV 审计；支持 `{"inspect":true}` 只读巡检 | 已缓解 | 轮换：`printf '%s' '<新值>' \| npx wrangler secret put ADMIN_TOKEN` |
+| R-07 | 单卡明细的历史数据边界：当前按 `tx.card` 精确过滤；迁移前 `card=NULL` 的历史流水不在单卡页显示，账户总流水可见 | 数据边界 | 迁移前历史数据不回填，避免为展示引入不可审计的推断 |
+| R-08 | 演示种子接口采用 **DEMO_MODE + ADMIN_TOKEN 双门**（常数时间比较、fail-closed），成功调用写审计；支持 `{"inspect":true}` 只读巡检 | 现行控制 | 轮换：`printf '%s' '<新值>' \| npx wrangler secret put ADMIN_TOKEN` |
 | R-09 | 邮件失败不阻塞主流程（仅日志） | 设计取舍 | 验证码场景用户可 60s 后重试；站内通知兜底 |
-| R-10 | wrangler r2 put 偶发假成功 | 已遇并修复 | 上传脚本 put 后 get 回验 + 退避重传 |
+| R-10 | R2 上传完整性：put 后回验 + 退避重传 + ETag=MD5 校验 | 现行控制 | 校验通过后才更新 manifest |
 
 ## 3. 测试证据
 
-- **463 个用例全绿**（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离；63 文件 = unit 24 / integration 33 / attack 6）
+- **545 个用例全绿**（vitest + @cloudflare/vitest-pool-workers，真实 workerd + DO/KV/R2 模拟绑定，逐测试隔离；78 文件 = unit 26 / integration 45 / attack 7）；四模型消融基线为 463
 - **生产黑盒实测（2026-10-06）**：拦截类 106 断言（注入七族 66 + 越权伪造 37 + 熔断行为）+ 准确率类 122 用例（数值幻觉 24 / 执行一致 14 / 意图分级 50 / 金额解析 30+），全部通过——证据库 `docs/benchmarks/`
 - **四模型消融**：GLM / Qwen3.8 / DeepSeek / Kimi K3 同套用例 vitest 463 + S1 24 + B1 50 + 注入 66 全部 100% 一致（`docs/benchmarks/ablation/`）
 - 对抗用例：注入样本拦截、重放拦截、授权绕过（AI 硬上限/未知工具/红级无 OTP）、同意突变失效——见 `backend/tests/{unit,attack,integration}`
@@ -65,9 +65,9 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 5. **执行层业务失败语义**：DO 返回业务错误（余额/外币不足等）时不再误报 EXECUTED，统一 BLOCKED + 结构化 reason。
 
 
-## 5. 2026-09-17 新增安全机制（第十二轮：凭证缺口修复）
+## 5. 凭证操作的安全基线（现行控制）
 
-1. **改密须当前密码**：PATCH /api/security/password 要求 current_password（缺失 400 PASSWORD_REQUIRED / 错误 401 WRONG_OLD_PASSWORD——本人已登录场景无枚举风险，明示原因）；邮箱 OTP 采用非消费式校验，密码比对失败不烧码，全对才消费。
+1. **改密须当前密码**：PATCH /api/security/password 要求 current_password（缺失 400 PASSWORD_REQUIRED / 错误 401 WRONG_OLD_PASSWORD——本人已登录场景无枚举风险，明示原因）；短信/邮箱双通道 OTP 采用非消费式校验，密码比对失败不烧码，全对才一次性消费。
 2. **关闭 2FA 须当前密码**（降安全操作高摩擦；开启保持仅 OTP，提升安全低摩擦）。
 3. **会话纪元全设备下线**：改密/找回密码成功 → profile.session_epoch +1 → 该用户全部既有 JWT 即刻 401（requireSession 全量校验，代价 = 每个已登录请求 +1 次 DO 读取，实测延迟同量级）；改密响应返回新纪元 token，当前设备不掉线。
 4. **找回密码页零旧密码字段**（红线：忘记密码场景不要求旧密码）；补确认密码框本地拦截。
@@ -89,7 +89,7 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 
 ## 7. 2026-10-06 多指标安全实测（板块一）
 
-新增 6 个测试文件并全部纳入 vitest 常备回归（合计 463 用例全绿）：
+新增 6 个测试文件并全部纳入 vitest 常备回归（当时 463；当前全量 545）：
 
 | 指标 | 文件 | 规模 | 结果 |
 |---|---|---|---|
@@ -122,6 +122,21 @@ LLM 无法自造交易结果：所有结果 JSON 来自账本执行层；Verifie
 - **范围**：表单/REST 两段式确认（客户端壳走各自原生框架：AndroidX BiometricPrompt / Windows Hello / Touch ID；Web 走 WebAuthn 平台通行密钥，触发的仍是设备同一套 OS 生物识别）与 AI 对话确认卡（Web 端同样接入，`ai.js` 的「确认执行」）。
 - **机制**：`frontend/assets/js/core/biometric-web.js`（`S.bioWeb`）按需懒加载，不进入任何 HTML；首次黄级确认弹窗征得同意后 `credentials.create()` 本地登记（`authenticatorAttachment: platform`、`userVerification: required`），此后每次确认 `credentials.get()` 由 OS 生物识别把关。凭据 id 仅存本浏览器 localStorage，不含生物特征、不能用于登录、他站不可用；`user.id` 随机生成，与账户无关。
 - **失败语义**：用户取消/超时 → 中止本次确认（对齐客户端 `verify()` 的 `{ok:false}`）；未启用、无平台认证器、加载或校验异常 → 一律放行。**增强不是门槛**，绝不因缺失或故障阻断业务。
-- **边界**：该门为纯本地因子，服务端零感知、零改动；红级仍以 OTP 为准，红级服务端可验证的 FIDO2/Passkey 因子仍属路线图（R-05）。它与「通行密钥登录」是两件事，不构成认证因子。
+- **边界**：该门为纯本地因子，服务端零感知、零改动；红级仍以短信/邮箱 OTP 为准，红级服务端可验证的 FIDO2/Passkey 因子仍属路线图（R-05）。它与「通行密钥登录」是两件事，不构成认证因子。
 - **隐私**：生物特征由设备 OS 持有，平台不收集、不上传；仅保存 WebAuthn 凭据标识于本浏览器，清除浏览器数据即删除。条款见隐私政策第十一条之五（Web 端，2026-10 增补）。
 - **佐证**：2026-10-28 demo 账户黄级限额调整实测——首次确认弹出启用询问，「暂不」后放行并落库，二次确认不再询问；回滚后额度恢复。真实登记后的 `create/get` 仪式需本机 Hello/Touch ID 交互，属代码级审查、待真机首用验证。
+
+## 9. 3.188 现行控制（安全边界与资源约束）
+
+以下控制与五道验证互补，均以当前版本为准：
+
+| 控制 | 当前实现 |
+|---|---|
+| 同意绑定覆盖 | `TOOL_SCHEMA.authFields` 覆盖全部展示性授权字段（含批量 `items`、定时代付 `item`）；标量保型、对象排序键规范化；grant 绑定签发 tier |
+| 借记卡限额 | 单笔/日累计在即时转账、预约建单、到期执行三侧强制；信用卡消费走信用额度 |
+| 异步扣款 | 预约到期与失败补偿均有余额/负余额守卫；不会把余额扣成负数 |
+| 私有报告 | 月报清单与 PDF 按属主隔离，非属主 404 |
+| 验证码 | 短信/邮箱双通道、一次性消费、跨重发失败累计 |
+| 语音通道 | `POST /api/voice/ticket` 换 90 秒一次性票据；浏览器不再把 JWT 放 query |
+| 输出净化 | Markdown 引号实体化 + `safeUrl` 协议白名单；演示商户工具仅 DEMO_MODE |
+| 隐私/防枚举 | 注册同形响应；收款人 lookup 仅 `{found}` + 限流 |

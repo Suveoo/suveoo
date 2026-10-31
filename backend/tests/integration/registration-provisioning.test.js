@@ -77,12 +77,18 @@ describe("注册与开户（发卡）", () => {
     expect(badQuiz.status).toBe(400);
   });
 
-  it("重复注册：email-code 返回 409 EMAIL_TAKEN", async () => {
+  it("重复注册：发码同形 200（防枚举），且不会签发注册码", async () => {
     const email = "dup@test.dev";
     await registerUser(email);
     const r = await post("/api/auth/email-code", { scene: "register", email });
-    expect(r.status).toBe(409);
-    expect((await j(r)).error.code).toBe("EMAIL_TAKEN");
+    expect(r.status).toBe(200); /* P2-11：不再 409，避免"邮箱是否已注册"的判定器 */
+    const body = await j(r);
+    expect(body.ok).toBe(true);
+    expect(body.error).toBeUndefined();
+    /* 未签发注册码：拿任意码去注册只得到 CODE_NOT_FOUND（该路径仅邮箱主人可达） */
+    const reg = await post("/api/auth/register", { email, code: "123456", name: "冒名", password: PASSWORD, risk_answers: [3, 3, 4, 3, 4], aml_consented: true });
+    expect(reg.status).toBe(401);
+    expect((await j(reg)).error.code).toBe("CODE_NOT_FOUND");
   });
 });
 

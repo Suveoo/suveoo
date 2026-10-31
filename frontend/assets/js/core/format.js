@@ -44,6 +44,14 @@ S.fmt = {
     return { local, beijing: bj + " (UTC+8)" };
   },
   escape(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); },
+  /** 站内跳转白名单（P3-15）：只接受以单个 / 开头的站内路径。
+   *  拒绝 //host（协议相对）、/\\host、绝对 URL、javascript:/data: 与控制字符——登录页 next 参数此前未校验。 */
+  safeNext(v, fallback = "/home") {
+    const s = String(v ?? "");
+    if (!s.startsWith("/") || s.startsWith("//") || s.startsWith("/\\")) return fallback;
+    if (/[\u0000-\u001f\u007f]/.test(s)) return fallback;
+    return s;
+  },
   /* 通知标题去 emoji（第五十八轮）：严谨银行风格——源头（后端 title/前端弹窗前缀）已清零，
    * 此处清洗历史存量通知（通知中心/铃铛下拉渲染层统一走这）。仅清彩色 emoji 与变体选择符，
    * 保留 ✓✗·→ 等纯文本记号 */

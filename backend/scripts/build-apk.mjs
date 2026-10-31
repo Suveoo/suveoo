@@ -16,7 +16,8 @@ const OUT = path.resolve(HERE, "../../for_developer");
 const JAVA = "C:/Program Files/Microsoft/jdk-21.0.12.101-hotspot";
 const SDK = "D:/android-sdk";
 
-const shouldSkip = (rel) => /cards-front\/.*\.(jpg|svg)$/i.test(rel);
+/* 壳内精简：卡面高清源图 + 站点根 docs/*.pdf（技术文档/安全自评，35MB，Web 下载用；客户端不内置） */
+const shouldSkip = (rel) => /cards-front\/.*\.(jpg|svg)$/i.test(rel) || /^docs\/.*\.pdf$/i.test(rel);
 const totalSize = (dir) => {
   let n = 0;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -77,7 +78,9 @@ execFileSync("cmd.exe", ["/c", path.join(ANDROID, "gradlew.bat"), "assembleRelea
 
 const apk = path.join(ANDROID, "app/build/outputs/apk/release/app-release.apk");
 if (!existsSync(apk)) throw new Error("APK not found");
+/* 版本号唯一来源 = build.gradle（避免脚本与 Gradle 双写漂移） */
+const APP_VERSION = /versionName\s+"([^"]+)"/.exec(readFileSync(path.join(ANDROID, "app/build.gradle"), "utf8"))?.[1] ?? "0.0.0";
 mkdirSync(OUT, { recursive: true });
-const dest = path.join(OUT, "Suveoo-v3.186.0.apk");
+const dest = path.join(OUT, `Suveoo-v${APP_VERSION}.apk`);
 cpSync(apk, dest);
 console.log(`✓ APK ${(statSync(dest).size / 1024 / 1024).toFixed(1)} MB → ${dest}`);

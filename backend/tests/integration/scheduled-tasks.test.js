@@ -117,11 +117,13 @@ describe("预约转账（长程任务）", () => {
     const other = myCards.find((c) => c.kind === "debit" && Number(c.is_default) !== 1);
 
     /* 模型把收款人放顶层（无 transfer 子对象）——服务端归一 */
+    /* execute_at 是授权字段：确认卡绑定的就是这张卡上的时刻，二次提交必须原样回传（此处显式复用同一值） */
+    const executeAt = new Date(Date.now() + 3600_000).toISOString();
     const c1 = await j(await SELF.fetch(`${BASE}/mcp?sid=st4`, { method: "POST", headers: H, body: JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "tools/call",
       params: { name: "scheduled_task_create", arguments: {
         task_type: "scheduled_transfer", title: "预约转账 · 收款庚", amount: "66.60",
-        execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once",
+        execute_at: executeAt, repeat: "once",
         recipient_name: "收款庚", recipient_account: toDebit.number, memo: "MCP 卡片验证", from_card: other.slug,
       } },
     }) }));
@@ -139,7 +141,7 @@ describe("预约转账（长程任务）", () => {
       jsonrpc: "2.0", id: 2, method: "tools/call",
       params: { name: "scheduled_task_create", arguments: {
         task_type: "scheduled_transfer", title: "预约转账 · 收款庚", amount: "66.60",
-        execute_at: new Date(Date.now() + 3600_000).toISOString(), repeat: "once", transfer: { recipient_name: "收款庚", recipient_account: toDebit.number, amount: "66.60", memo: "MCP 卡片验证", from_card: other.slug },
+        execute_at: executeAt, repeat: "once", transfer: { recipient_name: "收款庚", recipient_account: toDebit.number, amount: "66.60", memo: "MCP 卡片验证", from_card: other.slug },
         grant_hash: inner1.grant.grant_hash,
       } },
     }) }));
@@ -206,10 +208,11 @@ describe("预约转账（长程任务）", () => {
   it("MCP：reminder 任务（无金额）→ 出卡确认建立；到期发站内通知（非哑完成）", async () => {
     const out = await registerUser("st7@test.dev", "定时丑");
     const H = { authorization: `Bearer ${out.token}`, "content-type": "application/json" };
+    const executeAt = new Date(Date.now() + 2500).toISOString();
     const c1 = await j(await SELF.fetch(`${BASE}/mcp?sid=st7`, { method: "POST", headers: H, body: JSON.stringify({
       jsonrpc: "2.0", id: 1, method: "tools/call",
       params: { name: "scheduled_task_create", arguments: {
-        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: new Date(Date.now() + 2500).toISOString(), repeat: "once",
+        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: executeAt, repeat: "once",
       } },
     }) }));
     const inner1 = JSON.parse(c1.result.content[0].text);
@@ -217,7 +220,7 @@ describe("预约转账（长程任务）", () => {
     const c2 = await j(await SELF.fetch(`${BASE}/mcp?sid=st7`, { method: "POST", headers: H, body: JSON.stringify({
       jsonrpc: "2.0", id: 2, method: "tools/call",
       params: { name: "scheduled_task_create", arguments: {
-        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: new Date(Date.now() + 2500).toISOString(), repeat: "once",
+        task_type: "reminder", title: "Netflix 续费提醒", body: "Netflix 将于 10-02 续费 ¥68", execute_at: executeAt, repeat: "once",
         grant_hash: inner1.grant.grant_hash,
       } },
     }) }));

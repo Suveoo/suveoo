@@ -8,15 +8,17 @@ S.router.register("ai-tasks", async () => {
   const el = document.getElementById("tasks");
   const list = r.data?.tasks ?? [];
   if (!list.length) { el.innerHTML = S.ui.empty(S.t("tasks.none")); return; }
-  /* 生日预订类统一前缀兼容口径（同后端 isBirthdayTask：单复数都识别） */
+  /* 生日预订类统一前缀兼容口径（同后端 isBirthdayTask：单复数都识别）；
+     定时代付/订购（scheduled_purchase）与生日别名共用同一资金语义与 Saga 路径 */
   const isBd = (t) => String(t.type ?? "").startsWith("birthday_flower");
+  const isPurchase = (t) => isBd(t) || t.type === "scheduled_purchase";
   const stepsFor = (t) => {
     const ok = S.ui.icon("check", 12), bad = S.ui.icon("x", 12), wait = "…";
     const amt = t.payload?.amount ? ` ¥${S.fmt.escape(String(t.payload.amount))}` : "";
     const when = t.next_run_at ? `（${S.fmt.dualTime(t.next_run_at).local}）` : "";
     if (t.status === "COMPENSATED") return [`T1 ${ok} ${S.t("genui.stepLock")}${amt}`, `T2 ${bad} ${S.t("genui.stepOrder")}`, `C1 ${ok} ${S.t("genui.stepUnlock")}${amt}`];
     if (t.status === "DONE") return isBd(t) ? [`T1 ${ok} ${S.t("genui.stepLock")}${amt}`, `T2 ${ok} ${S.t("genui.stepOrder")}`] : [`T1 ${ok} ${S.t("genui.stepExec")}`];
-    if (isBd(t) && t.payload?.locked) return [`T1 ${ok} ${S.t("genui.stepLock")}${amt}`, `T2 ${wait} ${S.t("genui.stepFulfil")}${when}`, `C1 ${wait} ${S.t("genui.stepBackup")}`];
+    if (isPurchase(t) && t.payload?.locked) return [`T1 ${ok} ${S.t("genui.stepLock")}${amt}`, `T2 ${wait} ${S.t("genui.stepFulfil")}${when}`, `C1 ${wait} ${S.t("genui.stepBackup")}`];
     /* 修复 2 之前的存量任务未锁资金：T1 不冒称已锁定 */
     return [`T1 ${wait} ${S.t("genui.stepWait")}`, `T2 ${wait} ${S.t("genui.stepFulfil")}${when}`, `C1 ${wait} ${S.t("genui.stepBackup")}`];
   };
@@ -26,17 +28,22 @@ S.router.register("ai-tasks", async () => {
         <div><b>${S.fmt.escape(t.title)}</b>
           <div class="muted small">${S.fmt.escape(S.t("tasks.next"))}：${t.next_run_at ? S.fmt.dualTime(t.next_run_at).local + " / " + S.fmt.dualTime(t.next_run_at).beijing : "—"}</div></div>
         <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">
-          ${isBd(t) && t.status === "PENDING" && t.payload?.locked && t.payload?.amount ? S.ui.badge(S.t("tasks.heldBadge", S.fmt.moneyPlain(String(t.payload.amount))), "badge-navy") : ""}
+          ${isPurchase(t) && t.status === "PENDING" && t.payload?.locked && t.payload?.amount ? S.ui.badge(S.t("tasks.heldBadge", S.fmt.moneyPlain(String(t.payload.amount))), "badge-navy") : ""}
           ${t.fail_next ? S.ui.badge(S.t("tasks.injectedBadge"), "badge-red") : S.ui.badge(S.t("tasks.status." + t.status) ?? t.status, t.status === "DONE" ? "badge-green" : t.status === "PENDING" ? "badge-yellow" : t.status === "COMPENSATED" ? "badge-navy" : "badge-gray")}
         </div>
       </div>
       <div style="margin:12px 0">${stepsFor(t).map((s) => `<div class="task-step"><span class="st">·</span>${s}</div>`).join("")}</div>
       ${t.fail_next ? `<div class="banner" style="display:flex;background:var(--color-red-bg);color:var(--color-red);padding:8px 12px;margin-top:16px">${S.ui.icon("shield", 14)}<div class="small">${S.fmt.escape(S.t("tasks.injectNote"))}</div></div>` : ""}
       ${t.payload?.amount ? `<div class="muted small">${S.fmt.escape(S.t("genui.budget"))}：¥${S.fmt.escape(String(t.payload.amount))}</div>` : ""}
+      ${isPurchase(t) && (t.payload?.recipient_name || t.payload?.merchant || t.payload?.occasion) ? `<div class="muted small">${[
+        t.payload?.occasion ? S.fmt.escape(S.t("genui.occasion")) + "：" + S.fmt.escape(String(t.payload.occasion)) : "",
+        t.payload?.recipient_name ? S.fmt.escape(S.t("genui.recipient")) + "：" + S.fmt.escape(String(t.payload.recipient_name)) : "",
+        t.payload?.merchant ? S.fmt.escape(S.t("genui.merchant")) + "：" + S.fmt.escape(String(t.payload.merchant)) : "",
+      ].filter(Boolean).join(" · ")}</div>` : ""}
       <div class="row" style="margin-top:12px">
         ${t.status === "PENDING" ? `<button class="btn btn-sm btn-ghost cancel" data-id="${t.id}">${S.fmt.escape(S.t("tasks.cancel"))}</button>` : ""}
-        ${t.status === "PENDING" && isBd(t) && !t.fail_next ? `<button class="btn btn-sm btn-danger inject" data-id="${t.id}">${S.fmt.escape(S.t("trust.inject"))}</button>` : ""}
-        ${t.status === "PENDING" && isBd(t) ? `<button class="btn btn-sm btn-primary demo-run" data-id="${t.id}">${S.fmt.escape(S.t("tasks.demoRun"))}</button>` : ""}
+        ${t.status === "PENDING" && isPurchase(t) && !t.fail_next ? `<button class="btn btn-sm btn-danger inject" data-id="${t.id}">${S.fmt.escape(S.t("trust.inject"))}</button>` : ""}
+        ${t.status === "PENDING" && isPurchase(t) ? `<button class="btn btn-sm btn-primary demo-run" data-id="${t.id}">${S.fmt.escape(S.t("tasks.demoRun"))}</button>` : ""}
       </div>
     </div>`).join("");
   S.ui.$$(".cancel").forEach((b) => {

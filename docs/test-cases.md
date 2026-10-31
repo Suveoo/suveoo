@@ -4,9 +4,9 @@
 
 ## 目录与覆盖
 
-当前规模：**Worker 域 63 文件 / 473 用例**（unit 24 / integration 33 / attack 6；2026-10-27 实跑全绿，四模型消融时点为 463），另有**桌面壳独立套件**：`backend/windows/tests/` 4 文件 34 用例、`backend/macos/tests/` 4 文件 47 用例（各自 vitest 配置 node 池——依赖 electron，与根 Workers 池互斥；根配置 `include` 已限定 `tests/**`）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
+当前规模：**Worker 域 78 文件 / 545 用例**（unit 26 / integration 45 / attack 7；2026-10-30 实跑全绿，四模型消融时点为 463），另有**桌面壳独立套件**：`backend/windows/tests/` 4 文件 34 用例、`backend/macos/tests/` 4 文件 47 用例（各自 vitest 配置 node 池——依赖 electron，与根 Workers 池互斥；根配置 `include` 已限定 `tests/**`）。以下目录表列出奠基用例，后续新增按日期记录在文末日志。
 
-### unit/（纯函数，24 文件）
+### unit/（纯函数，26 文件）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -22,7 +22,7 @@
 | calc-tools.test.js | 10 款 calc_* 纯函数（复利/贷款/目标/信用卡/退休/通胀/AA/存款对比/汇率/预算分配）：典型值、边界与非法参数 |
 | fund-data.test.js | 16 只基金 JSON 完整性：序列 ≥49 月且三线等长、returns 自洽（since≈期末涨幅）、stats 合理（R1 波动<2.5%、R5>15%）、蒙特卡洛 p10≤p25≤p50≤p75≤p90、披露要素齐全；fxQuotesFromRates 纯函数（JPY 100 口径、点差比例、spark 透传） |
 
-### integration/（SELF 全栈 + 真实绑定，33 文件）
+### integration/（SELF 全栈 + 真实绑定，45 文件）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -33,7 +33,7 @@
 | scheduled-tasks.test.js | 预约建立（两段式）→alarm 到点执行→DONE+扣款；到期前取消→CANCELLED 不执行 |
 | dimensional-seed.test.js | 维度化注入：覆盖落库=注入计数+卡片按档位+欠款=明细合计+集团签名在册；预检 dry-run=实跑同构；合并只增+payees 无重名+二次幂等；自定义只动勾选块；缺省旧行为回归；非法 preset 兜底 |
 
-### attack/（对抗用例，6 文件，与 unit 同跑）
+### attack/（对抗用例，7 文件，与 unit 同跑）
 
 | 文件 | 覆盖 |
 |------|------|
@@ -47,8 +47,8 @@
 ## 运行结果
 
 ```
-Test Files  63 passed (63)          # cd backend && npx vitest run（Workers 池，backend/tests 域）
-     Tests  463 passed (463)
+Test Files  78 passed (78)          # cd backend && npx vitest run（Workers 池，backend/tests 域）
+     Tests  545 passed (545)
   Duration   ~52s
 
 # 桌面壳（各自目录独立跑，node 池）：
@@ -56,10 +56,18 @@ cd backend/windows && npx vitest run   # 4 files / 34 tests passed（ipc-schema 
 cd backend/macos   && npx vitest run   # 4 files / 47 tests passed（同前三 + mac-platform：navKeyAction / installerCandidate / 动态路由）
 ```
 
+## 2026-10-30（3.188 安全回归与跨场景增量）
+
+- **跨场景**：`scheduled-purchase.test.js`（8 用例）覆盖 `scheduled_purchase` 建单锁钱、到期扣款、取消解锁、月度重锁、生日别名回归与组合卡字段。
+- **授权绑定**：`consent-binding-coverage.test.js`（35）覆盖每个非绿工具的 authFields 改写即失效；`consent-mutation-v2.test.js`（3）覆盖批量 items、标量类型与全字段突变。
+- **资源/异步**：`card-limits.test.js`（4）、`async-debit-guards.test.js`（3）、`report-access.test.js`（1）、`otp-single-use.test.js`（2）、`demo-self-seed-gate.test.js`（3）。
+- **流程/隐私/加固**：`p1-3-batch-refund-nav.test.js`（2）、`p2-9-task-cancel.test.js`（1）、`p2-10-voice-ticket.test.js`（1）、`p2-11-register-enum.test.js`（2）、`p2-12-payee-oracle.test.js`（2）、`p3-hardening.test.js`（2）、`constant-time.test.js`（3）。
+- 当前全量：backend **78 文件 / 545 用例**（unit 26/296、integration 45/211、attack 7/38）；双壳 34 + 47；全量 **626**。
+
 ## 2026-10-08（三端客户端测试体系收口）
 
 - **windows/tests/protocol-routes.test.js 新增 5 用例**：`rewriteDynamicRoutes` 动态路由重写（卡片页 slug 剥离 / `/ai/s/{sid}` 复用 / 卡面图旧路径→mastercard/ / 不重写路径 / resolveAsset 落地三页可解析）——Bug4（队长实测卡片页三按钮壳内 404，根因=Worker 动态路由在 Electron 壳缺失）的回归防线；与 macos 侧 mac-platform.test.js 同款（Windows 版对路径分隔符做归一断言）。windows 套件 29→34。
-- **根 vitest include 边界修复**：backend/vitest.config.js 此前未限定 include，默认全仓扫描会把 windows/macos 壳测试卷进 Cloudflare Workers 池（无法 require electron）——现限定 `tests/**/*.test.js`，三套件分列（463 + 34 + 47 = 544）。
+- **根 vitest include 边界修复**：backend/vitest.config.js 此前未限定 include，默认全仓扫描会把 windows/macos 壳测试卷进 Cloudflare Workers 池（无法 require electron）——现限定 `tests/**/*.test.js`，三套件分列（545 + 34 + 47 = 626）。
 - **桌面壳 E2E 现状**：Windows 10 套件全绿（`backend/windows/e2e-results.json`）；macOS 9/10（transfer-red-xyz 因 VM 性能差 3 秒未赶上取码窗口，队长实机手动全链验证覆盖；`backend/macos/e2e-results.json`）。
 - **AppleDouble 清理**：mac 写 vmhgfs 共享产生的 84 个 `._*` 元数据文件曾混入 macos/tests 致根套件误加载——已删（.gitignore 已含 `._*` 规则）。
 
@@ -82,7 +90,7 @@ cd backend/macos   && npx vitest run   # 4 files / 47 tests passed（同前三 +
 - scripts/tool-latency.mjs——P3 工具调用延迟（3 轮 × 11 并发，P95=435ms）
 - scripts/s2b4p4-e2e.mjs——S2/B4/P4 执行一致与转账全链路（14 有效执行 + 2 篡改拒绝）
 
-四模型消融：MODEL_PROFILE 切换 GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3，同一套矩阵（vitest 463 + S1 24 + B1 50 + 注入 66）全部 100% 一致；消融中修复 5 处模型无关缺陷（4 项服务端预计算 + B1 最终卡判定）。证据：docs/benchmarks/（整理副本）与 for_developer/bench-results/20261006/（原始 53 份）。
+四模型消融：MODEL_PROFILE 切换 GLM-5.3-Flash / Qwen3.8-Flash / DeepSeek V4.1 / Kimi K3，同一套矩阵（vitest 463 + S1 24 + B1 50 + 注入 66）全部 100% 一致；消融中落地 5 项服务端预算字段（4 项服务端预计算 + B1 最终卡判定）。证据：docs/benchmarks/（整理副本）与 for_developer/bench-results/20261006/（原始 53 份）。
 
 2026-09-30（第五期 idle，v3.77）新增测试（377→384，两遍全绿）：
 - tests/integration/solution-package.test.js（7）——①solution_preview 确定性/整数守恒/期限风险上限（6M≤R2、36M 允许 R4）/应急场景零风险资产；②黄级两段式一键购买：默认卡扣减=总额、逐笔持仓=分配额、通知+审计；③幻觉产品 INVALID_PRODUCT 出卡前拦；④分配合计≠总额 INVALID_AMOUNT（服务端复算值入拒绝信息）；⑤PR1 用户含 R2 基金确认段 INVARIANT_PR_MISMATCH；⑥>¥1000 升红（确认段缺 OTP → OTP_REQUIRED）；⑦部分失败：已成交笔按成本 wealthRedeem 精确回退、成败笔数明确、余额/持仓归位

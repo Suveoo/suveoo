@@ -96,7 +96,7 @@ name = "EMAIL"
 CONSENT_GRANT_TTL_SECONDS = "120"
 INVARIANT_STRICT_MODE = "true"
 DEMO_MODE = "false"                 # 决赛演示环境置 true（开启故障注入/Baseline 开关）
-FIDO2_RP_ID = "suveoo.com"
+FIDO2_RP_ID = "suveoo.com"        # 预留给红级 passkey 路线图；当前 Web 黄级 WebAuthn 门不需要服务端 RP 配置
 FIDO2_ORIGIN = "https://suveoo.com"
 SENDER_NOREPLY = "noreply@suveoo.com"
 SENDER_SECURITY = "security@suveoo.com"
@@ -116,7 +116,7 @@ npx wrangler dev            # http://127.0.0.1:8787
 ```
 
 - 静态资源本地联调：`wrangler dev` 通过 R2 binding 读**线上桶**（remote binding）；或临时 `wrangler r2 object put` 上传 `frontend/`。前端改动后运行 `node scripts/deploy-frontend.mjs --local`（脚本内用 miniflare 本地桶，最终实现以脚本为准）。
-- MCP 联调：`npx wrangler dev` 后用 **MCP Inspector**（`npx @modelcontextprotocol/inspector`）连接 `http://127.0.0.1:8787/mcp`（Streamable HTTP），验证 `tools/list` 22 个工具与 elicitation 往返。
+- MCP 联调：`npx wrangler dev` 后用 **MCP Inspector**（`npx @modelcontextprotocol/inspector`）连接 `http://127.0.0.1:8787/mcp`（Streamable HTTP），验证 `tools/list` 63 个工具与 elicitation 往返。
 - Email 本地限制：`wrangler dev` 下 `send_email` 需 remote binding（`[[send_email]] name="EMAIL" remote=true` 仅本地调试段使用）；二进制附件本地模拟器不可序列化——验收以线上为准。
 - 单测：`npm test`（vitest，unit/integration/attack 全跑）。
 
@@ -225,19 +225,19 @@ npx wrangler tail suveoo-bank-main --format pretty                     # 实时�
 - [ ] 未知路径返回 404.html（HTTP 404）；`/` 跳转 `/home`
 - [ ] `www.suveoo.com` 301 → `suveoo.com`；`/downloads` 301 → `/download`
 - [ ] `/download` 200 且三平台卡（Android/Windows/macOS）渲染；`/dl/apk-manifest.json`、`/dl/windows-manifest.json`、`/dl/macos-manifest.json` 三件均 200（客户端验收细则见 §15/§16）
-- [ ] MCP Inspector 连 `https://suveoo.com/mcp`：initialize + tools/list（22 个）成功
+- [ ] MCP Inspector 连 `https://suveoo.com/mcp`：initialize + tools/list（63 个）成功
 - [ ] 注册开户：收到验证码邮件；开户后 4 借记 + 1 信用卡、总余额 ∈ [999,328.24, 1,124,549.38]
 - [ ] 黄级转账：确认卡倒计时 + grant_hash 显示；红级：OTP 邮件可达
 
 ## 15. Windows 客户端（Suveoo for Windows，Electron 44）
 
-源码 `backend/windows/`；构建与发布一键化：`npm run release`（`--dry` 只构建不上传）。
+源码 `backend/windows/`；构建与发布一键化：`npm run release`（`--dry` 只构建不上传；`--no-upload` 构建并写 manifest、不上传）。
 
 ### 15.1 首次环境
 `npm install`（.npmrc 已配 npmmirror，electron 二进制走镜像）→ `npm install-scripts approve electron && npm rebuild electron`（npm 新版安全机制放行 postinstall）→ `python scripts/make-ico.py`（需 Pillow，生成 build/icon.ico）。
 
 ### 15.2 构建（三段式，绕开 winCodeSign 符号链接坑）
-① `npx electron-builder --win dir` 解包 → ② 用 winCodeSign 缓存内的 rcedit-x64.exe 给 `dist/win-unpacked/Suveoo.exe` 打图标与版本元数据（ProductName=Suveoo、file/product-version）→ ③ `npx electron-builder --win nsis portable --prepackaged dist/win-unpacked` 出安装包+便携版（`release.mjs` 已封装全流程并自动定位 rcedit）。产物约 136 MB（extraResources 裁剪 cards-front 源图 + .mimosa）。
+① `npx electron-builder --win dir` 解包 → ② 用 winCodeSign 缓存内的 rcedit-x64.exe 给 `dist/win-unpacked/Suveoo.exe` 打图标与版本元数据（ProductName=Suveoo、file/product-version）→ ③ `npx electron-builder --win nsis portable --prepackaged dist/win-unpacked` 出安装包+便携版（`release.mjs` 已封装全流程并自动定位 rcedit）。产物约 136.2 MB（extraResources 裁剪 cards-front 源图、.mimosa 与 docs PDF）。
 
 坑位备忘：非管理员无符号链接特权致 winCodeSign 缓存解包必败——正解是构建配置关掉签改可执行文件 + 手动 rcedit（剥归档/Developer Mode 均偏方）；npx 在 Windows 须经 shell；asar 内不可写（运行时日志写 userData）；混合显卡本机默认禁 GPU（崩溃根治）。
 
@@ -248,7 +248,7 @@ npx wrangler tail suveoo-bank-main --format pretty                     # 实时�
 Worker 壳源白名单已含 Windows 壳 origin `suveoo-app://local`；`/download` 页读 windows-manifest 渲染 Windows 卡片。
 
 ### 15.5 测试
-`npm test`（vitest 29+：更新决策/URL 白名单/导航分类/IPC schema）｜`npx electron . --smoke`（78 路由冒烟）｜`--shot=<url> --size=WxH --out` 排版截图｜`--e2e=<suite>` 实机 E2E（demo-login / transfer-yellow / transfer-red-xyz / i18n-switch / external-browser / offline-resilience / tray-persist / deeplink / update-ask / update-force）。OTP 套件取码：browser-use 驱动 IAB Gmail 读码写入 `e2e-otp.txt`；账户凭据经 `e2e-creds.json` 注入（gitignore）。
+`npm test`（vitest 34：更新决策/URL 白名单/导航分类/IPC schema）｜`npx electron . --smoke`（78 路由冒烟）｜`--shot=<url> --size=WxH --out` 排版截图｜`--e2e=<suite>` 实机 E2E（demo-login / transfer-yellow / transfer-red-xyz / i18n-switch / external-browser / offline-resilience / tray-persist / deeplink / update-ask / update-force）。OTP 套件取码：browser-use 驱动 IAB Gmail 读码写入 `e2e-otp.txt`；账户凭据经 `e2e-creds.json` 注入（gitignore）。
 - [ ] 商户备注注入样本 → Trust Console 显示 `TAINT BLOCKED`
 - [ ] 重复提交同一转账 → `REPLAY BLOCKED` 且返回原结果
 - [ ] GA4 实时收到 page_view（接受全部后）
@@ -262,10 +262,10 @@ Worker 壳源白名单已含 Windows 壳 origin `suveoo-app://local`；`/downloa
 `npm install`（.npmrc 已配 npmmirror，electron 二进制走镜像）→ `bash scripts/make-icns.sh`（favicon-1024 → iconset → `iconutil -c icns`，纯系统工具）。Electron postinstall 若被 npm 安全机制拦截：`npm install-scripts approve electron && npm rebuild electron`。
 
 ### 16.2 构建（三段式，mac 版；**3.183.2 起为 Universal 双架构**）
-① `npx electron-builder --mac dir --universal` 解包（**输出目录 `dist/mac-universal/`**，非旧 x64 流程的 `dist/mac/`——release.mjs 已内置两目录的构建前清理，防旧残留骗过检查）→ ② `codesign --force --deep -s - dist/mac-universal/Suveoo.app` **ad-hoc 签名** + `codesign --verify` 自验 + **`lipo -archs` 双片断言**（必须同时含 x86_64 与 arm64，缺片即中止——3.183.2 首构建曾拦截旧 x64 残留冒充事件）（electron-builder 25 对 `mac.identity:"-"` 会误查证书名而跳过签名——ad-hoc 必须手动做，发布脚本已封装且签名失败即中止）→ ③ `npx electron-builder --mac dmg zip --prepackaged dist/mac-universal --universal` 出 DMG（拖装）+ zip（脚本党）。产物约 250 MB（extraResources 裁剪同 Windows：cards-front 源图 + .mimosa）。**arm64 切片在 Intel 构建机上无法运行实测**（壳为纯 Electron+JS 零原生模块 + Electron 官方双架构预编译产物，风险低。
+① `npx electron-builder --mac dir --universal` 解包（**输出目录 `dist/mac-universal/`**，非旧 x64 流程的 `dist/mac/`——release.mjs 已内置两目录的构建前清理）→ ② `codesign --force --deep -s - dist/mac-universal/Suveoo.app` **ad-hoc 签名** + `codesign --verify` 自验 + **`lipo -archs` 双片断言**（必须同时含 x86_64 与 arm64，缺片即中止；electron-builder 25 对 `mac.identity:"-"` 会误查证书名而跳过签名，ad-hoc 必须手动做，发布脚本已封装且签名失败即中止）→ ③ `npx electron-builder --mac dmg zip --prepackaged dist/mac-universal --universal` 出 DMG（拖装）+ zip（脚本党）。**3.188.0** 产物约 250.0 MB / zip 243.1 MB（extraResources 裁剪同 Windows：cards-front 源图、.mimosa 与 docs PDF）。**arm64 切片在 Intel 构建机上无法运行实测**（壳为纯 Electron+JS 零原生模块 + Electron 官方双架构预编译产物，风险低）。
 
 ### 16.3 发布（R2 铁律 --remote）
-`node scripts/release.mjs`：三段构建 → sha256 → 上传 DMG/zip → 更新 `/dl/macos-manifest.json`（字段 versionName/version/versionCode/minVersionCode/url(DMG)/sha256/sizeBytes/zipUrl/zipSha256；`--no-upload`＝协作模式：VM 构建后工件经共享目录由宿主机上传（VM 直传大文件不稳的既定对策）；versionCode=major×1e6+minor×1e3+patch，3.183.0=3183000）。**强制更新**＝minVersionCode 抬线；回滚＝manifest 改回旧值。客户端「安装」＝`shell.openPath(DMG)` 挂载后拖入 Applications（与 Android 唤起系统安装器同语义）。
+`node scripts/release.mjs`：三段构建 → sha256 → 上传 DMG/zip → 更新 `/dl/macos-manifest.json`（字段 versionName/version/versionCode/minVersionCode/url(DMG)/sha256/sizeBytes/zipUrl/zipSha256；`--no-upload`＝协作模式：VM 构建后工件经共享目录由宿主机上传；versionCode=major×1e6+minor×1e3+patch，3.188.0=3188000）。**强制更新**＝minVersionCode 抬线；回滚＝manifest 改回旧值。客户端「安装」＝`shell.openPath(DMG)` 挂载后拖入 Applications（与 Android 唤起系统安装器同语义）。
 
 ### 16.4 服务端配套（一次性）
 Worker 壳源白名单 `SHELL_ORIGINS` 已含 `suveoo-app://local`（与 Windows 壳同 origin，零服务端改动）；`/download` 页读 macos-manifest 渲染 macOS 卡片（前端 mac 卡要求 manifest 含非空 sha256 才显示）。
@@ -274,4 +274,4 @@ Worker 壳源白名单 `SHELL_ORIGINS` 已含 `suveoo-app://local`（与 Windows
 无 Apple 开发者账号 → ad-hoc 签名 + 不公证：用户首次打开若提示「无法验证开发者/已损坏」，右键 Suveoo →「打开」，或 `xattr -d com.apple.quarantine /Applications/Suveoo.app`。/download 页与 i18n `dl.macNote` 已写明。
 
 ### 16.6 测试
-`npm test`（vitest 42：29 继承 + mac 平台 13——返回键映射/DMG 候选/深链归一）｜`npx electron . --smoke`（78 路由冒烟，打包态自动写 userData）｜`--shot=<url> --size=WxH --out` 排版截图（打包态自动改落 userData——Windows 轮遗留项的 mac 正解）｜`--e2e=<suite>` 实机 E2E（同 Windows 十套件）｜`scripts/probe-m2.js --stage=bio|notify|ext|upd` 功能探针（不进打包产物）。深链：开发态用 argv（冷启）/二实例 argv（热启）；`open "suveoo://…"`（LaunchServices/open-url 事件）仅打包态可用。
+`npm test`（vitest 47：IPC/导航/更新/动态路由 + mac 平台——返回键映射/DMG 候选/深链归一）｜`npx electron . --smoke`（78 路由冒烟，打包态自动写 userData）｜`--shot=<url> --size=WxH --out` 排版截图（打包态自动改落 userData）｜`--e2e=<suite>` 实机 E2E（同 Windows 十套件）｜`scripts/probe-m2.js --stage=bio|notify|ext|upd` 功能探针（不进打包产物）。深链：开发态用 argv（冷启）/二实例 argv（热启）；`open "suveoo://…"`（LaunchServices/open-url 事件）仅打包态可用。

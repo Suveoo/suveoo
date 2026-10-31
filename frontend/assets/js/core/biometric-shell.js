@@ -139,8 +139,10 @@
       if (j && j.token) {
         localStorage.setItem("suveoo_token", j.token);
         try { localStorage.setItem("suveoo_login_hint", creds.email); } catch { /* 隐私模式忽略 */ }
-        const next = new URLSearchParams(location.search).get("next");
-        location.replace(next || "/home"); /* 页面替换即卸载 proc，无需 close */
+        const nextRaw = new URLSearchParams(location.search).get("next");
+        /* P3-15：壳内同样只允许站内路径（//host、绝对 URL、伪协议一律回落 /home） */
+        const next = typeof nextRaw === "string" && nextRaw.startsWith("/") && !nextRaw.startsWith("//") && !nextRaw.startsWith("/\\") ? nextRaw : "/home";
+        location.replace(next); /* 页面替换即卸载 proc，无需 close */
         return true;
       }
       if (j && j.mfa_required) {

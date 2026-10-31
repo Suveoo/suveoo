@@ -5,7 +5,7 @@
 
 <div align="center">
 
-![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1531%20keys%20%C3%97%203%20langs-inactive) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
+![Tools](https://img.shields.io/badge/AI%20tools-63%20%28MCP%29-blue) ![Pages](https://img.shields.io/badge/pages-76%20%2B%2062%20controllers-orange) ![i18n](https://img.shields.io/badge/i18n-1606%20keys%20%C3%97%204%20locales) ![Platform](https://img.shields.io/badge/platform-Web%20%2B%20PWA%20%2B%20Android%20%2B%20Windows%20%2B%20macOS-informational) ![Edge](https://img.shields.io/badge/runtime-Cloudflare%20Worker%20%2B%20KV%20%2B%20DO%20%2B%20R2-orange)
 
 </div>
 
@@ -45,9 +45,9 @@ Suveoo 采用现代化 Web 与云原生技术栈，结合 Cloudflare 边缘计�
 
 **Suveoo AI 的解决方案及核心技术**：任何提议必须编译为类型化的 **BankAction IR**，并通过 **Suveoo Verification Runtime** 五道确定性验证，获得 VERIFIED 判定之后才被允许触达账本。更换底层模型，授权、合规与审计规则一行不改，把概率性智能与确定性金融授权彻底分离。
 
-**Suveoo AI 为什么可信**：确定性自动化测试 544 条全绿（Worker 域 463 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#5-suveoo-ai-测试与评测体系)）。
+**Suveoo AI 为什么可信**：确定性自动化测试 626 条全绿（Worker 域 545 + Windows/macOS 双壳 81）；安全与准确率指标在生产环境实测 228/228 通过，含拦截类 106 用例、准确率类 122 用例；提示注入七族变体 66 断言、授权伪造与越权 37 断言、数值幻觉 24 用例、意图分级 50 变体，全部在生产环境实测通过；四模型（GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V4.1 Flash、Kimi K3）消融实验在全部核心指标上 100% 一致，这佐证了 Suveoo AI 的安全能力由 Suveoo Verification Runtime 架构保证，与底层 LLM 完全无关（详见[测试与评测体系](#5-suveoo-ai-测试与评测体系)）。
 
-**三色分级、官方场景全覆盖**：自然语言编译为 BankAction IR，规则引擎确定性三色分级：绿自动执行、黄确认卡（grant 哈希绑定参数）、红邮箱 OTP；63 个工具同走五道验证，六大场景全覆盖，四模型 100% 一致。
+**三色分级、官方场景全覆盖**：自然语言编译为 BankAction IR，规则引擎确定性三色分级：绿自动执行、黄确认卡（grant 哈希绑定参数）、红级短信/邮箱 OTP；63 个工具同走五道验证，六大场景全覆盖，四模型 100% 一致。
 
 ## 3. Suveoo AI 安全内核：BankAction IR 与 Suveoo Verification Runtime
 
@@ -103,7 +103,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 1. **三通道同规**：REST 表单、AI 对话、MCP 工具调用——殊途同归到同一个 `compileToIR() → verify() → executeIntent()`，一套验证逻辑通吃。
 2. **Verified GenUI**：确认卡上渲染的金额/收款人/费用**只来自已验证的 IR 快照**（`issuer === "verified_ir"`），"界面显示 ¥500、后端转 ¥5000"从架构上被堵死。13 个验证组件覆盖全部写操作形态。
-3. **红级强验证**：短信 + 邮箱双通道 OTP、生物识别（Android）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
+3. **红级强验证**：短信 + 邮箱双通道 OTP（一次性消费）、生物识别（Android BiometricPrompt / Windows Hello / Touch ID；Web 黄级另有 WebAuthn 本机门）、会话纪元全设备下线、异常熔断（连错锁定、查询不受影响）。
 4. **全程审计**：每笔写操作 `user_audit` 五字段落库 + Trust Console 实时五盏灯（评委可在演示里亲眼看 POLICY → CONSENT → PROVENANCE → INVARIANTS → REPLAY 逐门亮起）。
 
 ![Process and Technical Architecture](docs/images/readme/process-and-technical-architecture.svg)
@@ -143,7 +143,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 > 案例中人物与场景均经虚构处理，未涉及任何团队及他人的隐私
 
-7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——检查点落库、`T1 锁定 → T2 商户下单 → C1 解锁补偿`（Suveoo AI 页 / 长程任务中心页（[/ai/tasks](https://suveoo.com/ai/tasks)）**现场故障注入按钮**用于模拟商户履约失败）。
+7. **长程任务 + Saga 补偿**："我爱人生日当月锁 ¥1,000，生日前 2 天订花"——`scheduled_purchase` 同样支持任意收礼人/品类/场景（生日、纪念日、节日、餐饮、门票等），检查点落库、`T1 锁定 → T2 商户履约 → C1 解锁补偿`（Suveoo AI 页 / 长程任务中心页（[/ai/tasks](https://suveoo.com/ai/tasks)）**现场故障注入按钮**用于模拟商户履约失败）。
 
 ![Saga Trust Console](docs/images/readme/saga-trust-console.webp)
 
@@ -155,7 +155,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 测试分三层，全部可复现、证据落盘：
 
-1. **确定性自动化**：vitest + @cloudflare/vitest-pool-workers，**63 文件 463 用例全绿**（unit 24 / integration 33 / attack 6）。攻击套件覆盖注入（两代）、越权、确认后篡改、重放、授权伪造五类。
+1. **确定性自动化**：vitest + @cloudflare/vitest-pool-workers，**78 文件 545 用例全绿**（unit 26 / integration 45 / attack 7）。攻击套件覆盖注入（两代）、越权、确认后篡改、重放、授权伪造五类。
 2. **客户端壳套件**：Windows 34 用例 + macOS 47 用例（各自独立 vitest 配置；含 IPC schema / 导航守卫 / 更新决策 / 动态路由重写），打包态全路由冒烟 78/78 × 双壳，实机 E2E（Windows 10 套件全绿；macOS 9/10 + 队长实机手动全链验证）。
 3. **生产黑盒评测**：Node 脚本直连生产 Worker（真实登录 + 2FA），准确率类 **122 用例**、拦截类 **106 断言**，2026-10-06 全部通过。
 4. **四模型消融（Ablation）**：同一套用例在 4 个 LLM 上完整重跑，证明结果与模型无关。
@@ -324,7 +324,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 
 延迟是唯一随模型变化的维度——这恰是消融实验的价值：**正确性指标 100% 一致，性能指标呈现模型差异**（DeepSeek V4.1 TTFT 快 3.5 倍且首跑即双满分；Qwen3.8 快 2.1 倍；Kimi K3 因 thinking 常开最慢但正确率不受影响）。运行时按业务需要切换模型，安全与准确率不动。
 
-**工程附注（消融过程中修复的 5 处模型无关缺陷）**：为抹平模型间表述差异，我们把 4 项聚合计算下沉到服务端预计算（`wealth_holdings_query` 的 `total_principal/total_value`、`contacts_search` 的 `total_payees`、`subscription_scan` 的 `next_charge`），并将 B1 判定改为取最终确认卡。这些修复让"任何模型都能答对"从偶然变为架构必然——正是 Runtime 思路的又一次验证。
+**工程附注（消融中的五项服务端预算字段）**：为抹平模型间表述差异，我们把聚合计算下沉到服务端预计算（`wealth_holdings_query` 的 `total_principal/total_value`、`contacts_search` 的 `total_payees`、`subscription_scan` 的 `next_charge` 等），并将 B1 判定改为取最终确认卡。预算字段让"任何模型都能答对"从偶然变为架构必然——正是 Runtime 思路的又一次验证。
 
 | 消融产物 | 路径 |
 |---|---|
@@ -334,7 +334,7 @@ IR（Intermediate Representation，中间表示）源自编译器领域，编译
 | S1 四模型全量文本 | [`docs/benchmarks/business/s1-*-full.json`](./docs/benchmarks/business/)（4 份） |
 | B1 四模型全量文本 | [`docs/benchmarks/business/b1-*-full.json`](./docs/benchmarks/business/)（4 份） |
 
-> 看板呈现：`/ai/benchmark`（SuveooBench，12 指标 + 四模型消融对比，数据源 `frontend/assets/data/benchmark.json`）。完整测试方案：[`for_developer/testing_20261002.md`](./for_developer/testing_20261002.md)（v1.1）。
+> 看板呈现：`/ai/benchmark`（SuveooBench v2，九项实测指标 + 四模型消融矩阵，数据源 `frontend/assets/data/benchmark.json`）。完整测试方案：[`for_developer/testing_20261002.md`](./for_developer/testing_20261002.md)（v1.1）。
 
 ## 6. 快速开始
 
@@ -346,13 +346,13 @@ npx wrangler dev        # 本地起 Worker + DO + KV + R2 模拟
 npx wrangler deploy     # 部署（需 wrangler login + Cloudflare 账号）
 ```
 
-**Web**：[suveoo.com](https://suveoo.com)，全平台兼容。零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1551 键恒等**、SEO 三方友善。
+**Web**：[suveoo.com](https://suveoo.com)，全平台兼容。零构建 MPA（76 页 / 62 控制器）、PWA 离线兜底、三语 i18n **1,606 键恒等**、SEO 三方友善。
 
-**Suveoo for Android**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。本地资产秒载、生物识别四场景、后台原生通知服务、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；站内链接 100% App 内原生打开 + 站外链接内嵌浏览器；无 GMS 设备可用。
+**Suveoo for Android**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。**3.188.0 / versionCode 82**，APK 35.3 MB（技术文档/安全自评 PDF 不内置）；本地资产秒载、生物识别四场景、后台原生通知服务、三级自动更新（含强制阻断层）、返回手势 31 场景全接管；站内链接 100% App 内原生打开 + 站外链接内嵌浏览器；无 GMS 设备可用。
 
-**Suveoo for Windows**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。Electron 44，安装版/便携版 136 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`。
+**Suveoo for Windows**：[suveoo.com/download](https://suveoo.com/download) 提供安装包下载。Electron 44，**3.188.0 / vc3188000**，安装版 136.2 MB / 便携版 136.0 MB，三级自动更新 + Windows Hello 生物识别 + 系统 Toast 通知；客户端源码在 `backend/windows/`。
 
-**Suveoo for macOS**：[suveoo.com/download](https://suveoo.com/download) Electron 44 双壳同源；**Universal 双架构包**——Intel 与 Apple Silicon 通用，DMG/zip 250 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动。
+**Suveoo for macOS**：[suveoo.com/download](https://suveoo.com/download) Electron 44 双壳同源；**3.188.0 / vc3188000**，**Universal 双架构包**——Intel 与 Apple Silicon 通用，DMG 250.0 MB / zip 243.1 MB，三级自动更新 + Touch ID 生物识别（无传感器自动回落）+ 通知中心与 dock 角标，ad-hoc 签名免公证分发；客户端源码在 `backend/macos/`，与 Windows 壳同 origin 零服务端改动。
 
 完整部署手册：[DEPLOYMENT.md](./DEPLOYMENT.md)（环境变量、密钥、域名、R2、Cron、APK 构建、Windows/macOS 客户端构建与发布）。
 
@@ -363,11 +363,11 @@ suveoo/
 ├── .github/
 │   └── workflows/
 ├── backend/
-│   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（~9740 行）
+│   ├── worker-main.js          # 单文件 Worker：IR 编译 + 五道验证 + 63 工具 + DO + 邮件 + …（10,191 行）
 │   ├── android/                # Capacitor 壳（Java：目录路由/生物识别/通知服务/内嵌浏览器/更新）
 │   ├── windows/                # Electron 壳（suveoo-app 协议/Capacitor 兼容 shim/三级更新/Hello/Toast/E2E 驱动器）
 │   ├── macos/                  # Electron 壳（Windows 壳同源 + Touch ID/DMG 更新/open-url 深链/通知中心/dock 角标/mac 菜单）
-│   ├── tests/                  # 463 用例（unit 24 / integration 33 / attack 6）
+│   ├── tests/                  # 545 用例（unit 26 / integration 45 / attack 7）
 │   └── scripts/                # 部署/APK 构建/评测脚本（ai-hallucination / b1-intent-matrix / ai-bench / tool-latency / s2b4p4-e2e）
 ├── frontend/                   # 零构建 MPA：76 页 / 62 控制器 / 10 计算器 / 三语 i18n / PWA
 ├── docs/

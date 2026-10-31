@@ -25,7 +25,7 @@ describe("② Consent Binding：创建", () => {
     const g = await createConsentGrant(kv, ir, { ttlSeconds: 120, now: NOW });
 
     expect(g.grant_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(g.snapshot).toEqual({ action: "transfer_execute", params: { recipient: "U88111", amount: "500", currency: "CNY" } });
+    expect(g.snapshot).toEqual({ action: "transfer_execute", params: { recipient: "U88111", amount: "500", currency: "CNY", from_card: null } });
     expect(g.expires_at).toBe(new Date(NOW + 120_000).toISOString());
     expect(kv.map.has(`grant:U19382:${g.grant_hash}`)).toBe(true);
   });

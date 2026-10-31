@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // backend/windows
 const BACKEND = path.resolve(ROOT, "..");                                // backend（wrangler.toml 所在）
 const DRY = process.argv.includes("--dry");
+const NOUPLOAD = process.argv.includes("--no-upload"); /* 协作/自管上传档位：构建+manifest，不上传 */
 const NOTES_ARG = (process.argv.find((a) => a.startsWith("--notes=")) || "").slice(8) || null;
 
 const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
@@ -78,12 +79,14 @@ const mb = (f) => (statSync(f).size / 1048576).toFixed(1);
 log(`setup    ${mb(setup)} MB  sha256=${shaSetup.slice(0, 16)}…`);
 log(`portable ${mb(portable)} MB  sha256=${shaPortable.slice(0, 16)}…`);
 
-if (DRY) { log("--dry：跳过上传，产物在 dist/"); process.exit(0); }
+if (DRY) { log("--dry：跳过上传与 manifest，产物在 dist/"); process.exit(0); }
 
-// ④ 上传安装包到 R2（必带 --remote）
-for (const f of [setup, portable]) {
-  log(`upload r2 dl/${path.basename(f)}`);
-  run("npx", ["wrangler", "r2", "object", "put", `suveoo-bank-r2/dl/${path.basename(f)}`, "--remote", "--file", f], { cwd: BACKEND });
+// ④ 上传安装包到 R2（必带 --remote）；--no-upload 协作模式跳过
+if (!NOUPLOAD) {
+  for (const f of [setup, portable]) {
+    log(`upload r2 dl/${path.basename(f)}`);
+    run("npx", ["wrangler", "r2", "object", "put", `suveoo-bank-r2/dl/${path.basename(f)}`, "--remote", "--file", f], { cwd: BACKEND });
+  }
 }
 
 // ⑤ manifest 更新（保留线上 minVersionCode——强制线是服务端独立决策）
@@ -107,7 +110,11 @@ const manifest = {
 };
 const mf = path.join(ROOT, "dist", "windows-manifest.json");
 writeFileSync(mf, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-log("upload r2 dl/windows-manifest.json");
-run("npx", ["wrangler", "r2", "object", "put", "suveoo-bank-r2/dl/windows-manifest.json", "--remote", "--content-type", "application/json", "--file", mf], { cwd: BACKEND });
+if (NOUPLOAD) {
+  log(`--no-upload：manifest 已写 ${mf}；setup/portable/manifest 三件待宿主机上传`);
+} else {
+  log("upload r2 dl/windows-manifest.json");
+  run("npx", ["wrangler", "r2", "object", "put", "suveoo-bank-r2/dl/windows-manifest.json", "--remote", "--content-type", "application/json", "--file", mf], { cwd: BACKEND });
+}
 
 log(`DONE ${V} → https://suveoo.com/dl/suveoo-setup-${V}.exe ｜ manifest vc${manifest.versionCode}`);
